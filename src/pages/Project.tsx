@@ -241,7 +241,7 @@ const Project = () => {
     // Mettre à jour dans le Map
     setHrResources(prev => new Map(prev).set(updatedResource.id, updatedResource));
 
-    // Mettre à jour le nœud correspondant
+      // Mettre à jour le nœud correspondant avec le prix calculé
     setNodes(nds =>
       nds.map(node => {
         if (node.id === updatedResource.id) {
@@ -256,9 +256,10 @@ const Project = () => {
               languageNames: updatedResource.languageNames,
               expertiseNames: updatedResource.expertiseNames,
             },
+            selected: true // Garder le nœud sélectionné pour montrer la mise à jour
           };
         }
-        return node;
+        return { ...node, selected: false };
       })
     );
 
@@ -339,6 +340,20 @@ const Project = () => {
 
   const saveFlow = async () => {
     if (!id) return;
+    
+    // Vérifier l'authentification de l'utilisateur admin
+    const { user } = useAuth();
+    if (!user) {
+      console.error('User not authenticated');
+      toast({
+        title: "Erreur d'authentification",
+        description: "Vous devez être connecté pour sauvegarder.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Saving with user:', user.id, 'project:', id);
     
     setIsSaving(true);
     try {
