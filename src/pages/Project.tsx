@@ -374,13 +374,18 @@ const Project = () => {
       });
 
       if (resourceAssignments.length > 0) {
+        console.log('Saving resource assignments:', resourceAssignments);
+        
         const { error: resourceError } = await supabase
           .from('hr_resource_assignments')
           .upsert(resourceAssignments, {
             onConflict: 'id'
           });
 
-        if (resourceError) throw resourceError;
+        if (resourceError) {
+          console.error('Resource save error:', resourceError);
+          throw resourceError;
+        }
       }
 
       toast({

@@ -268,9 +268,9 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
             {languages
               .filter(lang => !selectedLanguages.includes(lang.id))
               .map(language => (
-                <SelectItem key={language.id} value={language.id}>
-                  {language.name} (+{language.cost_percentage}%)
-                </SelectItem>
+                 <SelectItem key={language.id} value={language.id}>
+                   {language.name}
+                 </SelectItem>
               ))}
           </SelectContent>
         </Select>
@@ -278,8 +278,8 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
           {selectedLanguages.map(langId => {
             const language = languages.find(l => l.id === langId);
             return language ? (
-              <Badge key={langId} variant="secondary" className="flex items-center gap-1">
-                {language.name} (+{language.cost_percentage}%)
+               <Badge key={langId} variant="secondary" className="flex items-center gap-1">
+                 {language.name}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -305,9 +305,9 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
             {expertises
               .filter(exp => !selectedExpertises.includes(exp.id))
               .map(expertise => (
-                <SelectItem key={expertise.id} value={expertise.id}>
-                  {expertise.name} (+{expertise.cost_percentage}%)
-                </SelectItem>
+                 <SelectItem key={expertise.id} value={expertise.id}>
+                   {expertise.name}
+                 </SelectItem>
               ))}
           </SelectContent>
         </Select>
@@ -315,8 +315,8 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
           {selectedExpertises.map(expId => {
             const expertise = expertises.find(e => e.id === expId);
             return expertise ? (
-              <Badge key={expId} variant="outline" className="flex items-center gap-1">
-                {expertise.name} (+{expertise.cost_percentage}%)
+               <Badge key={expId} variant="outline" className="flex items-center gap-1">
+                 {expertise.name}
                 <Button
                   variant="ghost"
                   size="sm"
