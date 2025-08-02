@@ -356,23 +356,47 @@ const Project = () => {
   }, []);
 
   const handleGraphGenerated = useCallback((newNodes: Node[], newEdges: Edge[]) => {
-    // Validate positions for all new nodes
-    const validatedNodes = newNodes.map(node => ({
-      ...node,
-      position: ensureValidPosition(node.position)
-    }));
+    // Process nodes and create proper HRResource objects
+    const processedNodes = newNodes.map(node => {
+      const validatedNode = {
+        ...node,
+        position: ensureValidPosition(node.position)
+      };
+
+      // Create HRResource from the node data
+      if (validatedNode.data?.hrResource) {
+        const hrResourceData = validatedNode.data.hrResource as any;
+        const newResource: HRResource = {
+          id: hrResourceData.id || crypto.randomUUID(),
+          profile_id: hrResourceData.profileId || '',
+          seniority: hrResourceData.seniority || 'junior',
+          languages: hrResourceData.languages || [],
+          expertises: hrResourceData.expertises || [],
+          calculated_price: hrResourceData.calculatedPrice || 50
+        };
+
+        // Add to resources map
+        setHrResources(prev => new Map(prev).set(newResource.id, newResource));
+
+        // Update node data for display
+        validatedNode.data = {
+          id: newResource.id,
+          profileName: hrResourceData.profile?.name || 'Profil inconnu',
+          seniority: newResource.seniority,
+          languages: newResource.languages,
+          expertises: newResource.expertises,
+          calculatedPrice: newResource.calculated_price,
+          selected: false,
+        };
+        validatedNode.id = newResource.id;
+      }
+
+      return validatedNode;
+    });
 
     // Add generated nodes to existing ones
-    setNodes(currentNodes => [...currentNodes, ...validatedNodes]);
+    setNodes(currentNodes => [...currentNodes, ...processedNodes]);
     setEdges(currentEdges => [...currentEdges, ...newEdges]);
-    
-    // Add generated resources to the resources map
-    validatedNodes.forEach(node => {
-      if (node.data?.resource && typeof node.data.resource === 'object' && 'id' in node.data.resource) {
-        const resource = node.data.resource as HRResource;
-        setHrResources(prev => new Map(prev).set(resource.id, resource));
-      }
-    });
   }, [setNodes, setEdges]);
 
   const saveFlow = async () => {

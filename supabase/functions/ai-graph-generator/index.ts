@@ -59,17 +59,17 @@ serve(async (req) => {
         content: `Tu es un assistant IA spécialisé dans la création d'équipes de projets avec des ressources humaines.
 
 Ton rôle est de :
-1. Comprendre les demandes de projets
-2. Poser 1-2 questions de clarification si nécessaire  
-3. Générer un graphe d'équipe avec les bonnes ressources HR
+1. Analyser le projet décrit par l'utilisateur
+2. Proposer une équipe adaptée en JUSTIFIANT VOS CHOIX de séniorité
+3. Expliquer pourquoi chaque niveau de séniorité est approprié pour chaque rôle
 
 PROFILS HR DISPONIBLES :
 ${profilesText}
 
 NIVEAUX DE SÉNIORITÉ :
-- junior (multiplicateur x1)
-- intermediate (multiplicateur x1.5) 
-- senior (multiplicateur x2)
+- junior : pour des tâches standards, bien définies, avec supervision
+- intermediate : pour des tâches complexes nécessitant de l'autonomie  
+- senior : pour des tâches critiques, leadership, architecture, expertise pointue
 
 LANGUES DISPONIBLES (bonus) :
 ${languagesText}
@@ -77,25 +77,28 @@ ${languagesText}
 EXPERTISES DISPONIBLES (bonus) :
 ${expertisesText}
 
-IMPORTANT : Pour générer une équipe, tu DOIS répondre avec un JSON au format suivant :
+INSTRUCTIONS IMPORTANTES :
+1. NE JAMAIS mentionner les prix dans votre réponse textuelle
+2. TOUJOURS justifier vos choix de séniorité avec des arguments pertinents
+3. Expliquer comment l'équipe va fonctionner ensemble
+4. Utiliser UNIQUEMENT les profils disponibles dans la base de données
+
+Exemple de justification :
+"Pour ce projet e-commerce, j'ai choisi :
+- Un chef de projet SENIOR car la coordination de multiples équipes et la gestion des délais serrés nécessitent une forte expérience
+- Un développeur JUNIOR pour l'intégration frontend car les technologies sont standards et bien documentées
+- Un designer INTERMEDIATE pour l'UX car l'interface utilisateur est critique pour les conversions"
+
+Pour générer une équipe, inclure un JSON à la fin de votre réponse :
 {
   "type": "graph_generation",
   "nodes": [
     {
       "id": "node-1",
-      "type": "hrResource", 
-      "position": { "x": 200, "y": 100 },
-      "data": {
-        "id": "resource-1",
-        "profileId": "[ID du profil depuis la base]",
-        "profileName": "[Nom du profil]",
-        "seniority": "junior|intermediate|senior",
-        "languages": ["[IDs des langues]"],
-        "expertises": ["[IDs des expertises]"],
-        "calculatedPrice": [prix calculé avec formule],
-        "languageNames": ["[Noms des langues]"],
-        "expertiseNames": ["[Noms des expertises]"]
-      }
+      "profile_id": "[ID du profil depuis la base]",
+      "seniority": "junior|intermediate|senior",
+      "languages": ["[IDs des langues]"],
+      "expertises": ["[IDs des expertises]"]
     }
   ],
   "edges": [
@@ -103,13 +106,7 @@ IMPORTANT : Pour générer une équipe, tu DOIS répondre avec un JSON au format
   ]
 }
 
-FORMULE DE CALCUL DU PRIX :
-Prix final = (prix_base × multiplicateur_séniorité) × (1 + somme_bonus_langues/100 + somme_bonus_expertises/100)
-
-Exemples d'équipes :
-- Site WordPress → Chef projet + Designer + Développeur (avec expertise WordPress)
-- E-commerce → Chef projet senior + Designer + Développeur full-stack (avec expertise E-commerce)
-- Comptabilité → Expert comptable + Assistant (avec expertise Comptabilité fiscale)`
+Répondez en français et justifiez chaque choix de séniorité.`
       },
       ...conversationHistory,
       { role: 'user', content: message }
@@ -145,25 +142,29 @@ Exemples d'équipes :
         const parsed = JSON.parse(jsonStr);
         if (parsed.type === 'graph_generation') {
           // Transform AI nodes to proper ReactFlow nodes with HRResource data
-          const transformedNodes = parsed.nodes.map((node: any, index: number) => ({
-            id: node.id || `node-${Date.now()}-${index}`,
-            type: 'hrResource',
-            position: node.position || { 
-              x: 200 + (index % 3) * 250, 
-              y: 100 + Math.floor(index / 3) * 200 
-            },
-            data: {
-              id: node.data?.id || `resource-${Date.now()}-${index}`,
-              profileId: node.data?.profileId || '',
-              profileName: node.data?.profileName || 'Profil inconnu',
-              seniority: node.data?.seniority || 'junior',
-              languages: node.data?.languages || [],
-              expertises: node.data?.expertises || [],
-              calculatedPrice: node.data?.calculatedPrice || 50,
-              languageNames: node.data?.languageNames || [],
-              expertiseNames: node.data?.expertiseNames || []
+          const transformedNodes = parsed.nodes.map((node: any, index: number) => {
+            const profile = profiles.find(p => p.id === node.profile_id);
+            
+            return {
+              id: `node-${Date.now()}-${index}`,
+              type: 'hrResource',
+              position: { 
+                x: 200 + (index % 3) * 250, 
+                y: 100 + Math.floor(index / 3) * 200 
+              },
+              data: {
+                hrResource: {
+                  id: `resource-${Date.now()}-${index}`,
+                  profileId: node.profile_id,
+                  profile: profile,
+                  seniority: node.seniority || 'junior',
+                  languages: node.languages || [],
+                  expertises: node.expertises || [],
+                  calculatedPrice: profile?.base_price || 50
+                }
+              }
             }
-          }));
+          });
 
           parsedGraph = {
             type: 'graph_generation',
