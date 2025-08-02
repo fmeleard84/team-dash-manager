@@ -48,10 +48,13 @@ const Admin = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby="login-description">
           <DialogHeader>
             <DialogTitle className="text-center">Connexion Admin</DialogTitle>
           </DialogHeader>
+          <div id="login-description" className="sr-only">
+            Formulaire de connexion pour accéder à l'espace d'administration
+          </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="login">Identifiant</Label>
