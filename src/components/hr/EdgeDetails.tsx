@@ -37,7 +37,7 @@ export function EdgeDetails({ sourceProfile, targetProfile, onClose }: EdgeDetai
   }
 
   return (
-    <Card className="w-80 bg-background border shadow-lg">
+    <Card className="w-80 bg-background border shadow-lg" aria-describedby="edge-details-description">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center justify-between">
           <span>Connexion des livrables</span>
@@ -51,6 +51,9 @@ export function EdgeDetails({ sourceProfile, targetProfile, onClose }: EdgeDetai
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div id="edge-details-description" className="sr-only">
+          Détails de la connexion entre {sourceProfile.name} et {targetProfile.name}, montrant les inputs et outputs de chaque ressource.
+        </div>
         {/* Source Profile */}
         <div>
           <h4 className="font-medium text-sm text-muted-foreground mb-2">

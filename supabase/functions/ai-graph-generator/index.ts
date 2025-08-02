@@ -86,6 +86,7 @@ INSTRUCTIONS IMPORTANTES :
 3. Expliquer comment l'équipe va fonctionner ensemble et qui collabore avec qui
 4. Créer des CONNEXIONS (edges) basées sur les inputs/outputs des profils
 5. Utiliser UNIQUEMENT les profils disponibles dans la base de données
+6. UTILISER LES IDs UUID pour les langues et expertises, JAMAIS les noms
 
 RÈGLE POUR LES CONNEXIONS :
 - Si les outputs d'un profil correspondent aux inputs d'un autre, créez une connexion
@@ -106,10 +107,10 @@ Pour générer une équipe, inclure un JSON à la fin de votre réponse (CE JSON
   "nodes": [
     {
       "id": "node-1",
-      "profile_id": "[ID du profil depuis la base]",
+      "profile_id": "[ID UUID du profil depuis la base]",
       "seniority": "junior|intermediate|senior",
-      "languages": ["[IDs des langues]"],
-      "expertises": ["[IDs des expertises]"]
+      "languages": ["f70e571c-1e59-469e-92c6-cb385486c301"],
+      "expertises": ["d6015fa8-dddb-41cf-9d02-cfa16b89ae27"]
     }
   ],
   "edges": [
@@ -117,7 +118,11 @@ Pour générer une équipe, inclure un JSON à la fin de votre réponse (CE JSON
   ]
 }
 
-IMPORTANT: Créez TOUJOURS des edges entre les nodes pour former une équipe connectée, pas des ressources isolées.
+CRITICAL: 
+- UTILISEZ UNIQUEMENT des IDs UUID pour languages et expertises
+- Exemples d'IDs valides de langues: "f70e571c-1e59-469e-92c6-cb385486c301" (Anglais), "07179458-cd7b-4ed2-bcb0-d2027ee7c544" (Français)
+- Exemples d'IDs valides d'expertises: "d6015fa8-dddb-41cf-9d02-cfa16b89ae27" (PHP), "7d0f5118-2b7b-4cba-b60d-34b2ced7c087" (JavaScript)
+- NE JAMAIS utiliser "Anglais", "PHP" etc. - SEULEMENT les UUIDs
 
 Répondez en français et justifiez chaque choix de séniorité et chaque connexion.`
       },
