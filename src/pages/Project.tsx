@@ -45,6 +45,8 @@ interface HRResource {
   languages: string[];
   expertises: string[];
   calculated_price: number;
+  languageNames?: string[];
+  expertiseNames?: string[];
 }
 
 const initialNodes: Node[] = [];

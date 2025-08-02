@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,12 +11,14 @@ interface Language {
   id: string;
   name: string;
   code: string;
+  cost_percentage: number;
 }
 
 interface Expertise {
   id: string;
   name: string;
   category_id: string;
+  cost_percentage: number;
 }
 
 interface HRResource {
@@ -26,6 +28,8 @@ interface HRResource {
   languages: string[];
   expertises: string[];
   calculated_price: number;
+  languageNames?: string[];
+  expertiseNames?: string[];
 }
 
 interface HRResourcePanelProps {
@@ -47,10 +51,19 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     fetchExpertises();
   }, []);
 
+  useEffect(() => {
+    if (selectedResource) {
+      setSelectedLanguages(selectedResource.languages || []);
+      setSelectedExpertises(selectedResource.expertises || []);
+      setSeniority(selectedResource.seniority);
+      setCalculatedPrice(selectedResource.calculated_price || 0);
+    }
+  }, [selectedResource]);
+
   const fetchLanguages = async () => {
     const { data, error } = await supabase
       .from('hr_languages')
-      .select('*')
+      .select('*, cost_percentage')
       .order('name');
     
     if (error) {
@@ -67,7 +80,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
   const fetchExpertises = async () => {
     const { data, error } = await supabase
       .from('hr_expertises')
-      .select('*')
+      .select('*, cost_percentage')
       .order('name');
     
     if (error) {
@@ -81,25 +94,61 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     }
   };
 
-  const calculatePrice = () => {
-    let basePrice = 50; // Prix de base par heure
-
-    // Multiplicateur selon la séniorité
+  const calculatePrice = useCallback(async () => {
+    if (!selectedResource) return;
+    
+    // Get base price from the profile
+    const { data: profile } = await supabase
+      .from('hr_profiles')
+      .select('base_price')
+      .eq('id', selectedResource.profile_id)
+      .single();
+    
+    const basePrice = profile?.base_price || 50;
+    
+    // Seniority multiplier
     const seniorityMultiplier = {
       junior: 1,
       intermediate: 1.5,
-      senior: 2.2
+      senior: 2
     };
-
-    // Bonus par langue supplémentaire
-    const languageBonus = Math.max(0, selectedLanguages.length - 1) * 10;
-
-    // Bonus par expertise supplémentaire
-    const expertiseBonus = Math.max(0, selectedExpertises.length - 1) * 15;
-
-    const finalPrice = (basePrice * seniorityMultiplier[seniority]) + languageBonus + expertiseBonus;
+    
+    // Calculate language bonus based on actual percentages
+    let languageBonus = 0;
+    if (selectedLanguages.length > 0) {
+      const { data: languageData } = await supabase
+        .from('hr_languages')
+        .select('cost_percentage')
+        .in('id', selectedLanguages);
+      
+      if (languageData) {
+        languageBonus = languageData.reduce((sum, lang) => sum + (lang.cost_percentage / 100), 0);
+      }
+    }
+    
+    // Calculate expertise bonus based on actual percentages
+    let expertiseBonus = 0;
+    if (selectedExpertises.length > 0) {
+      const { data: expertiseData } = await supabase
+        .from('hr_expertises')
+        .select('cost_percentage')
+        .in('id', selectedExpertises);
+      
+      if (expertiseData) {
+        expertiseBonus = expertiseData.reduce((sum, exp) => sum + (exp.cost_percentage / 100), 0);
+      }
+    }
+    
+    const finalPrice = basePrice * seniorityMultiplier[seniority] * (1 + languageBonus + expertiseBonus);
+    
     setCalculatedPrice(Math.round(finalPrice * 100) / 100);
-  };
+  }, [selectedLanguages, selectedExpertises, seniority, selectedResource]);
+
+  useEffect(() => {
+    if (selectedResource) {
+      calculatePrice();
+    }
+  }, [calculatePrice, selectedResource]);
 
   const addLanguage = (languageId: string) => {
     if (!selectedLanguages.includes(languageId)) {
@@ -129,15 +178,43 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     setTimeout(() => updateResource({ expertises: newExpertises }), 100);
   };
 
-  const updateResource = (updates: Partial<HRResource>) => {
-    if (selectedResource) {
-      const updatedResource = {
-        ...selectedResource,
-        ...updates,
-        calculated_price: calculatedPrice
-      };
-      onResourceUpdate(updatedResource);
-    }
+  const updateResource = async (updates: Partial<HRResource>) => {
+    if (!selectedResource) return;
+    
+    const updatedResource = {
+      ...selectedResource,
+      ...updates,
+      calculated_price: calculatedPrice
+    };
+    
+    // Get language and expertise names for display
+    const languageNames = await Promise.all(
+      updatedResource.languages.map(async (langId) => {
+        const { data } = await supabase
+          .from('hr_languages')
+          .select('name')
+          .eq('id', langId)
+          .single();
+        return data?.name || langId;
+      })
+    );
+    
+    const expertiseNames = await Promise.all(
+      updatedResource.expertises.map(async (expId) => {
+        const { data } = await supabase
+          .from('hr_expertises')
+          .select('name')
+          .eq('id', expId)
+          .single();
+        return data?.name || expId;
+      })
+    );
+    
+    // Update resource with display names
+    updatedResource.languageNames = languageNames;
+    updatedResource.expertiseNames = expertiseNames;
+    
+    onResourceUpdate(updatedResource);
   };
 
   const handleSeniorityChange = (newSeniority: 'junior' | 'intermediate' | 'senior') => {
@@ -192,7 +269,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
               .filter(lang => !selectedLanguages.includes(lang.id))
               .map(language => (
                 <SelectItem key={language.id} value={language.id}>
-                  {language.name}
+                  {language.name} (+{language.cost_percentage}%)
                 </SelectItem>
               ))}
           </SelectContent>
@@ -202,7 +279,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
             const language = languages.find(l => l.id === langId);
             return language ? (
               <Badge key={langId} variant="secondary" className="flex items-center gap-1">
-                {language.name}
+                {language.name} (+{language.cost_percentage}%)
                 <Button
                   variant="ghost"
                   size="sm"
@@ -229,7 +306,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
               .filter(exp => !selectedExpertises.includes(exp.id))
               .map(expertise => (
                 <SelectItem key={expertise.id} value={expertise.id}>
-                  {expertise.name}
+                  {expertise.name} (+{expertise.cost_percentage}%)
                 </SelectItem>
               ))}
           </SelectContent>
@@ -239,7 +316,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
             const expertise = expertises.find(e => e.id === expId);
             return expertise ? (
               <Badge key={expId} variant="outline" className="flex items-center gap-1">
-                {expertise.name}
+                {expertise.name} (+{expertise.cost_percentage}%)
                 <Button
                   variant="ghost"
                   size="sm"

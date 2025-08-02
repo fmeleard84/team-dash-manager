@@ -4,13 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { User, Clock } from 'lucide-react';
 
 interface HRResourceNodeData {
-  id: string;
   profileName: string;
   seniority: 'junior' | 'intermediate' | 'senior';
   languages: string[];
   expertises: string[];
   calculatedPrice: number;
-  selected?: boolean;
+  languageNames?: string[];
+  expertiseNames?: string[];
 }
 
 interface HRResourceNodeProps {
@@ -56,39 +56,29 @@ const HRResourceNode = memo(({ data, selected }: HRResourceNodeProps) => {
       </div>
 
       {/* Langues */}
-      {data.languages.length > 0 && (
+      {(data.languageNames || data.languages).length > 0 && (
         <div className="mb-2">
           <div className="text-xs text-muted-foreground mb-1">Langues:</div>
-          <div className="flex flex-wrap gap-1">
-            {data.languages.slice(0, 3).map((lang, index) => (
-              <Badge key={index} variant="secondary" className="text-xs py-0 px-1">
-                {lang}
+          <div className="flex flex-wrap gap-1 mt-2">
+            {(data.languageNames || data.languages).map((language, index) => (
+              <Badge key={index} variant="secondary" className="text-xs">
+                {language}
               </Badge>
             ))}
-            {data.languages.length > 3 && (
-              <Badge variant="secondary" className="text-xs py-0 px-1">
-                +{data.languages.length - 3}
-              </Badge>
-            )}
           </div>
         </div>
       )}
 
       {/* Expertises */}
-      {data.expertises.length > 0 && (
+      {(data.expertiseNames || data.expertises).length > 0 && (
         <div>
           <div className="text-xs text-muted-foreground mb-1">Expertises:</div>
-          <div className="flex flex-wrap gap-1">
-            {data.expertises.slice(0, 2).map((exp, index) => (
-              <Badge key={index} variant="outline" className="text-xs py-0 px-1">
-                {exp}
+          <div className="flex flex-wrap gap-1 mt-2">
+            {(data.expertiseNames || data.expertises).map((expertise, index) => (
+              <Badge key={index} variant="outline" className="text-xs">
+                {expertise}
               </Badge>
             ))}
-            {data.expertises.length > 2 && (
-              <Badge variant="outline" className="text-xs py-0 px-1">
-                +{data.expertises.length - 2}
-              </Badge>
-            )}
           </div>
         </div>
       )}

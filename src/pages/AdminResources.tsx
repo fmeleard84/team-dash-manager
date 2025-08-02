@@ -33,6 +33,7 @@ interface Language {
   id: string;
   name: string;
   code: string;
+  cost_percentage: number;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +42,7 @@ interface Expertise {
   id: string;
   name: string;
   category_id: string;
+  cost_percentage: number;
   created_at: string;
   updated_at: string;
 }
@@ -84,8 +86,8 @@ const AdminResources = () => {
       const [categoriesData, profilesData, languagesData, expertisesData] = await Promise.all([
         supabase.from('hr_categories').select('*').order('name'),
         supabase.from('hr_profiles').select('*').order('name'),
-        supabase.from('hr_languages').select('*').order('name'),
-        supabase.from('hr_expertises').select('*').order('name')
+        supabase.from('hr_languages').select('*, cost_percentage').order('name'),
+        supabase.from('hr_expertises').select('*, cost_percentage').order('name')
       ]);
 
       if (categoriesData.error) throw categoriesData.error;
@@ -217,7 +219,8 @@ const AdminResources = () => {
           .from('hr_languages')
           .update({ 
             name: languageForm.name,
-            code: languageForm.code
+            code: languageForm.code,
+            cost_percentage: languageForm.cost_percentage
           })
           .eq('id', languageDialog.data.id);
         if (error) throw error;
@@ -227,7 +230,8 @@ const AdminResources = () => {
           .from('hr_languages')
           .insert({ 
             name: languageForm.name,
-            code: languageForm.code
+            code: languageForm.code,
+            cost_percentage: languageForm.cost_percentage
           });
         if (error) throw error;
         toast({ title: "Succès", description: "Langue créée avec succès." });
@@ -267,7 +271,8 @@ const AdminResources = () => {
           .from('hr_expertises')
           .update({ 
             name: expertiseForm.name,
-            category_id: expertiseForm.category_id
+            category_id: expertiseForm.category_id,
+            cost_percentage: expertiseForm.cost_percentage
           })
           .eq('id', expertiseDialog.data.id);
         if (error) throw error;
@@ -277,7 +282,8 @@ const AdminResources = () => {
           .from('hr_expertises')
           .insert({ 
             name: expertiseForm.name,
-            category_id: expertiseForm.category_id
+            category_id: expertiseForm.category_id,
+            cost_percentage: expertiseForm.cost_percentage
           });
         if (error) throw error;
         toast({ title: "Succès", description: "Expertise créée avec succès." });
@@ -554,7 +560,7 @@ const AdminResources = () => {
                   <CardTitle>Langues Disponibles</CardTitle>
                   <Dialog open={languageDialog.open} onOpenChange={(open) => {
                     setLanguageDialog({ open, edit: false, data: null });
-                    setLanguageForm({ name: '', code: '' });
+                    setLanguageForm({ name: '', code: '', cost_percentage: 5 });
                   }}>
                     <DialogTrigger asChild>
                       <Button>
@@ -588,6 +594,18 @@ const AdminResources = () => {
                             maxLength={3}
                           />
                         </div>
+                        <div>
+                          <Label htmlFor="language-cost">Coût supplémentaire (%)</Label>
+                          <Input
+                            id="language-cost"
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={languageForm.cost_percentage}
+                            onChange={(e) => setLanguageForm({ ...languageForm, cost_percentage: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 5.0"
+                          />
+                        </div>
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => setLanguageDialog({ open: false, edit: false, data: null })}>
                             Annuler
@@ -608,12 +626,12 @@ const AdminResources = () => {
                       key={language.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50"
                     >
-                      <div>
-                        <h3 className="font-medium">{language.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Code: {language.code}
-                        </p>
-                      </div>
+                       <div>
+                         <h3 className="font-medium">{language.name}</h3>
+                         <p className="text-sm text-muted-foreground">
+                           Code: {language.code} | +{language.cost_percentage}%
+                         </p>
+                       </div>
                       <div className="flex gap-2">
                         <Button 
                           variant="outline" 
@@ -621,7 +639,8 @@ const AdminResources = () => {
                           onClick={() => {
                             setLanguageForm({ 
                               name: language.name,
-                              code: language.code
+                              code: language.code,
+                              cost_percentage: language.cost_percentage
                             });
                             setLanguageDialog({ open: true, edit: true, data: language });
                           }}
@@ -651,7 +670,7 @@ const AdminResources = () => {
                   <CardTitle>Expertises par Catégorie</CardTitle>
                   <Dialog open={expertiseDialog.open} onOpenChange={(open) => {
                     setExpertiseDialog({ open, edit: false, data: null });
-                    setExpertiseForm({ name: '', category_id: '' });
+                    setExpertiseForm({ name: '', category_id: '', cost_percentage: 10 });
                   }}>
                     <DialogTrigger asChild>
                       <Button>
@@ -691,6 +710,18 @@ const AdminResources = () => {
                             </SelectContent>
                           </Select>
                         </div>
+                        <div>
+                          <Label htmlFor="expertise-cost">Coût supplémentaire (%)</Label>
+                          <Input
+                            id="expertise-cost"
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={expertiseForm.cost_percentage}
+                            onChange={(e) => setExpertiseForm({ ...expertiseForm, cost_percentage: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 10.0"
+                          />
+                        </div>
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => setExpertiseDialog({ open: false, edit: false, data: null })}>
                             Annuler
@@ -711,12 +742,12 @@ const AdminResources = () => {
                       key={expertise.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50"
                     >
-                      <div>
-                        <h3 className="font-medium">{expertise.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {getCategoryName(expertise.category_id)}
-                        </p>
-                      </div>
+                       <div>
+                         <h3 className="font-medium">{expertise.name}</h3>
+                         <p className="text-sm text-muted-foreground">
+                           {getCategoryName(expertise.category_id)} | +{expertise.cost_percentage}%
+                         </p>
+                       </div>
                       <div className="flex gap-2">
                         <Button 
                           variant="outline" 
@@ -724,7 +755,8 @@ const AdminResources = () => {
                           onClick={() => {
                             setExpertiseForm({ 
                               name: expertise.name,
-                              category_id: expertise.category_id
+                              category_id: expertise.category_id,
+                              cost_percentage: expertise.cost_percentage
                             });
                             setExpertiseDialog({ open: true, edit: true, data: expertise });
                           }}
