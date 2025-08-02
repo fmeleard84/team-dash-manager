@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronUp, ChevronDown, Bot, User, Loader2, CheckCircle } from 'lucide-react';
+import { ChevronUp, ChevronDown, Bot, User, Loader2, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Node, Edge } from '@xyflow/react';
@@ -22,14 +22,24 @@ interface Message {
 
 interface AIGraphGeneratorProps {
   onGraphGenerated: (nodes: Node[], edges: Edge[]) => void;
+  projectId?: string;
 }
 
-const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated }) => {
+const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated, projectId }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isLoading]);
 
   const sendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -54,7 +64,8 @@ const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated })
       const { data, error } = await supabase.functions.invoke('ai-graph-generator', {
         body: {
           message: userMessage.content,
-          conversationHistory
+          conversationHistory,
+          projectId
         }
       });
 
@@ -72,8 +83,8 @@ const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated })
 
       if (data.graph) {
         toast({
-          title: "Graphe généré !",
-          description: "Le graphe a été créé avec succès. Vous pouvez l'appliquer à votre projet.",
+          title: "Équipe générée !",
+          description: "L'équipe a été créée avec succès. Vous pouvez la créer dans votre projet.",
         });
       }
 
@@ -89,11 +100,11 @@ const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated })
     }
   };
 
-  const applyGraph = (graph: { nodes: Node[]; edges: Edge[] }) => {
+  const createTeam = (graph: { nodes: Node[]; edges: Edge[] }) => {
     onGraphGenerated(graph.nodes, graph.edges);
     toast({
-      title: "Graphe appliqué !",
-      description: "Le graphe a été ajouté à votre projet.",
+      title: "Équipe créée !",
+      description: "L'équipe a été ajoutée à votre projet.",
     });
   };
 
@@ -110,20 +121,30 @@ const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated })
       {isExpanded && (
         <Card className="mx-4 mb-2 max-h-96 shadow-lg border-border bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Bot className="h-5 w-5 text-primary" />
-              Assistant IA - Génération de graphes
+            <CardTitle className="flex items-center justify-between text-base">
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" />
+                Assistant IA - Génération d'équipes
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </CardTitle>
           </CardHeader>
           
           <CardContent className="space-y-4">
             {/* Messages */}
-            <ScrollArea className="h-48">
+            <ScrollArea className="h-48" ref={scrollAreaRef}>
               <div className="space-y-3 pr-4">
                 {messages.length === 0 && (
                   <div className="text-center text-muted-foreground py-8">
                     <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Décrivez votre projet et je créerai le graphe correspondant !</p>
+                    <p>Décrivez votre projet et je créerai l'équipe correspondante !</p>
                     <p className="text-sm mt-1">
                       Ex: "Je veux créer un site WordPress simple" ou "J'ai besoin d'un service comptable"
                     </p>
@@ -153,14 +174,15 @@ const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated })
                             <div className="flex items-center justify-between mb-2">
                               <Badge variant="secondary" className="text-xs">
                                 <CheckCircle className="h-3 w-3 mr-1" />
-                                Graphe généré
+                                Équipe générée
                               </Badge>
                               <Button
                                 size="sm"
-                                onClick={() => applyGraph(message.graph!)}
+                                onClick={() => createTeam(message.graph!)}
                                 className="h-7 px-3 text-xs"
+                                variant="default"
                               >
-                                Appliquer
+                                Créer l'équipe
                               </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
@@ -188,6 +210,9 @@ const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated })
                     </div>
                   </div>
                 )}
+                
+                {/* Scroll anchor */}
+                <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
             
@@ -223,7 +248,7 @@ const AIGraphGenerator: React.FC<AIGraphGeneratorProps> = ({ onGraphGenerated })
           >
             <div className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
-              <span>Assistant IA - Générateur de graphes</span>
+              <span>Assistant IA - Générateur d'équipes</span>
               {messages.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {messages.length}

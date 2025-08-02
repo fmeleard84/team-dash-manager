@@ -13,50 +13,103 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationHistory = [] } = await req.json();
+    const { message, conversationHistory = [], projectId } = await req.json();
     
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch HR data from Supabase
+    const [categoriesRes, profilesRes, languagesRes, expertisesRes] = await Promise.all([
+      supabase.from('hr_categories').select('*'),
+      supabase.from('hr_profiles').select('*'),
+      supabase.from('hr_languages').select('*'),
+      supabase.from('hr_expertises').select('*')
+    ]);
+
+    const categories = categoriesRes.data || [];
+    const profiles = profilesRes.data || [];
+    const languages = languagesRes.data || [];
+    const expertises = expertisesRes.data || [];
+
+    // Build dynamic system message with real data
+    const profilesText = profiles.map(p => {
+      const category = categories.find(c => c.id === p.category_id);
+      return `- ${p.name} (ID: "${p.id}") - ${p.base_price}€/h - Catégorie: ${category?.name || 'N/A'}`;
+    }).join('\n');
+
+    const languagesText = languages.map(l => 
+      `${l.name} (+${l.cost_percentage}%)`
+    ).join(', ');
+
+    const expertisesText = expertises.map(e => 
+      `${e.name} (+${e.cost_percentage}%)`
+    ).join(', ');
+
     // Prepare conversation messages
     const messages = [
       {
         role: 'system',
-        content: `Tu es un assistant IA spécialisé dans la création de graphes de projets avec des ressources humaines.
+        content: `Tu es un assistant IA spécialisé dans la création d'équipes de projets avec des ressources humaines.
 
 Ton rôle est de :
 1. Comprendre les demandes de projets
 2. Poser 1-2 questions de clarification si nécessaire  
-3. Générer un graphe ReactFlow avec les bonnes ressources HR
+3. Générer un graphe d'équipe avec les bonnes ressources HR
 
-Profils HR disponibles :
-- Chef de projet junior (id: "1") - 60€/h
-- Chef de projet senior (id: "2") - 120€/h
-- Designer UI/UX (id: "3") - 80€/h  
-- Développeur junior (id: "4") - 50€/h
-- Développeur full-stack (id: "5") - 100€/h
-- Expert comptable (id: "6") - 90€/h
-- Assistant comptable (id: "7") - 45€/h
-- Marketing digital (id: "8") - 70€/h
+PROFILS HR DISPONIBLES :
+${profilesText}
 
-Niveaux séniorité: junior (x1), intermediate (x1.5), senior (x2)
+NIVEAUX DE SÉNIORITÉ :
+- junior (multiplicateur x1)
+- intermediate (multiplicateur x1.5) 
+- senior (multiplicateur x2)
 
-Langues (bonus %): Anglais +10%, Espagnol +8%, Allemand +12%
-Expertises (bonus %): WordPress +15%, E-commerce +20%, SEO +10%, Comptabilité fiscale +25%
+LANGUES DISPONIBLES (bonus) :
+${languagesText}
 
-Pour générer un graphe, réponds avec un JSON:
+EXPERTISES DISPONIBLES (bonus) :
+${expertisesText}
+
+IMPORTANT : Pour générer une équipe, tu DOIS répondre avec un JSON au format suivant :
 {
-  "type": "graph_generation", 
-  "nodes": [...],
-  "edges": [...]
+  "type": "graph_generation",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "hrResource", 
+      "position": { "x": 200, "y": 100 },
+      "data": {
+        "id": "resource-1",
+        "profileId": "[ID du profil depuis la base]",
+        "profileName": "[Nom du profil]",
+        "seniority": "junior|intermediate|senior",
+        "languages": ["[IDs des langues]"],
+        "expertises": ["[IDs des expertises]"],
+        "calculatedPrice": [prix calculé avec formule],
+        "languageNames": ["[Noms des langues]"],
+        "expertiseNames": ["[Noms des expertises]"]
+      }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "target": "node-2" }
+  ]
 }
 
-Exemples:
-- Site WordPress → Chef projet junior + Designer + Dev junior (WordPress +15%)
-- E-commerce → Chef projet senior + Designer + Dev full-stack (E-commerce +20%)
-- Comptabilité → Expert comptable + Assistant (Compta fiscale +25%)`
+FORMULE DE CALCUL DU PRIX :
+Prix final = (prix_base × multiplicateur_séniorité) × (1 + somme_bonus_langues/100 + somme_bonus_expertises/100)
+
+Exemples d'équipes :
+- Site WordPress → Chef projet + Designer + Développeur (avec expertise WordPress)
+- E-commerce → Chef projet senior + Designer + Développeur full-stack (avec expertise E-commerce)
+- Comptabilité → Expert comptable + Assistant (avec expertise Comptabilité fiscale)`
       },
       ...conversationHistory,
       { role: 'user', content: message }
@@ -91,11 +144,36 @@ Exemples:
         const jsonStr = jsonMatch[0];
         const parsed = JSON.parse(jsonStr);
         if (parsed.type === 'graph_generation') {
-          parsedGraph = parsed;
+          // Transform AI nodes to proper ReactFlow nodes with HRResource data
+          const transformedNodes = parsed.nodes.map((node: any, index: number) => ({
+            id: node.id || `node-${Date.now()}-${index}`,
+            type: 'hrResource',
+            position: node.position || { 
+              x: 200 + (index % 3) * 250, 
+              y: 100 + Math.floor(index / 3) * 200 
+            },
+            data: {
+              id: node.data?.id || `resource-${Date.now()}-${index}`,
+              profileId: node.data?.profileId || '',
+              profileName: node.data?.profileName || 'Profil inconnu',
+              seniority: node.data?.seniority || 'junior',
+              languages: node.data?.languages || [],
+              expertises: node.data?.expertises || [],
+              calculatedPrice: node.data?.calculatedPrice || 50,
+              languageNames: node.data?.languageNames || [],
+              expertiseNames: node.data?.expertiseNames || []
+            }
+          }));
+
+          parsedGraph = {
+            type: 'graph_generation',
+            nodes: transformedNodes,
+            edges: parsed.edges || []
+          };
         }
       }
     } catch (e) {
-      // Not a JSON response, that's fine
+      console.error('Error parsing graph JSON:', e);
     }
 
     return new Response(JSON.stringify({

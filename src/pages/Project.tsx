@@ -543,7 +543,10 @@ const Project = () => {
       </div>
       
       {/* AI Graph Generator Footer */}
-      <AIGraphGenerator onGraphGenerated={handleGraphGenerated} />
+        <AIGraphGenerator 
+          onGraphGenerated={handleGraphGenerated} 
+          projectId={id}
+        />
     </div>
   );
 };
