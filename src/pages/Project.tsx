@@ -93,20 +93,92 @@ const Project = () => {
       if (projectError) throw projectError;
       setProject(projectData as Project);
 
-      // Fetch flow data
+      // Fetch HR resource assignments
+      const { data: resourceAssignments, error: resourceError } = await supabase
+        .from('hr_resource_assignments')
+        .select('*')
+        .eq('project_id', id);
+
+      const resourcesMap = new Map<string, HRResource>();
+      const reconstructedNodes: Node[] = [];
+
+      if (!resourceError && resourceAssignments) {
+        // Fetch all needed data for reconstruction
+        const profileIds = [...new Set(resourceAssignments.map(r => r.profile_id))];
+        const { data: profiles } = await supabase
+          .from('hr_profiles')
+          .select('*')
+          .in('id', profileIds);
+
+        const { data: languages } = await supabase
+          .from('hr_languages')
+          .select('*');
+
+        const { data: expertises } = await supabase
+          .from('hr_expertises')
+          .select('*');
+
+        // Create lookup maps
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const languageMap = new Map(languages?.map(l => [l.id, l]) || []);
+        const expertiseMap = new Map(expertises?.map(e => [e.id, e]) || []);
+
+        // Reconstruct resources and nodes
+        for (const assignment of resourceAssignments) {
+          const profile = profileMap.get(assignment.profile_id);
+          if (!profile) continue;
+
+          const languageNames = assignment.languages?.map(id => languageMap.get(id)?.name).filter(Boolean) || [];
+          const expertiseNames = assignment.expertises?.map(id => expertiseMap.get(id)?.name).filter(Boolean) || [];
+
+          const resource: HRResource = {
+            id: assignment.id,
+            profile_id: assignment.profile_id,
+            seniority: assignment.seniority,
+            languages: assignment.languages || [],
+            expertises: assignment.expertises || [],
+            calculated_price: assignment.calculated_price,
+            languageNames,
+            expertiseNames,
+          };
+
+          resourcesMap.set(assignment.id, resource);
+
+          // Reconstruct node from node_data or create default
+          const nodeData = assignment.node_data as any;
+          reconstructedNodes.push({
+            id: assignment.id,
+            type: 'hrResource',
+            position: nodeData?.position || { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+            data: {
+              id: assignment.id,
+              profileName: profile.name,
+              seniority: resource.seniority,
+              languages: resource.languages,
+              expertises: resource.expertises,
+              calculatedPrice: resource.calculated_price,
+              languageNames,
+              expertiseNames,
+              selected: false,
+            },
+          });
+        }
+      }
+
+      setHrResources(resourcesMap);
+      if (reconstructedNodes.length > 0) {
+        setNodes(reconstructedNodes);
+      }
+
+      // Fetch flow data for edges
       const { data: flowData, error: flowError } = await supabase
         .from('project_flows')
         .select('flow_data')
         .eq('project_id', id)
         .single();
 
-      if (flowError) {
-        console.error('Flow data not found, using defaults');
-      } else if (flowData?.flow_data) {
+      if (!flowError && flowData?.flow_data) {
         const flowDataParsed = flowData.flow_data as { nodes?: Node[], edges?: Edge[] };
-        if (flowDataParsed.nodes && flowDataParsed.nodes.length > 0) {
-          setNodes(flowDataParsed.nodes);
-        }
         if (flowDataParsed.edges && flowDataParsed.edges.length > 0) {
           setEdges(flowDataParsed.edges);
         }
@@ -268,7 +340,8 @@ const Project = () => {
     
     setIsSaving(true);
     try {
-      const { error } = await supabase
+      // Save flow data (for edges and visual layout)
+      const { error: flowError } = await supabase
         .from('project_flows')
         .upsert({
           project_id: id,
@@ -277,17 +350,42 @@ const Project = () => {
           onConflict: 'project_id'
         });
 
-      if (error) throw error;
+      if (flowError) throw flowError;
+
+      // Save HR resource assignments
+      const resourceAssignments = Array.from(hrResources.values()).map(resource => {
+        const node = nodes.find(n => n.id === resource.id);
+        return {
+          id: resource.id,
+          project_id: id,
+          profile_id: resource.profile_id,
+          seniority: resource.seniority,
+          languages: resource.languages,
+          expertises: resource.expertises,
+          calculated_price: resource.calculated_price,
+          node_data: { position: node?.position }
+        };
+      });
+
+      if (resourceAssignments.length > 0) {
+        const { error: resourceError } = await supabase
+          .from('hr_resource_assignments')
+          .upsert(resourceAssignments, {
+            onConflict: 'id'
+          });
+
+        if (resourceError) throw resourceError;
+      }
 
       toast({
         title: "Sauvegardé",
-        description: "Le diagramme a été sauvegardé avec succès.",
+        description: "Le projet a été sauvegardé avec succès.",
       });
     } catch (error) {
       console.error('Error saving flow:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de sauvegarder le diagramme.",
+        description: "Impossible de sauvegarder le projet.",
         variant: "destructive",
       });
     } finally {

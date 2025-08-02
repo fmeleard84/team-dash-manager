@@ -36,9 +36,9 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
           <p className="text-sm text-muted-foreground">
             {project.description || 'Aucune description'}
           </p>
-          <p className="font-medium">
-            {project.price_per_minute.toFixed(2)} €/min
-          </p>
+           <p className="font-medium">
+             {project.price_per_minute.toFixed(2)} €/h
+           </p>
         </div>
         
         <div className="flex items-center justify-between gap-2">

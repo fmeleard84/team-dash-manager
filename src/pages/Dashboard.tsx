@@ -52,7 +52,25 @@ const Dashboard = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProjects((data || []) as Project[]);
+      
+      // Calculate total price for each project
+      const projectsWithCalculatedPrice = await Promise.all(
+        (data || []).map(async (project) => {
+          const { data: assignments } = await supabase
+            .from('hr_resource_assignments')
+            .select('calculated_price')
+            .eq('project_id', project.id);
+          
+          const totalPrice = assignments?.reduce((sum, assignment) => sum + (assignment.calculated_price || 0), 0) || 0;
+          
+          return {
+            ...project,
+            price_per_minute: totalPrice
+          };
+        })
+      );
+      
+      setProjects(projectsWithCalculatedPrice as Project[]);
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast({
@@ -223,18 +241,6 @@ const Dashboard = () => {
                     onChange={(e) => setNewProject({...newProject, description: e.target.value})}
                     placeholder="Description du projet"
                     rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="price">Prix à la minute (€)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={newProject.price_per_minute}
-                    onChange={(e) => setNewProject({...newProject, price_per_minute: parseFloat(e.target.value) || 0})}
-                    required
-                    placeholder="0.00"
                   />
                 </div>
                 <div className="space-y-2">
