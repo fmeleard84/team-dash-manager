@@ -128,18 +128,24 @@ const Project = () => {
           const profile = profileMap.get(assignment.profile_id);
           if (!profile) continue;
 
-          const languageNames = assignment.languages?.map(id => languageMap.get(id)?.name).filter(Boolean) || [];
-          const expertiseNames = assignment.expertises?.map(id => expertiseMap.get(id)?.name).filter(Boolean) || [];
+          // Convert stored names back to IDs for the working data
+          const languageIds = assignment.languages?.map(name => 
+            languages?.find(l => l.name === name)?.id
+          ).filter(Boolean) || [];
+          
+          const expertiseIds = assignment.expertises?.map(name => 
+            expertises?.find(e => e.name === name)?.id
+          ).filter(Boolean) || [];
 
           const resource: HRResource = {
             id: assignment.id,
             profile_id: assignment.profile_id,
             seniority: assignment.seniority,
-            languages: assignment.languages || [],
-            expertises: assignment.expertises || [],
+            languages: languageIds, // Use IDs for working with the UI
+            expertises: expertiseIds, // Use IDs for working with the UI
             calculated_price: assignment.calculated_price,
-            languageNames,
-            expertiseNames,
+            languageNames: assignment.languages || [], // Keep names for display
+            expertiseNames: assignment.expertises || [], // Keep names for display
           };
 
           resourcesMap.set(assignment.id, resource);
@@ -157,8 +163,8 @@ const Project = () => {
               languages: resource.languages,
               expertises: resource.expertises,
               calculatedPrice: resource.calculated_price,
-              languageNames,
-              expertiseNames,
+              languageNames: resource.languageNames,
+              expertiseNames: resource.expertiseNames,
               selected: false,
             },
           });
