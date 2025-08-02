@@ -407,7 +407,9 @@ const Project = () => {
           seniority: newResource.seniority,
           languages: newResource.languages,
           expertises: newResource.expertises,
-          calculatedPrice: newResource.calculated_price,
+          languageNames: hrResourceData.languageNames || [],
+          expertiseNames: hrResourceData.expertiseNames || [],
+          calculatedPrice: hrResourceData.calculatedPrice || newResource.calculated_price,
           selected: false,
         };
         validatedNode.id = newResource.id;

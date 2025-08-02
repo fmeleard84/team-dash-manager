@@ -165,8 +165,49 @@ Répondez en français et justifiez chaque choix de séniorité et chaque connex
           cleanMessage = aiResponse.replace(/\{[\s\S]*\}/, '').trim();
           
           // Transform AI nodes to proper ReactFlow nodes with HRResource data
-          const transformedNodes = parsed.nodes.map((node: any, index: number) => {
+          const transformedNodes = await Promise.all(parsed.nodes.map(async (node: any, index: number) => {
             const profile = profiles.find(p => p.id === node.profile_id);
+            
+            // Calculate correct price with seniority and bonuses
+            const basePrice = profile?.base_price || 50;
+            const seniorityMultiplier = {
+              junior: 1,
+              intermediate: 1.5,
+              senior: 2
+            };
+            
+            // Get language bonuses
+            let languageBonus = 0;
+            let languageNames: string[] = [];
+            if (node.languages && node.languages.length > 0) {
+              const { data: languageData } = await supabase
+                .from('hr_languages')
+                .select('cost_percentage, name')
+                .in('id', node.languages);
+              
+              if (languageData) {
+                languageBonus = languageData.reduce((sum: number, lang: any) => sum + (lang.cost_percentage / 100), 0);
+                languageNames = languageData.map((lang: any) => lang.name);
+              }
+            }
+            
+            // Get expertise bonuses
+            let expertiseBonus = 0;
+            let expertiseNames: string[] = [];
+            if (node.expertises && node.expertises.length > 0) {
+              const { data: expertiseData } = await supabase
+                .from('hr_expertises')
+                .select('cost_percentage, name')
+                .in('id', node.expertises);
+              
+              if (expertiseData) {
+                expertiseBonus = expertiseData.reduce((sum: number, exp: any) => sum + (exp.cost_percentage / 100), 0);
+                expertiseNames = expertiseData.map((exp: any) => exp.name);
+              }
+            }
+            
+            const finalPrice = basePrice * seniorityMultiplier[node.seniority || 'junior'] * (1 + languageBonus + expertiseBonus);
+            const calculatedPrice = Math.round(finalPrice * 100) / 100;
             
             return {
               id: `node-${Date.now()}-${index}`,
@@ -183,24 +224,32 @@ Répondez en français et justifiez chaque choix de séniorité et chaque connex
                   seniority: node.seniority || 'junior',
                   languages: node.languages || [],
                   expertises: node.expertises || [],
-                  calculatedPrice: profile?.base_price || 50
+                  languageNames: languageNames,
+                  expertiseNames: expertiseNames,
+                  calculatedPrice: calculatedPrice
                 }
               }
             }
-          });
+          }));
 
           // Transform edges with proper IDs
+          const timestamp = Date.now();
           const transformedEdges = (parsed.edges || []).map((edge: any, index: number) => {
             const sourceIndex = parsed.nodes.findIndex((n: any) => n.id === edge.source);
             const targetIndex = parsed.nodes.findIndex((n: any) => n.id === edge.target);
             
+            if (sourceIndex === -1 || targetIndex === -1) {
+              console.warn('Edge references non-existent node:', edge);
+              return null;
+            }
+            
             return {
-              id: `edge-${Date.now()}-${index}`,
-              source: `node-${Date.now()}-${sourceIndex}`,
-              target: `node-${Date.now()}-${targetIndex}`,
+              id: `edge-${timestamp}-${index}`,
+              source: `node-${timestamp}-${sourceIndex}`,
+              target: `node-${timestamp}-${targetIndex}`,
               type: 'default'
             };
-          });
+          }).filter(Boolean);
 
           parsedGraph = {
             type: 'graph_generation',

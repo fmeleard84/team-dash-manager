@@ -56,11 +56,11 @@ const HRResourceNode = memo(({ data, selected }: HRResourceNodeProps) => {
       </div>
 
       {/* Langues */}
-      {(data.languageNames || data.languages).length > 0 && (
+      {data.languageNames && data.languageNames.length > 0 && (
         <div className="mb-2">
           <div className="text-xs text-muted-foreground mb-1">Langues:</div>
-          <div className="flex flex-wrap gap-1 mt-2">
-            {(data.languageNames || data.languages).map((language, index) => (
+          <div className="flex flex-wrap gap-1">
+            {data.languageNames.map((language, index) => (
               <Badge key={index} variant="secondary" className="text-xs">
                 {language}
               </Badge>
@@ -70,11 +70,11 @@ const HRResourceNode = memo(({ data, selected }: HRResourceNodeProps) => {
       )}
 
       {/* Expertises */}
-      {(data.expertiseNames || data.expertises).length > 0 && (
+      {data.expertiseNames && data.expertiseNames.length > 0 && (
         <div>
           <div className="text-xs text-muted-foreground mb-1">Expertises:</div>
-          <div className="flex flex-wrap gap-1 mt-2">
-            {(data.expertiseNames || data.expertises).map((expertise, index) => (
+          <div className="flex flex-wrap gap-1">
+            {data.expertiseNames.map((expertise, index) => (
               <Badge key={index} variant="outline" className="text-xs">
                 {expertise}
               </Badge>
