@@ -118,6 +118,45 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_profile_expertises: {
+        Row: {
+          created_at: string
+          expertise_id: string
+          id: string
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expertise_id: string
+          id?: string
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expertise_id?: string
+          id?: string
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_profile_expertises_expertise_id_fkey"
+            columns: ["expertise_id"]
+            isOneToOne: false
+            referencedRelation: "hr_expertises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_profile_expertises_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "hr_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_profiles: {
         Row: {
           base_price: number

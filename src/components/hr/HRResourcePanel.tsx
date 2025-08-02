@@ -49,7 +49,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
   useEffect(() => {
     fetchLanguages();
     fetchExpertises();
-  }, []);
+  }, [selectedResource?.profile_id]); // Re-fetch when profile changes
 
   useEffect(() => {
     if (selectedResource) {
@@ -78,19 +78,48 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
   };
 
   const fetchExpertises = async () => {
+    if (!selectedResource?.profile_id) {
+      // Fallback: show all expertises if no profile selected
+      const { data, error } = await supabase
+        .from('hr_expertises')
+        .select('*, cost_percentage')
+        .order('name');
+      
+      if (error) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de charger les expertises.",
+          variant: "destructive",
+        });
+      } else {
+        setExpertises(data || []);
+      }
+      return;
+    }
+
+    // Fetch only expertises linked to this profile
     const { data, error } = await supabase
-      .from('hr_expertises')
-      .select('*, cost_percentage')
-      .order('name');
+      .from('hr_profile_expertises')
+      .select(`
+        expertise_id,
+        hr_expertises!inner (
+          id,
+          name,
+          category_id,
+          cost_percentage
+        )
+      `)
+      .eq('profile_id', selectedResource.profile_id);
     
     if (error) {
       toast({
         title: "Erreur",
-        description: "Impossible de charger les expertises.",
+        description: "Impossible de charger les expertises pour ce métier.",
         variant: "destructive",
       });
     } else {
-      setExpertises(data || []);
+      const profileExpertises = data?.map(pe => pe.hr_expertises) || [];
+      setExpertises(profileExpertises);
     }
   };
 
