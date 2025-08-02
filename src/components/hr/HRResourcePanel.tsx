@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface Language {
   id: string;
@@ -31,60 +33,52 @@ interface HRResourcePanelProps {
   onResourceUpdate: (resource: HRResource) => void;
 }
 
-// Données temporaires en attendant la migration
-const mockLanguages: Language[] = [
-  { id: '1', name: 'Français', code: 'fr' },
-  { id: '2', name: 'Anglais', code: 'en' },
-  { id: '3', name: 'Espagnol', code: 'es' },
-  { id: '4', name: 'Allemand', code: 'de' },
-  { id: '5', name: 'Italien', code: 'it' },
-];
-
-const mockExpertises: Expertise[] = [
-  { id: '1', name: 'PHP', category_id: '2' },
-  { id: '2', name: 'JavaScript', category_id: '2' },
-  { id: '3', name: 'React', category_id: '2' },
-  { id: '4', name: 'Vue.js', category_id: '2' },
-  { id: '5', name: 'Node.js', category_id: '2' },
-  { id: '6', name: 'Google Ads', category_id: '1' },
-  { id: '7', name: 'SEO', category_id: '1' },
-  { id: '8', name: 'Social Media', category_id: '1' },
-  { id: '9', name: 'Agile', category_id: '3' },
-  { id: '10', name: 'Scrum', category_id: '3' },
-];
-
 const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanelProps) => {
-  const [languages, setLanguages] = useState<Language[]>(mockLanguages);
-  const [expertises, setExpertises] = useState<Expertise[]>(mockExpertises);
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [expertises, setExpertises] = useState<Expertise[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [selectedExpertises, setSelectedExpertises] = useState<string[]>([]);
   const [seniority, setSeniority] = useState<'junior' | 'intermediate' | 'senior'>('junior');
   const [calculatedPrice, setCalculatedPrice] = useState(0);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Données déjà chargées avec les mocks
+    fetchLanguages();
+    fetchExpertises();
   }, []);
 
-  useEffect(() => {
-    if (selectedResource) {
-      setSelectedLanguages(selectedResource.languages);
-      setSelectedExpertises(selectedResource.expertises);
-      setSeniority(selectedResource.seniority);
-      setCalculatedPrice(selectedResource.calculated_price);
-    }
-  }, [selectedResource]);
-
-  useEffect(() => {
-    calculatePrice();
-  }, [seniority, selectedLanguages, selectedExpertises]);
-
-  // Ces fonctions seront activées après la migration
   const fetchLanguages = async () => {
-    // Utilise les données mock pour l'instant
+    const { data, error } = await supabase
+      .from('hr_languages')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les langues.",
+        variant: "destructive",
+      });
+    } else {
+      setLanguages(data || []);
+    }
   };
 
   const fetchExpertises = async () => {
-    // Utilise les données mock pour l'instant
+    const { data, error } = await supabase
+      .from('hr_expertises')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les expertises.",
+        variant: "destructive",
+      });
+    } else {
+      setExpertises(data || []);
+    }
   };
 
   const calculatePrice = () => {

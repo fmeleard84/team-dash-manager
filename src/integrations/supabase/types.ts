@@ -35,6 +35,172 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hr_expertises: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_expertises_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "hr_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_languages: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hr_profiles: {
+        Row: {
+          base_price: number
+          category_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          base_price?: number
+          category_id: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          base_price?: number
+          category_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_profiles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "hr_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_resource_assignments: {
+        Row: {
+          calculated_price: number
+          created_at: string
+          expertises: string[] | null
+          id: string
+          languages: string[] | null
+          node_data: Json | null
+          profile_id: string
+          project_id: string
+          seniority: Database["public"]["Enums"]["hr_seniority"]
+          updated_at: string
+        }
+        Insert: {
+          calculated_price?: number
+          created_at?: string
+          expertises?: string[] | null
+          id?: string
+          languages?: string[] | null
+          node_data?: Json | null
+          profile_id: string
+          project_id: string
+          seniority?: Database["public"]["Enums"]["hr_seniority"]
+          updated_at?: string
+        }
+        Update: {
+          calculated_price?: number
+          created_at?: string
+          expertises?: string[] | null
+          id?: string
+          languages?: string[] | null
+          node_data?: Json | null
+          profile_id?: string
+          project_id?: string
+          seniority?: Database["public"]["Enums"]["hr_seniority"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_resource_assignments_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "hr_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_resource_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_flows: {
         Row: {
           created_at: string
@@ -61,7 +227,7 @@ export type Database = {
           {
             foreignKeyName: "project_flows_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -119,7 +285,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      hr_seniority: "junior" | "intermediate" | "senior"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -246,6 +412,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      hr_seniority: ["junior", "intermediate", "senior"],
+    },
   },
 } as const

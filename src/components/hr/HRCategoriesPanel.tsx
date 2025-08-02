@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface HRProfile {
   id: string;
@@ -21,59 +23,57 @@ interface HRCategoriesPanelProps {
   onProfileSelect: (profile: HRProfile) => void;
 }
 
-// Données temporaires en attendant la migration
-const mockCategories: HRCategory[] = [
-  {
-    id: '1',
-    name: 'Marketing',
-    profiles: [
-      { id: '1-1', name: 'Directeur marketing', category_id: '1', base_price: 80 },
-      { id: '1-2', name: 'Stratégiste marketing', category_id: '1', base_price: 65 },
-      { id: '1-3', name: 'Chef de projet marketing', category_id: '1', base_price: 55 },
-    ]
-  },
-  {
-    id: '2',
-    name: 'Développement',
-    profiles: [
-      { id: '2-1', name: 'Architecte technique', category_id: '2', base_price: 90 },
-      { id: '2-2', name: 'Développeur Full-Stack', category_id: '2', base_price: 70 },
-      { id: '2-3', name: 'Développeur Frontend', category_id: '2', base_price: 60 },
-      { id: '2-4', name: 'Développeur Backend', category_id: '2', base_price: 65 },
-    ]
-  },
-  {
-    id: '3',
-    name: 'Gestion de projet',
-    profiles: [
-      { id: '3-1', name: 'Chef de projet senior', category_id: '3', base_price: 75 },
-      { id: '3-2', name: 'Project Manager', category_id: '3', base_price: 65 },
-      { id: '3-3', name: 'Scrum Master', category_id: '3', base_price: 60 },
-    ]
-  },
-  {
-    id: '4',
-    name: 'Comptabilité',
-    profiles: [
-      { id: '4-1', name: 'Expert-comptable', category_id: '4', base_price: 85 },
-      { id: '4-2', name: 'Comptable senior', category_id: '4', base_price: 55 },
-      { id: '4-3', name: 'Assistant comptable', category_id: '4', base_price: 35 },
-    ]
-  },
-  {
-    id: '5',
-    name: 'Finance',
-    profiles: [
-      { id: '5-1', name: 'Directeur financier', category_id: '5', base_price: 95 },
-      { id: '5-2', name: 'Analyste financier', category_id: '5', base_price: 70 },
-      { id: '5-3', name: 'Contrôleur de gestion', category_id: '5', base_price: 65 },
-    ]
-  }
-];
-
 const HRCategoriesPanel = ({ onProfileSelect }: HRCategoriesPanelProps) => {
-  const [categories, setCategories] = useState<HRCategory[]>(mockCategories);
-  const [openCategories, setOpenCategories] = useState<string[]>(['1']);
+  const [categories, setCategories] = useState<HRCategory[]>([]);
+  const [openCategories, setOpenCategories] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchCategoriesAndProfiles();
+  }, []);
+
+  const fetchCategoriesAndProfiles = async () => {
+    try {
+      // Récupérer les catégories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('hr_categories')
+        .select('*')
+        .order('name');
+
+      if (categoriesError) throw categoriesError;
+
+      // Récupérer les profils
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('hr_profiles')
+        .select('*')
+        .order('name');
+
+      if (profilesError) throw profilesError;
+
+      // Organiser les profils par catégorie
+      const categoriesWithProfiles = categoriesData.map(category => ({
+        ...category,
+        profiles: profilesData.filter(profile => profile.category_id === category.id)
+      }));
+
+      setCategories(categoriesWithProfiles);
+      
+      // Ouvrir la première catégorie par défaut
+      if (categoriesWithProfiles.length > 0) {
+        setOpenCategories([categoriesWithProfiles[0].id]);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des catégories:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les catégories RH.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleCategory = (categoryId: string) => {
     setOpenCategories(prev => 
@@ -87,6 +87,18 @@ const HRCategoriesPanel = ({ onProfileSelect }: HRCategoriesPanelProps) => {
     e.dataTransfer.setData('application/json', JSON.stringify(profile));
     e.dataTransfer.effectAllowed = 'copy';
   };
+
+  if (isLoading) {
+    return (
+      <div className="w-80 bg-card border-r p-4 space-y-2">
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="w-5 h-5 text-primary" />
+          <h2 className="font-semibold">Ressources Humaines</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">Chargement...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-80 bg-card border-r p-4 space-y-2">

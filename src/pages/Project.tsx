@@ -266,33 +266,14 @@ const Project = () => {
     
     setIsSaving(true);
     try {
-      // Vérifier si un flow existe déjà
-      const { data: existingFlow } = await supabase
+      const { error } = await supabase
         .from('project_flows')
-        .select('id')
-        .eq('project_id', id)
-        .single();
-
-      let error;
-      if (existingFlow) {
-        // Mettre à jour
-        const result = await supabase
-          .from('project_flows')
-          .update({
-            flow_data: { nodes, edges } as any
-          })
-          .eq('project_id', id);
-        error = result.error;
-      } else {
-        // Créer
-        const result = await supabase
-          .from('project_flows')
-          .insert({
-            project_id: id,
-            flow_data: { nodes, edges } as any
-          });
-        error = result.error;
-      }
+        .upsert({
+          project_id: id,
+          flow_data: { nodes, edges } as any
+        }, {
+          onConflict: 'project_id'
+        });
 
       if (error) throw error;
 
