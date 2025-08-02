@@ -59,6 +59,7 @@ export type Database = {
       hr_expertises: {
         Row: {
           category_id: string
+          cost_percentage: number
           created_at: string
           id: string
           name: string
@@ -66,6 +67,7 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          cost_percentage?: number
           created_at?: string
           id?: string
           name: string
@@ -73,6 +75,7 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          cost_percentage?: number
           created_at?: string
           id?: string
           name?: string
@@ -91,6 +94,7 @@ export type Database = {
       hr_languages: {
         Row: {
           code: string
+          cost_percentage: number
           created_at: string
           id: string
           name: string
@@ -98,6 +102,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          cost_percentage?: number
           created_at?: string
           id?: string
           name: string
@@ -105,6 +110,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          cost_percentage?: number
           created_at?: string
           id?: string
           name?: string

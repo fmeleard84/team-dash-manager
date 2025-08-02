@@ -66,8 +66,8 @@ const AdminResources = () => {
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '' });
   const [profileForm, setProfileForm] = useState({ name: '', category_id: '', base_price: 50 });
-  const [languageForm, setLanguageForm] = useState({ name: '', code: '' });
-  const [expertiseForm, setExpertiseForm] = useState({ name: '', category_id: '' });
+  const [languageForm, setLanguageForm] = useState({ name: '', code: '', cost_percentage: 5 });
+  const [expertiseForm, setExpertiseForm] = useState({ name: '', category_id: '', cost_percentage: 10 });
 
   useEffect(() => {
     if (!user) {
@@ -233,7 +233,7 @@ const AdminResources = () => {
         toast({ title: "Succès", description: "Langue créée avec succès." });
       }
       setLanguageDialog({ open: false, edit: false, data: null });
-      setLanguageForm({ name: '', code: '' });
+      setLanguageForm({ name: '', code: '', cost_percentage: 5 });
       fetchAllData();
     } catch (error: any) {
       toast({
@@ -283,7 +283,7 @@ const AdminResources = () => {
         toast({ title: "Succès", description: "Expertise créée avec succès." });
       }
       setExpertiseDialog({ open: false, edit: false, data: null });
-      setExpertiseForm({ name: '', category_id: '' });
+      setExpertiseForm({ name: '', category_id: '', cost_percentage: 10 });
       fetchAllData();
     } catch (error: any) {
       toast({

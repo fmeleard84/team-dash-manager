@@ -105,28 +105,28 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     if (!selectedLanguages.includes(languageId)) {
       const newLanguages = [...selectedLanguages, languageId];
       setSelectedLanguages(newLanguages);
-      updateResource({ languages: newLanguages });
+      setTimeout(() => updateResource({ languages: newLanguages }), 100);
     }
   };
 
   const removeLanguage = (languageId: string) => {
     const newLanguages = selectedLanguages.filter(id => id !== languageId);
     setSelectedLanguages(newLanguages);
-    updateResource({ languages: newLanguages });
+    setTimeout(() => updateResource({ languages: newLanguages }), 100);
   };
 
   const addExpertise = (expertiseId: string) => {
     if (!selectedExpertises.includes(expertiseId)) {
       const newExpertises = [...selectedExpertises, expertiseId];
       setSelectedExpertises(newExpertises);
-      updateResource({ expertises: newExpertises });
+      setTimeout(() => updateResource({ expertises: newExpertises }), 100);
     }
   };
 
   const removeExpertise = (expertiseId: string) => {
     const newExpertises = selectedExpertises.filter(id => id !== expertiseId);
     setSelectedExpertises(newExpertises);
-    updateResource({ expertises: newExpertises });
+    setTimeout(() => updateResource({ expertises: newExpertises }), 100);
   };
 
   const updateResource = (updates: Partial<HRResource>) => {
@@ -142,7 +142,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
 
   const handleSeniorityChange = (newSeniority: 'junior' | 'intermediate' | 'senior') => {
     setSeniority(newSeniority);
-    updateResource({ seniority: newSeniority });
+    setTimeout(() => updateResource({ seniority: newSeniority }), 100);
   };
 
   if (!selectedResource) {
