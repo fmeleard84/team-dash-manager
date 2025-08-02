@@ -354,21 +354,26 @@ const Project = () => {
 
       if (flowError) throw flowError;
 
-      // Save HR resource assignments
+      // Save HR resource assignments - Convert UUIDs to names for DB storage
       const resourceAssignments = Array.from(hrResources.values()).map(resource => {
         const node = nodes.find(n => n.id === resource.id);
+        
+        // Convert language IDs to names
+        const languageNames = resource.languageNames || [];
+        const expertiseNames = resource.expertiseNames || [];
+        
         return {
           id: resource.id,
           project_id: id,
           profile_id: resource.profile_id,
           seniority: resource.seniority,
-          languages: Array.isArray(resource.languages) ? resource.languages : [],
-          expertises: Array.isArray(resource.expertises) ? resource.expertises : [],
+          languages: languageNames, // Store names as text[], not UUIDs
+          expertises: expertiseNames, // Store names as text[], not UUIDs
           calculated_price: resource.calculated_price,
           node_data: { 
             position: node?.position,
-            languageNames: resource.languageNames,
-            expertiseNames: resource.expertiseNames
+            languageNames: languageNames,
+            expertiseNames: expertiseNames
           }
         };
       });
