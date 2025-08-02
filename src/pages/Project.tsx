@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save } from 'lucide-react';
+import AIGraphGenerator from '@/components/AIGraphGenerator';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
@@ -344,6 +345,20 @@ const Project = () => {
     event.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  const handleGraphGenerated = useCallback((newNodes: Node[], newEdges: Edge[]) => {
+    // Add generated nodes to existing ones
+    setNodes(currentNodes => [...currentNodes, ...newNodes]);
+    setEdges(currentEdges => [...currentEdges, ...newEdges]);
+    
+    // Add generated resources to the resources map
+    newNodes.forEach(node => {
+      if (node.data?.resource && typeof node.data.resource === 'object' && 'id' in node.data.resource) {
+        const resource = node.data.resource as HRResource;
+        setHrResources(prev => new Map(prev).set(resource.id, resource));
+      }
+    });
+  }, [setNodes, setEdges]);
+
   const saveFlow = async () => {
     if (!id) return;
     
@@ -510,6 +525,9 @@ const Project = () => {
           onResourceUpdate={handleResourceUpdate}
         />
       </div>
+      
+      {/* AI Graph Generator Footer */}
+      <AIGraphGenerator onGraphGenerated={handleGraphGenerated} />
     </div>
   );
 };
