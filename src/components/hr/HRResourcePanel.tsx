@@ -179,41 +179,104 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     }
   }, [calculatePrice, selectedResource]);
 
-  const addLanguage = (languageId: string) => {
+  const calculatePriceSync = async (
+    languages: string[], 
+    expertises: string[], 
+    seniorityLevel: 'junior' | 'intermediate' | 'senior'
+  ) => {
+    if (!selectedResource) return 0;
+    
+    // Get base price from the profile
+    const { data: profile } = await supabase
+      .from('hr_profiles')
+      .select('base_price')
+      .eq('id', selectedResource.profile_id)
+      .single();
+    
+    const basePrice = profile?.base_price || 50;
+    
+    // Seniority multiplier
+    const seniorityMultiplier = {
+      junior: 1,
+      intermediate: 1.5,
+      senior: 2
+    };
+    
+    // Calculate language bonus based on actual percentages
+    let languageBonus = 0;
+    if (languages.length > 0) {
+      const { data: languageData } = await supabase
+        .from('hr_languages')
+        .select('cost_percentage')
+        .in('id', languages);
+      
+      if (languageData) {
+        languageBonus = languageData.reduce((sum, lang) => sum + (lang.cost_percentage / 100), 0);
+      }
+    }
+    
+    // Calculate expertise bonus based on actual percentages
+    let expertiseBonus = 0;
+    if (expertises.length > 0) {
+      const { data: expertiseData } = await supabase
+        .from('hr_expertises')
+        .select('cost_percentage')
+        .in('id', expertises);
+      
+      if (expertiseData) {
+        expertiseBonus = expertiseData.reduce((sum, exp) => sum + (exp.cost_percentage / 100), 0);
+      }
+    }
+    
+    const finalPrice = basePrice * seniorityMultiplier[seniorityLevel] * (1 + languageBonus + expertiseBonus);
+    
+    return Math.round(finalPrice * 100) / 100;
+  };
+
+  const addLanguage = async (languageId: string) => {
     if (!selectedLanguages.includes(languageId)) {
       const newLanguages = [...selectedLanguages, languageId];
       setSelectedLanguages(newLanguages);
-      setTimeout(() => updateResource({ languages: newLanguages }), 100);
+      await updateResource({ languages: newLanguages }, newLanguages, selectedExpertises, seniority);
     }
   };
 
-  const removeLanguage = (languageId: string) => {
+  const removeLanguage = async (languageId: string) => {
     const newLanguages = selectedLanguages.filter(id => id !== languageId);
     setSelectedLanguages(newLanguages);
-    setTimeout(() => updateResource({ languages: newLanguages }), 100);
+    await updateResource({ languages: newLanguages }, newLanguages, selectedExpertises, seniority);
   };
 
-  const addExpertise = (expertiseId: string) => {
+  const addExpertise = async (expertiseId: string) => {
     if (!selectedExpertises.includes(expertiseId)) {
       const newExpertises = [...selectedExpertises, expertiseId];
       setSelectedExpertises(newExpertises);
-      setTimeout(() => updateResource({ expertises: newExpertises }), 100);
+      await updateResource({ expertises: newExpertises }, selectedLanguages, newExpertises, seniority);
     }
   };
 
-  const removeExpertise = (expertiseId: string) => {
+  const removeExpertise = async (expertiseId: string) => {
     const newExpertises = selectedExpertises.filter(id => id !== expertiseId);
     setSelectedExpertises(newExpertises);
-    setTimeout(() => updateResource({ expertises: newExpertises }), 100);
+    await updateResource({ expertises: newExpertises }, selectedLanguages, newExpertises, seniority);
   };
 
-  const updateResource = async (updates: Partial<HRResource>) => {
+  const updateResource = async (
+    updates: Partial<HRResource>, 
+    languages: string[] = selectedLanguages, 
+    expertises: string[] = selectedExpertises,
+    seniorityLevel: 'junior' | 'intermediate' | 'senior' = seniority
+  ) => {
     if (!selectedResource) return;
+    
+    // Calculate the current price with the new values
+    const currentPrice = await calculatePriceSync(languages, expertises, seniorityLevel);
+    setCalculatedPrice(currentPrice);
     
     const updatedResource = {
       ...selectedResource,
       ...updates,
-      calculated_price: calculatedPrice
+      calculated_price: currentPrice
     };
     
     // Get language and expertise names for display
@@ -246,9 +309,9 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     onResourceUpdate(updatedResource);
   };
 
-  const handleSeniorityChange = (newSeniority: 'junior' | 'intermediate' | 'senior') => {
+  const handleSeniorityChange = async (newSeniority: 'junior' | 'intermediate' | 'senior') => {
     setSeniority(newSeniority);
-    setTimeout(() => updateResource({ seniority: newSeniority }), 100);
+    await updateResource({ seniority: newSeniority }, selectedLanguages, selectedExpertises, newSeniority);
   };
 
   if (!selectedResource) {
