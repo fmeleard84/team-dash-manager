@@ -309,16 +309,26 @@ const Project = () => {
   }, [hrResources, setNodes]);
 
   const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
-    const sourceProfile = profiles.find(p => 
-      hrResources.get(edge.source)?.profile_id === p.id
-    );
-    const targetProfile = profiles.find(p => 
-      hrResources.get(edge.target)?.profile_id === p.id
-    );
+    setSelectedResource(null); // Clear resource selection when selecting edge
     
-    if (sourceProfile && targetProfile) {
-      setSelectedEdge({ source: sourceProfile, target: targetProfile });
-      setSelectedResource(null); // Clear resource selection when selecting edge
+    // For AI-generated edges, use the profile data from edge.data
+    if (edge.data?.sourceProfile && edge.data?.targetProfile) {
+      setSelectedEdge({ 
+        source: edge.data.sourceProfile, 
+        target: edge.data.targetProfile 
+      });
+    } else {
+      // For manual edges, find profiles by node IDs
+      const sourceProfile = profiles.find(p => 
+        hrResources.get(edge.source)?.profile_id === p.id
+      );
+      const targetProfile = profiles.find(p => 
+        hrResources.get(edge.target)?.profile_id === p.id
+      );
+      
+      if (sourceProfile && targetProfile) {
+        setSelectedEdge({ source: sourceProfile, target: targetProfile });
+      }
     }
   }, [profiles, hrResources]);
 

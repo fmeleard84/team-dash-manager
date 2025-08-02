@@ -232,14 +232,62 @@ Répondez en français et justifiez chaque choix de séniorité et chaque connex
             }
           }));
 
-          // Transform edges with proper IDs
+          // Create intelligent connections based on inputs/outputs
+          const connections = [];
+          for (let i = 0; i < parsed.nodes.length; i++) {
+            for (let j = i + 1; j < parsed.nodes.length; j++) {
+              const sourceNode = parsed.nodes[i];
+              const targetNode = parsed.nodes[j];
+              const sourceProfile = profiles.find(p => p.id === sourceNode.profile_id);
+              const targetProfile = profiles.find(p => p.id === targetNode.profile_id);
+              
+              if (!sourceProfile || !targetProfile) continue;
+              
+              // Check if source outputs match target inputs (bidirectional)
+              const sourceToTarget = sourceProfile.outputs?.some(output => 
+                targetProfile.inputs?.some(input => 
+                  input.toLowerCase().includes(output.toLowerCase()) || 
+                  output.toLowerCase().includes(input.toLowerCase()) ||
+                  output.toLowerCase() === input.toLowerCase()
+                )
+              );
+
+              const targetToSource = targetProfile.outputs?.some(output => 
+                sourceProfile.inputs?.some(input => 
+                  input.toLowerCase().includes(output.toLowerCase()) || 
+                  output.toLowerCase().includes(input.toLowerCase()) ||
+                  output.toLowerCase() === input.toLowerCase()
+                )
+              );
+              
+              if (sourceToTarget) {
+                connections.push({
+                  source: sourceNode.id,
+                  target: targetNode.id,
+                  sourceProfile: sourceProfile,
+                  targetProfile: targetProfile
+                });
+              }
+
+              if (targetToSource && !sourceToTarget) {
+                connections.push({
+                  source: targetNode.id,
+                  target: sourceNode.id,
+                  sourceProfile: targetProfile,
+                  targetProfile: sourceProfile
+                });
+              }
+            }
+          }
+
+          // Transform edges with proper IDs including profile data
           const timestamp = Date.now();
-          const transformedEdges = (parsed.edges || []).map((edge: any, index: number) => {
-            const sourceIndex = parsed.nodes.findIndex((n: any) => n.id === edge.source);
-            const targetIndex = parsed.nodes.findIndex((n: any) => n.id === edge.target);
+          const transformedEdges = connections.map((conn, index) => {
+            const sourceIndex = parsed.nodes.findIndex((n: any) => n.id === conn.source);
+            const targetIndex = parsed.nodes.findIndex((n: any) => n.id === conn.target);
             
             if (sourceIndex === -1 || targetIndex === -1) {
-              console.warn('Edge references non-existent node:', edge);
+              console.warn('Edge references non-existent node:', conn);
               return null;
             }
             
@@ -247,7 +295,13 @@ Répondez en français et justifiez chaque choix de séniorité et chaque connex
               id: `edge-${timestamp}-${index}`,
               source: `node-${timestamp}-${sourceIndex}`,
               target: `node-${timestamp}-${targetIndex}`,
-              type: 'default'
+              type: 'default',
+              animated: true,
+              style: { stroke: '#8b5cf6' },
+              data: {
+                sourceProfile: conn.sourceProfile,
+                targetProfile: conn.targetProfile
+              }
             };
           }).filter(Boolean);
 
