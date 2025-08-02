@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ProjectCard } from '@/components/ProjectCard';
-import { Plus, LogOut } from 'lucide-react';
+import { Plus, LogOut, Users } from 'lucide-react';
 
 interface Project {
   id: string;
@@ -187,7 +187,13 @@ const Dashboard = () => {
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-xl font-semibold">Mes Projets</h2>
           
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/admin/resources')}>
+              <Users className="w-4 h-4 mr-2" />
+              Gérer les ressources
+            </Button>
+            
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
@@ -247,6 +253,7 @@ const Dashboard = () => {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {projects.length === 0 ? (

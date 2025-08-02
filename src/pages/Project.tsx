@@ -18,6 +18,9 @@ import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save } from 'lucide-react';
+import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
+import HRResourcePanel from '@/components/hr/HRResourcePanel';
+import HRResourceNode from '@/components/hr/HRResourceNode';
 
 interface Project {
   id: string;
@@ -28,16 +31,28 @@ interface Project {
   status: 'play' | 'pause';
 }
 
-const initialNodes: Node[] = [
-  {
-    id: '1',
-    type: 'input',
-    data: { label: 'Début du projet' },
-    position: { x: 250, y: 25 },
-  },
-];
+interface HRProfile {
+  id: string;
+  name: string;
+  category_id: string;
+  base_price: number;
+}
 
+interface HRResource {
+  id: string;
+  profile_id: string;
+  seniority: 'junior' | 'intermediate' | 'senior';
+  languages: string[];
+  expertises: string[];
+  calculated_price: number;
+}
+
+const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
+
+const nodeTypes = {
+  hrResource: HRResourceNode,
+};
 
 const Project = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,6 +65,8 @@ const Project = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedResource, setSelectedResource] = useState<HRResource | null>(null);
+  const [hrResources, setHrResources] = useState<Map<string, HRResource>>(new Map());
 
   useEffect(() => {
     if (!user) {
@@ -110,6 +127,140 @@ const Project = () => {
     [setEdges],
   );
 
+  const handleProfileSelect = (profile: HRProfile) => {
+    const nodeId = `hr-${Date.now()}`;
+    
+    // Créer une nouvelle ressource HR
+    const newResource: HRResource = {
+      id: nodeId,
+      profile_id: profile.id,
+      seniority: 'junior',
+      languages: [],
+      expertises: [],
+      calculated_price: profile.base_price,
+    };
+
+    // Ajouter au Map des ressources
+    setHrResources(prev => new Map(prev).set(nodeId, newResource));
+
+    // Créer un nouveau nœud
+    const newNode: Node = {
+      id: nodeId,
+      type: 'hrResource',
+      position: { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+      data: {
+        id: nodeId,
+        profileName: profile.name,
+        seniority: newResource.seniority,
+        languages: [],
+        expertises: [],
+        calculatedPrice: newResource.calculated_price,
+        selected: false,
+      },
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setSelectedResource(newResource);
+  };
+
+  const handleResourceUpdate = (updatedResource: HRResource) => {
+    // Mettre à jour dans le Map
+    setHrResources(prev => new Map(prev).set(updatedResource.id, updatedResource));
+
+    // Mettre à jour le nœud correspondant
+    setNodes(nds =>
+      nds.map(node => {
+        if (node.id === updatedResource.id) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              seniority: updatedResource.seniority,
+              languages: updatedResource.languages,
+              expertises: updatedResource.expertises,
+              calculatedPrice: updatedResource.calculated_price,
+            },
+          };
+        }
+        return node;
+      })
+    );
+
+    setSelectedResource(updatedResource);
+  };
+
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    if (node.type === 'hrResource') {
+      const resource = hrResources.get(node.id);
+      if (resource) {
+        setSelectedResource(resource);
+        
+        // Mettre à jour l'état selected des nœuds
+        setNodes(nds =>
+          nds.map(n => ({
+            ...n,
+            data: { ...n.data, selected: n.id === node.id },
+          }))
+        );
+      }
+    }
+  }, [hrResources, setNodes]);
+
+  const handleCanvasDrop = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    
+    try {
+      const profile: HRProfile = JSON.parse(event.dataTransfer.getData('application/json'));
+      
+      // Calculer la position relative au canvas
+      const reactFlowBounds = (event.target as Element).closest('.react-flow')?.getBoundingClientRect();
+      if (!reactFlowBounds) return;
+      
+      const position = {
+        x: event.clientX - reactFlowBounds.left - 100, // Ajustement pour centrer
+        y: event.clientY - reactFlowBounds.top - 50,
+      };
+
+      const nodeId = `hr-${Date.now()}`;
+      
+      const newResource: HRResource = {
+        id: nodeId,
+        profile_id: profile.id,
+        seniority: 'junior',
+        languages: [],
+        expertises: [],
+        calculated_price: profile.base_price,
+      };
+
+      setHrResources(prev => new Map(prev).set(nodeId, newResource));
+
+      const newNode: Node = {
+        id: nodeId,
+        type: 'hrResource',
+        position,
+        data: {
+          id: nodeId,
+          profileName: profile.name,
+          seniority: newResource.seniority,
+          languages: [],
+          expertises: [],
+          calculatedPrice: newResource.calculated_price,
+          selected: false,
+        },
+      };
+
+      setNodes(nds => [...nds, newNode]);
+      setSelectedResource(newResource);
+    } catch (error) {
+      console.error('Erreur lors du drop:', error);
+    }
+  }, [setNodes]);
+
+  const handleCanvasDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
   const saveFlow = async () => {
     if (!id) return;
     
@@ -164,6 +315,7 @@ const Project = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col">
+      {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -177,7 +329,7 @@ const Project = () => {
             <div>
               <h1 className="text-xl font-bold">{project.title}</h1>
               <p className="text-sm text-muted-foreground">
-                {project.price_per_minute.toFixed(2)} €/min
+                Gestion des ressources humaines
               </p>
             </div>
           </div>
@@ -189,19 +341,38 @@ const Project = () => {
         </div>
       </header>
 
-      <div className="flex-1">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          fitView
+      {/* Main Content - 3 panels */}
+      <div className="flex-1 flex">
+        {/* Panel gauche - Catégories HR */}
+        <HRCategoriesPanel onProfileSelect={handleProfileSelect} />
+        
+        {/* Panel central - ReactFlow Canvas */}
+        <div 
+          className="flex-1 relative"
+          onDrop={handleCanvasDrop}
+          onDragOver={handleCanvasDragOver}
         >
-          <Controls />
-          <MiniMap />
-          <Background gap={12} size={1} />
-        </ReactFlow>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={handleNodeClick}
+            nodeTypes={nodeTypes}
+            fitView
+          >
+            <Controls />
+            <MiniMap />
+            <Background gap={12} size={1} />
+          </ReactFlow>
+        </div>
+        
+        {/* Panel droit - Configuration ressource */}
+        <HRResourcePanel 
+          selectedResource={selectedResource}
+          onResourceUpdate={handleResourceUpdate}
+        />
       </div>
     </div>
   );
