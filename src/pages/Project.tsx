@@ -57,6 +57,14 @@ const nodeTypes = {
   hrResource: HRResourceNode,
 };
 
+// Helper function to ensure valid position
+const ensureValidPosition = (position?: { x: number; y: number }) => {
+  if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
+    return { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 };
+  }
+  return position;
+};
+
 const Project = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -142,21 +150,23 @@ const Project = () => {
             id: assignment.id,
             profile_id: assignment.profile_id,
             seniority: assignment.seniority,
-            languages: languageIds, // Use IDs for working with the UI
-            expertises: expertiseIds, // Use IDs for working with the UI
+            languages: languageIds,
+            expertises: expertiseIds,
             calculated_price: assignment.calculated_price,
-            languageNames: assignment.languages || [], // Keep names for display
-            expertiseNames: assignment.expertises || [], // Keep names for display
+            languageNames: assignment.languages || [],
+            expertiseNames: assignment.expertises || [],
           };
 
           resourcesMap.set(assignment.id, resource);
 
-          // Reconstruct node from node_data or create default
+          // Reconstruct node from node_data with position validation
           const nodeData = assignment.node_data as any;
+          const validPosition = ensureValidPosition(nodeData?.position);
+
           reconstructedNodes.push({
             id: assignment.id,
             type: 'hrResource',
-            position: nodeData?.position || { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+            position: validPosition,
             data: {
               id: assignment.id,
               profileName: profile.name,
@@ -224,11 +234,11 @@ const Project = () => {
     // Ajouter au Map des ressources
     setHrResources(prev => new Map(prev).set(nodeId, newResource));
 
-    // Créer un nouveau nœud
+    // Créer un nouveau nœud avec position garantie
     const newNode: Node = {
       id: nodeId,
       type: 'hrResource',
-      position: { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+      position: ensureValidPosition({ x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 }),
       data: {
         id: nodeId,
         profileName: profile.name,
@@ -248,7 +258,7 @@ const Project = () => {
     // Mettre à jour dans le Map
     setHrResources(prev => new Map(prev).set(updatedResource.id, updatedResource));
 
-      // Mettre à jour le nœud correspondant avec le prix calculé
+    // Mettre à jour le nœud correspondant avec le prix calculé
     setNodes(nds =>
       nds.map(node => {
         if (node.id === updatedResource.id) {
@@ -263,7 +273,7 @@ const Project = () => {
               languageNames: updatedResource.languageNames,
               expertiseNames: updatedResource.expertiseNames,
             },
-            selected: true // Garder le nœud sélectionné pour montrer la mise à jour
+            selected: true
           };
         }
         return { ...node, selected: false };
@@ -300,10 +310,10 @@ const Project = () => {
       const reactFlowBounds = (event.target as Element).closest('.react-flow')?.getBoundingClientRect();
       if (!reactFlowBounds) return;
       
-      const position = {
-        x: event.clientX - reactFlowBounds.left - 100, // Ajustement pour centrer
+      const position = ensureValidPosition({
+        x: event.clientX - reactFlowBounds.left - 100,
         y: event.clientY - reactFlowBounds.top - 50,
-      };
+      });
 
       const nodeId = crypto.randomUUID();
       
@@ -346,12 +356,18 @@ const Project = () => {
   }, []);
 
   const handleGraphGenerated = useCallback((newNodes: Node[], newEdges: Edge[]) => {
+    // Validate positions for all new nodes
+    const validatedNodes = newNodes.map(node => ({
+      ...node,
+      position: ensureValidPosition(node.position)
+    }));
+
     // Add generated nodes to existing ones
-    setNodes(currentNodes => [...currentNodes, ...newNodes]);
+    setNodes(currentNodes => [...currentNodes, ...validatedNodes]);
     setEdges(currentEdges => [...currentEdges, ...newEdges]);
     
     // Add generated resources to the resources map
-    newNodes.forEach(node => {
+    validatedNodes.forEach(node => {
       if (node.data?.resource && typeof node.data.resource === 'object' && 'id' in node.data.resource) {
         const resource = node.data.resource as HRResource;
         setHrResources(prev => new Map(prev).set(resource.id, resource));
