@@ -202,7 +202,7 @@ const Project = () => {
   );
 
   const handleProfileSelect = (profile: HRProfile) => {
-    const nodeId = `hr-${Date.now()}`;
+    const nodeId = crypto.randomUUID();
     
     // Créer une nouvelle ressource HR
     const newResource: HRResource = {
@@ -297,7 +297,7 @@ const Project = () => {
         y: event.clientY - reactFlowBounds.top - 50,
       };
 
-      const nodeId = `hr-${Date.now()}`;
+      const nodeId = crypto.randomUUID();
       
       const newResource: HRResource = {
         id: nodeId,
