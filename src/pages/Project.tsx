@@ -342,7 +342,6 @@ const Project = () => {
     if (!id) return;
     
     // Vérifier l'authentification de l'utilisateur admin
-    const { user } = useAuth();
     if (!user) {
       console.error('User not authenticated');
       toast({
