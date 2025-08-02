@@ -253,6 +253,8 @@ const Project = () => {
               languages: updatedResource.languages,
               expertises: updatedResource.expertises,
               calculatedPrice: updatedResource.calculated_price,
+              languageNames: updatedResource.languageNames,
+              expertiseNames: updatedResource.expertiseNames,
             },
           };
         }
@@ -360,10 +362,14 @@ const Project = () => {
           project_id: id,
           profile_id: resource.profile_id,
           seniority: resource.seniority,
-          languages: resource.languages,
-          expertises: resource.expertises,
+          languages: Array.isArray(resource.languages) ? resource.languages : [],
+          expertises: Array.isArray(resource.expertises) ? resource.expertises : [],
           calculated_price: resource.calculated_price,
-          node_data: { position: node?.position }
+          node_data: { 
+            position: node?.position,
+            languageNames: resource.languageNames,
+            expertiseNames: resource.expertiseNames
+          }
         };
       });
 
