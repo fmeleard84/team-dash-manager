@@ -22,6 +22,7 @@ import AIGraphGenerator from '@/components/AIGraphGenerator';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
+import { EdgeDetails } from '@/components/hr/EdgeDetails';
 
 interface Project {
   id: string;
@@ -37,6 +38,8 @@ interface HRProfile {
   name: string;
   category_id: string;
   base_price: number;
+  inputs?: string[];
+  outputs?: string[];
 }
 
 interface HRResource {
@@ -78,6 +81,8 @@ const Project = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedResource, setSelectedResource] = useState<HRResource | null>(null);
   const [hrResources, setHrResources] = useState<Map<string, HRResource>>(new Map());
+  const [selectedEdge, setSelectedEdge] = useState<{ source: HRProfile; target: HRProfile } | null>(null);
+  const [profiles, setProfiles] = useState<HRProfile[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -114,10 +119,12 @@ const Project = () => {
       if (!resourceError && resourceAssignments) {
         // Fetch all needed data for reconstruction
         const profileIds = [...new Set(resourceAssignments.map(r => r.profile_id))];
-        const { data: profiles } = await supabase
+        const { data: profilesData } = await supabase
           .from('hr_profiles')
-          .select('*')
+          .select('*, inputs, outputs')
           .in('id', profileIds);
+          
+        setProfiles(profilesData || []);
 
         const { data: languages } = await supabase
           .from('hr_languages')
@@ -288,6 +295,7 @@ const Project = () => {
       const resource = hrResources.get(node.id);
       if (resource) {
         setSelectedResource(resource);
+        setSelectedEdge(null); // Clear edge selection when selecting node
         
         // Mettre à jour l'état selected des nœuds
         setNodes(nds =>
@@ -299,6 +307,20 @@ const Project = () => {
       }
     }
   }, [hrResources, setNodes]);
+
+  const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    const sourceProfile = profiles.find(p => 
+      hrResources.get(edge.source)?.profile_id === p.id
+    );
+    const targetProfile = profiles.find(p => 
+      hrResources.get(edge.target)?.profile_id === p.id
+    );
+    
+    if (sourceProfile && targetProfile) {
+      setSelectedEdge({ source: sourceProfile, target: targetProfile });
+      setSelectedResource(null); // Clear resource selection when selecting edge
+    }
+  }, [profiles, hrResources]);
 
   const handleCanvasDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -550,6 +572,7 @@ const Project = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={handleNodeClick}
+            onEdgeClick={handleEdgeClick}
             nodeTypes={nodeTypes}
             fitView
           >
@@ -557,6 +580,17 @@ const Project = () => {
             <MiniMap />
             <Background gap={12} size={1} />
           </ReactFlow>
+
+          {/* EdgeDetails overlay */}
+          {selectedEdge && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+              <EdgeDetails 
+                sourceProfile={selectedEdge.source}
+                targetProfile={selectedEdge.target}
+                onClose={() => setSelectedEdge(null)}
+              />
+            </div>
+          )}
         </div>
         
         {/* Panel droit - Configuration ressource */}
