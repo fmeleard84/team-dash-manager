@@ -43,9 +43,9 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
         .from('planka_projects')
         .select('planka_url')
         .eq('project_id', project.id)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (error) {
         console.error('Error checking Planka project:', error);
         return;
       }
@@ -74,10 +74,19 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
     setIsPlankaSyncing(true);
     
     try {
+      // Get admin user from localStorage for authentication
+      const adminUser = localStorage.getItem('admin-user');
+      const user = adminUser ? JSON.parse(adminUser) : null;
+      
+      if (!user) {
+        throw new Error('Utilisateur non authentifié');
+      }
+
       const { data, error } = await supabase.functions.invoke('planka-integration', {
         body: {
           action: 'sync-project',
           projectId: project.id,
+          adminUserId: user.id,
         },
       });
 

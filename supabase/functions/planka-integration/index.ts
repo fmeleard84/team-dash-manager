@@ -195,18 +195,42 @@ serve(async (req) => {
       }
     );
 
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
+    const body = await req.json();
+    const { action, projectId, adminUserId } = body;
+    
+    console.log('Request body:', { action, projectId, adminUserId });
 
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Validate admin user if provided
+    if (adminUserId) {
+      const { data: adminUser, error: adminError } = await supabaseClient
+        .from('admin_users')
+        .select('id, login')
+        .eq('id', adminUserId)
+        .single();
+
+      if (adminError || !adminUser) {
+        console.error('Admin user validation failed:', adminError);
+        return new Response(JSON.stringify({ error: 'Unauthorized - Invalid admin user' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log('Admin user validated:', adminUser.login);
+    } else {
+      // Fallback to Supabase auth
+      const {
+        data: { user },
+      } = await supabaseClient.auth.getUser();
+
+      if (!user) {
+        console.error('No valid authentication found');
+        return new Response(JSON.stringify({ error: 'Unauthorized - No authentication' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
-
-    const { action, projectId } = await req.json();
 
     if (action === 'sync-project') {
       console.log(`Syncing project ${projectId} with Planka...`);
@@ -227,7 +251,7 @@ serve(async (req) => {
         .from('planka_projects')
         .select('*')
         .eq('project_id', projectId)
-        .single();
+        .maybeSingle();
 
       if (existingPlanka) {
         console.log('Project already exists in Planka');
