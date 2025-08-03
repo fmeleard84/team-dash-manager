@@ -202,7 +202,7 @@ class PlankaClient {
     const listData = {
       name,
       position,
-      type: 0, // Adding required type parameter - usually 0 for standard lists
+      type: "active", // Valid values for lists: "active" or "closed"
     };
     
     console.log('List data being sent:', JSON.stringify(listData, null, 2));
