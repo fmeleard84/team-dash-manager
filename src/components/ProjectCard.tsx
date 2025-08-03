@@ -75,7 +75,7 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
     
     try {
       // Get admin user from localStorage for authentication
-      const adminUser = localStorage.getItem('admin-user');
+      const adminUser = localStorage.getItem('admin_user');
       console.log('Admin user from localStorage:', adminUser);
       
       const user = adminUser ? JSON.parse(adminUser) : null;
