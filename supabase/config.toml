@@ -76,3 +76,9 @@ verify_jwt = false
 
 [functions.planka-integration]
 verify_jwt = true
+
+[functions.candidate-auth]
+verify_jwt = false
+
+[functions.send-verification-email]
+verify_jwt = false

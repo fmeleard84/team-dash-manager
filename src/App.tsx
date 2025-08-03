@@ -8,6 +8,7 @@ import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import Project from "./pages/Project";
 import AdminResources from "./pages/AdminResources";
+import Team from "./pages/Team";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/project/:id" element={<Project />} />
             <Route path="/admin/resources" element={<AdminResources />} />
+            <Route path="/team" element={<Team />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

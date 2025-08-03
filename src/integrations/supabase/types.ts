@@ -35,6 +35,185 @@ export type Database = {
         }
         Relationships: []
       }
+      candidate_expertises: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          expertise_id: string
+          id: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          expertise_id: string
+          id?: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          expertise_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_expertises_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_expertises_expertise_id_fkey"
+            columns: ["expertise_id"]
+            isOneToOne: false
+            referencedRelation: "hr_expertises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_languages: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          id: string
+          language_id: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          id?: string
+          language_id: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          language_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_languages_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_languages_language_id_fkey"
+            columns: ["language_id"]
+            isOneToOne: false
+            referencedRelation: "hr_languages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_profiles: {
+        Row: {
+          category_id: string
+          created_at: string
+          daily_rate: number
+          email: string
+          email_verification_code: string | null
+          first_name: string
+          id: string
+          is_email_verified: boolean
+          last_name: string
+          password_hash: string
+          phone: string | null
+          seniority: Database["public"]["Enums"]["hr_seniority"]
+          updated_at: string
+          verification_code_expires_at: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          daily_rate?: number
+          email: string
+          email_verification_code?: string | null
+          first_name: string
+          id?: string
+          is_email_verified?: boolean
+          last_name: string
+          password_hash: string
+          phone?: string | null
+          seniority?: Database["public"]["Enums"]["hr_seniority"]
+          updated_at?: string
+          verification_code_expires_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          daily_rate?: number
+          email?: string
+          email_verification_code?: string | null
+          first_name?: string
+          id?: string
+          is_email_verified?: boolean
+          last_name?: string
+          password_hash?: string
+          phone?: string | null
+          seniority?: Database["public"]["Enums"]["hr_seniority"]
+          updated_at?: string
+          verification_code_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_profiles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "hr_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_project_assignments: {
+        Row: {
+          assigned_at: string
+          candidate_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          project_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          candidate_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          candidate_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_project_assignments_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_categories: {
         Row: {
           created_at: string
