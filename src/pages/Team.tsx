@@ -103,10 +103,17 @@ const Team = () => {
       });
 
       if (response.error) throw response.error;
+      
+      // Check if the response data contains an error
+      if (response.data?.error) {
+        toast.error(response.data.error);
+        return;
+      }
 
       toast.success("Compte créé avec succès ! Vous pouvez maintenant compléter votre profil.");
       setStep('profile');
     } catch (error: any) {
+      console.error('Signup error:', error);
       toast.error(error.message || "Erreur lors de la création du compte");
     } finally {
       setLoading(false);
