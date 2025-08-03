@@ -199,10 +199,15 @@ class PlankaClient {
   async createList(boardId: string, name: string, position: number): Promise<PlankaList> {
     console.log(`Creating list: ${name} in board: ${boardId}`);
     
-    const data = await this.apiCall(`/boards/${boardId}/lists`, 'POST', {
+    const listData = {
       name,
       position,
-    });
+      type: 0, // Adding required type parameter - usually 0 for standard lists
+    };
+    
+    console.log('List data being sent:', JSON.stringify(listData, null, 2));
+    
+    const data = await this.apiCall(`/boards/${boardId}/lists`, 'POST', listData);
     
     return data.item;
   }
