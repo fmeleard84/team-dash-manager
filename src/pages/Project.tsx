@@ -494,7 +494,7 @@ const Project = () => {
         const { error: resourceError } = await supabase
           .from('hr_resource_assignments')
           .upsert(resourceAssignments, {
-            onConflict: 'id'
+            onConflict: 'project_id,profile_id'
           });
 
         if (resourceError) {
