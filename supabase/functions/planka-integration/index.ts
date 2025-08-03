@@ -219,6 +219,7 @@ class PlankaClient {
       name,
       description: description || '',
       position: position || 1,
+      type: "task", // Required type parameter for cards
     });
     
     return data.item;
