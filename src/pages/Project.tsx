@@ -135,7 +135,7 @@ const Project = () => {
           .select('*');
 
         // Create lookup maps
-        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const profileMap = new Map(profilesData?.map(p => [p.id, p]) || []);
         const languageMap = new Map(languages?.map(l => [l.id, l]) || []);
         const expertiseMap = new Map(expertises?.map(e => [e.id, e]) || []);
 
