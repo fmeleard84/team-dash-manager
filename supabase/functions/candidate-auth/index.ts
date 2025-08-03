@@ -123,9 +123,14 @@ async function handleSignup(req: Request, supabase: any) {
   }
 
   // Send verification email
-  await supabase.functions.invoke('send-verification-email', {
-    body: { email, code: verificationCode, firstName }
-  });
+  try {
+    await supabase.functions.invoke('send-verification-email', {
+      body: { email, code: verificationCode, firstName }
+    });
+  } catch (emailError) {
+    console.error('Error sending verification email:', emailError);
+    // Continue anyway, user account is created
+  }
 
   return new Response(JSON.stringify({ 
     success: true, 
