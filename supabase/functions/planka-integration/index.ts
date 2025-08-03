@@ -1,0 +1,362 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface PlankaCredentials {
+  baseUrl: string;
+  email: string;
+  password: string;
+}
+
+interface PlankaUser {
+  id: string;
+  username: string;
+  email: string;
+  name: string;
+  accessToken: string;
+}
+
+interface PlankaProject {
+  id: string;
+  name: string;
+  background: {
+    color?: string;
+    imageUrl?: string;
+  };
+}
+
+interface PlankaBoard {
+  id: string;
+  name: string;
+  projectId: string;
+  lists?: PlankaList[];
+}
+
+interface PlankaList {
+  id: string;
+  name: string;
+  boardId: string;
+  position: number;
+}
+
+interface PlankaCard {
+  id: string;
+  name: string;
+  description?: string;
+  listId: string;
+  position: number;
+}
+
+class PlankaClient {
+  private baseUrl: string;
+  private accessToken: string | null = null;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+  }
+
+  async authenticate(email: string, password: string): Promise<PlankaUser> {
+    console.log('Authenticating with Planka...');
+    
+    const response = await fetch(`${this.baseUrl}/api/access-tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        emailOrUsername: email,
+        password: password,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Planka authentication failed:', errorText);
+      throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Authentication successful');
+    
+    this.accessToken = data.item.accessToken;
+    
+    return {
+      id: data.item.user.id,
+      username: data.item.user.username,
+      email: data.item.user.email,
+      name: data.item.user.name,
+      accessToken: data.item.accessToken,
+    };
+  }
+
+  private async apiCall(endpoint: string, method: string = 'GET', body?: any) {
+    if (!this.accessToken) {
+      throw new Error('Not authenticated. Call authenticate() first.');
+    }
+
+    const response = await fetch(`${this.baseUrl}/api${endpoint}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.accessToken}`,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API call failed: ${method} ${endpoint}`, errorText);
+      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async getProjects(): Promise<PlankaProject[]> {
+    console.log('Fetching Planka projects...');
+    const data = await this.apiCall('/projects');
+    return data.items || [];
+  }
+
+  async createProject(name: string, description?: string): Promise<PlankaProject> {
+    console.log(`Creating Planka project: ${name}`);
+    
+    const data = await this.apiCall('/projects', 'POST', {
+      name,
+      ...(description && { description }),
+      background: {
+        color: '#0079bf', // Default blue color
+      },
+    });
+    
+    return data.item;
+  }
+
+  async getProjectBoards(projectId: string): Promise<PlankaBoard[]> {
+    console.log(`Fetching boards for project: ${projectId}`);
+    const data = await this.apiCall(`/projects/${projectId}/boards`);
+    return data.items || [];
+  }
+
+  async createBoard(projectId: string, name: string): Promise<PlankaBoard> {
+    console.log(`Creating board: ${name} in project: ${projectId}`);
+    
+    const data = await this.apiCall(`/projects/${projectId}/boards`, 'POST', {
+      name,
+      position: 1,
+    });
+    
+    return data.item;
+  }
+
+  async createList(boardId: string, name: string, position: number): Promise<PlankaList> {
+    console.log(`Creating list: ${name} in board: ${boardId}`);
+    
+    const data = await this.apiCall(`/boards/${boardId}/lists`, 'POST', {
+      name,
+      position,
+    });
+    
+    return data.item;
+  }
+
+  async createCard(listId: string, name: string, description?: string, position?: number): Promise<PlankaCard> {
+    console.log(`Creating card: ${name} in list: ${listId}`);
+    
+    const data = await this.apiCall(`/lists/${listId}/cards`, 'POST', {
+      name,
+      description: description || '',
+      position: position || 1,
+    });
+    
+    return data.item;
+  }
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    );
+
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser();
+
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { action, projectId } = await req.json();
+
+    if (action === 'sync-project') {
+      console.log(`Syncing project ${projectId} with Planka...`);
+
+      // Get project details from Supabase
+      const { data: project, error: projectError } = await supabaseClient
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (projectError || !project) {
+        throw new Error('Project not found');
+      }
+
+      // Check if project already exists in Planka
+      const { data: existingPlanka } = await supabaseClient
+        .from('planka_projects')
+        .select('*')
+        .eq('project_id', projectId)
+        .single();
+
+      if (existingPlanka) {
+        console.log('Project already exists in Planka');
+        return new Response(JSON.stringify({
+          success: true,
+          exists: true,
+          plankaUrl: existingPlanka.planka_url,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Get Planka credentials from environment
+      const plankaBaseUrl = Deno.env.get('PLANKA_BASE_URL');
+      const plankaEmail = Deno.env.get('PLANKA_EMAIL');
+      const plankaPassword = Deno.env.get('PLANKA_PASSWORD');
+
+      if (!plankaBaseUrl || !plankaEmail || !plankaPassword) {
+        throw new Error('Missing Planka credentials');
+      }
+
+      // Initialize Planka client and authenticate
+      const planka = new PlankaClient(plankaBaseUrl);
+      await planka.authenticate(plankaEmail, plankaPassword);
+
+      // Create project in Planka
+      const plankaProject = await planka.createProject(
+        project.title,
+        project.description || `Projet HR System: ${project.title}`
+      );
+
+      // Create main board
+      const plankaBoard = await planka.createBoard(
+        plankaProject.id,
+        `Ressources - ${project.title}`
+      );
+
+      // Create default lists
+      const lists = [
+        { name: 'À faire', position: 1 },
+        { name: 'En cours', position: 2 },
+        { name: 'Terminé', position: 3 },
+      ];
+
+      for (const listData of lists) {
+        await planka.createList(plankaBoard.id, listData.name, listData.position);
+      }
+
+      // Get HR resource assignments for this project
+      const { data: hrResources } = await supabaseClient
+        .from('hr_resource_assignments')
+        .select(`
+          *,
+          hr_profiles (
+            name,
+            hr_categories (name)
+          )
+        `)
+        .eq('project_id', projectId);
+
+      // Create cards for each HR resource
+      if (hrResources) {
+        const todoList = await planka.createList(plankaBoard.id, 'Ressources assignées', 0);
+        
+        for (let i = 0; i < hrResources.length; i++) {
+          const resource = hrResources[i];
+          const profile = resource.hr_profiles;
+          
+          const cardName = `${profile?.name || 'Ressource'} - ${resource.seniority}`;
+          const cardDescription = `
+**Catégorie**: ${profile?.hr_categories?.name || 'Non définie'}
+**Séniorité**: ${resource.seniority}
+**Prix calculé**: ${resource.calculated_price}€/min
+**Langues**: ${resource.languages?.join(', ') || 'Aucune'}
+**Expertises**: ${resource.expertises?.join(', ') || 'Aucune'}
+          `.trim();
+
+          await planka.createCard(
+            todoList.id,
+            cardName,
+            cardDescription,
+            i + 1
+          );
+        }
+      }
+
+      // Save Planka project info to Supabase
+      const plankaUrl = `${plankaBaseUrl}/projects/${plankaProject.id}/boards/${plankaBoard.id}`;
+      
+      const { error: insertError } = await supabaseClient
+        .from('planka_projects')
+        .insert({
+          project_id: projectId,
+          planka_project_id: plankaProject.id,
+          planka_board_id: plankaBoard.id,
+          planka_url: plankaUrl,
+        });
+
+      if (insertError) {
+        console.error('Error saving Planka project info:', insertError);
+        throw insertError;
+      }
+
+      console.log('Project successfully synced with Planka');
+
+      return new Response(JSON.stringify({
+        success: true,
+        exists: false,
+        plankaUrl,
+        plankaProjectId: plankaProject.id,
+        plankaBoardId: plankaBoard.id,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in planka-integration function:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Internal server error',
+      details: error.stack,
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});

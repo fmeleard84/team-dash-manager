@@ -252,6 +252,44 @@ export type Database = {
           },
         ]
       }
+      planka_projects: {
+        Row: {
+          created_at: string
+          id: string
+          planka_board_id: string
+          planka_project_id: string
+          planka_url: string
+          project_id: string
+          synced_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          planka_board_id: string
+          planka_project_id: string
+          planka_url: string
+          project_id: string
+          synced_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          planka_board_id?: string
+          planka_project_id?: string
+          planka_url?: string
+          project_id?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planka_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_flows: {
         Row: {
           created_at: string
