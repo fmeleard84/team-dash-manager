@@ -93,6 +93,15 @@ interface VerifyEmailRequest {
   code: string;
 }
 
+interface CompleteProfileRequest {
+  email: string;
+  categoryId: string;
+  seniority: string;
+  dailyRate: number;
+  languages: string[];
+  expertises: string[];
+}
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -114,6 +123,8 @@ serve(async (req) => {
         return await handleLogin(req, supabase);
       case 'verify-email':
         return await handleVerifyEmail(req, supabase);
+      case 'complete-profile':
+        return await handleCompleteProfile(req, supabase);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
@@ -133,11 +144,19 @@ async function handleSignup(req: Request, supabase: any) {
   const { email, password, firstName, lastName, phone }: SignupRequest = await req.json();
 
   // Check if candidate already exists
-  const { data: existingCandidate } = await supabase
+  const { data: existingCandidate, error: checkError } = await supabase
     .from('candidate_profiles')
     .select('id')
     .eq('email', email)
-    .single();
+    .maybeSingle();
+
+  if (checkError) {
+    console.error('Error checking existing candidate:', checkError);
+    return new Response(JSON.stringify({ error: 'Erreur lors de la vérification du compte' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   if (existingCandidate) {
     return new Response(JSON.stringify({ error: 'Un compte avec cet email existe déjà' }), {
@@ -305,6 +324,81 @@ async function handleVerifyEmail(req: Request, supabase: any) {
   return new Response(JSON.stringify({ 
     success: true, 
     message: 'Email vérifié avec succès' 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function handleCompleteProfile(req: Request, supabase: any) {
+  const { email, categoryId, seniority, dailyRate, languages, expertises }: CompleteProfileRequest = await req.json();
+
+  // Get candidate
+  const { data: candidate, error: candidateError } = await supabase
+    .from('candidate_profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (candidateError || !candidate) {
+    return new Response(JSON.stringify({ error: 'Candidat non trouvé' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Update candidate profile
+  const { error: updateError } = await supabase
+    .from('candidate_profiles')
+    .update({
+      category_id: categoryId,
+      seniority,
+      daily_rate: dailyRate
+    })
+    .eq('id', candidate.id);
+
+  if (updateError) {
+    console.error('Error updating candidate profile:', updateError);
+    return new Response(JSON.stringify({ error: 'Erreur lors de la mise à jour du profil' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Add languages
+  if (languages && languages.length > 0) {
+    const languageInserts = languages.map(languageId => ({
+      candidate_id: candidate.id,
+      language_id: languageId
+    }));
+
+    const { error: languageError } = await supabase
+      .from('candidate_languages')
+      .insert(languageInserts);
+
+    if (languageError) {
+      console.error('Error adding candidate languages:', languageError);
+    }
+  }
+
+  // Add expertises
+  if (expertises && expertises.length > 0) {
+    const expertiseInserts = expertises.map(expertiseId => ({
+      candidate_id: candidate.id,
+      expertise_id: expertiseId
+    }));
+
+    const { error: expertiseError } = await supabase
+      .from('candidate_expertises')
+      .insert(expertiseInserts);
+
+    if (expertiseError) {
+      console.error('Error adding candidate expertises:', expertiseError);
+    }
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    message: 'Profil complété avec succès' 
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });

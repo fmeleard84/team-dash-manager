@@ -198,6 +198,37 @@ const Team = () => {
   const calculateHourlyRate = () => (profileData.dailyRate / 8).toFixed(2);
   const calculateMinuteRate = () => (profileData.dailyRate / (8 * 60)).toFixed(2);
 
+  const handleCompleteProfile = async () => {
+    if (!profileData.categoryId || profileData.dailyRate <= 0) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await supabase.functions.invoke('candidate-auth/complete-profile', {
+        body: {
+          email: signupData.email,
+          categoryId: profileData.categoryId,
+          seniority: profileData.seniority,
+          dailyRate: profileData.dailyRate,
+          languages: profileData.languages,
+          expertises: profileData.expertises
+        }
+      });
+
+      if (response.error) throw response.error;
+
+      toast.success("Profil complété avec succès !");
+      setStep('complete');
+    } catch (error: any) {
+      console.error('Error completing profile:', error);
+      toast.error(error.message || "Erreur lors de la completion du profil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (step === 'verify') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -361,12 +392,42 @@ const Team = () => {
                 </div>
               </div>
 
-              <Button className="w-full" disabled={!profileData.categoryId}>
-                Finaliser mon inscription
+              <Button 
+                onClick={handleCompleteProfile} 
+                disabled={loading || !profileData.categoryId}
+                className="w-full"
+              >
+                {loading ? "Finalisation..." : "Finaliser mon inscription"}
               </Button>
             </CardContent>
           </Card>
         </div>
+      </div>
+    );
+  }
+
+  if (step === 'complete') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle>Inscription complétée !</CardTitle>
+            <p className="text-muted-foreground">
+              Votre profil a été créé avec succès. Vous pouvez maintenant vous connecter à votre espace candidat.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              onClick={() => {
+                setActiveTab('login');
+                setStep('auth');
+              }}
+              className="w-full"
+            >
+              Se connecter
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
