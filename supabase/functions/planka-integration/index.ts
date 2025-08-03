@@ -144,15 +144,50 @@ class PlankaClient {
   async createProject(name: string, description?: string): Promise<PlankaProject> {
     console.log(`Creating Planka project: ${name}`);
     
-    const data = await this.apiCall('/projects', 'POST', {
+    // First attempt with type: 0 (most common default for APIs)
+    const projectData = {
       name,
+      type: 0, // Adding required type parameter (integer)
       ...(description && { description }),
       background: {
         color: '#0079bf', // Default blue color
       },
-    });
+    };
     
-    return data.item;
+    console.log('Project data being sent:', JSON.stringify(projectData, null, 2));
+    
+    try {
+      const data = await this.apiCall('/projects', 'POST', projectData);
+      console.log('Project created successfully with type: 0');
+      return data.item;
+    } catch (error) {
+      console.log('Failed with type: 0, trying type: 1...');
+      
+      // Fallback: try with type: 1
+      try {
+        const fallbackData = { ...projectData, type: 1 };
+        console.log('Fallback project data:', JSON.stringify(fallbackData, null, 2));
+        const data = await this.apiCall('/projects', 'POST', fallbackData);
+        console.log('Project created successfully with type: 1');
+        return data.item;
+      } catch (fallbackError) {
+        console.log('Failed with type: 1, trying type: "kanban"...');
+        
+        // Second fallback: try with type as string
+        try {
+          const stringTypeData = { ...projectData, type: "kanban" };
+          console.log('String type project data:', JSON.stringify(stringTypeData, null, 2));
+          const data = await this.apiCall('/projects', 'POST', stringTypeData);
+          console.log('Project created successfully with type: "kanban"');
+          return data.item;
+        } catch (stringError) {
+          console.error('All type attempts failed. Original error:', error);
+          console.error('Type 1 error:', fallbackError);
+          console.error('String type error:', stringError);
+          throw new Error(`Failed to create project with any type value. Last error: ${stringError.message}`);
+        }
+      }
+    }
   }
 
   async getProjectBoards(projectId: string): Promise<PlankaBoard[]> {
