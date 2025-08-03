@@ -81,9 +81,7 @@ async function handleSignup(req: Request, supabase: any) {
   // Hash password
   const passwordHash = await hash(password);
 
-  // Generate verification code
-  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  // No email verification for now - directly verify the account
 
   // Get default category (first one available)
   const { data: categories } = await supabase
@@ -98,7 +96,7 @@ async function handleSignup(req: Request, supabase: any) {
     });
   }
 
-  // Create candidate profile
+  // Create candidate profile (directly verified)
   const { data: candidate, error } = await supabase
     .from('candidate_profiles')
     .insert({
@@ -107,8 +105,7 @@ async function handleSignup(req: Request, supabase: any) {
       first_name: firstName,
       last_name: lastName,
       phone,
-      email_verification_code: verificationCode,
-      verification_code_expires_at: expiresAt.toISOString(),
+      is_email_verified: true, // Directly verified for now
       category_id: categories[0].id
     })
     .select()
@@ -122,19 +119,9 @@ async function handleSignup(req: Request, supabase: any) {
     });
   }
 
-  // Send verification email
-  try {
-    await supabase.functions.invoke('send-verification-email', {
-      body: { email, code: verificationCode, firstName }
-    });
-  } catch (emailError) {
-    console.error('Error sending verification email:', emailError);
-    // Continue anyway, user account is created
-  }
-
   return new Response(JSON.stringify({ 
     success: true, 
-    message: 'Compte créé. Vérifiez vos emails pour le code de vérification.' 
+    message: 'Compte créé avec succès. Vous pouvez maintenant vous connecter.' 
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });

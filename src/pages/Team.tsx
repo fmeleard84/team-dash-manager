@@ -104,8 +104,8 @@ const Team = () => {
 
       if (response.error) throw response.error;
 
-      toast.success("Compte créé ! Vérifiez vos emails pour le code de vérification.");
-      setStep('verify');
+      toast.success("Compte créé avec succès ! Vous pouvez maintenant compléter votre profil.");
+      setStep('profile');
     } catch (error: any) {
       toast.error(error.message || "Erreur lors de la création du compte");
     } finally {
