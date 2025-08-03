@@ -89,19 +89,22 @@ class PlankaClient {
       const data = await response.json();
       console.log('Authentication response:', JSON.stringify(data, null, 2));
       
-      if (!data.item || !data.item.user) {
+      // Planka returns the JWT directly in data.item
+      if (!data.item || typeof data.item !== 'string') {
         console.error('Invalid authentication response structure:', data);
         throw new Error('Invalid authentication response from Planka');
       }
       
-      this.accessToken = data.item.accessToken;
+      this.accessToken = data.item;
       
+      // For now, we'll create a minimal user object since Planka just returns the JWT
+      // We could decode the JWT to get user info, but for basic functionality this works
       return {
-        id: data.item.user.id,
-        username: data.item.user.username,
-        email: data.item.user.email,
-        name: data.item.user.name,
-        accessToken: data.item.accessToken,
+        id: 'planka-user', // We don't have the actual user ID from this response
+        username: email.split('@')[0], // Use email prefix as username
+        email: email,
+        name: email.split('@')[0], // Use email prefix as name
+        accessToken: data.item,
       };
     } catch (error) {
       console.error('Authentication error details:', error);
