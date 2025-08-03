@@ -62,41 +62,51 @@ class PlankaClient {
 
   async authenticate(email: string, password: string): Promise<PlankaUser> {
     console.log('Authenticating with Planka...');
+    console.log('Base URL:', this.baseUrl);
+    console.log('Email:', email);
     
-    const response = await fetch(`${this.baseUrl}/api/access-tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        emailOrUsername: email,
-        password: password,
-      }),
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/api/access-tokens`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          emailOrUsername: email,
+          password: password,
+        }),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Planka authentication failed:', errorText);
-      throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
-    }
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
-    const data = await response.json();
-    console.log('Authentication response:', JSON.stringify(data, null, 2));
-    
-    if (!data.item || !data.item.user) {
-      console.error('Invalid authentication response structure:', data);
-      throw new Error('Invalid authentication response from Planka');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Planka authentication failed:', errorText);
+        throw new Error(`Authentication failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Authentication response:', JSON.stringify(data, null, 2));
+      
+      if (!data.item || !data.item.user) {
+        console.error('Invalid authentication response structure:', data);
+        throw new Error('Invalid authentication response from Planka');
+      }
+      
+      this.accessToken = data.item.accessToken;
+      
+      return {
+        id: data.item.user.id,
+        username: data.item.user.username,
+        email: data.item.user.email,
+        name: data.item.user.name,
+        accessToken: data.item.accessToken,
+      };
+    } catch (error) {
+      console.error('Authentication error details:', error);
+      throw error;
     }
-    
-    this.accessToken = data.item.accessToken;
-    
-    return {
-      id: data.item.user.id,
-      username: data.item.user.username,
-      email: data.item.user.email,
-      name: data.item.user.name,
-      accessToken: data.item.accessToken,
-    };
   }
 
   private async apiCall(endpoint: string, method: string = 'GET', body?: any) {
