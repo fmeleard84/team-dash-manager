@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import { hash, compare } from "https://deno.land/x/bcrypt@v0.2.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,7 +79,7 @@ async function handleSignup(req: Request, supabase: any) {
   }
 
   // Hash password
-  const passwordHash = await bcrypt.hash(password);
+  const passwordHash = await hash(password);
 
   // Generate verification code
   const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -153,7 +153,7 @@ async function handleLogin(req: Request, supabase: any) {
   }
 
   // Check password
-  const passwordValid = await bcrypt.compare(password, candidate.password_hash);
+  const passwordValid = await compare(password, candidate.password_hash);
   if (!passwordValid) {
     return new Response(JSON.stringify({ error: 'Email ou mot de passe incorrect' }), {
       status: 401,
