@@ -370,12 +370,15 @@ const AdminResources = () => {
                         Ajouter
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent aria-describedby="category-description">
                       <DialogHeader>
                         <DialogTitle>
                           {categoryDialog.edit ? 'Modifier' : 'Créer'} une catégorie
                         </DialogTitle>
                       </DialogHeader>
+                      <p id="category-description" className="text-sm text-muted-foreground mb-4">
+                        {categoryDialog.edit ? 'Modifiez les informations de la catégorie.' : 'Créez une nouvelle catégorie pour organiser vos profils HR.'}
+                      </p>
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="category-name">Nom</Label>
@@ -454,12 +457,15 @@ const AdminResources = () => {
                         Ajouter
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent aria-describedby="profile-description">
                       <DialogHeader>
                         <DialogTitle>
                           {profileDialog.edit ? 'Modifier' : 'Créer'} un profil
                         </DialogTitle>
                       </DialogHeader>
+                      <p id="profile-description" className="text-sm text-muted-foreground mb-4">
+                        {profileDialog.edit ? 'Modifiez les informations du profil.' : 'Créez un nouveau profil HR avec ses compétences et tarification.'}
+                      </p>
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="profile-name">Nom</Label>
@@ -568,12 +574,15 @@ const AdminResources = () => {
                         Ajouter
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent aria-describedby="language-description">
                       <DialogHeader>
                         <DialogTitle>
                           {languageDialog.edit ? 'Modifier' : 'Créer'} une langue
                         </DialogTitle>
                       </DialogHeader>
+                      <p id="language-description" className="text-sm text-muted-foreground mb-4">
+                        {languageDialog.edit ? 'Modifiez les informations de la langue.' : 'Ajoutez une nouvelle langue avec son impact sur les coûts.'}
+                      </p>
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="language-name">Nom</Label>
@@ -678,12 +687,15 @@ const AdminResources = () => {
                         Ajouter
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent aria-describedby="expertise-description">
                       <DialogHeader>
                         <DialogTitle>
                           {expertiseDialog.edit ? 'Modifier' : 'Créer'} une expertise
                         </DialogTitle>
                       </DialogHeader>
+                      <p id="expertise-description" className="text-sm text-muted-foreground mb-4">
+                        {expertiseDialog.edit ? 'Modifiez les informations de l\'expertise.' : 'Créez une nouvelle expertise technique avec son surcoût.'}
+                      </p>
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="expertise-name">Nom</Label>
