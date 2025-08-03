@@ -403,7 +403,7 @@ serve(async (req) => {
       }
 
       // Save Planka project info to Supabase
-      const plankaUrl = `${plankaBaseUrl}/projects/${plankaProject.id}/boards/${plankaBoard.id}`;
+      const plankaUrl = `${plankaBaseUrl}/boards/${plankaBoard.id}`;
       
       const { error: insertError } = await supabaseClient
         .from('planka_projects')
