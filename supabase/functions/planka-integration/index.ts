@@ -81,7 +81,12 @@ class PlankaClient {
     }
 
     const data = await response.json();
-    console.log('Authentication successful');
+    console.log('Authentication response:', JSON.stringify(data, null, 2));
+    
+    if (!data.item || !data.item.user) {
+      console.error('Invalid authentication response structure:', data);
+      throw new Error('Invalid authentication response from Planka');
+    }
     
     this.accessToken = data.item.accessToken;
     
