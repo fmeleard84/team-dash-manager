@@ -1,6 +1,74 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { hash, compare } from "https://deno.land/x/bcrypt@v0.2.4/mod.ts";
+
+// Password hashing using Web Crypto API (native to Deno)
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  
+  const key = await crypto.subtle.importKey(
+    'raw',
+    data,
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+  
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 10000,
+      hash: 'SHA-256'
+    },
+    key,
+    256
+  );
+  
+  const hashArray = new Uint8Array(hashBuffer);
+  const combined = new Uint8Array(salt.length + hashArray.length);
+  combined.set(salt);
+  combined.set(hashArray, salt.length);
+  
+  return btoa(String.fromCharCode.apply(null, Array.from(combined)));
+}
+
+async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    
+    const combined = new Uint8Array(atob(hashedPassword).split('').map(c => c.charCodeAt(0)));
+    const salt = combined.slice(0, 16);
+    const hash = combined.slice(16);
+    
+    const key = await crypto.subtle.importKey(
+      'raw',
+      data,
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits']
+    );
+    
+    const hashBuffer = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: 10000,
+        hash: 'SHA-256'
+      },
+      key,
+      256
+    );
+    
+    const newHash = new Uint8Array(hashBuffer);
+    return hash.every((byte, index) => byte === newHash[index]);
+  } catch (error) {
+    console.error('Error verifying password:', error);
+    return false;
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,7 +147,7 @@ async function handleSignup(req: Request, supabase: any) {
   }
 
   // Hash password
-  const passwordHash = await hash(password);
+  const passwordHash = await hashPassword(password);
 
   // No email verification for now - directly verify the account
 
@@ -145,7 +213,7 @@ async function handleLogin(req: Request, supabase: any) {
   }
 
   // Check password
-  const passwordValid = await compare(password, candidate.password_hash);
+  const passwordValid = await verifyPassword(password, candidate.password_hash);
   if (!passwordValid) {
     return new Response(JSON.stringify({ error: 'Email ou mot de passe incorrect' }), {
       status: 401,
