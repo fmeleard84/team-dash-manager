@@ -215,14 +215,30 @@ class PlankaClient {
   async createCard(listId: string, name: string, description?: string, position?: number): Promise<PlankaCard> {
     console.log(`Creating card: ${name} in list: ${listId}`);
     
-    const data = await this.apiCall(`/lists/${listId}/cards`, 'POST', {
+    const cardData = {
       name,
       description: description || '',
       position: position || 1,
-      type: "task", // Required type parameter for cards
-    });
+      type: "project", // Valid values: "project" or "story"
+    };
     
-    return data.item;
+    console.log('Card data being sent:', JSON.stringify(cardData, null, 2));
+    
+    try {
+      const data = await this.apiCall(`/lists/${listId}/cards`, 'POST', cardData);
+      console.log(`Card created successfully: ${name}`);
+      return data.item;
+    } catch (error) {
+      console.log(`Failed to create card with type "project", trying with type "story"...`);
+      
+      // Fallback to "story" type if "project" fails
+      const fallbackCardData = { ...cardData, type: "story" };
+      console.log('Fallback card data being sent:', JSON.stringify(fallbackCardData, null, 2));
+      
+      const data = await this.apiCall(`/lists/${listId}/cards`, 'POST', fallbackCardData);
+      console.log(`Card created successfully with fallback type: ${name}`);
+      return data.item;
+    }
   }
 }
 
