@@ -567,8 +567,8 @@ const Project = () => {
         </div>
       </header>
 
-      {/* Main Content - 3 panels */}
-      <div className="flex-1 flex">
+      {/* Main Content - 3 panels with footer space */}
+      <div className="flex-1 flex" style={{ height: 'calc(100vh - 80px - 70px)' }}>
         {/* Panel gauche - Catégories HR */}
         <HRCategoriesPanel onProfileSelect={handleProfileSelect} />
         
@@ -613,11 +613,13 @@ const Project = () => {
         />
       </div>
       
-      {/* AI Graph Generator Footer */}
+      {/* AI Graph Generator Footer - reserved space */}
+      <div style={{ height: '70px' }}>
         <AIGraphGenerator 
           onGraphGenerated={handleGraphGenerated} 
           projectId={id}
         />
+      </div>
     </div>
   );
 };

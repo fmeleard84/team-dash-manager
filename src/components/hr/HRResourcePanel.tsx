@@ -48,6 +48,9 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
 
   useEffect(() => {
     fetchLanguages();
+  }, []);
+  
+  useEffect(() => {
     fetchExpertises();
   }, [selectedResource?.profile_id]); // Re-fetch when profile changes
 
@@ -329,7 +332,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
       {/* Prix calculé */}
       <div className="text-center p-4 bg-primary/10 rounded-lg">
         <div className="text-2xl font-bold text-primary">
-          {calculatedPrice.toFixed(2)} €/h
+          {calculatedPrice.toFixed(2)} €/mn
         </div>
         <div className="text-sm text-muted-foreground">Prix calculé</div>
       </div>

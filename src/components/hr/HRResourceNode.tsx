@@ -51,7 +51,7 @@ const HRResourceNode = memo(({ data, selected }: HRResourceNodeProps) => {
       <div className="flex items-center gap-1 mb-2">
         <Clock className="w-3 h-3 text-muted-foreground" />
         <span className="text-sm font-semibold text-primary">
-          {data.calculatedPrice.toFixed(2)} €/h
+          {data.calculatedPrice.toFixed(2)} €/mn
         </span>
       </div>
 

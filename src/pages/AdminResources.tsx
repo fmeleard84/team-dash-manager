@@ -493,7 +493,7 @@ const AdminResources = () => {
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor="profile-price">Prix de base (€/h)</Label>
+                          <Label htmlFor="profile-price">Prix de base (€/mn)</Label>
                           <Input
                             id="profile-price"
                             type="number"
@@ -524,9 +524,9 @@ const AdminResources = () => {
                     >
                       <div>
                         <h3 className="font-medium">{profile.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {getCategoryName(profile.category_id)} • {profile.base_price}€/h
-                        </p>
+                         <p className="text-sm text-muted-foreground">
+                           {getCategoryName(profile.category_id)} • {profile.base_price}€/mn
+                         </p>
                       </div>
                       <div className="flex gap-2">
                         <Button 

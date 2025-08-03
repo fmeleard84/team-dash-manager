@@ -141,8 +141,8 @@ const HRCategoriesPanel = ({ onProfileSelect }: HRCategoriesPanelProps) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm">{profile.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {profile.base_price}€/h
+                     <span className="text-xs text-muted-foreground">
+                      {profile.base_price}€/mn
                     </span>
                   </div>
                 </div>

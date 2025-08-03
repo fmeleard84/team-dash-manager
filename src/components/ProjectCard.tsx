@@ -37,7 +37,7 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
             {project.description || 'Aucune description'}
           </p>
            <p className="font-medium">
-             {project.price_per_minute.toFixed(2)} €/h
+             {project.price_per_minute.toFixed(2)} €/mn
            </p>
         </div>
         
