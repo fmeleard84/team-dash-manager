@@ -77,6 +77,23 @@ const Project = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Handler pour la suppression de nœuds
+  const handleNodesChange = useCallback((changes: any[]) => {
+    // Detect node removal and update hrResources accordingly
+    changes.forEach(change => {
+      if (change.type === 'remove') {
+        setHrResources(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(change.id);
+          return newMap;
+        });
+        // Clear selection if the removed node was selected
+        setSelectedResource(prev => prev?.id === change.id ? null : prev);
+      }
+    });
+    onNodesChange(changes);
+  }, [onNodesChange]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedResource, setSelectedResource] = useState<HRResource | null>(null);
@@ -452,20 +469,45 @@ const Project = () => {
     
     setIsSaving(true);
     try {
-      // Save flow data (for edges and visual layout)
-      const { error: flowError } = await supabase
-        .from('project_flows')
-        .upsert({
-          project_id: id,
-          flow_data: { nodes, edges } as any
-        }, {
-          onConflict: 'project_id'
-        });
+      // 1. First, delete resources that exist in DB but not in current canvas
+      const { data: existingResources } = await supabase
+        .from('hr_resource_assignments')
+        .select('id')
+        .eq('project_id', id);
 
-      if (flowError) throw flowError;
+      if (existingResources) {
+        const currentResourceIds = Array.from(hrResources.keys());
+        const resourcesToDelete = existingResources
+          .filter(resource => !currentResourceIds.includes(resource.id))
+          .map(resource => resource.id);
 
-      // Save HR resource assignments - Convert UUIDs to names for DB storage
-      const resourceAssignments = Array.from(hrResources.values()).map(resource => {
+        if (resourcesToDelete.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('hr_resource_assignments')
+            .delete()
+            .in('id', resourcesToDelete);
+
+          if (deleteError) {
+            console.error('Delete error:', deleteError);
+            throw deleteError;
+          }
+        }
+      }
+
+      // 2. Filter out duplicate profile_id combinations and prefer existing resources
+      const resourceAssignments = Array.from(hrResources.values())
+        .reduce((acc, resource) => {
+          const key = `${id}-${resource.profile_id}`;
+          // Keep the first occurrence or prefer existing resources (those with existing assignments)
+          if (!acc.has(key)) {
+            acc.set(key, resource);
+          }
+          return acc;
+        }, new Map())
+        .values();
+
+      // Convert to array and prepare for DB storage
+      const assignmentsArray = Array.from(resourceAssignments).map(resource => {
         const node = nodes.find(n => n.id === resource.id);
         
         // Convert language IDs to names
@@ -488,13 +530,26 @@ const Project = () => {
         };
       });
 
-      if (resourceAssignments.length > 0) {
-        console.log('Saving resource assignments:', resourceAssignments);
+      // 3. Save flow data (for edges and visual layout)
+      const { error: flowError } = await supabase
+        .from('project_flows')
+        .upsert({
+          project_id: id,
+          flow_data: { nodes, edges } as any
+        }, {
+          onConflict: 'project_id'
+        });
+
+      if (flowError) throw flowError;
+
+      // 4. Save HR resource assignments if any exist
+      if (assignmentsArray.length > 0) {
+        console.log('Saving resource assignments:', assignmentsArray);
         
         const { error: resourceError } = await supabase
           .from('hr_resource_assignments')
-          .upsert(resourceAssignments, {
-            onConflict: 'project_id,profile_id'
+          .upsert(assignmentsArray, {
+            onConflict: 'id'
           });
 
         if (resourceError) {
@@ -581,7 +636,7 @@ const Project = () => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
+            onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={handleNodeClick}
