@@ -226,15 +226,7 @@ export type Database = {
           updated_at?: string
           verification_code_expires_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "candidate_profiles_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "hr_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       candidate_project_assignments: {
         Row: {

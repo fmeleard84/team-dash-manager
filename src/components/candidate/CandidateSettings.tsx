@@ -32,11 +32,6 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
         .from('candidate_profiles')
         .select(`
           *,
-          hr_profiles (
-            id,
-            name,
-            hr_categories (name)
-          ),
           candidate_languages (
             hr_languages (id, name)
           ),
@@ -147,8 +142,8 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Domaine</p>
-              <p className="text-lg">{candidateProfile.hr_profiles?.hr_categories?.name}</p>
+              <p className="text-sm font-medium text-muted-foreground">Profil</p>
+              <p className="text-lg">Ressource IT</p>
             </div>
             <Button 
               variant="outline" 
@@ -160,8 +155,8 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
             </Button>
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">Poste</p>
-            <p className="text-lg">{candidateProfile.hr_profiles?.name}</p>
+            <p className="text-sm font-medium text-muted-foreground">Type de profil</p>
+            <p className="text-lg capitalize">{candidateProfile.profile_type || 'resource'}</p>
           </div>
           <div className="flex items-center justify-between">
             <div>
