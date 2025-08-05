@@ -61,6 +61,27 @@ serve(async (req) => {
       url: keycloakUrl
     });
 
+    // Add health check endpoint for testing
+    if (action === 'health-check') {
+      console.log('Health check requested');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Keycloak function is working',
+          timestamp: new Date().toISOString(),
+          environment: {
+            hasKeycloakUrl: !!keycloakUrl,
+            hasUsername: !!keycloakUsername,
+            hasPassword: !!keycloakPassword
+          }
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     switch (action) {
       case 'create-user':
         return await handleCreateUser(body, supabase);

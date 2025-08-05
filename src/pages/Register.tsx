@@ -24,7 +24,23 @@ const Register = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    console.log('=== Registration process started ===');
+    console.log('Supabase client configuration:', {
+      url: 'https://egdelmcijszuapcpglsy.supabase.co',
+      hasAnonymousKey: !!supabase
+    });
+
     try {
+      // Test edge function connectivity first
+      console.log('Testing edge function connectivity...');
+      try {
+        const healthCheck = await supabase.functions.invoke('keycloak-user-management', {
+          body: { action: 'health-check' }
+        });
+        console.log('Health check result:', healthCheck);
+      } catch (healthError) {
+        console.error('Health check failed:', healthError);
+      }
       // Validate form
       if (formData.password !== formData.confirmPassword) {
         toast({
