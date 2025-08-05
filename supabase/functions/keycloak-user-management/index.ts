@@ -119,10 +119,10 @@ async function getKeycloakAdminToken(): Promise<string> {
   const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
   const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
-  console.log(`Connecting to Keycloak at: ${keycloakBaseUrl}/realms/master`);
+  console.log(`Connecting to Keycloak at: ${keycloakBaseUrl}/realms/${realm}`);
   console.log(`Using username: ${adminUsername}`);
 
-  const tokenUrl = `${keycloakBaseUrl}/realms/master/protocol/openid-connect/token`;
+  const tokenUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
   
   const response = await fetch(tokenUrl, {
     method: 'POST',
