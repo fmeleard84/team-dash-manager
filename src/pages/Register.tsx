@@ -45,6 +45,14 @@ const Register = () => {
       }
 
       // Create user via Keycloak edge function
+      console.log('Attempting to create user via Keycloak...');
+      console.log('Form data:', { 
+        email: formData.email, 
+        firstName: formData.firstName, 
+        lastName: formData.lastName, 
+        phoneNumber: formData.phoneNumber 
+      });
+      
       const { data, error } = await supabase.functions.invoke('keycloak-user-management', {
         body: {
           action: 'create-user',
@@ -56,15 +64,30 @@ const Register = () => {
         },
       });
 
+      console.log('Keycloak function response:', { data, error });
+
       if (error) {
-        console.error('Registration error:', error);
+        console.error('Keycloak function error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
         toast({
           title: "Erreur d'inscription",
-          description: "Une erreur est survenue lors de l'inscription",
+          description: `Une erreur est survenue lors de l'inscription: ${error.message || 'Erreur inconnue'}`,
           variant: "destructive",
         });
         return;
       }
+
+      if (!data) {
+        console.error('No data returned from Keycloak function');
+        toast({
+          title: "Erreur",
+          description: "Aucune donnée retournée par le service d'authentification",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('User created successfully:', data);
 
       if (data.success) {
         toast({
@@ -72,6 +95,13 @@ const Register = () => {
           description: "Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.",
         });
         navigate('/auth');
+      } else {
+        console.error('User creation failed:', data);
+        toast({
+          title: "Erreur d'inscription",
+          description: data.error || "L'inscription a échoué",
+          variant: "destructive",
+        });
       }
 
     } catch (error) {

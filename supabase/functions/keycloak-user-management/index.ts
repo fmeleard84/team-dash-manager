@@ -25,22 +25,41 @@ interface CreateProjectGroupRequest {
 }
 
 serve(async (req) => {
+  console.log(`=== Keycloak User Management Function Called ===`);
+  console.log(`Method: ${req.method}`);
+  console.log(`URL: ${req.url}`);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('CORS preflight request handled');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('Initializing Supabase client...');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    console.log('Parsing request body...');
     const body = await req.json();
     const { action } = body;
 
     console.log(`Keycloak user management request: ${action}`);
     console.log(`Request body:`, JSON.stringify(body, null, 2));
+
+    // Verify Keycloak environment variables
+    const keycloakUrl = Deno.env.get('KEYCLOAK_BASE_URL');
+    const keycloakUsername = Deno.env.get('KEYCLOAK_ADMIN_USERNAME');
+    const keycloakPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
+    
+    console.log('Keycloak config check:', {
+      hasUrl: !!keycloakUrl,
+      hasUsername: !!keycloakUsername,
+      hasPassword: !!keycloakPassword,
+      url: keycloakUrl
+    });
 
     switch (action) {
       case 'create-user':
