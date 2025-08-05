@@ -640,14 +640,13 @@ interface StoreProfileParams {
   companyName?: string;
 }
 
-async function assignUserToGroup(token: string, userId: string, profileType: string): Promise<{ success: boolean; error?: string }> {
+async function createGroupIfNotExists(token: string, groupName: string): Promise<{ success: boolean; groupId?: string; error?: string }> {
   try {
     const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
     const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
-    // Get the group ID for the profile type
-    const groupsResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups?search=${profileType}`, {
-      method: 'GET',
+    // Check if group exists
+    const groupsResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -660,15 +659,77 @@ async function assignUserToGroup(token: string, userId: string, profileType: str
     }
 
     const groups = await groupsResponse.json();
-    const group = groups.find((g: any) => g.name === profileType);
-    
-    if (!group) {
-      console.error(`Group ${profileType} not found`);
-      return { success: false, error: `Group ${profileType} not found` };
+    const existingGroup = groups.find((group: any) => group.name === groupName);
+
+    if (existingGroup) {
+      console.log(`Group ${groupName} already exists with ID: ${existingGroup.id}`);
+      return { success: true, groupId: existingGroup.id };
+    }
+
+    // Create the group
+    console.log(`Creating group: ${groupName}`);
+    const createGroupResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: groupName,
+      }),
+    });
+
+    if (!createGroupResponse.ok) {
+      const errorText = await createGroupResponse.text();
+      console.error('Failed to create group:', errorText);
+      return { success: false, error: `Failed to create group: ${errorText}` };
+    }
+
+    // Get the created group ID from the location header
+    const locationHeader = createGroupResponse.headers.get('location');
+    if (locationHeader) {
+      const groupId = locationHeader.split('/').pop();
+      console.log(`Group ${groupName} created with ID: ${groupId}`);
+      return { success: true, groupId: groupId! };
+    }
+
+    // If no location header, fetch the group again to get its ID
+    const newGroupsResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (newGroupsResponse.ok) {
+      const newGroups = await newGroupsResponse.json();
+      const newGroup = newGroups.find((group: any) => group.name === groupName);
+      if (newGroup) {
+        return { success: true, groupId: newGroup.id };
+      }
+    }
+
+    return { success: false, error: 'Failed to get group ID after creation' };
+  } catch (error) {
+    console.error(`Failed to create group ${groupName}: ${error.message}`);
+    return { success: false, error: `Failed to create group: ${error.message}` };
+  }
+}
+
+async function assignUserToGroup(token: string, userId: string, profileType: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
+    const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
+
+    // Ensure the group exists, create if it doesn't
+    const groupResult = await createGroupIfNotExists(token, profileType);
+    if (!groupResult.success || !groupResult.groupId) {
+      console.error(`Failed to ensure group ${profileType} exists:`, groupResult.error);
+      return { success: false, error: groupResult.error || 'Failed to create group' };
     }
 
     // Assign user to group
-    const assignResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/users/${userId}/groups/${group.id}`, {
+    const assignResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/users/${userId}/groups/${groupResult.groupId}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,

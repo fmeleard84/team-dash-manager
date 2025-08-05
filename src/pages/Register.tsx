@@ -32,12 +32,25 @@ const Register = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      // Redirect based on user groups from Keycloak
-      if (hasGroup('client')) {
-        navigate('/client-dashboard');
-      } else {
-        navigate('/candidate-dashboard');
-      }
+      console.log('User authenticated, checking groups...');
+      
+      // Small delay to ensure groups are loaded from Keycloak
+      setTimeout(() => {
+        console.log('Checking user groups for redirection...');
+        if (hasGroup('client')) {
+          console.log('User has client group, redirecting to client dashboard');
+          navigate('/client-dashboard');
+        } else if (hasGroup('candidate') || hasGroup('resource')) {
+          console.log('User has candidate/resource group, redirecting to candidate dashboard');
+          navigate('/candidate-dashboard');
+        } else if (hasGroup('admin')) {
+          console.log('User has admin group, redirecting to admin dashboard');
+          navigate('/admin');
+        } else {
+          console.log('No specific group found, redirecting to default dashboard');
+          navigate('/dashboard');
+        }
+      }, 1000);
     }
   }, [isAuthenticated, navigate, hasGroup]);
 

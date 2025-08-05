@@ -25,15 +25,14 @@ export const useKeycloakAuth = () => {
 const keycloakConfig = {
   authority: 'https://keycloak.ialla.fr/realms/haas',
   client_id: 'backoffice',
-  redirect_uri: window.location.origin,
+  redirect_uri: `${window.location.origin}/register?tab=login`,
   response_type: 'code',
   scope: 'openid profile email',
   automaticSilentRenew: true,
   includeIdTokenInSilentRenew: true,
   onSigninCallback: () => {
-    // Clean up the URL after successful login and redirect to appropriate dashboard
-    window.history.replaceState({}, document.title, window.location.pathname);
-    // The redirect will be handled by the Register component based on user groups
+    // Clean up the URL after successful login
+    window.history.replaceState({}, document.title, '/register?tab=login');
   },
 };
 
