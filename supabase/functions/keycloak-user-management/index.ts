@@ -774,7 +774,6 @@ async function storeCandidateProfile(params: StoreProfileParams): Promise<{ succ
         phone: phoneNumber,
         profile_type: 'resource',
         password_hash: 'managed_by_keycloak'
-        // Removed profile_id as it was causing foreign key constraint error
       }),
     });
 
