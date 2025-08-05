@@ -153,6 +153,12 @@ const Team = () => {
         setStep('verify');
         toast.info("Veuillez vérifier votre email avant de vous connecter");
       } else {
+        // Store auth data in localStorage
+        localStorage.setItem('candidate-auth', JSON.stringify({
+          candidateId: data.candidateId,
+          email: loginData.email,
+          candidate: data.candidate
+        }));
         toast.success("Connexion réussie !");
         // Redirect to dashboard
         window.location.href = '/candidate-dashboard';

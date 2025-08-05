@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import CandidateProjects from "@/components/candidate/CandidateProjects";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
+import { useCandidateAuth } from "@/hooks/useCandidateAuth";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -29,6 +30,7 @@ import {
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
+  const { currentCandidateId, isLoading, error } = useCandidateAuth();
 
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
@@ -45,6 +47,25 @@ const CandidateDashboard = () => {
   };
 
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="p-6 text-center">
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      );
+    }
+
+    if (error || !currentCandidateId) {
+      return (
+        <div className="p-6 text-center">
+          <p className="text-destructive mb-4">{error || 'Erreur d\'authentification'}</p>
+          <Button onClick={() => window.location.href = '/team'}>
+            Se connecter
+          </Button>
+        </div>
+      );
+    }
+
     switch (activeSection) {
       case 'projects':
         return <CandidateProjects />;
@@ -77,7 +98,7 @@ const CandidateDashboard = () => {
           </div>
         );
       case 'settings':
-        return <CandidateSettings currentCandidateId="test-candidate-id" />;
+        return <CandidateSettings currentCandidateId={currentCandidateId} />;
        
       default:
         return null;

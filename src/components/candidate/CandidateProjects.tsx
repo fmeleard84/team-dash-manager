@@ -52,27 +52,60 @@ const CandidateProjects = () => {
 
   const fetchCurrentCandidate = async () => {
     try {
-      // Pour le moment, on simule un candidat de test
-      // TODO: Implémenter l'authentification candidat complète
-      const testCandidateId = "test-candidate-id";
-      
-      // Vérifier si on a un candidat dans la base
-      const { data: candidates, error } = await supabase
-        .from('candidate_profiles')
-        .select('id, first_name, last_name, email')
-        .limit(1);
+      // Vérifier s'il y a des données d'authentification stockées
+      const candidateAuth = localStorage.getItem('candidate-auth');
+      if (!candidateAuth) {
+        // Si pas d'auth, chercher le premier candidat disponible pour les tests
+        const { data: candidates, error } = await supabase
+          .from('candidate_profiles')
+          .select('id, first_name, last_name, email')
+          .limit(1);
 
-      if (error) {
-        console.error('Error fetching candidates:', error);
-        toast.error('Erreur lors de la récupération des candidats');
+        if (error) {
+          console.error('Error fetching candidates:', error);
+          toast.error('Erreur lors de la récupération des candidats');
+          return;
+        }
+
+        if (candidates && candidates.length > 0) {
+          setCurrentCandidateId(candidates[0].id);
+          toast.success(`Connecté en tant que ${candidates[0].first_name} ${candidates[0].last_name}`);
+          // Stocker temporairement l'ID pour la session
+          localStorage.setItem('candidate-auth', JSON.stringify({ 
+            candidateId: candidates[0].id,
+            email: candidates[0].email 
+          }));
+        } else {
+          toast.error('Aucun candidat trouvé dans la base de données');
+        }
         return;
       }
 
-      if (candidates && candidates.length > 0) {
-        setCurrentCandidateId(candidates[0].id);
-        toast.success(`Connecté en tant que ${candidates[0].first_name} ${candidates[0].last_name}`);
-      } else {
-        toast.error('Aucun candidat trouvé dans la base de données');
+      // Parse les données d'authentification
+      const authData = JSON.parse(candidateAuth);
+      
+      if (authData.candidateId) {
+        setCurrentCandidateId(authData.candidateId);
+      } else if (authData.email) {
+        // Si on a seulement l'email, chercher l'ID
+        const { data: candidate, error } = await supabase
+          .from('candidate_profiles')
+          .select('id, first_name, last_name')
+          .eq('email', authData.email)
+          .single();
+
+        if (error || !candidate) {
+          toast.error('Candidat non trouvé');
+          return;
+        }
+
+        setCurrentCandidateId(candidate.id);
+        // Mettre à jour les données d'auth avec l'ID
+        localStorage.setItem('candidate-auth', JSON.stringify({
+          ...authData,
+          candidateId: candidate.id
+        }));
+        toast.success(`Connecté en tant que ${candidate.first_name} ${candidate.last_name}`);
       }
     } catch (error) {
       console.error('Error:', error);

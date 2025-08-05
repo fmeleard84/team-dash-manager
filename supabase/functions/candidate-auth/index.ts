@@ -251,12 +251,13 @@ async function handleLogin(req: Request, supabase: any) {
     });
   }
 
-  // Return candidate info (without password hash)
+  // Return candidate info (without password hash) with candidateId for localStorage
   const { password_hash, email_verification_code, ...candidateData } = candidate;
   
   return new Response(JSON.stringify({ 
     success: true, 
-    candidate: candidateData 
+    candidate: candidateData,
+    candidateId: candidateData.id // Add this for easy access
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
