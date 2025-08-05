@@ -181,7 +181,7 @@ export type Database = {
           last_name: string
           password_hash: string
           phone: string | null
-          profile_id: string
+          profile_id: string | null
           profile_type: Database["public"]["Enums"]["profile_type"] | null
           seniority: Database["public"]["Enums"]["hr_seniority"]
           status: string
@@ -200,7 +200,7 @@ export type Database = {
           last_name: string
           password_hash: string
           phone?: string | null
-          profile_id: string
+          profile_id?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
@@ -219,7 +219,7 @@ export type Database = {
           last_name?: string
           password_hash?: string
           phone?: string | null
-          profile_id?: string
+          profile_id?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
