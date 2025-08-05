@@ -44,7 +44,23 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
   const oidcAuth = useOidcAuth();
   
   const getUserGroups = (): string[] => {
-    if (!oidcAuth.user?.profile?.groups) return [];
+    console.log('Getting user groups from profile:', oidcAuth.user?.profile);
+    if (!oidcAuth.user?.profile?.groups) {
+      console.log('No groups found in profile, checking other locations...');
+      // Try different locations where groups might be stored
+      const profile = oidcAuth.user?.profile as any;
+      if (profile?.resource_access?.backoffice?.roles) {
+        console.log('Found roles in resource_access:', profile.resource_access.backoffice.roles);
+        return profile.resource_access.backoffice.roles as string[];
+      }
+      if (profile?.realm_access?.roles) {
+        console.log('Found roles in realm_access:', profile.realm_access.roles);
+        return (profile.realm_access.roles as string[]).filter((role: string) => 
+          ['client', 'candidate', 'resource', 'admin'].includes(role)
+        );
+      }
+      return [];
+    }
     return Array.isArray(oidcAuth.user.profile.groups) 
       ? oidcAuth.user.profile.groups as string[]
       : [];
