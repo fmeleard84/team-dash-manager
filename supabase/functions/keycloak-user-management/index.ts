@@ -223,7 +223,7 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
         phone_number: body.phoneNumber,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (dbError) {
       console.error('Error storing user in Supabase:', dbError);
