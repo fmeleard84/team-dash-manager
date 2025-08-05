@@ -96,9 +96,18 @@ serve(async (req) => {
         );
     }
   } catch (error) {
-    console.error('Error in keycloak-user-management:', error);
+    console.error('=== FATAL ERROR in Keycloak function ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        success: false, 
+        error: `Internal server error: ${error.message}`,
+        details: error.stack,
+        timestamp: new Date().toISOString()
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
