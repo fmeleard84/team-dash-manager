@@ -45,8 +45,9 @@ const Register = () => {
       }
 
       // Create user via Keycloak edge function
-      const { data, error } = await supabase.functions.invoke('keycloak-user-management/create-user', {
+      const { data, error } = await supabase.functions.invoke('keycloak-user-management', {
         body: {
+          action: 'create-user',
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName,

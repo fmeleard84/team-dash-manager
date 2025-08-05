@@ -36,16 +36,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const url = new URL(req.url);
-    const action = url.pathname.split('/').pop();
+    const body = await req.json();
+    const { action } = body;
+
+    console.log(`Keycloak user management request: ${action}`);
+    console.log(`Request body:`, JSON.stringify(body, null, 2));
 
     switch (action) {
       case 'create-user':
-        return await handleCreateUser(req, supabase);
+        return await handleCreateUser(body, supabase);
       case 'add-user-to-group':
-        return await handleAddUserToGroup(req, supabase);
+        return await handleAddUserToGroup(body, supabase);
       case 'create-project-group':
-        return await handleCreateProjectGroup(req, supabase);
+        return await handleCreateProjectGroup(body, supabase);
       default:
         return new Response(
           JSON.stringify({ error: 'Invalid action' }),
@@ -67,6 +70,9 @@ async function getKeycloakAdminToken(): Promise<string> {
   const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
   const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
+  console.log(`Connecting to Keycloak at: ${keycloakBaseUrl}/realms/master`);
+  console.log(`Using username: ${adminUsername}`);
+
   const tokenUrl = `${keycloakBaseUrl}/realms/master/protocol/openid-connect/token`;
   
   const response = await fetch(tokenUrl, {
@@ -83,15 +89,23 @@ async function getKeycloakAdminToken(): Promise<string> {
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Failed to get admin token: ${response.status} ${response.statusText}`, errorText);
     throw new Error(`Failed to get admin token: ${response.statusText}`);
   }
 
   const tokenData = await response.json();
+  console.log('Successfully obtained Keycloak admin token');
   return tokenData.access_token;
 }
 
-async function handleCreateUser(req: Request, supabase: any) {
-  const body: CreateUserRequest = await req.json();
+async function handleCreateUser(body: CreateUserRequest, supabase: any) {
+  console.log('Creating user with data:', {
+    email: body.email,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    phoneNumber: body.phoneNumber
+  });
   
   try {
     // Get admin token
@@ -185,8 +199,7 @@ async function handleCreateUser(req: Request, supabase: any) {
   }
 }
 
-async function handleCreateProjectGroup(req: Request, supabase: any) {
-  const body: CreateProjectGroupRequest = await req.json();
+async function handleCreateProjectGroup(body: CreateProjectGroupRequest, supabase: any) {
   
   try {
     const adminToken = await getKeycloakAdminToken();
@@ -256,8 +269,7 @@ async function handleCreateProjectGroup(req: Request, supabase: any) {
   }
 }
 
-async function handleAddUserToGroup(req: Request, supabase: any) {
-  const body: AddUserToGroupRequest = await req.json();
+async function handleAddUserToGroup(body: AddUserToGroupRequest, supabase: any) {
   
   try {
     const adminToken = await getKeycloakAdminToken();
