@@ -3,9 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CandidateProjects from "@/components/candidate/CandidateProjects";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
 import { useCandidateAuth } from "@/hooks/useCandidateAuth";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -32,6 +36,22 @@ const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
   const { currentCandidateId, isLoading, error } = useCandidateAuth();
 
+  // Fetch candidate profile for status
+  const { data: candidateProfile, refetch: refetchProfile } = useQuery({
+    queryKey: ['candidate-profile-status', currentCandidateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('candidate_profiles')
+        .select('status, first_name, last_name')
+        .eq('id', currentCandidateId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCandidateId
+  });
+
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
     { id: 'messages', label: 'Mes messages', icon: MessageSquare },
@@ -44,6 +64,48 @@ const CandidateDashboard = () => {
     // Clear any stored auth data and redirect
     localStorage.removeItem('candidate-auth');
     window.location.href = '/team';
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('candidate_profiles')
+        .update({ status: newStatus })
+        .eq('id', currentCandidateId);
+
+      if (error) throw error;
+
+      refetchProfile();
+      toast.success('Statut mis à jour');
+    } catch (error: any) {
+      toast.error('Erreur lors de la modification: ' + error.message);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'disponible':
+        return 'bg-green-500 text-white';
+      case 'en_pause':
+        return 'bg-gray-500 text-white';
+      case 'en_mission':
+        return 'bg-red-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'disponible':
+        return 'Disponible';
+      case 'en_pause':
+        return 'En pause';
+      case 'en_mission':
+        return 'En mission';
+      default:
+        return status;
+    }
   };
 
   const renderContent = () => {
@@ -151,11 +213,40 @@ const CandidateDashboard = () => {
         </Sidebar>
 
         <main className="flex-1">
-          <header className="h-16 border-b flex items-center px-6">
-            <SidebarTrigger />
-            <div className="ml-4">
-              <h1 className="text-xl font-semibold">Tableau de bord candidat</h1>
+          <header className="h-16 border-b flex items-center justify-between px-6">
+            <div className="flex items-center">
+              <SidebarTrigger />
+              <div className="ml-4">
+                <h1 className="text-xl font-semibold">Tableau de bord candidat</h1>
+                {candidateProfile && (
+                  <p className="text-sm text-muted-foreground">
+                    {candidateProfile.first_name} {candidateProfile.last_name}
+                  </p>
+                )}
+              </div>
             </div>
+            
+            {candidateProfile && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">Statut :</span>
+                <Badge className={getStatusColor(candidateProfile.status)}>
+                  {getStatusLabel(candidateProfile.status)}
+                </Badge>
+                <Select
+                  value={candidateProfile.status}
+                  onValueChange={handleStatusChange}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="disponible">Disponible</SelectItem>
+                    <SelectItem value="en_pause">En pause</SelectItem>
+                    <SelectItem value="en_mission">En mission</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </header>
           
           <div className="p-6">

@@ -184,31 +184,6 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Statut de disponibilité</p>
-              <Badge 
-                variant={candidateProfile.status === 'disponible' ? 'default' : 'secondary'} 
-                className="capitalize"
-              >
-                {candidateProfile.status === 'disponible' ? 'Disponible' : 
-                 candidateProfile.status === 'en_pause' ? 'En pause' : 'En mission'}
-              </Badge>
-            </div>
-            <Select
-              value={candidateProfile.status}
-              onValueChange={handleStatusChange}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="disponible">Disponible</SelectItem>
-                <SelectItem value="en_pause">En pause</SelectItem>
-                <SelectItem value="en_mission">En mission</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </CardContent>
       </Card>
 
