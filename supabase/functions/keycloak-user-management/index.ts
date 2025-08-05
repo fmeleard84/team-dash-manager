@@ -97,7 +97,14 @@ serve(async (req) => {
 
     switch (action) {
       case 'create-user':
-        return await handleCreateUser(body, supabase);
+        const createResult = await handleCreateUser(body, supabase);
+        return new Response(
+          JSON.stringify(createResult),
+          { 
+            status: createResult.success ? 200 : 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       case 'add-user-to-group':
         return await handleAddUserToGroup(body, supabase);
       case 'create-project-group':
@@ -268,6 +275,35 @@ async function testKeycloakConnection(): Promise<{ success: boolean; message: st
   }
 }
 
+// Helper function to set user password
+async function setUserPassword(keycloakBaseUrl: string, realm: string, userId: string, password: string, adminToken: string) {
+  console.log('Setting password for user:', userId);
+  
+  const passwordResponse = await fetch(
+    `${keycloakBaseUrl}/admin/realms/${realm}/users/${userId}/reset-password`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'password',
+        value: password,
+        temporary: false,
+      }),
+    }
+  );
+
+  if (!passwordResponse.ok) {
+    const errorText = await passwordResponse.text();
+    console.error('Failed to set password:', errorText);
+    throw new Error(`Failed to set user password: ${errorText}`);
+  }
+  
+  console.log('Password set successfully');
+}
+
 async function handleCreateUser(body: CreateUserRequest, supabase: any) {
   console.log('Creating user with data:', {
     email: body.email,
@@ -282,6 +318,50 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
     const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
     const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
+    console.log(`Creating user in realm: ${realm}`);
+    console.log(`API URL: ${keycloakBaseUrl}/admin/realms/${realm}/users`);
+    
+    // First, check if user already exists
+    console.log('Checking if user already exists...');
+    const checkUserResponse = await fetch(
+      `${keycloakBaseUrl}/admin/realms/${realm}/users?email=${encodeURIComponent(body.email)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (checkUserResponse.ok) {
+      const existingUsers = await checkUserResponse.json();
+      if (existingUsers && existingUsers.length > 0) {
+        console.log('User already exists:', existingUsers[0]);
+        return {
+          success: false,
+          error: `User with email ${body.email} already exists in Keycloak`
+        };
+      }
+    } else {
+      console.log('Failed to check existing users, proceeding with creation...');
+    }
+
+    // Create user payload
+    const userPayload = {
+      username: body.email,
+      email: body.email,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      enabled: true,
+      emailVerified: true,
+      attributes: {
+        phoneNumber: body.phoneNumber ? [body.phoneNumber] : []
+      }
+    };
+
+    console.log('Creating user with payload:', JSON.stringify(userPayload, null, 2));
+
     // Create user in Keycloak
     const createUserResponse = await fetch(
       `${keycloakBaseUrl}/admin/realms/${realm}/users`,
@@ -291,80 +371,111 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
           'Authorization': `Bearer ${adminToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          username: body.email,
-          email: body.email,
-          firstName: body.firstName,
-          lastName: body.lastName,
-          enabled: true,
-          emailVerified: true,
-        }),
+        body: JSON.stringify(userPayload),
       }
     );
+
+    console.log(`Create user response status: ${createUserResponse.status} ${createUserResponse.statusText}`);
 
     if (!createUserResponse.ok) {
       const errorText = await createUserResponse.text();
-      throw new Error(`Failed to create user in Keycloak: ${errorText}`);
+      console.error('Keycloak create user error:', errorText);
+      
+      // Parse the error for more details
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('Parsed error:', errorJson);
+        
+        if (errorJson.errorMessage) {
+          return { success: false, error: `Keycloak error: ${errorJson.errorMessage}` };
+        }
+        if (errorJson.error_description) {
+          return { success: false, error: `Keycloak error: ${errorJson.error_description}` };
+        }
+        if (errorJson.error) {
+          return { success: false, error: `Keycloak error: ${errorJson.error}` };
+        }
+      } catch (parseError) {
+        console.error('Could not parse error response:', parseError);
+      }
+      
+      // Provide specific error messages based on status
+      if (createUserResponse.status === 409) {
+        return { success: false, error: `User with email ${body.email} already exists` };
+      } else if (createUserResponse.status === 400) {
+        return { success: false, error: `Invalid user data provided: ${errorText}` };
+      } else if (createUserResponse.status === 403) {
+        return { success: false, error: `Insufficient permissions to create user` };
+      } else {
+        return { success: false, error: `Failed to create user in Keycloak (${createUserResponse.status}): ${errorText}` };
+      }
     }
+
+    console.log('User created successfully in Keycloak');
 
     // Get the created user's ID from the Location header
     const locationHeader = createUserResponse.headers.get('Location');
+    console.log('Location header:', locationHeader);
     const keycloakUserId = locationHeader?.split('/').pop();
 
     if (!keycloakUserId) {
-      throw new Error('Failed to get Keycloak user ID');
-    }
-
-    // Set password
-    await fetch(
-      `${keycloakBaseUrl}/admin/realms/${realm}/users/${keycloakUserId}/reset-password`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${adminToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'password',
-          value: body.password,
-          temporary: false,
-        }),
+      // Try to get user ID by searching for the user
+      console.log('No location header, searching for created user...');
+      const searchResponse = await fetch(
+        `${keycloakBaseUrl}/admin/realms/${realm}/users?email=${encodeURIComponent(body.email)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (searchResponse.ok) {
+        const users = await searchResponse.json();
+        if (users && users.length > 0) {
+          const foundUser = users[0];
+          console.log('Found created user:', foundUser);
+          const foundUserId = foundUser.id;
+          
+          // Set password for the found user
+          await setUserPassword(keycloakBaseUrl, realm, foundUserId, body.password, adminToken);
+          
+          return {
+            success: true,
+            message: 'User created successfully',
+            keycloakUserId: foundUserId,
+            userDetails: foundUser
+          };
+        }
       }
-    );
-
-    // Store user metadata in Supabase
-    const { data: user, error: dbError } = await supabase
-      .from('users')
-      .insert({
-        keycloak_user_id: keycloakUserId,
-        email: body.email,
-        first_name: body.firstName,
-        last_name: body.lastName,
-        phone_number: body.phoneNumber,
-      })
-      .select()
-      .maybeSingle();
-
-    if (dbError) {
-      console.error('Error storing user in Supabase:', dbError);
-      throw new Error('Failed to store user metadata');
+      
+      return { success: false, error: 'Failed to get Keycloak user ID and could not find created user' };
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        keycloakUserId,
-        user 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.log('Setting password for user:', keycloakUserId);
+    // Set password
+    await setUserPassword(keycloakBaseUrl, realm, keycloakUserId, body.password, adminToken);
+    
+    // Don't try to store in Supabase users table for now - focus on Keycloak only
+    console.log('User created successfully in Keycloak with ID:', keycloakUserId);
 
+    return {
+      success: true,
+      message: 'User created successfully',
+      keycloakUserId,
+      userDetails: {
+        email: body.email,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        phoneNumber: body.phoneNumber
+      }
+    };
+    
   } catch (error) {
     console.error('Error creating user:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return { success: false, error: error.message };
   }
 }
 
