@@ -293,14 +293,33 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
         {/* Booking Team button */}
         {resourceAssignments.length > 0 && !allResourcesBooked && (
           <Button
-            variant="default"
+            variant="secondary"
             size="sm"
             onClick={handleBookingTeam}
             disabled={isBookingTeam}
-            className="w-full"
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white"
           >
             <Users className="w-4 h-4 mr-2" />
-            {isBookingTeam ? 'Recherche en cours...' : 'Booking Team'}
+            {isBookingTeam ? 'Recherche en cours...' : 'En attente de booking'}
+          </Button>
+        )}
+
+        {/* Join Team button when all resources are booked */}
+        {resourceAssignments.length > 0 && allResourcesBooked && (
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => {
+              if (plankaProject?.planka_url) {
+                window.open(plankaProject.planka_url, '_blank');
+              } else {
+                toast.info('Le projet Planka n\'est pas encore configuré');
+              }
+            }}
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Rejoindre l'équipe
           </Button>
         )}
 

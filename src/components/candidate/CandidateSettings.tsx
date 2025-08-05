@@ -73,6 +73,21 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('candidate_profiles')
+        .update({ status: newStatus })
+        .eq('id', currentCandidateId);
+
+      if (error) throw error;
+
+      handleUpdate();
+    } catch (error: any) {
+      toast.error('Erreur lors de la modification: ' + error.message);
+    }
+  };
+
   if (!candidateProfile) {
     return (
       <div className="p-6">
@@ -166,6 +181,31 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
                 <SelectItem value="junior">Junior</SelectItem>
                 <SelectItem value="intermediate">Intermédiaire</SelectItem>
                 <SelectItem value="senior">Senior</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Statut de disponibilité</p>
+              <Badge 
+                variant={candidateProfile.status === 'disponible' ? 'default' : 'secondary'} 
+                className="capitalize"
+              >
+                {candidateProfile.status === 'disponible' ? 'Disponible' : 
+                 candidateProfile.status === 'en_pause' ? 'En pause' : 'En mission'}
+              </Badge>
+            </div>
+            <Select
+              value={candidateProfile.status}
+              onValueChange={handleStatusChange}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="disponible">Disponible</SelectItem>
+                <SelectItem value="en_pause">En pause</SelectItem>
+                <SelectItem value="en_mission">En mission</SelectItem>
               </SelectContent>
             </Select>
           </div>

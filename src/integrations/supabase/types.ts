@@ -179,6 +179,7 @@ export type Database = {
           phone: string | null
           profile_id: string
           seniority: Database["public"]["Enums"]["hr_seniority"]
+          status: string
           updated_at: string
           verification_code_expires_at: string | null
         }
@@ -195,6 +196,7 @@ export type Database = {
           phone?: string | null
           profile_id: string
           seniority?: Database["public"]["Enums"]["hr_seniority"]
+          status?: string
           updated_at?: string
           verification_code_expires_at?: string | null
         }
@@ -211,6 +213,7 @@ export type Database = {
           phone?: string | null
           profile_id?: string
           seniority?: Database["public"]["Enums"]["hr_seniority"]
+          status?: string
           updated_at?: string
           verification_code_expires_at?: string | null
         }
