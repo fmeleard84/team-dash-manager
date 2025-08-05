@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import CandidateProjects from "@/components/candidate/CandidateProjects";
+import { CandidateSettings } from "@/components/candidate/CandidateSettings";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -76,41 +77,7 @@ const CandidateDashboard = () => {
           </div>
         );
       case 'settings':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Paramètres</h2>
-            <Card>
-              <CardHeader>
-                <CardTitle>Profil candidat</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-2">Tarification</h4>
-                  <p className="text-sm text-muted-foreground">Modifiez votre tarif journalier</p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Modifier le tarif
-                  </Button>
-                </div>
-                <Separator />
-                <div>
-                  <h4 className="font-medium mb-2">Compétences</h4>
-                  <p className="text-sm text-muted-foreground">Gérez vos compétences et expertises</p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Modifier les compétences
-                  </Button>
-                </div>
-                <Separator />
-                <div>
-                  <h4 className="font-medium mb-2">Langues</h4>
-                  <p className="text-sm text-muted-foreground">Modifiez vos langues parlées</p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Modifier les langues
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return <CandidateSettings currentCandidateId="test-candidate-id" />;
        
       default:
         return null;

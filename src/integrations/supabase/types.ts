@@ -167,7 +167,6 @@ export type Database = {
       }
       candidate_profiles: {
         Row: {
-          category_id: string
           created_at: string
           daily_rate: number
           email: string
@@ -178,12 +177,12 @@ export type Database = {
           last_name: string
           password_hash: string
           phone: string | null
+          profile_id: string
           seniority: Database["public"]["Enums"]["hr_seniority"]
           updated_at: string
           verification_code_expires_at: string | null
         }
         Insert: {
-          category_id: string
           created_at?: string
           daily_rate?: number
           email: string
@@ -194,12 +193,12 @@ export type Database = {
           last_name: string
           password_hash: string
           phone?: string | null
+          profile_id: string
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           updated_at?: string
           verification_code_expires_at?: string | null
         }
         Update: {
-          category_id?: string
           created_at?: string
           daily_rate?: number
           email?: string
@@ -210,16 +209,17 @@ export type Database = {
           last_name?: string
           password_hash?: string
           phone?: string | null
+          profile_id?: string
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           updated_at?: string
           verification_code_expires_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "candidate_profiles_category_id_fkey"
-            columns: ["category_id"]
+            foreignKeyName: "candidate_profiles_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: "hr_categories"
+            referencedRelation: "hr_profiles"
             referencedColumns: ["id"]
           },
         ]

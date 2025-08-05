@@ -71,7 +71,7 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
   let notificationsSent = 0
 
   for (const assignment of resourceAssignments) {
-    // Find matching candidates
+    // Find matching candidates based on exact profile match
     const { data: candidates, error: candidatesError } = await supabase
       .from('candidate_profiles')
       .select(`
@@ -80,7 +80,7 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
         last_name,
         email,
         seniority,
-        category_id,
+        profile_id,
         candidate_languages (
           language_id,
           hr_languages (code, name)
@@ -90,7 +90,7 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
           hr_expertises (id, name)
         )
       `)
-      .eq('category_id', assignment.hr_profiles.category_id)
+      .eq('profile_id', assignment.profile_id)
       .eq('seniority', assignment.seniority)
       .eq('is_email_verified', true)
 

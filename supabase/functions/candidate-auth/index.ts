@@ -95,7 +95,7 @@ interface VerifyEmailRequest {
 
 interface CompleteProfileRequest {
   email: string;
-  categoryId: string;
+  profileId: string;
   seniority: string;
   dailyRate: number;
   languages: string[];
@@ -170,14 +170,14 @@ async function handleSignup(req: Request, supabase: any) {
 
   // No email verification for now - directly verify the account
 
-  // Get default category (first one available)
-  const { data: categories } = await supabase
-    .from('hr_categories')
+  // Get default profile (first one available)
+  const { data: profiles } = await supabase
+    .from('hr_profiles')
     .select('id')
     .limit(1);
 
-  if (!categories || categories.length === 0) {
-    return new Response(JSON.stringify({ error: 'Aucune catégorie disponible' }), {
+  if (!profiles || profiles.length === 0) {
+    return new Response(JSON.stringify({ error: 'Aucun profil disponible' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -193,7 +193,7 @@ async function handleSignup(req: Request, supabase: any) {
       last_name: lastName,
       phone,
       is_email_verified: true, // Directly verified for now
-      category_id: categories[0].id
+      profile_id: profiles[0].id
     })
     .select()
     .single();
@@ -330,7 +330,7 @@ async function handleVerifyEmail(req: Request, supabase: any) {
 }
 
 async function handleCompleteProfile(req: Request, supabase: any) {
-  const { email, categoryId, seniority, dailyRate, languages, expertises }: CompleteProfileRequest = await req.json();
+  const { email, profileId, seniority, dailyRate, languages, expertises }: CompleteProfileRequest = await req.json();
 
   // Get candidate
   const { data: candidate, error: candidateError } = await supabase
@@ -350,7 +350,7 @@ async function handleCompleteProfile(req: Request, supabase: any) {
   const { error: updateError } = await supabase
     .from('candidate_profiles')
     .update({
-      category_id: categoryId,
+      profile_id: profileId,
       seniority,
       daily_rate: dailyRate
     })

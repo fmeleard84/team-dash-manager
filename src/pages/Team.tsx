@@ -22,6 +22,7 @@ interface SignupData {
 
 interface ProfileData {
   categoryId: string;
+  profileId: string;
   seniority: string;
   languages: string[];
   expertises: string[];
@@ -49,6 +50,7 @@ const Team = () => {
   // Profile data
   const [profileData, setProfileData] = useState<ProfileData>({
     categoryId: '',
+    profileId: '',
     seniority: 'junior',
     languages: [],
     expertises: [],
@@ -78,6 +80,20 @@ const Team = () => {
       if (error) throw error;
       return data;
     }
+  });
+
+  // Fetch profiles by category
+  const { data: profiles } = useQuery({
+    queryKey: ['hr-profiles', profileData.categoryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('hr_profiles')
+        .select('*')
+        .eq('category_id', profileData.categoryId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profileData.categoryId
   });
 
   const { data: expertises } = useQuery({
@@ -206,7 +222,7 @@ const Team = () => {
   const calculateMinuteRate = () => (profileData.dailyRate / (8 * 60)).toFixed(2);
 
   const handleCompleteProfile = async () => {
-    if (!profileData.categoryId || profileData.dailyRate <= 0) {
+    if (!profileData.profileId || profileData.dailyRate <= 0) {
       toast.error("Veuillez remplir tous les champs obligatoires");
       return;
     }
@@ -216,7 +232,7 @@ const Team = () => {
       const response = await supabase.functions.invoke('candidate-auth/complete-profile', {
         body: {
           email: signupData.email,
-          categoryId: profileData.categoryId,
+          profileId: profileData.profileId,
           seniority: profileData.seniority,
           dailyRate: profileData.dailyRate,
           languages: profileData.languages,
@@ -284,13 +300,13 @@ const Team = () => {
             <CardContent className="space-y-6">
               {/* Category Selection */}
               <div>
-                <Label>Fonction</Label>
+                <Label>Domaine d'expertise</Label>
                 <Select 
                   value={profileData.categoryId} 
-                  onValueChange={(value) => setProfileData(prev => ({ ...prev, categoryId: value }))}
+                  onValueChange={(value) => setProfileData(prev => ({ ...prev, categoryId: value, profileId: '' }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre fonction" />
+                    <SelectValue placeholder="Sélectionnez votre domaine" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories?.map((category) => (
@@ -301,6 +317,28 @@ const Team = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Profile Selection */}
+              {profileData.categoryId && (
+                <div>
+                  <Label>Poste / Fonction</Label>
+                  <Select 
+                    value={profileData.profileId} 
+                    onValueChange={(value) => setProfileData(prev => ({ ...prev, profileId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez votre poste" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profiles?.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Seniority */}
               <div>
@@ -401,7 +439,7 @@ const Team = () => {
 
               <Button 
                 onClick={handleCompleteProfile} 
-                disabled={loading || !profileData.categoryId}
+                disabled={loading || !profileData.profileId}
                 className="w-full"
               >
                 {loading ? "Finalisation..." : "Finaliser mon inscription"}
