@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, DollarSign, Languages, Award, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import type { Database } from '@/integrations/supabase/types';
 import { EditJobModal } from './EditJobModal';
 import { EditRateModal } from './EditRateModal';
 import { EditLanguagesModal } from './EditLanguagesModal';
@@ -54,6 +56,21 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
   const handleUpdate = () => {
     refetch();
     toast.success('Profil mis à jour');
+  };
+
+  const handleSeniorityChange = async (newSeniority: Database['public']['Enums']['hr_seniority']) => {
+    try {
+      const { error } = await supabase
+        .from('candidate_profiles')
+        .update({ seniority: newSeniority })
+        .eq('id', currentCandidateId);
+
+      if (error) throw error;
+
+      handleUpdate();
+    } catch (error: any) {
+      toast.error('Erreur lors de la modification: ' + error.message);
+    }
   };
 
   if (!candidateProfile) {
@@ -131,11 +148,26 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
             <p className="text-sm font-medium text-muted-foreground">Poste</p>
             <p className="text-lg">{candidateProfile.hr_profiles?.name}</p>
           </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Niveau d'expérience</p>
-            <Badge variant="secondary" className="capitalize">
-              {candidateProfile.seniority}
-            </Badge>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Niveau d'expérience</p>
+              <Badge variant="secondary" className="capitalize">
+                {candidateProfile.seniority}
+              </Badge>
+            </div>
+            <Select
+              value={candidateProfile.seniority}
+              onValueChange={handleSeniorityChange}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="junior">Junior</SelectItem>
+                <SelectItem value="intermediate">Intermédiaire</SelectItem>
+                <SelectItem value="senior">Senior</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
