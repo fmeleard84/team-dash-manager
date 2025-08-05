@@ -8,6 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Register = () => {
+  console.log('=== Register component mounted ===');
+  
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
