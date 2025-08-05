@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { Link, useNavigate } from 'react-router-dom';
+import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 
 const Register = () => {
-  console.log('=== Register component mounted ===');
+  const navigate = useNavigate();
+  const { login, isAuthenticated, isLoading } = useKeycloakAuth();
+  const [activeTab, setActiveTab] = useState<'register' | 'login'>('register');
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -18,13 +22,17 @@ const Register = () => {
     password: '',
     confirmPassword: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/candidate-dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     console.log('=== Registration process started ===');
     console.log('Supabase client configuration:', {
@@ -43,22 +51,15 @@ const Register = () => {
       } catch (healthError) {
         console.error('Health check failed:', healthError);
       }
+      
       // Validate form
       if (formData.password !== formData.confirmPassword) {
-        toast({
-          title: "Erreur",
-          description: "Les mots de passe ne correspondent pas",
-          variant: "destructive",
-        });
+        toast.error("Les mots de passe ne correspondent pas");
         return;
       }
 
       if (formData.password.length < 6) {
-        toast({
-          title: "Erreur",
-          description: "Le mot de passe doit contenir au moins 6 caractères",
-          variant: "destructive",
-        });
+        toast.error("Le mot de passe doit contenir au moins 6 caractères");
         return;
       }
 
@@ -87,50 +88,31 @@ const Register = () => {
       if (error) {
         console.error('Keycloak function error:', error);
         console.error('Error details:', JSON.stringify(error, null, 2));
-        toast({
-          title: "Erreur d'inscription",
-          description: `Une erreur est survenue lors de l'inscription: ${error.message || 'Erreur inconnue'}`,
-          variant: "destructive",
-        });
+        toast.error(`Une erreur est survenue lors de l'inscription: ${error.message || 'Erreur inconnue'}`);
         return;
       }
 
       if (!data) {
         console.error('No data returned from Keycloak function');
-        toast({
-          title: "Erreur",
-          description: "Aucune donnée retournée par le service d'authentification",
-          variant: "destructive",
-        });
+        toast.error("Aucune donnée retournée par le service d'authentification");
         return;
       }
 
       console.log('User created successfully:', data);
 
       if (data.success) {
-        toast({
-          title: "Inscription réussie",
-          description: "Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.",
-        });
-        navigate('/auth');
+        toast.success("Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.");
+        setActiveTab('login');
       } else {
         console.error('User creation failed:', data);
-        toast({
-          title: "Erreur d'inscription",
-          description: data.error || "L'inscription a échoué",
-          variant: "destructive",
-        });
+        toast.error(data.error || "L'inscription a échoué");
       }
 
     } catch (error) {
       console.error('Registration error:', error);
-      toast({
-        title: "Erreur",
-        description: "Une erreur inattendue s'est produite",
-        variant: "destructive",
-      });
+      toast.error("Une erreur inattendue s'est produite");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -141,100 +123,134 @@ const Register = () => {
     });
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Chargement...</h2>
+          <p className="text-muted-foreground">Vérification de votre session</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Inscription</CardTitle>
+        <CardHeader className="text-center">
+          <CardTitle>Rejoindre notre équipe</CardTitle>
           <CardDescription>
-            Créez votre compte pour accéder à la plateforme
+            Inscrivez-vous ou connectez-vous pour accéder à votre espace
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">Prénom</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  type="text"
-                  required
-                  value={formData.firstName}
-                  onChange={handleChange}
-                />
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'register' | 'login')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="register">S'inscrire</TabsTrigger>
+              <TabsTrigger value="login">Se connecter</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="register" className="space-y-4 mt-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName">Prénom *</Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Nom *</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="phoneNumber">Téléphone</Label>
+                  <Input
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    type="tel"
+                    value={formData.phoneNumber}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="password">Mot de passe *</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <Button type="submit" disabled={isSubmitting} className="w-full">
+                  {isSubmitting ? 'Création...' : 'Créer mon compte'}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="login" className="space-y-4 mt-4">
+              <div className="text-center space-y-4">
+                <p className="text-muted-foreground">
+                  Connectez-vous avec votre compte Keycloak
+                </p>
+                <Button 
+                  onClick={login} 
+                  className="w-full"
+                  size="lg"
+                >
+                  Se connecter
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Nom</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  type="text"
-                  required
-                  value={formData.lastName}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </div>
+            </TabsContent>
+          </Tabs>
 
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
-              <Input
-                id="phoneNumber"
-                name="phoneNumber"
-                type="tel"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Inscription en cours...' : 'S\'inscrire'}
-            </Button>
-
-            <div className="text-center text-sm text-muted-foreground">
-              Vous avez déjà un compte ?{' '}
-              <Link to="/auth" className="text-primary hover:underline">
-                Se connecter
-              </Link>
-            </div>
-          </form>
+          <div className="mt-6 text-center">
+            <Link to="/" className="text-sm text-primary hover:underline">
+              Retour à l'accueil
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

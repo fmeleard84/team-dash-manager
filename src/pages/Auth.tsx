@@ -10,7 +10,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate('/candidate-dashboard');
     }
   }, [isAuthenticated, navigate]);
 
@@ -40,7 +40,7 @@ const Auth = () => {
             className="w-full"
             size="lg"
           >
-            Se connecter avec Keycloak
+            Se connecter
           </Button>
 
           <div className="text-center">

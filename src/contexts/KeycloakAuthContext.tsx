@@ -31,8 +31,9 @@ const keycloakConfig = {
   automaticSilentRenew: true,
   includeIdTokenInSilentRenew: true,
   onSigninCallback: () => {
-    // Clean up the URL after successful login
+    // Clean up the URL after successful login and redirect to dashboard
     window.history.replaceState({}, document.title, window.location.pathname);
+    window.location.href = '/candidate-dashboard';
   },
 };
 

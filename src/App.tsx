@@ -8,7 +8,7 @@ import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import Project from "./pages/Project";
 import AdminResources from "./pages/AdminResources";
-import Team from "./pages/Team";
+
 import CandidateDashboard from "./pages/CandidateDashboard";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/project/:id" element={<Project />} />
             <Route path="/admin/resources" element={<AdminResources />} />
-            <Route path="/team" element={<Team />} />
+            
             <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/register" element={<Register />} />
