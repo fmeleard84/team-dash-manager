@@ -141,7 +141,29 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "candidate_notifications_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_notifications_resource_assignment_id_fkey"
+            columns: ["resource_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "hr_resource_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       candidate_profiles: {
         Row: {
@@ -536,7 +558,29 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "project_bookings_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_bookings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_bookings_resource_assignment_id_fkey"
+            columns: ["resource_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "hr_resource_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_flows: {
         Row: {

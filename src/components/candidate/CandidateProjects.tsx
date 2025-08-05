@@ -82,17 +82,13 @@ const CandidateProjects = () => {
       const { data, error } = await supabase
         .from('candidate_notifications')
         .select(`
-          *,
-          projects (
-            title,
-            description,
-            project_date
-          ),
-          hr_resource_assignments (
-            hr_profiles (
-              name
-            )
-          )
+          id,
+          project_id,
+          resource_assignment_id,
+          title,
+          description,
+          status,
+          created_at
         `)
         .eq('candidate_id', currentCandidateId)
         .eq('status', 'unread')
@@ -103,7 +99,35 @@ const CandidateProjects = () => {
         return;
       }
 
-      setNotifications(data || []);
+      // Fetch additional project and resource data separately
+      const enrichedNotifications = await Promise.all(
+        (data || []).map(async (notification) => {
+          const [projectData, resourceData] = await Promise.all([
+            supabase
+              .from('projects')
+              .select('title, description, project_date')
+              .eq('id', notification.project_id)
+              .single(),
+            supabase
+              .from('hr_resource_assignments')
+              .select(`
+                hr_profiles (
+                  name
+                )
+              `)
+              .eq('id', notification.resource_assignment_id)
+              .single()
+          ]);
+
+          return {
+            ...notification,
+            projects: projectData.data || { title: '', description: '', project_date: '' },
+            hr_resource_assignments: resourceData.data || { hr_profiles: { name: '' } }
+          };
+        })
+      );
+
+      setNotifications(enrichedNotifications);
     } catch (error) {
       console.error('Error:', error);
     } finally {

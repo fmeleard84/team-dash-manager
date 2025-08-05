@@ -273,7 +273,11 @@ const Dashboard = () => {
             {projects.map((project) => (
               <ProjectCard
                 key={project.id}
-                project={project}
+                project={{
+                  ...project,
+                  price: project.price_per_minute,
+                  date: project.project_date
+                }}
                 onStatusToggle={handleStatusToggle}
                 onDelete={handleDeleteProject}
                 onView={(id) => navigate(`/project/${id}`)}

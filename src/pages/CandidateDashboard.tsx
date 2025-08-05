@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import CandidateProjects from "@/components/candidate/CandidateProjects";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -79,66 +80,6 @@ const CandidateDashboard = () => {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Paramètres</h2>
             <Card>
-              <CardContent className="p-6">
-                <p className="text-muted-foreground">Aucun projet en cours</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      
-      case 'messages':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes messages</h2>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-muted-foreground">Intégration Zulip à venir</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      
-      case 'appointments':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes rendez-vous</h2>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-muted-foreground">Intégration Cal.com à venir</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      
-      case 'deliverables':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes livrables</h2>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-muted-foreground">Intégration Seafile à venir</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      
-      case 'invoices':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes factures</h2>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-muted-foreground">Module de facturation à développer</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      
-      case 'settings':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Paramètres</h2>
-            <Card>
               <CardHeader>
                 <CardTitle>Profil candidat</CardTitle>
               </CardHeader>
@@ -170,7 +111,7 @@ const CandidateDashboard = () => {
             </Card>
           </div>
         );
-      
+       
       default:
         return null;
     }
