@@ -130,11 +130,13 @@ async function getKeycloakAdminToken(): Promise<string> {
   const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
   const adminUsername = Deno.env.get('KEYCLOAK_ADMIN_USERNAME');
   const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
-  const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
+  
+  // IMPORTANT: Admin authentication MUST use master realm
+  const adminRealm = 'master';
 
   console.log(`=== Keycloak Admin Token Request ===`);
   console.log(`Keycloak URL: ${keycloakBaseUrl}`);
-  console.log(`Realm: ${realm}`);
+  console.log(`Admin Realm: ${adminRealm} (fixed for admin API)`);
   console.log(`Username: ${adminUsername}`);
   console.log(`Password length: ${adminPassword?.length || 0} chars`);
 
@@ -147,7 +149,7 @@ async function getKeycloakAdminToken(): Promise<string> {
     throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
   }
 
-  const tokenUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
+  const tokenUrl = `${keycloakBaseUrl}/realms/${adminRealm}/protocol/openid-connect/token`;
   console.log(`Token URL: ${tokenUrl}`);
   
   try {
@@ -178,13 +180,13 @@ async function getKeycloakAdminToken(): Promise<string> {
         console.error(`Error details:`, errorData);
         
         if (errorData.error === 'invalid_grant') {
-          throw new Error(`KEYCLOAK AUTH FAILED: Invalid credentials for username '${adminUsername}' in realm '${realm}'. Please verify your KEYCLOAK_ADMIN_USERNAME and KEYCLOAK_ADMIN_PASSWORD secrets.`);
+          throw new Error(`KEYCLOAK AUTH FAILED: Invalid credentials for username '${adminUsername}' in realm '${adminRealm}'. Please verify your KEYCLOAK_ADMIN_USERNAME and KEYCLOAK_ADMIN_PASSWORD secrets.`);
         }
         if (errorData.error === 'unauthorized_client') {
-          throw new Error(`KEYCLOAK CLIENT ERROR: The admin-cli client is not configured properly in realm '${realm}'.`);
+          throw new Error(`KEYCLOAK CLIENT ERROR: The admin-cli client is not configured properly in realm '${adminRealm}'.`);
         }
         if (errorData.error === 'invalid_client') {
-          throw new Error(`KEYCLOAK CLIENT ERROR: Invalid client configuration for admin-cli in realm '${realm}'.`);
+          throw new Error(`KEYCLOAK CLIENT ERROR: Invalid client configuration for admin-cli in realm '${adminRealm}'.`);
         }
       } catch (parseError) {
         // Error response is not JSON, use original error
@@ -192,17 +194,17 @@ async function getKeycloakAdminToken(): Promise<string> {
       
       // Provide actionable error message
       if (response.status === 401) {
-        throw new Error(`KEYCLOAK UNAUTHORIZED: Please check your admin credentials and ensure the user '${adminUsername}' has admin permissions in realm '${realm}'.`);
+        throw new Error(`KEYCLOAK UNAUTHORIZED: Please check your admin credentials and ensure the user '${adminUsername}' has admin permissions in realm '${adminRealm}'.`);
       }
       if (response.status === 404) {
-        throw new Error(`KEYCLOAK REALM NOT FOUND: Realm '${realm}' does not exist. Please verify KEYCLOAK_REALM is correct.`);
+        throw new Error(`KEYCLOAK REALM NOT FOUND: Realm '${adminRealm}' does not exist. Please verify KEYCLOAK_BASE_URL is correct.`);
       }
       
       throw new Error(`KEYCLOAK ERROR: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const tokenData = await response.json();
-    console.log(`Successfully obtained Keycloak admin token for realm '${realm}'`);
+    console.log(`Successfully obtained Keycloak admin token from realm '${adminRealm}'`);
     return tokenData.access_token;
     
   } catch (error) {
@@ -212,7 +214,7 @@ async function getKeycloakAdminToken(): Promise<string> {
     
     // Add connectivity test suggestion
     if (error.message.includes('fetch')) {
-      console.error(`SUGGESTION: Test Keycloak connectivity by visiting: ${keycloakBaseUrl}/realms/${realm}/.well-known/openid_configuration`);
+      console.error(`SUGGESTION: Test Keycloak connectivity by visiting: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid_configuration`);
     }
     
     throw error;

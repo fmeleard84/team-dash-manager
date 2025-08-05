@@ -23,8 +23,8 @@ export const useKeycloakAuth = () => {
 };
 
 const keycloakConfig = {
-  authority: 'http://localhost:8080/realms/haas', // TODO: Replace with your Keycloak URL
-  client_id: 'web-client', // TODO: Replace with your client ID
+  authority: 'https://keycloak.ialla.fr/realms/haas',
+  client_id: 'backoffice',
   redirect_uri: window.location.origin,
   response_type: 'code',
   scope: 'openid profile email',
