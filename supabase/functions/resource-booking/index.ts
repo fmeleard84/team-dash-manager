@@ -18,12 +18,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { projectId, action } = await req.json()
+    const requestBody = await req.json()
+    const { projectId, action, candidateId, resourceAssignmentId } = requestBody
+
+    console.log('Request received:', { action, projectId, candidateId, resourceAssignmentId })
 
     if (action === 'find_candidates') {
       return await findCandidatesForProject(supabase, projectId)
     } else if (action === 'accept_mission') {
-      const { candidateId, resourceAssignmentId } = await req.json()
+      if (!candidateId || !resourceAssignmentId) {
+        throw new Error('candidateId and resourceAssignmentId are required for accept_mission')
+      }
       return await acceptMission(supabase, candidateId, resourceAssignmentId, projectId)
     }
 
