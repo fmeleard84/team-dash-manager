@@ -12,7 +12,7 @@ import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 
 const Register = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, isLoading, hasGroup } = useKeycloakAuth();
+  const { login, isAuthenticated, isLoading, hasGroup, getUserGroups, user } = useKeycloakAuth();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'register' | 'login'>(
     (searchParams.get('tab') as 'register' | 'login') || 'register'
@@ -33,10 +33,19 @@ const Register = () => {
   useEffect(() => {
     if (isAuthenticated) {
       console.log('User authenticated, checking groups...');
+      console.log('User object:', user);
+      console.log('User profile:', user?.profile);
       
       // Small delay to ensure groups are loaded from Keycloak
       setTimeout(() => {
         console.log('Checking user groups for redirection...');
+        const groups = getUserGroups();
+        console.log('All user groups:', groups);
+        console.log('hasGroup(client):', hasGroup('client'));
+        console.log('hasGroup(candidate):', hasGroup('candidate'));
+        console.log('hasGroup(resource):', hasGroup('resource'));
+        console.log('hasGroup(admin):', hasGroup('admin'));
+        
         if (hasGroup('client')) {
           console.log('User has client group, redirecting to client dashboard');
           navigate('/client-dashboard');
@@ -52,7 +61,7 @@ const Register = () => {
         }
       }, 1000);
     }
-  }, [isAuthenticated, navigate, hasGroup]);
+  }, [isAuthenticated, navigate, hasGroup, getUserGroups, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

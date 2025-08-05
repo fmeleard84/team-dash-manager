@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,24 +31,24 @@ const Dashboard = () => {
     project_date: new Date().toISOString().split('T')[0]
   });
   const [isLoading, setIsLoading] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useKeycloakAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!user) {
-      navigate('/admin');
+    if (!isAuthenticated) {
+      navigate('/register?tab=login');
       return;
     }
     fetchProjects();
-  }, [user, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const fetchProjects = async () => {
     try {
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user?.profile?.sub)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -90,7 +90,7 @@ const Dashboard = () => {
         .from('projects')
         .insert({
           ...newProject,
-          user_id: user?.id
+          user_id: user?.profile?.sub
         })
         .select()
         .single();
@@ -187,13 +187,13 @@ const Dashboard = () => {
     }
   };
 
-  if (!user) return null;
+  if (!isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Dashboard - {user.login}</h1>
+          <h1 className="text-2xl font-bold">Dashboard - {user?.profile?.email}</h1>
           <Button variant="outline" onClick={logout}>
             <LogOut className="w-4 h-4 mr-2" />
             Déconnexion
