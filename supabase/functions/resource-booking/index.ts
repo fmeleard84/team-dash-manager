@@ -101,8 +101,8 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
 
     // Filter candidates by languages and expertises
     const filteredCandidates = candidates.filter(candidate => {
-      // Check languages match
-      const candidateLanguages = candidate.candidate_languages.map(cl => cl.hr_languages.code)
+      // Check languages match - compare by language names, not codes
+      const candidateLanguages = candidate.candidate_languages.map(cl => cl.hr_languages.name)
       const requiredLanguages = assignment.languages || []
       const hasRequiredLanguages = requiredLanguages.every(lang => candidateLanguages.includes(lang))
 
@@ -110,6 +110,11 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
       const candidateExpertises = candidate.candidate_expertises.map(ce => ce.hr_expertises.name)
       const requiredExpertises = assignment.expertises || []
       const hasRequiredExpertises = requiredExpertises.every(exp => candidateExpertises.includes(exp))
+
+      // Debug logging
+      console.log(`Candidate ${candidate.first_name} ${candidate.last_name}:`)
+      console.log(`  Languages: ${candidateLanguages.join(', ')} | Required: ${requiredLanguages.join(', ')} | Match: ${hasRequiredLanguages}`)
+      console.log(`  Expertises: ${candidateExpertises.join(', ')} | Required: ${requiredExpertises.join(', ')} | Match: ${hasRequiredExpertises}`)
 
       return hasRequiredLanguages && hasRequiredExpertises
     })
