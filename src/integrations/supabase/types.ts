@@ -107,6 +107,42 @@ export type Database = {
           },
         ]
       }
+      candidate_notifications: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          description: string
+          id: string
+          project_id: string
+          resource_assignment_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          description: string
+          id?: string
+          project_id: string
+          resource_assignment_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          project_id?: string
+          resource_assignment_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       candidate_profiles: {
         Row: {
           category_id: string
@@ -379,6 +415,7 @@ export type Database = {
       }
       hr_resource_assignments: {
         Row: {
+          booking_status: string
           calculated_price: number
           created_at: string
           expertises: string[] | null
@@ -391,6 +428,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          booking_status?: string
           calculated_price?: number
           created_at?: string
           expertises?: string[] | null
@@ -403,6 +441,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          booking_status?: string
           calculated_price?: number
           created_at?: string
           expertises?: string[] | null
@@ -468,6 +507,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      project_bookings: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          id: string
+          project_id: string
+          resource_assignment_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          id?: string
+          project_id: string
+          resource_assignment_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          resource_assignment_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       project_flows: {
         Row: {

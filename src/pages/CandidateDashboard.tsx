@@ -45,9 +45,39 @@ const CandidateDashboard = () => {
   const renderContent = () => {
     switch (activeSection) {
       case 'projects':
+        return <CandidateProjects />;
+      case 'messages':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes projets</h2>
+            <h2 className="text-2xl font-bold">Mes messages</h2>
+            <p className="text-muted-foreground">Vos messages apparaîtront ici.</p>
+          </div>
+        );
+      case 'appointments':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Mes rendez-vous</h2>
+            <p className="text-muted-foreground">Vos rendez-vous apparaîtront ici.</p>
+          </div>
+        );
+      case 'deliverables':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Mes livrables</h2>
+            <p className="text-muted-foreground">Vos livrables apparaîtront ici.</p>
+          </div>
+        );
+      case 'invoices':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Mes factures</h2>
+            <p className="text-muted-foreground">Vos factures apparaîtront ici.</p>
+          </div>
+        );
+      case 'settings':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Paramètres</h2>
             <Card>
               <CardContent className="p-6">
                 <p className="text-muted-foreground">Aucun projet en cours</p>

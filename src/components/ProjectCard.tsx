@@ -1,22 +1,32 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Play, Pause, Trash2, Eye, ExternalLink } from 'lucide-react';
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { Card, CardHeader, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
+import { Play, Pause, Eye, Trash2, ExternalLink, Users } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Project {
   id: string;
   title: string;
-  description: string;
-  price_per_minute: number;
-  project_date: string;
-  status: 'play' | 'pause';
+  description?: string;
+  price: number;
+  date: string;
+  status: string;
+}
+
+interface ResourceAssignment {
+  id: string;
+  profile_id: string;
+  booking_status: string;
+  hr_profiles: {
+    name: string;
+  };
 }
 
 interface ProjectCardProps {
   project: Project;
-  onStatusToggle: (id: string, currentStatus: 'play' | 'pause') => void;
+  onStatusToggle: (id: string, status: string) => void;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
 }
@@ -25,18 +35,49 @@ interface PlankaProject {
   planka_url: string;
 }
 
-export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: ProjectCardProps) => {
+export function ProjectCard({ project, onStatusToggle, onDelete, onView }: ProjectCardProps) {
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
-  const [isPlankaSyncing, setIsPlankaSyncing] = useState(false);
-  const [plankaChecked, setPlankaChecked] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isChecked, setIsChecked] = useState(false);
+  const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
+  const [isBookingTeam, setIsBookingTeam] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
-  // Check if project exists in Planka when status changes to 'play'
+  useEffect(() => {
+    checkPlankaProject();
+    fetchResourceAssignments();
+  }, [project.id]);
+
+  const fetchResourceAssignments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hr_resource_assignments')
+        .select(`
+          id,
+          profile_id,
+          booking_status,
+          hr_profiles (
+            name
+          )
+        `)
+        .eq('project_id', project.id);
+
+      if (error) {
+        console.error('Error fetching resource assignments:', error);
+        return;
+      }
+
+      setResourceAssignments(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   const checkPlankaProject = async () => {
-    if (plankaChecked) return;
+    if (isChecked) return;
     
     try {
       const { data, error } = await supabase
@@ -54,24 +95,54 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
         setPlankaProject({ planka_url: data.planka_url });
       }
       
-      setPlankaChecked(true);
+      setIsChecked(true);
     } catch (error) {
       console.error('Error checking Planka project:', error);
     }
   };
 
-  const handleStatusToggle = async (id: string, currentStatus: 'play' | 'pause') => {
-    // First toggle the status
-    onStatusToggle(id, currentStatus);
+  const handleStatusToggle = async () => {
+    // Check if all resources are booked before allowing play
+    const allResourcesBooked = resourceAssignments.every(assignment => assignment.booking_status === 'booké');
     
-    // If changing to 'play', check for Planka project
-    if (currentStatus === 'pause') {
+    if (project.status === 'pause' && !allResourcesBooked) {
+      toast.error('Toutes les ressources doivent être bookées avant de démarrer le projet');
+      return;
+    }
+
+    const newStatus = project.status === 'play' ? 'pause' : 'play';
+    await onStatusToggle(project.id, newStatus);
+    
+    if (newStatus === 'play') {
       await checkPlankaProject();
     }
   };
 
+  const handleBookingTeam = async () => {
+    setIsBookingTeam(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('resource-booking', {
+        body: {
+          projectId: project.id,
+          action: 'find_candidates'
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message);
+      // Refresh resource assignments to update status
+      await fetchResourceAssignments();
+    } catch (error) {
+      console.error('Error booking team:', error);
+      toast.error('Erreur lors de la recherche d\'équipe');
+    } finally {
+      setIsBookingTeam(false);
+    }
+  };
+
   const syncWithPlanka = async () => {
-    setIsPlankaSyncing(true);
+    setIsSyncing(true);
     
     try {
       // Get admin user from localStorage for authentication
@@ -113,7 +184,7 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
       console.error('Error syncing with Planka:', error);
       toast.error('Erreur lors de la synchronisation avec Planka');
     } finally {
-      setIsPlankaSyncing(false);
+      setIsSyncing(false);
     }
   };
 
@@ -123,87 +194,145 @@ export const ProjectCard = ({ project, onStatusToggle, onDelete, onView }: Proje
     }
   };
 
+  const getBookingProgress = () => {
+    if (resourceAssignments.length === 0) return { percentage: 0, text: 'Aucune ressource' };
+    
+    const bookedCount = resourceAssignments.filter(assignment => assignment.booking_status === 'booké').length;
+    const percentage = (bookedCount / resourceAssignments.length) * 100;
+    
+    return {
+      percentage,
+      text: `${bookedCount}/${resourceAssignments.length} ressources bookées`
+    };
+  };
+
+  const bookingProgress = getBookingProgress();
+  const allResourcesBooked = resourceAssignments.every(assignment => assignment.booking_status === 'booké');
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="w-full max-w-md bg-background border border-border shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">{project.title}</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {formatDate(project.project_date)}
-        </p>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-foreground">{project.title}</h3>
+          <Badge variant={project.status === 'play' ? 'default' : 'secondary'}>
+            {project.status === 'play' ? 'En cours' : 'En pause'}
+          </Badge>
+        </div>
+        {project.description && (
+          <p className="text-sm text-muted-foreground mt-2">{project.description}</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            {project.description || 'Aucune description'}
-          </p>
-           <p className="font-medium">
-             {project.price_per_minute.toFixed(2)} €/mn
-           </p>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Prix total:</span>
+          <span className="font-medium text-foreground">{project.price}€</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Date:</span>
+          <span className="text-foreground">{formatDate(project.date)}</span>
         </div>
         
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={project.status === 'play' ? 'default' : 'secondary'}
-              onClick={() => handleStatusToggle(project.id, project.status)}
-              className={project.status === 'play' ? 'bg-success hover:bg-success/80' : ''}
-            >
-              {project.status === 'play' ? (
-                <Pause className="w-4 h-4" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
-            </Button>
-            
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onView(project.id)}
-            >
-              <Eye className="w-4 h-4" />
-            </Button>
+        {/* Resource assignments section */}
+        {resourceAssignments.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Équipe:</span>
+              <span className="text-foreground">{bookingProgress.text}</span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300" 
+                style={{ width: `${bookingProgress.percentage}%` }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {resourceAssignments.map((assignment) => (
+                <Badge 
+                  key={assignment.id} 
+                  variant={assignment.booking_status === 'booké' ? 'default' : 'outline'}
+                  className="text-xs"
+                >
+                  {assignment.hr_profiles.name}
+                  {assignment.booking_status === 'booké' && ' ✓'}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
 
-            {/* Planka Integration Buttons */}
-            {project.status === 'play' && (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStatusToggle}
+            className="flex-1"
+            disabled={project.status === 'pause' && !allResourcesBooked}
+          >
+            {project.status === 'play' ? (
               <>
-                {plankaProject ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={openPlanka}
-                    className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={syncWithPlanka}
-                    disabled={isPlankaSyncing}
-                    className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
-                  >
-                    {isPlankaSyncing ? (
-                      <div className="w-4 h-4 animate-spin rounded-full border-2 border-green-300 border-t-green-600" />
-                    ) : (
-                      <Play className="w-4 h-4" />
-                    )}
-                  </Button>
-                )}
+                <Pause className="w-4 h-4 mr-2" />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 mr-2" />
+                Play
               </>
             )}
-          </div>
-          
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => onDelete(project.id)}
-          >
+          </Button>
+
+          <Button variant="outline" size="sm" onClick={() => onView(project.id)}>
+            <Eye className="w-4 h-4" />
+          </Button>
+
+          <Button variant="destructive" size="sm" onClick={() => onDelete(project.id)}>
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
+
+        {/* Booking Team button */}
+        {resourceAssignments.length > 0 && !allResourcesBooked && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleBookingTeam}
+            disabled={isBookingTeam}
+            className="w-full"
+          >
+            <Users className="w-4 h-4 mr-2" />
+            {isBookingTeam ? 'Recherche en cours...' : 'Booking Team'}
+          </Button>
+        )}
+
+        {plankaProject && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openPlanka}
+              className="flex-1"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Ouvrir dans Planka
+            </Button>
+          </div>
+        )}
+
+        {!isChecked && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={syncWithPlanka}
+              disabled={isSyncing}
+              className="flex-1"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              {isSyncing ? 'Synchronisation...' : 'Synchroniser avec Planka'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
-};
+}
