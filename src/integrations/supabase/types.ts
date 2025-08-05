@@ -18,18 +18,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          keycloak_user_id: string | null
           login: string
           password_hash: string
         }
         Insert: {
           created_at?: string
           id?: string
+          keycloak_user_id?: string | null
           login: string
           password_hash: string
         }
         Update: {
           created_at?: string
           id?: string
+          keycloak_user_id?: string | null
           login?: string
           password_hash?: string
         }
@@ -174,6 +177,7 @@ export type Database = {
           first_name: string
           id: string
           is_email_verified: boolean
+          keycloak_user_id: string | null
           last_name: string
           password_hash: string
           phone: string | null
@@ -191,6 +195,7 @@ export type Database = {
           first_name: string
           id?: string
           is_email_verified?: boolean
+          keycloak_user_id?: string | null
           last_name: string
           password_hash: string
           phone?: string | null
@@ -208,6 +213,7 @@ export type Database = {
           first_name?: string
           id?: string
           is_email_verified?: boolean
+          keycloak_user_id?: string | null
           last_name?: string
           password_hash?: string
           phone?: string | null
@@ -617,6 +623,38 @@ export type Database = {
           },
         ]
       }
+      project_groups: {
+        Row: {
+          created_at: string
+          id: string
+          keycloak_group_id: string
+          keycloak_group_name: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          keycloak_group_id: string
+          keycloak_group_name: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          keycloak_group_id?: string
+          keycloak_group_name?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_groups_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
@@ -660,6 +698,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          keycloak_user_id: string
+          last_name: string
+          phone_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name: string
+          id?: string
+          keycloak_user_id: string
+          last_name: string
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string
+          id?: string
+          keycloak_user_id?: string
+          last_name?: string
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

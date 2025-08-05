@@ -80,5 +80,11 @@ verify_jwt = true
 [functions.candidate-auth]
 verify_jwt = false
 
+[functions.keycloak-user-management]
+verify_jwt = false
+
+[functions.resource-booking]
+verify_jwt = false
+
 [functions.send-verification-email]
 verify_jwt = false

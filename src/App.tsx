@@ -11,14 +11,16 @@ import AdminResources from "./pages/AdminResources";
 import Team from "./pages/Team";
 import CandidateDashboard from "./pages/CandidateDashboard";
 import NotFound from "./pages/NotFound";
-import { AuthProvider } from "./contexts/AuthContext";
+import Auth from "./pages/Auth";
+import Register from "./pages/Register";
+import { KeycloakAuthProvider } from "./contexts/KeycloakAuthContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
+      <KeycloakAuthProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -30,11 +32,13 @@ const App = () => (
             <Route path="/admin/resources" element={<AdminResources />} />
             <Route path="/team" element={<Team />} />
             <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/register" element={<Register />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-      </AuthProvider>
+      </KeycloakAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
