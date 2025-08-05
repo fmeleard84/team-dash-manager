@@ -82,6 +82,19 @@ serve(async (req) => {
       );
     }
 
+    // Add connection test endpoint
+    if (action === 'test-connection') {
+      console.log('Connection test requested');
+      const testResult = await testKeycloakConnection();
+      return new Response(
+        JSON.stringify(testResult),
+        { 
+          status: testResult.success ? 200 : 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     switch (action) {
       case 'create-user':
         return await handleCreateUser(body, supabase);
@@ -119,33 +132,138 @@ async function getKeycloakAdminToken(): Promise<string> {
   const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
   const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
-  console.log(`Connecting to Keycloak at: ${keycloakBaseUrl}/realms/${realm}`);
-  console.log(`Using username: ${adminUsername}`);
+  console.log(`=== Keycloak Admin Token Request ===`);
+  console.log(`Keycloak URL: ${keycloakBaseUrl}`);
+  console.log(`Realm: ${realm}`);
+  console.log(`Username: ${adminUsername}`);
+  console.log(`Password length: ${adminPassword?.length || 0} chars`);
 
-  const tokenUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
-  
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'password',
-      client_id: 'admin-cli',
-      username: adminUsername!,
-      password: adminPassword!,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Failed to get admin token: ${response.status} ${response.statusText}`, errorText);
-    throw new Error(`Failed to get admin token: ${response.statusText}`);
+  // Validate required environment variables
+  if (!keycloakBaseUrl || !adminUsername || !adminPassword) {
+    const missingVars = [];
+    if (!keycloakBaseUrl) missingVars.push('KEYCLOAK_BASE_URL');
+    if (!adminUsername) missingVars.push('KEYCLOAK_ADMIN_USERNAME');
+    if (!adminPassword) missingVars.push('KEYCLOAK_ADMIN_PASSWORD');
+    throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
   }
 
-  const tokenData = await response.json();
-  console.log('Successfully obtained Keycloak admin token');
-  return tokenData.access_token;
+  const tokenUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
+  console.log(`Token URL: ${tokenUrl}`);
+  
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'password',
+        client_id: 'admin-cli',
+        username: adminUsername,
+        password: adminPassword,
+      }),
+    });
+
+    console.log(`Token response status: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`=== Keycloak Token Error ===`);
+      console.error(`Status: ${response.status} ${response.statusText}`);
+      console.error(`Response body: ${errorText}`);
+      
+      // Try to parse error for more details
+      try {
+        const errorData = JSON.parse(errorText);
+        console.error(`Error details:`, errorData);
+        
+        if (errorData.error === 'invalid_grant') {
+          throw new Error(`KEYCLOAK AUTH FAILED: Invalid credentials for username '${adminUsername}' in realm '${realm}'. Please verify your KEYCLOAK_ADMIN_USERNAME and KEYCLOAK_ADMIN_PASSWORD secrets.`);
+        }
+        if (errorData.error === 'unauthorized_client') {
+          throw new Error(`KEYCLOAK CLIENT ERROR: The admin-cli client is not configured properly in realm '${realm}'.`);
+        }
+        if (errorData.error === 'invalid_client') {
+          throw new Error(`KEYCLOAK CLIENT ERROR: Invalid client configuration for admin-cli in realm '${realm}'.`);
+        }
+      } catch (parseError) {
+        // Error response is not JSON, use original error
+      }
+      
+      // Provide actionable error message
+      if (response.status === 401) {
+        throw new Error(`KEYCLOAK UNAUTHORIZED: Please check your admin credentials and ensure the user '${adminUsername}' has admin permissions in realm '${realm}'.`);
+      }
+      if (response.status === 404) {
+        throw new Error(`KEYCLOAK REALM NOT FOUND: Realm '${realm}' does not exist. Please verify KEYCLOAK_REALM is correct.`);
+      }
+      
+      throw new Error(`KEYCLOAK ERROR: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const tokenData = await response.json();
+    console.log(`Successfully obtained Keycloak admin token for realm '${realm}'`);
+    return tokenData.access_token;
+    
+  } catch (error) {
+    console.error(`=== Keycloak Connection Error ===`);
+    console.error(`Error type: ${error.name}`);
+    console.error(`Error message: ${error.message}`);
+    
+    // Add connectivity test suggestion
+    if (error.message.includes('fetch')) {
+      console.error(`SUGGESTION: Test Keycloak connectivity by visiting: ${keycloakBaseUrl}/realms/${realm}/.well-known/openid_configuration`);
+    }
+    
+    throw error;
+  }
+}
+
+// Add test function for Keycloak connectivity
+async function testKeycloakConnection(): Promise<{ success: boolean; message: string; details?: any }> {
+  try {
+    const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
+    const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
+    
+    if (!keycloakBaseUrl) {
+      return { success: false, message: 'KEYCLOAK_BASE_URL not configured' };
+    }
+    
+    // Test realm accessibility
+    const realmUrl = `${keycloakBaseUrl}/realms/${realm}/.well-known/openid_configuration`;
+    console.log(`Testing realm accessibility: ${realmUrl}`);
+    
+    const response = await fetch(realmUrl);
+    if (!response.ok) {
+      return { 
+        success: false, 
+        message: `Realm '${realm}' not accessible: ${response.status} ${response.statusText}`,
+        details: { url: realmUrl, status: response.status }
+      };
+    }
+    
+    const realmInfo = await response.json();
+    console.log(`Realm '${realm}' is accessible`);
+    
+    // Test admin token
+    try {
+      await getKeycloakAdminToken();
+      return { success: true, message: 'Keycloak connection and authentication successful' };
+    } catch (authError) {
+      return { 
+        success: false, 
+        message: `Authentication failed: ${authError.message}`,
+        details: { realmAccessible: true, authError: authError.message }
+      };
+    }
+    
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `Connection test failed: ${error.message}`,
+      details: { error: error.message }
+    };
+  }
 }
 
 async function handleCreateUser(body: CreateUserRequest, supabase: any) {
