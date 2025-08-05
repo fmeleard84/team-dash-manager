@@ -52,28 +52,31 @@ const CandidateProjects = () => {
 
   const fetchCurrentCandidate = async () => {
     try {
-      const candidateAuth = localStorage.getItem('candidate-auth');
-      if (!candidateAuth) {
-        toast.error('Non authentifié');
-        return;
-      }
-
-      const authData = JSON.parse(candidateAuth);
+      // Pour le moment, on simule un candidat de test
+      // TODO: Implémenter l'authentification candidat complète
+      const testCandidateId = "test-candidate-id";
       
-      const { data, error } = await supabase
+      // Vérifier si on a un candidat dans la base
+      const { data: candidates, error } = await supabase
         .from('candidate_profiles')
-        .select('id')
-        .eq('email', authData.email)
-        .single();
+        .select('id, first_name, last_name, email')
+        .limit(1);
 
       if (error) {
-        console.error('Error fetching candidate:', error);
+        console.error('Error fetching candidates:', error);
+        toast.error('Erreur lors de la récupération des candidats');
         return;
       }
 
-      setCurrentCandidateId(data.id);
+      if (candidates && candidates.length > 0) {
+        setCurrentCandidateId(candidates[0].id);
+        toast.success(`Connecté en tant que ${candidates[0].first_name} ${candidates[0].last_name}`);
+      } else {
+        toast.error('Aucun candidat trouvé dans la base de données');
+      }
     } catch (error) {
       console.error('Error:', error);
+      toast.error('Erreur de connexion');
     }
   };
 
