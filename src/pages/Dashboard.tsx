@@ -206,10 +206,7 @@ const Dashboard = () => {
           <h2 className="text-xl font-semibold">Mes Projets</h2>
           
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/admin/resources')}>
-              <Users className="w-4 h-4 mr-2" />
-              Gérer les ressources
-            </Button>
+            {/* Hide manage resources button - only for admins */}
             
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>

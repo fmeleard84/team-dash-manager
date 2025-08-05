@@ -118,7 +118,7 @@ const Project = () => {
         .from('projects')
         .select('*')
         .eq('id', id)
-        .eq('user_id', user?.id)
+        .eq('user_id', user?.profile?.sub)
         .single();
 
       if (projectError) throw projectError;

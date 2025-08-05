@@ -47,8 +47,8 @@ const Register = () => {
         console.log('hasGroup(admin):', hasGroup('admin'));
         
         if (hasGroup('client')) {
-          console.log('User has client group, redirecting to client dashboard');
-          navigate('/client-dashboard');
+          console.log('User has client group, redirecting to enterprise dashboard');
+          navigate('/enterprise-dashboard');
         } else if (hasGroup('candidate') || hasGroup('resource')) {
           console.log('User has candidate/resource group, redirecting to candidate dashboard');
           navigate('/candidate-dashboard');
@@ -56,8 +56,8 @@ const Register = () => {
           console.log('User has admin group, redirecting to admin dashboard');
           navigate('/admin');
         } else {
-          console.log('No specific group found, redirecting to default dashboard');
-          navigate('/dashboard');
+          console.log('No specific group found, redirecting to enterprise dashboard');
+          navigate('/enterprise-dashboard');
         }
       }, 1000);
     }

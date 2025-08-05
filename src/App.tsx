@@ -12,6 +12,7 @@ import Header from "./components/Header";
 
 import CandidateDashboard from "./pages/CandidateDashboard";
 import ClientDashboard from "./pages/ClientDashboard";
+import EnterpriseClientDashboard from "./pages/EnterpriseClientDashboard";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Register from "./pages/Register";
@@ -36,6 +37,7 @@ const App = () => (
             
             <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
             <Route path="/client-dashboard" element={<ClientDashboard />} />
+            <Route path="/enterprise-dashboard" element={<EnterpriseClientDashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/register" element={<Register />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
