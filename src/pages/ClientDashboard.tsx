@@ -2,14 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import CandidateProjects from "@/components/candidate/CandidateProjects";
-import { CandidateSettings } from "@/components/candidate/CandidateSettings";
-import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -24,27 +20,24 @@ import {
 } from "@/components/ui/sidebar";
 import { 
   FolderOpen, 
-  MessageSquare, 
-  Calendar, 
-  FileText, 
   Receipt, 
   Settings, 
   LogOut 
 } from "lucide-react";
 
-const CandidateDashboard = () => {
+const ClientDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
   const { user, logout, isLoading } = useKeycloakAuth();
 
-  // Fetch candidate profile for status
-  const { data: candidateProfile, refetch: refetchProfile } = useQuery({
-    queryKey: ['candidate-profile-status', user?.profile?.sub],
+  // Fetch client profile
+  const { data: clientProfile, refetch: refetchProfile } = useQuery({
+    queryKey: ['client-profile', user?.profile?.sub],
     queryFn: async () => {
       if (!user?.profile?.email) return null;
       
       const { data, error } = await supabase
-        .from('candidate_profiles')
-        .select('status, first_name, last_name, id')
+        .from('client_profiles')
+        .select('*')
         .eq('email', user.profile.email)
         .single();
       
@@ -56,58 +49,11 @@ const CandidateDashboard = () => {
 
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
-    { id: 'messages', label: 'Mes messages', icon: MessageSquare },
-    { id: 'appointments', label: 'Mes rendez-vous', icon: Calendar },
-    { id: 'deliverables', label: 'Mes livrables', icon: FileText },
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
   ];
 
   const handleLogout = () => {
     logout();
-  };
-
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      if (!candidateProfile?.id) return;
-      
-      const { error } = await supabase
-        .from('candidate_profiles')
-        .update({ status: newStatus })
-        .eq('id', candidateProfile.id);
-
-      if (error) throw error;
-
-      refetchProfile();
-      toast.success('Statut mis à jour');
-    } catch (error: any) {
-      toast.error('Erreur lors de la modification: ' + error.message);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'disponible':
-        return 'bg-green-500 text-white';
-      case 'en_pause':
-        return 'bg-gray-500 text-white';
-      case 'en_mission':
-        return 'bg-red-500 text-white';
-      default:
-        return 'bg-gray-500 text-white';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'disponible':
-        return 'Disponible';
-      case 'en_pause':
-        return 'En pause';
-      case 'en_mission':
-        return 'En mission';
-      default:
-        return status;
-    }
   };
 
   const renderContent = () => {
@@ -132,38 +78,75 @@ const CandidateDashboard = () => {
 
     switch (activeSection) {
       case 'projects':
-        return <CandidateProjects />;
-      case 'messages':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes messages</h2>
-            <p className="text-muted-foreground">Vos messages apparaîtront ici.</p>
-          </div>
-        );
-      case 'appointments':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes rendez-vous</h2>
-            <p className="text-muted-foreground">Vos rendez-vous apparaîtront ici.</p>
-          </div>
-        );
-      case 'deliverables':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes livrables</h2>
-            <p className="text-muted-foreground">Vos livrables apparaîtront ici.</p>
+            <h2 className="text-2xl font-bold">Mes projets</h2>
+            <p className="text-muted-foreground">Gérez vos projets et suivez leur avancement.</p>
+            <Card>
+              <CardContent className="p-6">
+                <p className="text-center text-muted-foreground">
+                  Aucun projet pour le moment. Créez votre premier projet !
+                </p>
+                <div className="flex justify-center mt-4">
+                  <Button>Créer un projet</Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         );
       case 'invoices':
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes factures</h2>
-            <p className="text-muted-foreground">Vos factures apparaîtront ici.</p>
+            <p className="text-muted-foreground">Consultez et téléchargez vos factures.</p>
+            <Card>
+              <CardContent className="p-6">
+                <p className="text-center text-muted-foreground">
+                  Aucune facture disponible.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         );
       case 'settings':
-        return candidateProfile?.id ? <CandidateSettings currentCandidateId={candidateProfile.id} /> : null;
-       
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Paramètres</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle>Informations du profil</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {clientProfile && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium">Nom complet</label>
+                      <p className="text-muted-foreground">
+                        {clientProfile.first_name} {clientProfile.last_name}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Email</label>
+                      <p className="text-muted-foreground">{clientProfile.email}</p>
+                    </div>
+                    {clientProfile.company_name && (
+                      <div>
+                        <label className="text-sm font-medium">Entreprise</label>
+                        <p className="text-muted-foreground">{clientProfile.company_name}</p>
+                      </div>
+                    )}
+                    {clientProfile.phone && (
+                      <div>
+                        <label className="text-sm font-medium">Téléphone</label>
+                        <p className="text-muted-foreground">{clientProfile.phone}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
       default:
         return null;
     }
@@ -175,7 +158,7 @@ const CandidateDashboard = () => {
         <Sidebar className="w-64">
           <SidebarContent>
             <div className="p-4">
-              <h3 className="font-semibold text-lg">Espace Candidat</h3>
+              <h3 className="font-semibold text-lg">Espace Client</h3>
             </div>
             
             <SidebarGroup>
@@ -219,36 +202,18 @@ const CandidateDashboard = () => {
             <div className="flex items-center">
               <SidebarTrigger />
               <div className="ml-4">
-                <h1 className="text-xl font-semibold">Tableau de bord candidat</h1>
-                {candidateProfile && (
+                <h1 className="text-xl font-semibold">Tableau de bord client</h1>
+                {clientProfile && (
                   <p className="text-sm text-muted-foreground">
-                    {candidateProfile.first_name} {candidateProfile.last_name}
+                    {clientProfile.first_name} {clientProfile.last_name}
                   </p>
                 )}
               </div>
             </div>
             
-            {candidateProfile && (
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">Statut :</span>
-                <Badge className={getStatusColor(candidateProfile.status)}>
-                  {getStatusLabel(candidateProfile.status)}
-                </Badge>
-                <Select
-                  value={candidateProfile.status}
-                  onValueChange={handleStatusChange}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="disponible">Disponible</SelectItem>
-                    <SelectItem value="en_pause">En pause</SelectItem>
-                    <SelectItem value="en_mission">En mission</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              <Badge variant="default">Client</Badge>
+            </div>
           </header>
           
           <div className="p-6">
@@ -260,4 +225,4 @@ const CandidateDashboard = () => {
   );
 };
 
-export default CandidateDashboard;
+export default ClientDashboard;

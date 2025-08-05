@@ -11,6 +11,7 @@ import AdminResources from "./pages/AdminResources";
 import Header from "./components/Header";
 
 import CandidateDashboard from "./pages/CandidateDashboard";
+import ClientDashboard from "./pages/ClientDashboard";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Register from "./pages/Register";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/admin/resources" element={<AdminResources />} />
             
             <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
+            <Route path="/client-dashboard" element={<ClientDashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/register" element={<Register />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

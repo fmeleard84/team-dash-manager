@@ -12,6 +12,8 @@ interface CreateUserRequest {
   lastName: string;
   phoneNumber?: string;
   password: string;
+  profileType?: string;
+  companyName?: string;
 }
 
 interface AddUserToGroupRequest {
@@ -309,7 +311,8 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
     email: body.email,
     firstName: body.firstName,
     lastName: body.lastName,
-    phoneNumber: body.phoneNumber
+    phoneNumber: body.phoneNumber,
+    profileType: body.profileType
   });
   
   try {
@@ -458,7 +461,47 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
     // Set password
     await setUserPassword(keycloakBaseUrl, realm, keycloakUserId, body.password, adminToken);
     
-    // Don't try to store in Supabase users table for now - focus on Keycloak only
+    // Assign user to appropriate group
+    if (body.profileType) {
+      console.log(`Assigning user to ${body.profileType} group...`);
+      const groupAssigned = await assignUserToGroup(adminToken, keycloakUserId, body.profileType);
+      if (!groupAssigned.success) {
+        console.warn('Failed to assign user to group:', groupAssigned.error);
+        // Don't fail the whole process if group assignment fails
+      }
+    }
+    
+    // Store profile in appropriate table
+    console.log('Storing user profile...');
+    let profileStored = { success: false, error: 'Unknown error' };
+    
+    if (body.profileType === 'client') {
+      profileStored = await storeClientProfile({
+        keycloakUserId,
+        email: body.email,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        phoneNumber: body.phoneNumber,
+        companyName: body.companyName
+      });
+    } else {
+      profileStored = await storeCandidateProfile({
+        keycloakUserId,
+        email: body.email,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        phoneNumber: body.phoneNumber
+      });
+    }
+
+    if (!profileStored.success) {
+      console.error('Failed to store user profile:', profileStored.error);
+      return {
+        success: false,
+        error: profileStored.error || 'Failed to store user profile'
+      };
+    }
+
     console.log('User created successfully in Keycloak with ID:', keycloakUserId);
 
     return {
@@ -469,7 +512,8 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
         email: body.email,
         firstName: body.firstName,
         lastName: body.lastName,
-        phoneNumber: body.phoneNumber
+        phoneNumber: body.phoneNumber,
+        profileType: body.profileType
       }
     };
     
@@ -584,5 +628,146 @@ async function handleAddUserToGroup(body: AddUserToGroupRequest, supabase: any) 
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+  }
+}
+
+interface StoreProfileParams {
+  keycloakUserId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string;
+  companyName?: string;
+}
+
+async function assignUserToGroup(token: string, userId: string, profileType: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
+    const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
+
+    // Get the group ID for the profile type
+    const groupsResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups?search=${profileType}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!groupsResponse.ok) {
+      console.error('Failed to fetch groups');
+      return { success: false, error: 'Failed to fetch groups' };
+    }
+
+    const groups = await groupsResponse.json();
+    const group = groups.find((g: any) => g.name === profileType);
+    
+    if (!group) {
+      console.error(`Group ${profileType} not found`);
+      return { success: false, error: `Group ${profileType} not found` };
+    }
+
+    // Assign user to group
+    const assignResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/users/${userId}/groups/${group.id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!assignResponse.ok) {
+      const errorText = await assignResponse.text();
+      console.error('Failed to assign user to group:', errorText);
+      return { success: false, error: 'Failed to assign user to group' };
+    }
+
+    console.log(`User assigned to ${profileType} group successfully`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error assigning user to group:', error);
+    return { success: false, error: `Failed to assign user to group: ${error.message}` };
+  }
+}
+
+async function storeCandidateProfile(params: StoreProfileParams): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { keycloakUserId, email, firstName, lastName, phoneNumber } = params;
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    const response = await fetch(`${supabaseUrl}/rest/v1/candidate_profiles`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+      },
+      body: JSON.stringify({
+        keycloak_user_id: keycloakUserId,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        phone: phoneNumber,
+        profile_type: 'resource',
+        password_hash: 'managed_by_keycloak',
+        profile_id: crypto.randomUUID()
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to store candidate profile:', errorText);
+      return { success: false, error: `Failed to store profile: ${errorText}` };
+    }
+
+    console.log('Candidate profile stored successfully');
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error storing candidate profile:', error);
+    return { success: false, error: `Failed to store profile: ${error.message}` };
+  }
+}
+
+async function storeClientProfile(params: StoreProfileParams): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { keycloakUserId, email, firstName, lastName, phoneNumber, companyName } = params;
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    const response = await fetch(`${supabaseUrl}/rest/v1/client_profiles`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+      },
+      body: JSON.stringify({
+        keycloak_user_id: keycloakUserId,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        phone: phoneNumber,
+        company_name: companyName,
+        user_id: crypto.randomUUID()
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to store client profile:', errorText);
+      return { success: false, error: `Failed to store profile: ${errorText}` };
+    }
+
+    console.log('Client profile stored successfully');
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error storing client profile:', error);
+    return { success: false, error: `Failed to store profile: ${error.message}` };
   }
 }

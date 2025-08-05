@@ -12,14 +12,14 @@ const Header = () => {
         
         <div className="flex items-center gap-4">
           <Button variant="ghost" asChild>
-            <Link to="/register" className="flex items-center gap-2">
+            <Link to="/register?tab=login" className="flex items-center gap-2">
               <LogIn className="h-4 w-4" />
               Connexion
             </Link>
           </Button>
           
           <Button asChild>
-            <Link to="/register" className="flex items-center gap-2">
+            <Link to="/register?tab=register" className="flex items-center gap-2">
               <UserPlus className="h-4 w-4" />
               S'inscrire
             </Link>

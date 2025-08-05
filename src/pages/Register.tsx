@@ -4,15 +4,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 
 const Register = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, isLoading } = useKeycloakAuth();
-  const [activeTab, setActiveTab] = useState<'register' | 'login'>('register');
+  const { login, isAuthenticated, isLoading, hasGroup } = useKeycloakAuth();
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'register' | 'login'>(
+    (searchParams.get('tab') as 'register' | 'login') || 'register'
+  );
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -21,14 +25,21 @@ const Register = () => {
     phoneNumber: '',
     password: '',
     confirmPassword: '',
+    profileType: 'resource' as 'client' | 'resource',
+    companyName: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/candidate-dashboard');
+      // Redirect based on user groups from Keycloak
+      if (hasGroup('client')) {
+        navigate('/client-dashboard');
+      } else {
+        navigate('/candidate-dashboard');
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, hasGroup]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +91,8 @@ const Register = () => {
           lastName: formData.lastName,
           phoneNumber: formData.phoneNumber,
           password: formData.password,
+          profileType: formData.profileType,
+          companyName: formData.companyName,
         },
       });
 
@@ -199,6 +212,38 @@ const Register = () => {
                     onChange={handleChange}
                   />
                 </div>
+
+                <div>
+                  <Label htmlFor="profileType">Type de profil *</Label>
+                  <Select
+                    value={formData.profileType}
+                    onValueChange={(value: 'client' | 'resource') =>
+                      setFormData({ ...formData, profileType: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="resource">Ressource (Je veux travailler sur des projets)</SelectItem>
+                      <SelectItem value="client">Client (Je veux créer des projets)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.profileType === 'client' && (
+                  <div>
+                    <Label htmlFor="companyName">Nom de l'entreprise</Label>
+                    <Input
+                      id="companyName"
+                      name="companyName"
+                      type="text"
+                      value={formData.companyName}
+                      onChange={handleChange}
+                      placeholder="Optionnel"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="password">Mot de passe *</Label>

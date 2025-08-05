@@ -182,6 +182,7 @@ export type Database = {
           password_hash: string
           phone: string | null
           profile_id: string
+          profile_type: Database["public"]["Enums"]["profile_type"] | null
           seniority: Database["public"]["Enums"]["hr_seniority"]
           status: string
           updated_at: string
@@ -200,6 +201,7 @@ export type Database = {
           password_hash: string
           phone?: string | null
           profile_id: string
+          profile_type?: Database["public"]["Enums"]["profile_type"] | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
           updated_at?: string
@@ -218,6 +220,7 @@ export type Database = {
           password_hash?: string
           phone?: string | null
           profile_id?: string
+          profile_type?: Database["public"]["Enums"]["profile_type"] | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
           updated_at?: string
@@ -280,6 +283,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      client_profiles: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          keycloak_user_id: string | null
+          last_name: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          email: string
+          first_name: string
+          id?: string
+          keycloak_user_id?: string | null
+          last_name: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string
+          id?: string
+          keycloak_user_id?: string | null
+          last_name?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       hr_categories: {
         Row: {
@@ -741,6 +783,7 @@ export type Database = {
     }
     Enums: {
       hr_seniority: "junior" | "intermediate" | "senior"
+      profile_type: "client" | "resource"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -869,6 +912,7 @@ export const Constants = {
   public: {
     Enums: {
       hr_seniority: ["junior", "intermediate", "senior"],
+      profile_type: ["client", "resource"],
     },
   },
 } as const
