@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -12,37 +12,38 @@ const Admin = () => {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { user, login: authLogin } = useAuth();
+  const { user, login: authLogin, isAuthenticated } = useKeycloakAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
+    if (isAuthenticated) {
       navigate('/dashboard');
     }
-  }, [user, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    const success = await authLogin(login, password);
-    
-    if (success) {
+    try {
+      // Redirect to Keycloak login
+      authLogin();
+      
       toast({
-        title: "Connexion réussie",
-        description: "Bienvenue dans votre espace admin.",
+        title: "Redirection en cours",
+        description: "Vous allez être redirigé vers la page de connexion.",
       });
-      navigate('/dashboard');
-    } else {
+    } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: "Erreur de connexion",
-        description: "Identifiants incorrects.",
+        description: "Impossible de démarrer la connexion.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (

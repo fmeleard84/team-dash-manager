@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ReactFlow,
@@ -70,7 +70,7 @@ const ensureValidPosition = (position?: { x: number; y: number }) => {
 
 const Project = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user } = useKeycloakAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   

@@ -44,23 +44,34 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
   const oidcAuth = useOidcAuth();
   
   const getUserGroups = (): string[] => {
-    console.log('Getting user groups from profile:', oidcAuth.user?.profile);
+    console.log('=== DEBUG: Getting user groups ===');
+    console.log('Full user object:', oidcAuth.user);
+    console.log('User profile:', oidcAuth.user?.profile);
+    
     if (!oidcAuth.user?.profile?.groups) {
-      console.log('No groups found in profile, checking other locations...');
+      console.log('No groups found in profile.groups, checking other locations...');
       // Try different locations where groups might be stored
       const profile = oidcAuth.user?.profile as any;
+      
+      console.log('Checking resource_access:', profile?.resource_access);
       if (profile?.resource_access?.backoffice?.roles) {
-        console.log('Found roles in resource_access:', profile.resource_access.backoffice.roles);
+        console.log('Found roles in resource_access.backoffice:', profile.resource_access.backoffice.roles);
         return profile.resource_access.backoffice.roles as string[];
       }
+      
+      console.log('Checking realm_access:', profile?.realm_access);
       if (profile?.realm_access?.roles) {
         console.log('Found roles in realm_access:', profile.realm_access.roles);
         return (profile.realm_access.roles as string[]).filter((role: string) => 
           ['client', 'candidate', 'resource', 'admin'].includes(role)
         );
       }
+      
+      console.log('No groups found anywhere in token');
       return [];
     }
+    
+    console.log('Found groups in profile.groups:', oidcAuth.user.profile.groups);
     return Array.isArray(oidcAuth.user.profile.groups) 
       ? oidcAuth.user.profile.groups as string[]
       : [];

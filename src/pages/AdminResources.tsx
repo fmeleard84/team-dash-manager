@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ interface Expertise {
 }
 
 const AdminResources = () => {
-  const { user } = useAuth();
+  const { user } = useKeycloakAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
