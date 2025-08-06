@@ -60,28 +60,29 @@ const CandidateProjects = () => {
       // Vérifier s'il y a des données d'authentification stockées
       const candidateAuth = localStorage.getItem('candidate-auth');
       if (!candidateAuth) {
-        // Si pas d'auth, chercher le premier candidat disponible pour les tests
-        const { data: candidates, error } = await supabase
+        // Si pas d'auth, chercher Francis Meleard spécifiquement
+        const { data: candidate, error } = await supabase
           .from('candidate_profiles')
           .select('id, first_name, last_name, email')
-          .limit(1);
+          .eq('email', 'fmeleard+a1201@gmail.com')
+          .single();
 
         if (error) {
-          console.error('Error fetching candidates:', error);
-          toast.error('Erreur lors de la récupération des candidats');
+          console.error('Error fetching candidate:', error);
+          toast.error('Erreur lors de la récupération du candidat');
           return;
         }
 
-        if (candidates && candidates.length > 0) {
-          setCurrentCandidateId(candidates[0].id);
-          toast.success(`Connecté en tant que ${candidates[0].first_name} ${candidates[0].last_name}`);
+        if (candidate) {
+          setCurrentCandidateId(candidate.id);
+          toast.success(`Connecté en tant que ${candidate.first_name} ${candidate.last_name}`);
           // Stocker temporairement l'ID pour la session
           localStorage.setItem('candidate-auth', JSON.stringify({ 
-            candidateId: candidates[0].id,
-            email: candidates[0].email 
+            candidateId: candidate.id,
+            email: candidate.email 
           }));
         } else {
-          toast.error('Aucun candidat trouvé dans la base de données');
+          toast.error('Candidat Francis Meleard non trouvé');
         }
         return;
       }
