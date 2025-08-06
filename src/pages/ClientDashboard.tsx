@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
+import { useNavigate } from "react-router-dom";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -27,7 +28,9 @@ import {
 
 const ClientDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const { user, logout, isLoading } = useKeycloakAuth();
+  const navigate = useNavigate();
 
   // Fetch client profile
   const { data: clientProfile, refetch: refetchProfile } = useQuery({
@@ -54,6 +57,38 @@ const ClientDashboard = () => {
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleCreateProject = async () => {
+    if (!user?.profile?.email) {
+      toast.error('Utilisateur non connecté');
+      return;
+    }
+
+    setIsCreatingProject(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          title: 'Nouveau projet',
+          description: null,
+          user_id: user.profile.email,
+          status: 'pause',
+          project_date: new Date().toISOString().split('T')[0]
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Projet créé avec succès');
+      navigate(`/project/${data.id}`);
+    } catch (error: any) {
+      toast.error('Erreur lors de la création: ' + error.message);
+    } finally {
+      setIsCreatingProject(false);
+    }
   };
 
   const renderContent = () => {
@@ -88,7 +123,12 @@ const ClientDashboard = () => {
                   Aucun projet pour le moment. Créez votre premier projet !
                 </p>
                 <div className="flex justify-center mt-4">
-                  <Button>Créer un projet</Button>
+                  <Button 
+                    onClick={handleCreateProject}
+                    disabled={isCreatingProject}
+                  >
+                    {isCreatingProject ? 'Création...' : 'Créer un projet'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

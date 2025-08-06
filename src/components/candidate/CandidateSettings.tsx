@@ -48,6 +48,29 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
     enabled: !!currentCandidateId
   });
 
+  // Fetch profile and category data separately
+  const { data: profileData } = useQuery({
+    queryKey: ['profile-with-category', candidateProfile?.profile_id],
+    queryFn: async () => {
+      if (!candidateProfile?.profile_id) return null;
+      
+      const { data, error } = await supabase
+        .from('hr_profiles')
+        .select(`
+          name,
+          hr_categories (
+            name
+          )
+        `)
+        .eq('id', candidateProfile.profile_id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!candidateProfile?.profile_id
+  });
+
   const handleUpdate = () => {
     refetch();
     toast.success('Profil mis à jour');
@@ -143,7 +166,9 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Profil</p>
-              <p className="text-lg">Ressource IT</p>
+              <p className="text-lg">
+                {profileData?.name || 'Aucun profil sélectionné'}
+              </p>
             </div>
             <Button 
               variant="outline" 
@@ -155,8 +180,10 @@ export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps
             </Button>
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">Type de profil</p>
-            <p className="text-lg capitalize">{candidateProfile.profile_type || 'resource'}</p>
+            <p className="text-sm font-medium text-muted-foreground">Domaine d'expertise</p>
+            <p className="text-lg">
+              {profileData?.hr_categories?.name || 'Aucun domaine sélectionné'}
+            </p>
           </div>
           <div className="flex items-center justify-between">
             <div>
