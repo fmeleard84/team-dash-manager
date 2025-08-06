@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,7 @@ interface EditJobModalProps {
 
 export function EditJobModal({ isOpen, onClose, currentCandidateId, currentProfileId, onUpdate }: EditJobModalProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [selectedProfileId, setSelectedProfileId] = useState(currentProfileId);
+  const [selectedProfileId, setSelectedProfileId] = useState(currentProfileId || '');
   const [loading, setLoading] = useState(false);
 
   // Fetch categories
@@ -28,6 +28,22 @@ export function EditJobModal({ isOpen, onClose, currentCandidateId, currentProfi
       if (error) throw error;
       return data;
     }
+  });
+
+  // Fetch current profile to get category
+  const { data: currentProfile } = useQuery({
+    queryKey: ['current-hr-profile', currentProfileId],
+    queryFn: async () => {
+      if (!currentProfileId) return null;
+      const { data, error } = await supabase
+        .from('hr_profiles')
+        .select('*, hr_categories(id, name)')
+        .eq('id', currentProfileId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentProfileId
   });
 
   // Fetch profiles by category
@@ -43,6 +59,13 @@ export function EditJobModal({ isOpen, onClose, currentCandidateId, currentProfi
     },
     enabled: !!selectedCategoryId
   });
+
+  // Set initial category when current profile is loaded
+  useEffect(() => {
+    if (currentProfile?.hr_categories?.id && !selectedCategoryId) {
+      setSelectedCategoryId(currentProfile.hr_categories.id);
+    }
+  }, [currentProfile, selectedCategoryId]);
 
   const handleSave = async () => {
     if (!selectedProfileId) {

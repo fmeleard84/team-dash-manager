@@ -6,6 +6,8 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CandidateProjects from "@/components/candidate/CandidateProjects";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
+import { CandidateNotes } from "@/components/candidate/CandidateNotes";
+import { StarRating } from "@/components/ui/star-rating";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +31,8 @@ import {
   FileText, 
   Receipt, 
   Settings, 
-  LogOut 
+  LogOut,
+  Star
 } from "lucide-react";
 
 const CandidateDashboard = () => {
@@ -44,7 +47,7 @@ const CandidateDashboard = () => {
       
       const { data, error } = await supabase
         .from('candidate_profiles')
-        .select('status, first_name, last_name, id')
+        .select('status, first_name, last_name, id, rating')
         .eq('email', user.profile.email)
         .single();
       
@@ -59,6 +62,7 @@ const CandidateDashboard = () => {
     { id: 'messages', label: 'Mes messages', icon: MessageSquare },
     { id: 'appointments', label: 'Mes rendez-vous', icon: Calendar },
     { id: 'deliverables', label: 'Mes livrables', icon: FileText },
+    { id: 'notes', label: 'Mes notes', icon: Star },
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
   ];
 
@@ -154,6 +158,8 @@ const CandidateDashboard = () => {
             <p className="text-muted-foreground">Vos livrables apparaîtront ici.</p>
           </div>
         );
+      case 'notes':
+        return candidateProfile?.id ? <CandidateNotes currentCandidateId={candidateProfile.id} /> : null;
       case 'invoices':
         return (
           <div className="space-y-4">
@@ -176,6 +182,11 @@ const CandidateDashboard = () => {
           <SidebarContent>
             <div className="p-4">
               <h3 className="font-semibold text-lg">Espace Candidat</h3>
+              {candidateProfile && candidateProfile.rating > 0 && (
+                <div className="mt-2">
+                  <StarRating rating={candidateProfile.rating} size={14} />
+                </div>
+              )}
             </div>
             
             <SidebarGroup>

@@ -183,6 +183,7 @@ export type Database = {
           phone: string | null
           profile_id: string | null
           profile_type: Database["public"]["Enums"]["profile_type"] | null
+          rating: number | null
           seniority: Database["public"]["Enums"]["hr_seniority"]
           status: string
           updated_at: string
@@ -202,6 +203,7 @@ export type Database = {
           phone?: string | null
           profile_id?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
+          rating?: number | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
           updated_at?: string
@@ -221,6 +223,7 @@ export type Database = {
           phone?: string | null
           profile_id?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
+          rating?: number | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
           updated_at?: string
@@ -269,6 +272,51 @@ export type Database = {
           },
           {
             foreignKeyName: "candidate_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_reviews: {
+        Row: {
+          candidate_id: string
+          client_comment: string | null
+          client_rating: number
+          created_at: string
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          candidate_id: string
+          client_comment?: string | null
+          client_rating: number
+          created_at?: string
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string
+          client_comment?: string | null
+          client_rating?: number
+          created_at?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_reviews_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_reviews_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
