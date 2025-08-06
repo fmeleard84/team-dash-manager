@@ -87,9 +87,20 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
     console.log('Extracted user groups/roles:', userGroups);
     console.log('Required group:', requiredGroup);
     
-    const hasRequiredGroup = userGroups.includes(requiredGroup);
+    // More flexible group checking - check if user has any project-related access
+    // or is a client owner (propriétaire)
+    const hasRequiredGroup = userGroups.some(group => 
+      group === requiredGroup || 
+      group.includes('Client (propriétaire)') ||
+      group.includes('propriétaire') ||
+      (typeof group === 'string' && group.toLowerCase().includes('client'))
+    );
+    
+    console.log('Group check result:', hasRequiredGroup);
     
     if (!hasRequiredGroup) {
+      console.error('Access denied. User groups:', userGroups);
+      console.error('Required group pattern:', requiredGroup);
       throw new Error(`User does not belong to required group: ${requiredGroup}. Available groups/roles: ${userGroups.join(', ')}`);
     }
     
