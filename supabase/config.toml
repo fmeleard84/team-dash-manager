@@ -54,11 +54,6 @@ refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
 
-[auth.jwt]
-secret = "super-secret-jwt-token-with-at-least-32-characters-long"
-aud = "backoffice"
-issuer = "https://keycloak.ialla.fr/realms/haas"
-
 [auth.external.keycloak]
 enabled = true
 client_id = "backoffice"
