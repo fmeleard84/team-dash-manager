@@ -87,14 +87,19 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
     console.log('Extracted user groups/roles:', userGroups);
     console.log('Required group:', requiredGroup);
     
+    // Normalize group names by replacing spaces with hyphens for comparison
+    const normalizeGroupName = (name: string) => name.replace(/\s+/g, '-');
+    const normalizedRequiredGroup = normalizeGroupName(requiredGroup);
+    
     // More flexible group checking - check if user has any project-related access
     // or is a client owner (propriétaire)
-    const hasRequiredGroup = userGroups.some(group => 
-      group === requiredGroup || 
-      group.includes('Client (propriétaire)') ||
-      group.includes('propriétaire') ||
-      (typeof group === 'string' && group.toLowerCase().includes('client'))
-    );
+    const hasRequiredGroup = userGroups.some(group => {
+      const normalizedGroup = normalizeGroupName(group);
+      return normalizedGroup === normalizedRequiredGroup || 
+             group.includes('Client (propriétaire)') ||
+             group.includes('propriétaire') ||
+             (typeof group === 'string' && group.toLowerCase().includes('client'));
+    });
     
     console.log('Group check result:', hasRequiredGroup);
     
@@ -395,8 +400,12 @@ serve(async (req) => {
         throw new Error('Project not found');
       }
 
-      const requiredGroup = `Projet-${project.title}`;
+      // Normalize project title by replacing spaces with hyphens for consistent group naming
+      const normalizedTitle = project.title.replace(/\s+/g, '-');
+      const requiredGroup = `Projet-${normalizedTitle}`;
       console.log('Checking membership for group:', requiredGroup);
+      console.log('Original project title:', project.title);
+      console.log('Normalized project title:', normalizedTitle);
       
       const tokenPayload = await validateKeycloakToken(token, requiredGroup);
       console.log('User authenticated and authorized for project:', projectId);
