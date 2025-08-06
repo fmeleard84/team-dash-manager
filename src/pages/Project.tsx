@@ -211,12 +211,12 @@ const Project = () => {
         setNodes(reconstructedNodes);
       }
 
-      // Fetch flow data for edges
+      // Fetch flow data for edges  
       const { data: flowData, error: flowError } = await supabase
         .from('project_flows')
         .select('flow_data')
         .eq('project_id', id)
-        .single();
+        .maybeSingle();
 
       if (!flowError && flowData?.flow_data) {
         const flowDataParsed = flowData.flow_data as { nodes?: Node[], edges?: Edge[] };
