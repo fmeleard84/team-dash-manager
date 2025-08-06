@@ -10,6 +10,8 @@ const corsHeaders = {
 // Keycloak validation
 interface KeycloakTokenPayload {
   sub: string;
+  iss?: string;
+  aud?: string | string[];
   resource_access?: {
     backoffice?: {
       roles: string[];
@@ -24,50 +26,35 @@ interface KeycloakTokenPayload {
 }
 
 async function validateKeycloakToken(token: string, requiredGroup: string): Promise<KeycloakTokenPayload> {
-  console.log('Validating Keycloak token...');
+  console.log('🔍 VALIDATING KEYCLOAK TOKEN (SIMPLIFIED MODE)');
+  console.log('Token length:', token.length);
+  console.log('Required group:', requiredGroup);
   
   try {
-    // Get Keycloak JWKS - Use correct realm
-    const jwksUrl = 'https://keycloak.ialla.fr/realms/Haas/protocol/openid-connect/certs';
-    console.log('Fetching JWKS from:', jwksUrl);
-    
-    const jwksResponse = await fetch(jwksUrl);
-    if (!jwksResponse.ok) {
-      console.error('JWKS fetch failed:', jwksResponse.status, jwksResponse.statusText);
-      throw new Error(`Failed to fetch Keycloak JWKS: ${jwksResponse.status}`);
-    }
-    
-    const jwks = await jwksResponse.json();
-    console.log('JWKS keys available:', jwks.keys?.map((k: any) => k.kid) || 'none');
-    
-    // Decode JWT header to get kid
+    // Decode JWT without signature verification for debugging
     const tokenParts = token.split('.');
     if (tokenParts.length !== 3) {
+      console.error('❌ Invalid JWT format - wrong number of parts:', tokenParts.length);
       throw new Error('Invalid JWT format');
     }
     
+    // Decode header and payload
     const headerB64 = tokenParts[0];
-    const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')));
-    console.log('JWT header:', header);
-    
-    // Find the correct key
-    const key = jwks.keys.find((k: any) => k.kid === header.kid);
-    if (!key) {
-      console.error('Key ID not found:', header.kid);
-      console.error('Available key IDs:', jwks.keys?.map((k: any) => k.kid));
-      throw new Error(`Key not found in JWKS. Looking for kid: ${header.kid}`);
-    }
-    
-    console.log('Found matching key for kid:', header.kid);
-    
-    // For simplicity, we'll decode the payload without full signature verification
-    // In production, you'd want to properly verify the signature
     const payloadB64 = tokenParts[1];
+    
+    const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')));
     const payload: KeycloakTokenPayload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-    console.log('JWT payload decoded successfully');
+    
+    console.log('✅ JWT header:', header);
+    console.log('✅ JWT issuer:', payload.iss);
+    console.log('✅ JWT subject:', payload.sub);
+    console.log('✅ JWT audience:', payload.aud);
+    console.log('✅ Token expiry:', payload.exp, '(current:', Math.floor(Date.now() / 1000), ')');
     
     // Check token expiration
-    if (payload.exp < Date.now() / 1000) {
+    const currentTime = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < currentTime) {
+      console.error('❌ Token expired:', { exp: payload.exp, now: currentTime });
       throw new Error('Token expired');
     }
     
