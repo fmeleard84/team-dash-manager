@@ -58,6 +58,11 @@ enable_anonymous_sign_ins = false
 secret = "super-secret-jwt-token-with-at-least-32-characters-long"
 aud = "backoffice"
 issuer = "https://keycloak.ialla.fr/realms/haas"
+
+[auth.external.keycloak]
+enabled = true
+client_id = "backoffice"
+issuer = "https://keycloak.ialla.fr/realms/haas"
 jwks_uri = "https://keycloak.ialla.fr/realms/haas/protocol/openid-connect/certs"
 
 [auth.email]
