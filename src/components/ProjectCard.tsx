@@ -111,10 +111,32 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     }
 
     const newStatus = project.status === 'play' ? 'pause' : 'play';
-    await onStatusToggle(project.id, newStatus);
     
+    // If switching to play, create Keycloak project and sync with Planka
     if (newStatus === 'play') {
-      await checkPlankaProject();
+      try {
+        setIsSyncing(true);
+        
+        // Create Keycloak project group and add team members
+        await createKeycloakProjectGroup();
+        
+        // Sync with Planka
+        await syncWithPlanka();
+        
+        // Update project status
+        await onStatusToggle(project.id, newStatus);
+        
+        toast.success('Projet démarré avec succès ! Équipe créée et espace de travail prêt.');
+      } catch (error) {
+        console.error('Error starting project:', error);
+        toast.error('Erreur lors du démarrage du projet');
+        return;
+      } finally {
+        setIsSyncing(false);
+      }
+    } else {
+      // Simple pause
+      await onStatusToggle(project.id, newStatus);
     }
   };
 
@@ -141,9 +163,108 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     }
   };
 
+  const createKeycloakProjectGroup = async () => {
+    try {
+      console.log('Creating Keycloak project group...');
+      
+      // Create the project group
+      const { data: groupData, error: groupError } = await supabase.functions.invoke('keycloak-user-management', {
+        body: {
+          action: 'create-project-group',
+          projectId: project.id,
+          groupName: `Projet-${project.title.replace(/\s+/g, '-')}`
+        }
+      });
+
+      if (groupError) throw groupError;
+      
+      console.log('Project group created:', groupData);
+
+      // Get all booked resources for this project
+      const { data: bookedResources, error: resourceError } = await supabase
+        .from('project_bookings')
+        .select(`
+          candidate_id,
+          candidate_profiles (
+            keycloak_user_id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('project_id', project.id)
+        .eq('status', 'accepted');
+
+      if (resourceError) throw resourceError;
+
+      // Get project owner (client)
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select(`
+          keycloak_user_id,
+          title
+        `)
+        .eq('id', project.id)
+        .single();
+
+      if (projectError) throw projectError;
+
+      // Add each team member to the group
+      const members = [];
+      
+      // Add client to the group
+      if (projectData?.keycloak_user_id) {
+        try {
+          const { data: addClientData, error: addClientError } = await supabase.functions.invoke('keycloak-user-management', {
+            body: {
+              action: 'add-user-to-group',
+              userId: projectData.keycloak_user_id,
+              groupId: groupData.groupId
+            }
+          });
+          
+          if (!addClientError) {
+            members.push('Client (propriétaire)');
+          }
+        } catch (error) {
+          console.warn('Failed to add client to group:', error);
+        }
+      }
+
+      // Add each booked resource to the group
+      if (bookedResources) {
+        for (const booking of bookedResources) {
+          const candidate = booking.candidate_profiles;
+          if (candidate?.keycloak_user_id) {
+            try {
+              const { data: addMemberData, error: addMemberError } = await supabase.functions.invoke('keycloak-user-management', {
+                body: {
+                  action: 'add-user-to-group',
+                  userId: candidate.keycloak_user_id,
+                  groupId: groupData.groupId
+                }
+              });
+              
+              if (!addMemberError) {
+                members.push(`${candidate.first_name} ${candidate.last_name}`);
+              }
+            } catch (error) {
+              console.warn(`Failed to add ${candidate.email} to group:`, error);
+            }
+          }
+        }
+      }
+
+      console.log(`Keycloak project group created with ${members.length} members:`, members);
+      return { success: true, members };
+      
+    } catch (error) {
+      console.error('Error creating Keycloak project group:', error);
+      throw error;
+    }
+  };
+
   const syncWithPlanka = async () => {
-    setIsSyncing(true);
-    
     try {
       // Get admin user from localStorage for authentication
       const adminUser = localStorage.getItem('admin_user');
@@ -171,20 +292,19 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
 
       if (data.success) {
         if (data.exists) {
-          toast.success('Projet Planka déjà existant !');
+          console.log('Projet Planka déjà existant');
         } else {
-          toast.success('Projet créé avec succès dans Planka !');
+          console.log('Projet créé avec succès dans Planka');
         }
         
         setPlankaProject({ planka_url: data.plankaUrl });
+        return { success: true, plankaUrl: data.plankaUrl };
       } else {
         throw new Error('Échec de la synchronisation');
       }
     } catch (error) {
       console.error('Error syncing with Planka:', error);
-      toast.error('Erreur lors de la synchronisation avec Planka');
-    } finally {
-      setIsSyncing(false);
+      throw error;
     }
   };
 
@@ -290,8 +410,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
           </Button>
         </div>
 
-        {/* Booking Team button */}
-        {resourceAssignments.length > 0 && !allResourcesBooked && (
+        {/* Booking Team button - only show when resources exist but not all are booked */}
+        {resourceAssignments.length > 0 && !allResourcesBooked && project.status === 'pause' && (
           <Button
             variant="secondary"
             size="sm"
@@ -300,44 +420,25 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
             className="w-full bg-orange-500 hover:bg-orange-600 text-white"
           >
             <Users className="w-4 h-4 mr-2" />
-            {isBookingTeam ? 'Recherche en cours...' : 'En attente de booking'}
+            {isBookingTeam ? 'Recherche en cours...' : 'Rejoindre l\'équipe'}
           </Button>
         )}
 
-        {/* Join Team button when all resources are booked */}
-        {resourceAssignments.length > 0 && allResourcesBooked && (
+        {/* My Workspace button - only show when project is active (play) */}
+        {project.status === 'play' && plankaProject?.planka_url && (
           <Button
             variant="default"
             size="sm"
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-            onClick={() => {
-              if (plankaProject?.planka_url) {
-                window.open(plankaProject.planka_url, '_blank');
-              } else {
-                toast.info('Le projet Planka n\'est pas encore configuré');
-              }
-            }}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+            onClick={() => window.open(plankaProject.planka_url, '_blank')}
           >
-            <Users className="w-4 h-4 mr-2" />
-            Rejoindre l'équipe
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Mon espace de travail
           </Button>
         )}
 
-        {plankaProject && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openPlanka}
-              className="flex-1"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Ouvrir dans Planka
-            </Button>
-          </div>
-        )}
-
-        {!isChecked && (
+        {/* Sync with Planka button - only show for admins when not checked and project is paused */}
+        {!isChecked && project.status === 'pause' && (
           <div className="flex gap-2">
             <Button
               variant="outline"

@@ -523,75 +523,6 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
   }
 }
 
-async function handleCreateProjectGroup(body: CreateProjectGroupRequest, supabase: any) {
-  
-  try {
-    const adminToken = await getKeycloakAdminToken();
-    const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
-    const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
-
-    // Create group in Keycloak
-    const createGroupResponse = await fetch(
-      `${keycloakBaseUrl}/admin/realms/${realm}/groups`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${adminToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: body.groupName,
-          path: `/${body.groupName}`,
-        }),
-      }
-    );
-
-    if (!createGroupResponse.ok) {
-      const errorText = await createGroupResponse.text();
-      throw new Error(`Failed to create group in Keycloak: ${errorText}`);
-    }
-
-    // Get the created group's ID
-    const locationHeader = createGroupResponse.headers.get('Location');
-    const keycloakGroupId = locationHeader?.split('/').pop();
-
-    if (!keycloakGroupId) {
-      throw new Error('Failed to get Keycloak group ID');
-    }
-
-    // Store group info in Supabase
-    const { data: projectGroup, error: dbError } = await supabase
-      .from('project_groups')
-      .insert({
-        project_id: body.projectId,
-        keycloak_group_id: keycloakGroupId,
-        keycloak_group_name: body.groupName,
-      })
-      .select()
-      .single();
-
-    if (dbError) {
-      console.error('Error storing project group in Supabase:', dbError);
-      throw new Error('Failed to store project group metadata');
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        keycloakGroupId,
-        projectGroup 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('Error creating project group:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-}
 
 async function handleAddUserToGroup(body: AddUserToGroupRequest, supabase: any) {
   
@@ -829,5 +760,62 @@ async function storeClientProfile(params: StoreProfileParams): Promise<{ success
   } catch (error) {
     console.error('Error storing client profile:', error);
     return { success: false, error: `Failed to store profile: ${error.message}` };
+  }
+}
+
+async function handleCreateProjectGroup(body: CreateProjectGroupRequest, supabase: any) {
+  console.log('Creating project group:', body);
+  
+  try {
+    // Get admin token
+    const adminToken = await getKeycloakAdminToken();
+    
+    // Create the group in Keycloak
+    const groupResult = await createGroupIfNotExists(adminToken, body.groupName);
+    
+    if (!groupResult.success || !groupResult.groupId) {
+      throw new Error(groupResult.error || 'Failed to create project group');
+    }
+
+    // Store the project group mapping in Supabase
+    const { data: existingGroup } = await supabase
+      .from('project_groups')
+      .select('id')
+      .eq('project_id', body.projectId)
+      .eq('keycloak_group_id', groupResult.groupId)
+      .maybeSingle();
+
+    if (!existingGroup) {
+      const { error: insertError } = await supabase
+        .from('project_groups')
+        .insert({
+          project_id: body.projectId,
+          keycloak_group_id: groupResult.groupId,
+          keycloak_group_name: body.groupName
+        });
+
+      if (insertError) {
+        console.error('Failed to store project group mapping:', insertError);
+        throw new Error('Failed to store project group mapping');
+      }
+    }
+
+    console.log(`Project group created successfully: ${body.groupName} (${groupResult.groupId})`);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        groupId: groupResult.groupId,
+        groupName: body.groupName
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error creating project group:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 }
