@@ -81,7 +81,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.planka-integration]
-verify_jwt = true
+verify_jwt = false
 
 [functions.candidate-auth]
 verify_jwt = false
