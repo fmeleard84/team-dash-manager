@@ -72,13 +72,17 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
     }
     
     // Check if user belongs to required group - check multiple possible locations
-    const userGroups = 
-      payload.groups || 
-      payload.realm_access?.roles || 
-      payload.resource_access?.backoffice?.roles || 
-      [];
+    const userGroups = [
+      ...(payload.groups || []),
+      ...(payload.realm_access?.roles || []),
+      ...(payload.resource_access?.backoffice?.roles || []),
+      // Check all resource access roles
+      ...Object.values(payload.resource_access || {}).flatMap((resource: any) => resource.roles || [])
+    ];
     
+    console.log('=== GROUP VALIDATION DEBUG ===');
     console.log('Full token payload structure:', JSON.stringify({
+      sub: payload.sub,
       groups: payload.groups,
       realm_access: payload.realm_access,
       resource_access: payload.resource_access
@@ -88,24 +92,40 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
     console.log('Required group:', requiredGroup);
     
     // Normalize group names by replacing spaces with hyphens for comparison
-    const normalizeGroupName = (name: string) => name.replace(/\s+/g, '-');
+    const normalizeGroupName = (name: string) => name.replace(/\s+/g, '-').toLowerCase();
     const normalizedRequiredGroup = normalizeGroupName(requiredGroup);
+    
+    console.log('Normalized required group:', normalizedRequiredGroup);
+    console.log('Normalized user groups:', userGroups.map(g => normalizeGroupName(g)));
     
     // More flexible group checking - check if user has any project-related access
     // or is a client owner (propriétaire)
     const hasRequiredGroup = userGroups.some(group => {
       const normalizedGroup = normalizeGroupName(group);
-      return normalizedGroup === normalizedRequiredGroup || 
-             group.includes('Client (propriétaire)') ||
-             group.includes('propriétaire') ||
-             (typeof group === 'string' && group.toLowerCase().includes('client'));
+      const hasExactMatch = normalizedGroup === normalizedRequiredGroup;
+      const hasProjectMatch = normalizedGroup.includes('projet') && normalizedRequiredGroup.includes('projet');
+      const hasClientAccess = group.includes('Client (propriétaire)') || 
+                             group.includes('propriétaire') ||
+                             (typeof group === 'string' && group.toLowerCase().includes('client'));
+      
+      console.log(`Checking group "${group}":`, {
+        normalized: normalizedGroup,
+        exactMatch: hasExactMatch,
+        projectMatch: hasProjectMatch,
+        clientAccess: hasClientAccess
+      });
+      
+      return hasExactMatch || hasProjectMatch || hasClientAccess;
     });
     
-    console.log('Group check result:', hasRequiredGroup);
+    console.log('Final group check result:', hasRequiredGroup);
+    console.log('=== END GROUP VALIDATION DEBUG ===');
     
     if (!hasRequiredGroup) {
-      console.error('Access denied. User groups:', userGroups);
+      console.error('ACCESS DENIED');
+      console.error('User groups:', userGroups);
       console.error('Required group pattern:', requiredGroup);
+      console.error('Normalized required:', normalizedRequiredGroup);
       throw new Error(`User does not belong to required group: ${requiredGroup}. Available groups/roles: ${userGroups.join(', ')}`);
     }
     
