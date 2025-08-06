@@ -43,18 +43,23 @@ const ClientDashboard = () => {
   const { data: clientProfile, refetch: refetchProfile } = useQuery({
     queryKey: ['client-profile', user?.profile?.sub],
     queryFn: async () => {
-      if (!user?.profile?.email) return null;
+      if (!user?.profile?.sub) return null;
       
+      console.log('Fetching client profile for user:', user.profile.sub);
       const { data, error } = await supabase
         .from('client_profiles')
         .select('*')
-        .eq('email', user.profile.email)
-        .single();
+        .eq('keycloak_user_id', user.profile.sub)
+        .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching client profile:', error);
+        throw error;
+      }
+      console.log('Client profile result:', data);
       return data;
     },
-    enabled: !!user?.profile?.email
+    enabled: !!user?.profile?.sub
   });
 
   // Fetch user projects

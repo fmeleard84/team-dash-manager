@@ -7,21 +7,26 @@ export const useSupabaseAuth = () => {
 
   useEffect(() => {
     if (isAuthenticated && user?.access_token) {
-      // Set the Authorization header for Supabase requests
+      console.log('Setting up Supabase auth with Keycloak token');
+      
+      // Configure global headers for all Supabase requests
+      (supabase as any).rest.headers = {
+        ...(supabase as any).rest.headers,
+        'Authorization': `Bearer ${user.access_token}`,
+      };
+      
+      // Set auth for Edge Functions
       supabase.functions.setAuth(user.access_token);
       
-      // For database requests, we need to modify the global headers
-      const originalFrom = supabase.from;
-      supabase.from = (table: string) => {
-        const query = originalFrom.call(supabase, table);
-        (query as any).headers = {
-          ...((query as any).headers || {}),
-          'Authorization': `Bearer ${user.access_token}`,
-        };
-        return query;
-      };
+      console.log('Supabase auth configured with JWT token');
+    } else {
+      console.log('Clearing Supabase auth - user not authenticated');
+      // Clear auth headers when user is not authenticated
+      if ((supabase as any).rest.headers) {
+        delete (supabase as any).rest.headers['Authorization'];
+      }
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.access_token]);
 
   return { isAuthenticated, user };
 };
