@@ -266,23 +266,10 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
 
   const syncWithPlanka = async () => {
     try {
-      // Get admin user from localStorage for authentication
-      const adminUser = localStorage.getItem('admin_user');
-      console.log('Admin user from localStorage:', adminUser);
-      
-      const user = adminUser ? JSON.parse(adminUser) : null;
-      console.log('Parsed user:', user);
-      
-      if (!user || !user.id) {
-        console.error('No valid admin user found in localStorage');
-        throw new Error('Utilisateur non authentifié - Veuillez vous reconnecter');
-      }
-
       const { data, error } = await supabase.functions.invoke('planka-integration', {
         body: {
           action: 'sync-project',
           projectId: project.id,
-          adminUserId: user.id,
         },
       });
 
