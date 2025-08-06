@@ -814,7 +814,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      debug_jwt_claims: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
     }
     Enums: {
       hr_seniority: "junior" | "intermediate" | "senior"
