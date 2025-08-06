@@ -13,5 +13,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: false, // Disable Supabase auth URL detection since we use Keycloak
+  },
+  global: {
+    headers: {
+      // We'll set the Authorization header dynamically via interceptor
+    }
   }
 });

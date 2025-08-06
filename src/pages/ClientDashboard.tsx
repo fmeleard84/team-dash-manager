@@ -9,6 +9,7 @@ import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { useNavigate } from "react-router-dom";
 import { ProjectCard } from "@/components/ProjectCard";
 import CreateProjectModal from "@/components/CreateProjectModal";
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { 
   Sidebar, 
   SidebarContent, 
@@ -34,6 +35,9 @@ const ClientDashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { user, logout, isLoading } = useKeycloakAuth();
   const navigate = useNavigate();
+  
+  // Configure Supabase auth with Keycloak tokens
+  useSupabaseAuth();
 
   // Fetch client profile
   const { data: clientProfile, refetch: refetchProfile } = useQuery({
