@@ -5,6 +5,7 @@ import { Play, Pause, Eye, Trash2, ExternalLink, Users } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 
 interface Project {
   id: string;
@@ -36,6 +37,7 @@ interface PlankaProject {
 }
 
 export function ProjectCard({ project, onStatusToggle, onDelete, onView }: ProjectCardProps) {
+  const { user } = useKeycloakAuth();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
@@ -266,10 +268,19 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
 
   const syncWithPlanka = async () => {
     try {
+      // Get the Keycloak access token
+      const token = user?.access_token;
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
       const { data, error } = await supabase.functions.invoke('planka-integration', {
         body: {
           action: 'sync-project',
           projectId: project.id,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
       });
 
