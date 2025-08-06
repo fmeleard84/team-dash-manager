@@ -454,8 +454,8 @@ const Project = () => {
   const saveFlow = async () => {
     if (!id) return;
     
-    // Vérifier l'authentification de l'utilisateur admin
-    if (!user) {
+    // Vérifier l'authentification de l'utilisateur
+    if (!user?.profile?.email) {
       console.error('User not authenticated');
       toast({
         title: "Erreur d'authentification",
@@ -465,7 +465,7 @@ const Project = () => {
       return;
     }
 
-    console.log('Saving with user:', user.id, 'project:', id);
+    console.log('Saving with user:', user.profile.email, 'project:', id);
     
     setIsSaving(true);
     try {

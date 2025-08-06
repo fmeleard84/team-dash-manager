@@ -7,7 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { useNavigate } from "react-router-dom";
-import ProjectsList from "@/components/ProjectsList";
+import { ProjectCard } from "@/components/ProjectCard";
+import CreateProjectModal from "@/components/CreateProjectModal";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -30,6 +31,7 @@ import {
 const ClientDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { user, logout, isLoading } = useKeycloakAuth();
   const navigate = useNavigate();
 
@@ -51,6 +53,24 @@ const ClientDashboard = () => {
     enabled: !!user?.profile?.email
   });
 
+  // Fetch user projects
+  const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useQuery({
+    queryKey: ['user-projects', user?.profile?.email],
+    queryFn: async () => {
+      if (!user?.profile?.email) return [];
+      
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.profile.email)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.profile?.email
+  });
+
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
@@ -60,7 +80,11 @@ const ClientDashboard = () => {
     logout();
   };
 
-  const handleCreateProject = async () => {
+  const handleCreateProject = async (projectData: {
+    title: string;
+    description?: string;
+    project_date: string;
+  }) => {
     if (!user?.profile?.email) {
       toast.error('Utilisateur non connecté');
       return;
@@ -72,11 +96,11 @@ const ClientDashboard = () => {
       const { data, error } = await supabase
         .from('projects')
         .insert({
-          title: 'Nouveau projet',
-          description: null,
+          title: projectData.title,
+          description: projectData.description || null,
           user_id: user.profile.email,
           status: 'pause',
-          project_date: new Date().toISOString().split('T')[0]
+          project_date: projectData.project_date
         })
         .select()
         .single();
@@ -84,12 +108,52 @@ const ClientDashboard = () => {
       if (error) throw error;
 
       toast.success('Projet créé avec succès');
+      setIsModalOpen(false);
+      refetchProjects();
       navigate(`/project/${data.id}`);
     } catch (error: any) {
       toast.error('Erreur lors de la création: ' + error.message);
     } finally {
       setIsCreatingProject(false);
     }
+  };
+
+  const handleStatusToggle = async (id: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success(`Projet ${newStatus === 'play' ? 'démarré' : 'mis en pause'}`);
+      refetchProjects();
+    } catch (error: any) {
+      toast.error('Erreur lors de la mise à jour: ' + error.message);
+    }
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce projet ?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Projet supprimé');
+      refetchProjects();
+    } catch (error: any) {
+      toast.error('Erreur lors de la suppression: ' + error.message);
+    }
+  };
+
+  const handleViewProject = (id: string) => {
+    navigate(`/project/${id}`);
   };
 
   const renderContent = () => {
@@ -118,13 +182,44 @@ const ClientDashboard = () => {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes projets</h2>
             <p className="text-muted-foreground">Gérez vos projets et suivez leur avancement.</p>
-            <ProjectsList userEmail={user?.profile?.email} />
-            <div className="flex justify-center mt-4">
+            
+            {projectsLoading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Chargement des projets...</p>
+              </div>
+            ) : !projects || projects.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  Aucun projet pour le moment. Créez votre premier projet !
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {projects.map((project) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={{
+                      id: project.id,
+                      title: project.title,
+                      description: project.description,
+                      price: 0, // Will be calculated based on resources
+                      date: project.project_date,
+                      status: project.status
+                    }}
+                    onStatusToggle={handleStatusToggle}
+                    onDelete={handleDeleteProject}
+                    onView={handleViewProject}
+                  />
+                ))}
+              </div>
+            )}
+            
+            <div className="flex justify-center mt-6">
               <Button 
-                onClick={handleCreateProject}
+                onClick={() => setIsModalOpen(true)}
                 disabled={isCreatingProject}
               >
-                {isCreatingProject ? 'Création...' : 'Créer un projet'}
+                Créer un projet
               </Button>
             </div>
           </div>
@@ -256,6 +351,13 @@ const ClientDashboard = () => {
           </div>
         </main>
       </div>
+      
+      <CreateProjectModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onCreateProject={handleCreateProject}
+        isCreating={isCreatingProject}
+      />
     </SidebarProvider>
   );
 };
