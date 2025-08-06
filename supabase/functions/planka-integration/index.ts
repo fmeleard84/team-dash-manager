@@ -27,28 +27,44 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
   console.log('Validating Keycloak token...');
   
   try {
-    // Get Keycloak JWKS
-    const jwksResponse = await fetch('https://keycloak.ialla.fr/realms/haas/protocol/openid-connect/certs');
+    // Get Keycloak JWKS - Use correct realm
+    const jwksUrl = 'https://keycloak.ialla.fr/realms/Haas/protocol/openid-connect/certs';
+    console.log('Fetching JWKS from:', jwksUrl);
+    
+    const jwksResponse = await fetch(jwksUrl);
     if (!jwksResponse.ok) {
-      throw new Error('Failed to fetch Keycloak JWKS');
+      console.error('JWKS fetch failed:', jwksResponse.status, jwksResponse.statusText);
+      throw new Error(`Failed to fetch Keycloak JWKS: ${jwksResponse.status}`);
     }
     
     const jwks = await jwksResponse.json();
+    console.log('JWKS keys available:', jwks.keys?.map((k: any) => k.kid) || 'none');
     
     // Decode JWT header to get kid
-    const headerB64 = token.split('.')[0];
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      throw new Error('Invalid JWT format');
+    }
+    
+    const headerB64 = tokenParts[0];
     const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')));
+    console.log('JWT header:', header);
     
     // Find the correct key
     const key = jwks.keys.find((k: any) => k.kid === header.kid);
     if (!key) {
-      throw new Error('Key not found in JWKS');
+      console.error('Key ID not found:', header.kid);
+      console.error('Available key IDs:', jwks.keys?.map((k: any) => k.kid));
+      throw new Error(`Key not found in JWKS. Looking for kid: ${header.kid}`);
     }
+    
+    console.log('Found matching key for kid:', header.kid);
     
     // For simplicity, we'll decode the payload without full signature verification
     // In production, you'd want to properly verify the signature
-    const payloadB64 = token.split('.')[1];
+    const payloadB64 = tokenParts[1];
     const payload: KeycloakTokenPayload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+    console.log('JWT payload decoded successfully');
     
     // Check token expiration
     if (payload.exp < Date.now() / 1000) {
