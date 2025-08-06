@@ -71,14 +71,24 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
       throw new Error('Token expired');
     }
     
-    // Check if user belongs to required group - check multiple possible locations
-    const userGroups = [
-      ...(payload.groups || []),
+    // Check if user belongs to required group - prioritize payload.groups (new mapper)
+    console.log('🔍 DETAILED GROUP ANALYSIS:');
+    console.log('payload.groups:', payload.groups);
+    console.log('payload.realm_access?.roles:', payload.realm_access?.roles);
+    console.log('payload.resource_access?.backoffice?.roles:', payload.resource_access?.backoffice?.roles);
+    
+    // Primary source: payload.groups (from new Keycloak mapper)
+    const userGroups = payload.groups || [];
+    
+    // Fallback: old locations for backward compatibility
+    const fallbackGroups = [
       ...(payload.realm_access?.roles || []),
       ...(payload.resource_access?.backoffice?.roles || []),
-      // Check all resource access roles
       ...Object.values(payload.resource_access || {}).flatMap((resource: any) => resource.roles || [])
     ];
+    
+    console.log('Primary userGroups (from payload.groups):', userGroups);
+    console.log('Fallback groups (from other locations):', fallbackGroups);
     
     console.log('=== GROUP VALIDATION DEBUG ===');
     console.log('Full token payload structure:', JSON.stringify({
@@ -98,9 +108,8 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
     console.log('Normalized required group:', normalizedRequiredGroup);
     console.log('Normalized user groups:', userGroups.map(g => normalizeGroupName(g)));
     
-    // More flexible group checking - check if user has any project-related access
-    // or is a client owner (propriétaire)
-    const hasRequiredGroup = userGroups.some(group => {
+    // Check primary groups first (from payload.groups)
+    let hasRequiredGroup = userGroups.some(group => {
       const normalizedGroup = normalizeGroupName(group);
       const hasExactMatch = normalizedGroup === normalizedRequiredGroup;
       const hasProjectMatch = normalizedGroup.includes('projet') && normalizedRequiredGroup.includes('projet');
@@ -108,7 +117,7 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
                              group.includes('propriétaire') ||
                              (typeof group === 'string' && group.toLowerCase().includes('client'));
       
-      console.log(`Checking group "${group}":`, {
+      console.log(`✅ Checking PRIMARY group "${group}":`, {
         normalized: normalizedGroup,
         exactMatch: hasExactMatch,
         projectMatch: hasProjectMatch,
@@ -118,15 +127,39 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
       return hasExactMatch || hasProjectMatch || hasClientAccess;
     });
     
+    // If not found in primary groups, check fallback groups
+    if (!hasRequiredGroup && fallbackGroups.length > 0) {
+      console.log('🔄 Checking fallback groups since primary check failed...');
+      hasRequiredGroup = fallbackGroups.some(group => {
+        const normalizedGroup = normalizeGroupName(group);
+        const hasExactMatch = normalizedGroup === normalizedRequiredGroup;
+        const hasProjectMatch = normalizedGroup.includes('projet') && normalizedRequiredGroup.includes('projet');
+        const hasClientAccess = group.includes('Client (propriétaire)') || 
+                               group.includes('propriétaire') ||
+                               (typeof group === 'string' && group.toLowerCase().includes('client'));
+        
+        console.log(`⚠️  Checking FALLBACK group "${group}":`, {
+          normalized: normalizedGroup,
+          exactMatch: hasExactMatch,
+          projectMatch: hasProjectMatch,
+          clientAccess: hasClientAccess
+        });
+        
+        return hasExactMatch || hasProjectMatch || hasClientAccess;
+      });
+    }
+    
     console.log('Final group check result:', hasRequiredGroup);
     console.log('=== END GROUP VALIDATION DEBUG ===');
     
     if (!hasRequiredGroup) {
-      console.error('ACCESS DENIED');
-      console.error('User groups:', userGroups);
+      console.error('❌ ACCESS DENIED');
+      console.error('Primary user groups (payload.groups):', userGroups);
+      console.error('Fallback groups:', fallbackGroups);
       console.error('Required group pattern:', requiredGroup);
       console.error('Normalized required:', normalizedRequiredGroup);
-      throw new Error(`User does not belong to required group: ${requiredGroup}. Available groups/roles: ${userGroups.join(', ')}`);
+      const allAvailableGroups = [...userGroups, ...fallbackGroups];
+      throw new Error(`User does not belong to required group: ${requiredGroup}. Available groups: ${allAvailableGroups.join(', ')}`);
     }
     
     console.log('Token validation successful');
