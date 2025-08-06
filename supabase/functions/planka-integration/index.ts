@@ -260,7 +260,14 @@ class PlankaClient {
       throw new Error('Not authenticated. Call authenticate() first.');
     }
 
-    const response = await fetch(`${this.baseUrl}/api${endpoint}`, {
+    const url = `${this.baseUrl}/api${endpoint}`;
+    console.log(`🌐 Planka API Call: ${method} ${url}`);
+    
+    if (body) {
+      console.log('📤 Request body:', JSON.stringify(body, null, 2));
+    }
+
+    const response = await fetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -269,13 +276,17 @@ class PlankaClient {
       body: body ? JSON.stringify(body) : undefined,
     });
 
+    console.log(`📡 Planka response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`API call failed: ${method} ${endpoint}`, errorText);
-      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      console.error(`❌ Planka API Error (${response.status}):`, errorText);
+      throw new Error(`API call failed: ${response.status} ${response.statusText}. Details: ${errorText}`);
     }
 
-    return await response.json();
+    const responseData = await response.json();
+    console.log('📥 Planka response data:', JSON.stringify(responseData, null, 2));
+    return responseData;
   }
 
   async getProjects(): Promise<PlankaProject[]> {
