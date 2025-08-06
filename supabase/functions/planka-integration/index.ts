@@ -480,7 +480,7 @@ serve(async (req) => {
     }
 
     if (action === 'sync-project') {
-      console.log(`Syncing project ${projectId} with Planka...`);
+      console.log(`🔍 SYNC PROJECT - Looking for project in Supabase: ${projectId}`);
 
       // Get project details from Supabase
       const { data: project, error: projectError } = await supabaseClient
@@ -489,9 +489,21 @@ serve(async (req) => {
         .eq('id', projectId)
         .single();
 
+      console.log('📊 Project query result:', { project, error: projectError });
+
       if (projectError || !project) {
-        throw new Error('Project not found');
+        console.error('❌ Project not found in Supabase:', { projectId, error: projectError });
+        return new Response(JSON.stringify({
+          error: "Project not found",
+          details: `No project found in Supabase with id=${projectId}`,
+          projectId: projectId
+        }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
+
+      console.log('✅ Project found in Supabase:', project.title);
 
       // Check if project already exists in Planka
       const { data: existingPlanka } = await supabaseClient
