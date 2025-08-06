@@ -45,7 +45,7 @@ image_transformation = { enabled = true, quality = 80 }
 
 [auth]
 enabled = true
-port = 54329
+port = 54331
 site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["https://127.0.0.1:3000"]
 jwt_expiry = 3600
@@ -53,6 +53,12 @@ refresh_token_rotation_enabled = true
 refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
+
+[auth.jwt]
+secret = "super-secret-jwt-token-with-at-least-32-characters-long"
+aud = "backoffice"
+issuer = "https://keycloak.ialla.fr/realms/haas"
+jwks_uri = "https://keycloak.ialla.fr/realms/haas/protocol/openid-connect/certs"
 
 [auth.email]
 enable_signup = true
