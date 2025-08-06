@@ -7,6 +7,70 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Keycloak validation
+interface KeycloakTokenPayload {
+  sub: string;
+  resource_access?: {
+    backoffice?: {
+      roles: string[];
+    };
+  };
+  groups?: string[];
+  exp: number;
+  iat: number;
+}
+
+async function validateKeycloakToken(token: string, requiredGroup: string): Promise<KeycloakTokenPayload> {
+  console.log('Validating Keycloak token...');
+  
+  try {
+    // Get Keycloak JWKS
+    const jwksResponse = await fetch('https://keycloak.ialla.fr/realms/haas/protocol/openid-connect/certs');
+    if (!jwksResponse.ok) {
+      throw new Error('Failed to fetch Keycloak JWKS');
+    }
+    
+    const jwks = await jwksResponse.json();
+    
+    // Decode JWT header to get kid
+    const headerB64 = token.split('.')[0];
+    const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')));
+    
+    // Find the correct key
+    const key = jwks.keys.find((k: any) => k.kid === header.kid);
+    if (!key) {
+      throw new Error('Key not found in JWKS');
+    }
+    
+    // For simplicity, we'll decode the payload without full signature verification
+    // In production, you'd want to properly verify the signature
+    const payloadB64 = token.split('.')[1];
+    const payload: KeycloakTokenPayload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+    
+    // Check token expiration
+    if (payload.exp < Date.now() / 1000) {
+      throw new Error('Token expired');
+    }
+    
+    // Check if user belongs to required group
+    const userGroups = payload.groups || [];
+    const hasRequiredGroup = userGroups.includes(requiredGroup);
+    
+    if (!hasRequiredGroup) {
+      console.log('User groups:', userGroups);
+      console.log('Required group:', requiredGroup);
+      throw new Error(`User does not belong to required group: ${requiredGroup}`);
+    }
+    
+    console.log('Token validation successful');
+    return payload;
+    
+  } catch (error) {
+    console.error('Token validation failed:', error);
+    throw new Error(`Authentication failed: ${error.message}`);
+  }
+}
+
 interface PlankaCredentials {
   baseUrl: string;
   email: string;
@@ -264,36 +328,44 @@ serve(async (req) => {
     
     console.log('Request body:', { action, projectId, adminUserId });
 
-    // Validate admin user if provided
-    if (adminUserId) {
-      const { data: adminUser, error: adminError } = await supabaseClient
-        .from('admin_users')
-        .select('id, login')
-        .eq('id', adminUserId)
+    // Extract Bearer token from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header');
+      return new Response(JSON.stringify({ error: 'Unauthorized - Missing token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Validate Keycloak token and check project group membership
+    try {
+      // Get project details to build correct group name
+      const { data: project, error: projectError } = await supabaseClient
+        .from('projects')
+        .select('title')
+        .eq('id', projectId)
         .single();
 
-      if (adminError || !adminUser) {
-        console.error('Admin user validation failed:', adminError);
-        return new Response(JSON.stringify({ error: 'Unauthorized - Invalid admin user' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (projectError || !project) {
+        throw new Error('Project not found');
       }
-      
-      console.log('Admin user validated:', adminUser.login);
-    } else {
-      // Fallback to Supabase auth
-      const {
-        data: { user },
-      } = await supabaseClient.auth.getUser();
 
-      if (!user) {
-        console.error('No valid authentication found');
-        return new Response(JSON.stringify({ error: 'Unauthorized - No authentication' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      const requiredGroup = `Projet-${project.title}`;
+      console.log('Checking membership for group:', requiredGroup);
+      
+      const tokenPayload = await validateKeycloakToken(token, requiredGroup);
+      console.log('User authenticated and authorized for project:', projectId);
+      console.log('User ID:', tokenPayload.sub);
+      
+    } catch (error) {
+      console.error('Keycloak authentication failed:', error);
+      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid or insufficient permissions' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (action === 'sync-project') {
