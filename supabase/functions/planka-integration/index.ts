@@ -397,14 +397,15 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Creating Supabase client...');
-    const supabaseClient = createClient(
+    console.log('Creating admin Supabase client for all operations...');
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
       }
     );
 
@@ -437,9 +438,9 @@ serve(async (req) => {
     let tokenPayload: KeycloakTokenPayload;
     
     try {
-      // Get project details to build correct group name
-      console.log('Fetching project details from Supabase...');
-      const { data: project, error: projectError } = await supabaseClient
+      // Get project details to build correct group name - using admin client
+      console.log('🔍 Fetching project details from Supabase with admin client...');
+      const { data: project, error: projectError } = await supabaseAdmin
         .from('projects')
         .select('title')
         .eq('id', projectId)
@@ -545,7 +546,7 @@ serve(async (req) => {
       }
 
       // Check if project already exists in Planka
-      const { data: existingPlanka } = await supabaseClient
+      const { data: existingPlanka } = await supabaseAdmin
         .from('planka_projects')
         .select('*')
         .eq('project_id', projectId)
@@ -599,7 +600,7 @@ serve(async (req) => {
       }
 
       // Get HR resource assignments for this project
-      const { data: hrResources } = await supabaseClient
+      const { data: hrResources } = await supabaseAdmin
         .from('hr_resource_assignments')
         .select(`
           *,
@@ -639,7 +640,7 @@ serve(async (req) => {
       // Save Planka project info to Supabase
       const plankaUrl = `${plankaBaseUrl}/boards/${plankaBoard.id}`;
       
-      const { error: insertError } = await supabaseClient
+      const { error: insertError } = await supabaseAdmin
         .from('planka_projects')
         .insert({
           project_id: projectId,
