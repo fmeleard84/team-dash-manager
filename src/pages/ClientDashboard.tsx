@@ -55,20 +55,20 @@ const ClientDashboard = () => {
 
   // Fetch user projects
   const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useQuery({
-    queryKey: ['user-projects', user?.profile?.email],
+    queryKey: ['user-projects', user?.profile?.sub],
     queryFn: async () => {
-      if (!user?.profile?.email) return [];
+      if (!user?.profile?.sub) return [];
       
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('user_id', user.profile.email)
+        .eq('keycloak_user_id', user.profile.sub)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.profile?.email
+    enabled: !!user?.profile?.sub
   });
 
   const menuItems = [
@@ -85,7 +85,7 @@ const ClientDashboard = () => {
     description?: string;
     project_date: string;
   }) => {
-    if (!user?.profile?.email) {
+    if (!user?.profile?.sub) {
       toast.error('Utilisateur non connecté');
       return;
     }
@@ -98,7 +98,8 @@ const ClientDashboard = () => {
         .insert({
           title: projectData.title,
           description: projectData.description || null,
-          user_id: user.profile.email,
+          user_id: user.profile.sub, // Temporarily using user_id field with keycloak sub
+          keycloak_user_id: user.profile.sub,
           status: 'pause',
           project_date: projectData.project_date
         })

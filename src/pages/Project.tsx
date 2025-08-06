@@ -118,7 +118,7 @@ const Project = () => {
         .from('projects')
         .select('*')
         .eq('id', id)
-        .eq('user_id', user?.profile?.email)
+        .eq('keycloak_user_id', user?.profile?.sub)
         .single();
 
       if (projectError) throw projectError;
@@ -455,7 +455,7 @@ const Project = () => {
     if (!id) return;
     
     // Vérifier l'authentification de l'utilisateur
-    if (!user?.profile?.email) {
+    if (!user?.profile?.sub) {
       console.error('User not authenticated');
       toast({
         title: "Erreur d'authentification",
@@ -465,7 +465,7 @@ const Project = () => {
       return;
     }
 
-    console.log('Saving with user:', user.profile.email, 'project:', id);
+    console.log('Saving with user:', user.profile.sub, 'project:', id);
     
     setIsSaving(true);
     try {

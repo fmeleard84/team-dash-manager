@@ -742,6 +742,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          keycloak_user_id: string | null
           price_per_minute: number
           project_date: string
           status: string
@@ -753,6 +754,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          keycloak_user_id?: string | null
           price_per_minute?: number
           project_date?: string
           status?: string
@@ -764,6 +766,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          keycloak_user_id?: string | null
           price_per_minute?: number
           project_date?: string
           status?: string
