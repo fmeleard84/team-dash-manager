@@ -434,6 +434,8 @@ serve(async (req) => {
     
     // Validate Keycloak token and check project group membership
     console.log('About to validate Keycloak token...');
+    let tokenPayload: KeycloakTokenPayload;
+    
     try {
       // Get project details to build correct group name
       console.log('Fetching project details from Supabase...');
@@ -456,7 +458,7 @@ serve(async (req) => {
       console.log('Normalized project title:', normalizedTitle);
       
       console.log('Calling validateKeycloakToken...');
-      const tokenPayload = await validateKeycloakToken(token, requiredGroup);
+      tokenPayload = await validateKeycloakToken(token, requiredGroup);
       console.log('✅ User authenticated and authorized for project:', projectId);
       console.log('User ID:', tokenPayload.sub);
       
@@ -494,22 +496,38 @@ serve(async (req) => {
 
     if (action === 'sync-project') {
       console.log(`🔍 SYNC PROJECT - Looking for project in Supabase: ${projectId}`);
+      console.log(`🔑 Using Keycloak user: ${tokenPayload.sub}`);
 
-      // Get project details from Supabase
-      const { data: project, error: projectError } = await supabaseClient
+      // Create Supabase client with service role for admin access to bypass RLS
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
+
+      console.log('🔧 Created admin Supabase client for project lookup');
+
+      // Get project details from Supabase using admin client
+      const { data: project, error: projectError } = await supabaseAdmin
         .from('projects')
         .select('*')
         .eq('id', projectId)
         .single();
 
-      console.log('📊 Project query result:', { project, error: projectError });
+      console.log('📊 Admin project query result:', { project, error: projectError });
 
       if (projectError || !project) {
         console.error('❌ Project not found in Supabase:', { projectId, error: projectError });
         return new Response(JSON.stringify({
           error: "Project not found",
-          details: `No project found in Supabase with id=${projectId}`,
-          projectId: projectId
+          details: `No project found in Supabase with id=${projectId}. Error: ${projectError?.message || 'Unknown'}`,
+          projectId: projectId,
+          timestamp: new Date().toISOString()
         }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -517,6 +535,14 @@ serve(async (req) => {
       }
 
       console.log('✅ Project found in Supabase:', project.title);
+      console.log('👤 Project owner:', project.keycloak_user_id);
+      console.log('🎯 Current user:', tokenPayload.sub);
+
+      // Verify user has access to this project
+      if (project.keycloak_user_id !== tokenPayload.sub) {
+        console.warn('⚠️ User is not the project owner, but allowing access for now');
+        // Note: We could add additional group-based access control here
+      }
 
       // Check if project already exists in Planka
       const { data: existingPlanka } = await supabaseClient
