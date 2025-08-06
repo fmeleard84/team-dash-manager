@@ -270,23 +270,44 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     try {
       // Get the Keycloak access token
       const token = user?.access_token;
+      console.log('🔐 SYNC PLANKA - Token Debug:');
+      console.log('User object:', user);
+      console.log('Access token length:', token?.length || 'UNDEFINED');
+      console.log('Token preview:', token ? `${token.substring(0, 50)}...` : 'NO TOKEN');
+      
       if (!token) {
+        console.error('❌ No authentication token available');
         throw new Error('No authentication token available');
       }
 
-      const { data, error } = await supabase.functions.invoke('planka-integration', {
-        body: {
+      console.log('🚀 Calling planka-integration with Keycloak token...');
+      
+      // Create a temporary Supabase client without auth for this request  
+      // We need to bypass Supabase's automatic auth to use our Keycloak token instead
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://egdelmcijszuapcpglsy.supabase.co'}/functions/v1/planka-integration`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxNjIyMDAsImV4cCI6MjA2OTczODIwMH0.JYV-JxosrfE7kMtFw3XLs27PGf3Fn-rDyJLDWeYXF_U',
+        },
+        body: JSON.stringify({
           action: 'sync-project',
           projectId: project.id,
-        },
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        }),
       });
 
-      if (error) {
-        throw error;
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
+
+      const data = await response.json();
+      console.log('✅ Success response:', data);
 
       if (data.success) {
         if (data.exists) {
