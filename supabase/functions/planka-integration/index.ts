@@ -204,9 +204,20 @@ class PlankaClient {
   }
 
   async authenticate(email: string, password: string): Promise<PlankaUser> {
-    console.log('Authenticating with Planka...');
-    console.log('Base URL:', this.baseUrl);
-    console.log('Email:', email);
+    console.log('🔐 Authenticating with Planka...');
+    console.log('🌐 Base URL:', this.baseUrl);
+    console.log('📧 Email:', email);
+    console.log('🔑 Password length:', password.length, 'chars');
+    
+    // Test basic connectivity first
+    console.log('🏥 Testing Planka server connectivity...');
+    try {
+      const healthCheck = await fetch(this.baseUrl, { method: 'HEAD' });
+      console.log('🏥 Planka server status:', healthCheck.status, healthCheck.statusText);
+    } catch (error) {
+      console.error('🚨 Planka server unreachable:', error.message);
+      throw new Error(`Planka server unreachable: ${error.message}`);
+    }
     
     try {
       const response = await fetch(`${this.baseUrl}/api/access-tokens`, {
