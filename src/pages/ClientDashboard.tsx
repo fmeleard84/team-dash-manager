@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { useNavigate } from "react-router-dom";
+import ProjectsList from "@/components/ProjectsList";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -117,21 +118,15 @@ const ClientDashboard = () => {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes projets</h2>
             <p className="text-muted-foreground">Gérez vos projets et suivez leur avancement.</p>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-center text-muted-foreground">
-                  Aucun projet pour le moment. Créez votre premier projet !
-                </p>
-                <div className="flex justify-center mt-4">
-                  <Button 
-                    onClick={handleCreateProject}
-                    disabled={isCreatingProject}
-                  >
-                    {isCreatingProject ? 'Création...' : 'Créer un projet'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ProjectsList userEmail={user?.profile?.email} />
+            <div className="flex justify-center mt-4">
+              <Button 
+                onClick={handleCreateProject}
+                disabled={isCreatingProject}
+              >
+                {isCreatingProject ? 'Création...' : 'Créer un projet'}
+              </Button>
+            </div>
           </div>
         );
       case 'invoices':

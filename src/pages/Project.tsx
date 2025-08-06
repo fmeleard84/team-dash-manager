@@ -231,7 +231,7 @@ const Project = () => {
         description: "Impossible de charger le projet.",
         variant: "destructive",
       });
-      navigate('/dashboard');
+      navigate('/client-dashboard');
     } finally {
       setIsLoading(false);
     }
@@ -602,7 +602,7 @@ const Project = () => {
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/client-dashboard')}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Retour
