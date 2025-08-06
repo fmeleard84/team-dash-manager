@@ -15,6 +15,9 @@ interface KeycloakTokenPayload {
       roles: string[];
     };
   };
+  realm_access?: {
+    roles: string[];
+  };
   groups?: string[];
   exp: number;
   iat: number;
@@ -52,14 +55,26 @@ async function validateKeycloakToken(token: string, requiredGroup: string): Prom
       throw new Error('Token expired');
     }
     
-    // Check if user belongs to required group
-    const userGroups = payload.groups || [];
+    // Check if user belongs to required group - check multiple possible locations
+    const userGroups = 
+      payload.groups || 
+      payload.realm_access?.roles || 
+      payload.resource_access?.backoffice?.roles || 
+      [];
+    
+    console.log('Full token payload structure:', JSON.stringify({
+      groups: payload.groups,
+      realm_access: payload.realm_access,
+      resource_access: payload.resource_access
+    }, null, 2));
+    
+    console.log('Extracted user groups/roles:', userGroups);
+    console.log('Required group:', requiredGroup);
+    
     const hasRequiredGroup = userGroups.includes(requiredGroup);
     
     if (!hasRequiredGroup) {
-      console.log('User groups:', userGroups);
-      console.log('Required group:', requiredGroup);
-      throw new Error(`User does not belong to required group: ${requiredGroup}`);
+      throw new Error(`User does not belong to required group: ${requiredGroup}. Available groups/roles: ${userGroups.join(', ')}`);
     }
     
     console.log('Token validation successful');
