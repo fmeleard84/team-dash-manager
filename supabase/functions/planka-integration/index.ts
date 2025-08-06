@@ -421,8 +421,10 @@ serve(async (req) => {
     console.log('Token extracted, length:', token.length);
     
     // Validate Keycloak token and check project group membership
+    console.log('About to validate Keycloak token...');
     try {
       // Get project details to build correct group name
+      console.log('Fetching project details from Supabase...');
       const { data: project, error: projectError } = await supabaseClient
         .from('projects')
         .select('title')
@@ -430,6 +432,7 @@ serve(async (req) => {
         .single();
 
       if (projectError || !project) {
+        console.error('Project not found:', projectError);
         throw new Error('Project not found');
       }
 
@@ -440,13 +443,17 @@ serve(async (req) => {
       console.log('Original project title:', project.title);
       console.log('Normalized project title:', normalizedTitle);
       
+      console.log('Calling validateKeycloakToken...');
       const tokenPayload = await validateKeycloakToken(token, requiredGroup);
-      console.log('User authenticated and authorized for project:', projectId);
+      console.log('✅ User authenticated and authorized for project:', projectId);
       console.log('User ID:', tokenPayload.sub);
       
     } catch (error) {
-      console.error('Keycloak authentication failed:', error);
-      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid or insufficient permissions' }), {
+      console.error('❌ Keycloak authentication failed:', error);
+      return new Response(JSON.stringify({ 
+        error: 'Unauthorized - Invalid or insufficient permissions',
+        details: error.message 
+      }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
