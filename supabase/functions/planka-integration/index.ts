@@ -374,12 +374,18 @@ class PlankaClient {
 }
 
 serve(async (req) => {
+  console.log('=== PLANKA INTEGRATION FUNCTION START ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('CORS preflight request handled');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('Creating Supabase client...');
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -390,13 +396,18 @@ serve(async (req) => {
       }
     );
 
+    console.log('Parsing request body...');
     const body = await req.json();
     const { action, projectId, adminUserId } = body;
     
-    console.log('Request body:', { action, projectId, adminUserId });
+    console.log('Request body:', JSON.stringify({ action, projectId, adminUserId }, null, 2));
 
     // Extract Bearer token from Authorization header
+    console.log('Getting authorization header...');
     const authHeader = req.headers.get('Authorization');
+    console.log('Authorization header present:', !!authHeader);
+    console.log('Authorization header preview:', authHeader?.substring(0, 50) + '...');
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('Missing or invalid Authorization header');
       return new Response(JSON.stringify({ error: 'Unauthorized - Missing token' }), {
@@ -405,7 +416,9 @@ serve(async (req) => {
       });
     }
 
+    console.log('Extracting token from Authorization header...');
     const token = authHeader.replace('Bearer ', '');
+    console.log('Token extracted, length:', token.length);
     
     // Validate Keycloak token and check project group membership
     try {
