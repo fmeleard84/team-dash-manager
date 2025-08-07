@@ -48,6 +48,8 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
     console.log('Full user object:', oidcAuth.user);
     console.log('User profile:', oidcAuth.user?.profile);
     
+    let rawGroups: string[] = [];
+    
     if (!oidcAuth.user?.profile?.groups) {
       console.log('No groups found in profile.groups, checking other locations...');
       // Try different locations where groups might be stored
@@ -56,25 +58,37 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
       console.log('Checking resource_access:', profile?.resource_access);
       if (profile?.resource_access?.backoffice?.roles) {
         console.log('Found roles in resource_access.backoffice:', profile.resource_access.backoffice.roles);
-        return profile.resource_access.backoffice.roles as string[];
+        rawGroups = profile.resource_access.backoffice.roles as string[];
+      } else {
+        console.log('Checking realm_access:', profile?.realm_access);
+        if (profile?.realm_access?.roles) {
+          console.log('Found roles in realm_access:', profile.realm_access.roles);
+          rawGroups = (profile.realm_access.roles as string[]).filter((role: string) => 
+            ['client', 'candidate', 'resource', 'admin'].includes(role)
+          );
+        }
       }
       
-      console.log('Checking realm_access:', profile?.realm_access);
-      if (profile?.realm_access?.roles) {
-        console.log('Found roles in realm_access:', profile.realm_access.roles);
-        return (profile.realm_access.roles as string[]).filter((role: string) => 
-          ['client', 'candidate', 'resource', 'admin'].includes(role)
-        );
+      if (rawGroups.length === 0) {
+        console.log('No groups found anywhere in token');
+        return [];
       }
-      
-      console.log('No groups found anywhere in token');
-      return [];
+    } else {
+      console.log('Found groups in profile.groups:', oidcAuth.user.profile.groups);
+      rawGroups = Array.isArray(oidcAuth.user.profile.groups) 
+        ? oidcAuth.user.profile.groups as string[]
+        : [];
     }
     
-    console.log('Found groups in profile.groups:', oidcAuth.user.profile.groups);
-    return Array.isArray(oidcAuth.user.profile.groups) 
-      ? oidcAuth.user.profile.groups as string[]
-      : [];
+    // Clean group names by removing leading "/" and extracting relevant roles
+    const cleanedGroups = rawGroups
+      .map(group => group.startsWith('/') ? group.substring(1) : group)
+      .filter(group => ['client', 'candidate', 'resource', 'admin'].includes(group));
+    
+    console.log('Raw groups:', rawGroups);
+    console.log('Cleaned groups:', cleanedGroups);
+    
+    return cleanedGroups;
   };
 
   const hasGroup = (groupName: string): boolean => {
