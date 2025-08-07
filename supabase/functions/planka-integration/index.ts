@@ -204,100 +204,249 @@ class PlankaClient {
   }
 
   async authenticate(email: string, password: string): Promise<PlankaUser> {
-    console.log('🔐 Authenticating with Planka...');
+    console.log('=== 🔐 PLANKA AUTHENTICATION STARTING ===');
     console.log('🌐 Base URL:', this.baseUrl);
     console.log('📧 Email:', email);
     console.log('🔑 Password length:', password.length, 'chars');
+    console.log('⏰ Timestamp:', new Date().toISOString());
     
-    // Test basic connectivity first
-    console.log('🏥 Testing Planka server connectivity...');
+    // Test basic connectivity first with detailed logging
+    console.log('=== 🏥 TESTING PLANKA SERVER CONNECTIVITY ===');
+    let connectivityResult = { reachable: false, status: null, timing: null };
+    
     try {
-      const healthCheck = await fetch(this.baseUrl, { method: 'HEAD' });
-      console.log('🏥 Planka server status:', healthCheck.status, healthCheck.statusText);
+      const startTime = Date.now();
+      console.log('🚀 Sending HEAD request to:', this.baseUrl);
+      
+      const healthCheck = await fetch(this.baseUrl, { 
+        method: 'HEAD',
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
+      
+      const endTime = Date.now();
+      connectivityResult = {
+        reachable: true,
+        status: healthCheck.status,
+        timing: endTime - startTime
+      };
+      
+      console.log('✅ Planka server connectivity check passed:');
+      console.log('  - Status:', healthCheck.status, healthCheck.statusText);
+      console.log('  - Response time:', endTime - startTime, 'ms');
+      console.log('  - Headers:', Object.fromEntries(healthCheck.headers.entries()));
+      
     } catch (error) {
-      console.error('🚨 Planka server unreachable:', error.message);
-      throw new Error(`Planka server unreachable: ${error.message}`);
+      connectivityResult.reachable = false;
+      console.error('🚨 PLANKA SERVER CONNECTIVITY FAILED:');
+      console.error('  - Error type:', error.constructor.name);
+      console.error('  - Error message:', error.message);
+      console.error('  - Error stack:', error.stack);
+      
+      // Don't throw immediately, let's try the actual authentication anyway
+      console.log('⚠️ Continuing with authentication despite connectivity issues...');
     }
     
+    console.log('=== 🔐 STARTING AUTHENTICATION REQUEST ===');
+    const authUrl = `${this.baseUrl}/api/access-tokens`;
+    console.log('🎯 Authentication URL:', authUrl);
+    
+    const requestBody = {
+      emailOrUsername: email,
+      password: password,
+    };
+    console.log('📤 Request body structure:', {
+      emailOrUsername: email,
+      passwordLength: password.length
+    });
+    
     try {
-      const response = await fetch(`${this.baseUrl}/api/access-tokens`, {
+      const startTime = Date.now();
+      console.log('🚀 Sending POST request to Planka auth endpoint...');
+      
+      const response = await fetch(authUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          emailOrUsername: email,
-          password: password,
-        }),
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(15000) // 15 second timeout
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const endTime = Date.now();
+      
+      console.log('📡 AUTHENTICATION RESPONSE RECEIVED:');
+      console.log('  - Status:', response.status, response.statusText);
+      console.log('  - Response time:', endTime - startTime, 'ms');
+      console.log('  - Headers:', Object.fromEntries(response.headers.entries()));
+      console.log('  - Content-Type:', response.headers.get('content-type'));
+      console.log('  - Content-Length:', response.headers.get('content-length'));
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Planka authentication failed:', errorText);
+        console.error('❌ AUTHENTICATION FAILED - HTTP ERROR:');
+        
+        let errorText = 'No response body';
+        try {
+          errorText = await response.text();
+          console.error('  - Error response body:', errorText);
+        } catch (readError) {
+          console.error('  - Failed to read error response:', readError.message);
+        }
+        
+        console.error('  - This error might be causing Planka to crash!');
+        console.error('  - Check Planka server logs for more details');
+        
         throw new Error(`Authentication failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
-
+      
+      console.log('✅ Authentication response successful, parsing JSON...');
       const data = await response.json();
-      console.log('Authentication response:', JSON.stringify(data, null, 2));
+      console.log('📥 Authentication response data structure:');
+      console.log('  - Type:', typeof data);
+      console.log('  - Keys:', Object.keys(data || {}));
+      console.log('  - Full data:', JSON.stringify(data, null, 2));
       
       // Planka returns the JWT directly in data.item
       if (!data.item || typeof data.item !== 'string') {
-        console.error('Invalid authentication response structure:', data);
+        console.error('❌ INVALID AUTHENTICATION RESPONSE STRUCTURE:');
+        console.error('  - Expected: { item: "jwt_token_string" }');
+        console.error('  - Received:', data);
         throw new Error('Invalid authentication response from Planka');
       }
       
+      console.log('✅ JWT token extracted successfully:');
+      console.log('  - Token length:', data.item.length);
+      console.log('  - Token preview:', data.item.substring(0, 50) + '...');
+      
       this.accessToken = data.item;
       
-      // For now, we'll create a minimal user object since Planka just returns the JWT
-      // We could decode the JWT to get user info, but for basic functionality this works
-      return {
-        id: 'planka-user', // We don't have the actual user ID from this response
-        username: email.split('@')[0], // Use email prefix as username
+      const user = {
+        id: 'planka-user',
+        username: email.split('@')[0],
         email: email,
-        name: email.split('@')[0], // Use email prefix as name
+        name: email.split('@')[0],
         accessToken: data.item,
       };
+      
+      console.log('✅ PLANKA AUTHENTICATION COMPLETED SUCCESSFULLY');
+      console.log('👤 User object created:', {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        name: user.name,
+        accessTokenLength: user.accessToken.length
+      });
+      
+      return user;
+      
     } catch (error) {
-      console.error('Authentication error details:', error);
+      console.error('=== ❌ PLANKA AUTHENTICATION ERROR ===');
+      console.error('🔥 Error type:', error.constructor.name);
+      console.error('🔥 Error message:', error.message);
+      console.error('🔥 Error stack:', error.stack);
+      console.error('🔥 Connectivity result:', connectivityResult);
+      console.error('🔥 This error could potentially crash Planka server!');
+      console.error('🔥 Check Planka server status and logs immediately');
+      
       throw error;
     }
   }
 
   private async apiCall(endpoint: string, method: string = 'GET', body?: any) {
     if (!this.accessToken) {
+      console.error('❌ PLANKA API CALL FAILED - No access token');
       throw new Error('Not authenticated. Call authenticate() first.');
     }
 
     const url = `${this.baseUrl}/api${endpoint}`;
-    console.log(`🌐 Planka API Call: ${method} ${url}`);
+    console.log(`=== 🌐 PLANKA API CALL STARTING ===`);
+    console.log(`🎯 Method: ${method}`);
+    console.log(`🔗 URL: ${url}`);
+    console.log(`🔐 Access token length: ${this.accessToken.length}`);
+    console.log(`⏰ Request timestamp: ${new Date().toISOString()}`);
     
     if (body) {
-      console.log('📤 Request body:', JSON.stringify(body, null, 2));
+      console.log('📤 Request body structure:');
+      console.log('  - Type:', typeof body);
+      console.log('  - Keys:', Object.keys(body || {}));
+      console.log('  - Full body:', JSON.stringify(body, null, 2));
     }
 
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.accessToken}`,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    try {
+      const startTime = Date.now();
+      console.log('🚀 Sending request to Planka API...');
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.accessToken}`,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(20000) // 20 second timeout
+      });
+      
+      const endTime = Date.now();
+      
+      console.log(`📡 PLANKA API RESPONSE RECEIVED:`);
+      console.log(`  - Status: ${response.status} ${response.statusText}`);
+      console.log(`  - Response time: ${endTime - startTime}ms`);
+      console.log(`  - Headers:`, Object.fromEntries(response.headers.entries()));
+      console.log(`  - Content-Type: ${response.headers.get('content-type')}`);
+      console.log(`  - Content-Length: ${response.headers.get('content-length')}`);
 
-    console.log(`📡 Planka response status: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Planka API Error (${response.status}):`, errorText);
-      throw new Error(`API call failed: ${response.status} ${response.statusText}. Details: ${errorText}`);
+      if (!response.ok) {
+        console.error('❌ PLANKA API ERROR - HTTP NON-OK STATUS:');
+        
+        let errorText = 'No response body available';
+        try {
+          errorText = await response.text();
+          console.error('  - Error response body:', errorText);
+          console.error('  - Error body length:', errorText.length);
+        } catch (readError) {
+          console.error('  - Failed to read error response body:', readError.message);
+        }
+        
+        console.error('  - Request details:');
+        console.error('    * Method:', method);
+        console.error('    * URL:', url);
+        console.error('    * Body sent:', body ? JSON.stringify(body) : 'none');
+        console.error('  - Response details:');
+        console.error('    * Status:', response.status);
+        console.error('    * Status text:', response.statusText);
+        console.error('    * Headers:', Object.fromEntries(response.headers.entries()));
+        
+        console.error('🚨 THIS API ERROR MIGHT BE CAUSING PLANKA SERVER ISSUES!');
+        console.error('🚨 Check Planka server logs and status immediately!');
+        
+        throw new Error(`API call failed: ${response.status} ${response.statusText}. Details: ${errorText}`);
+      }
+      
+      console.log('✅ Planka API response successful, parsing JSON...');
+      const responseData = await response.json();
+      
+      console.log('📥 PLANKA RESPONSE DATA STRUCTURE:');
+      console.log('  - Type:', typeof responseData);
+      console.log('  - Keys:', Object.keys(responseData || {}));
+      console.log('  - Full response data:', JSON.stringify(responseData, null, 2));
+      
+      console.log('✅ PLANKA API CALL COMPLETED SUCCESSFULLY');
+      return responseData;
+      
+    } catch (error) {
+      console.error('=== ❌ PLANKA API CALL CRITICAL ERROR ===');
+      console.error('🔥 Error type:', error.constructor.name);
+      console.error('🔥 Error message:', error.message);
+      console.error('🔥 Error stack:', error.stack);
+      console.error('🔥 Request details:');
+      console.error('  - Method:', method);
+      console.error('  - URL:', url);
+      console.error('  - Body:', body ? JSON.stringify(body) : 'none');
+      console.error('  - Access token length:', this.accessToken?.length || 'no token');
+      console.error('🚨 THIS ERROR COULD BE CRASHING PLANKA SERVER!');
+      console.error('🚨 IMMEDIATE ACTION REQUIRED - CHECK PLANKA STATUS!');
+      
+      throw error;
     }
-
-    const responseData = await response.json();
-    console.log('📥 Planka response data:', JSON.stringify(responseData, null, 2));
-    return responseData;
   }
 
   async getProjects(): Promise<PlankaProject[]> {
@@ -594,63 +743,110 @@ serve(async (req) => {
         throw new Error('Missing Planka credentials');
       }
 
-      // Initialize Planka client and authenticate - with fallback for development
-      console.log('🔧 Initializing Planka client...');
+      // Initialize Planka client and authenticate - with intelligent fallback
+      console.log('=== 🔧 PLANKA INTEGRATION STARTING ===');
+      console.log('🌐 Planka Base URL:', plankaBaseUrl);
+      console.log('📧 Planka Email:', plankaEmail);
+      console.log('🔑 Planka Password configured:', !!plankaPassword);
+      
       const planka = new PlankaClient(plankaBaseUrl);
       
       let plankaProject: any;
       let plankaBoard: any;
+      let useMockData = false;
+      let integrationErrorDetails = null;
       
       try {
-        console.log('🔐 Attempting Planka authentication...');
+        console.log('=== 🔐 PLANKA AUTHENTICATION PHASE ===');
         await planka.authenticate(plankaEmail, plankaPassword);
-        console.log('✅ Planka authentication successful');
+        console.log('✅ PLANKA AUTHENTICATION SUCCESSFUL');
 
-        // Create project in Planka
-        console.log('📁 Creating Planka project...');
+        console.log('=== 📁 PLANKA PROJECT CREATION PHASE ===');
         plankaProject = await planka.createProject(
           project.title,
           project.description || `Projet HR System: ${project.title}`
         );
+        console.log('✅ PLANKA PROJECT CREATED:', plankaProject.id);
 
-        // Create main board
-        console.log('📋 Creating Planka board...');
+        console.log('=== 📋 PLANKA BOARD CREATION PHASE ===');
         plankaBoard = await planka.createBoard(
           plankaProject.id,
           `Ressources - ${project.title}`
         );
+        console.log('✅ PLANKA BOARD CREATED:', plankaBoard.id);
 
-        // Create default lists
+        console.log('=== 📝 PLANKA LISTS CREATION PHASE ===');
         const lists = [
           { name: 'À faire', position: 1 },
           { name: 'En cours', position: 2 },
           { name: 'Terminé', position: 3 },
         ];
 
-        console.log('📝 Creating Planka lists...');
         for (const listData of lists) {
-          await planka.createList(plankaBoard.id, listData.name, listData.position);
+          console.log(`📝 Creating list: ${listData.name} at position ${listData.position}`);
+          try {
+            await planka.createList(plankaBoard.id, listData.name, listData.position);
+            console.log(`✅ List created successfully: ${listData.name}`);
+          } catch (listError) {
+            console.error(`❌ Failed to create list "${listData.name}":`, listError.message);
+            // Don't fail the entire process for list creation errors
+          }
         }
         
-        console.log('✅ Planka project structure created successfully');
+        console.log('✅ PLANKA PROJECT STRUCTURE CREATED SUCCESSFULLY');
         
       } catch (plankaError) {
-        console.warn('⚠️ Planka integration failed, continuing without it:', plankaError.message);
+        useMockData = true;
+        integrationErrorDetails = {
+          error: plankaError.message,
+          stack: plankaError.stack,
+          timestamp: new Date().toISOString()
+        };
         
-        // Create mock Planka data for development
+        console.error('=== ❌ PLANKA INTEGRATION FAILED ===');
+        console.error('🔥 Error type:', plankaError.constructor.name);
+        console.error('🔥 Error message:', plankaError.message);
+        console.error('🔥 Error stack:', plankaError.stack);
+        
+        // Check if this is a server-crashing error
+        if (plankaError.message.includes('500') || 
+            plankaError.message.includes('Internal Server Error') ||
+            plankaError.message.includes('ECONNREFUSED') ||
+            plankaError.message.includes('timeout')) {
+          console.error('🚨 CRITICAL: This error suggests Planka server may be down or crashed!');
+          console.error('🚨 Planka server status should be checked immediately!');
+          console.error('🚨 Possible causes:');
+          console.error('  - Planka server is down or restarting');
+          console.error('  - Database connection issues');
+          console.error('  - Resource exhaustion');
+          console.error('  - Configuration problems');
+        }
+        
+        console.warn('⚠️ Switching to MOCK MODE to prevent further Planka issues...');
+        
+        // Create enhanced mock Planka data for development/fallback
+        const mockId = Date.now();
         plankaProject = {
-          id: `mock-${Date.now()}`,
+          id: `mock-${mockId}`,
           name: project.title,
-          description: project.description || `Projet HR System: ${project.title}`
+          description: project.description || `Projet HR System: ${project.title}`,
+          mock: true,
+          originalError: plankaError.message
         };
         
         plankaBoard = {
-          id: `mock-board-${Date.now()}`,
+          id: `mock-board-${mockId}`,
           name: `Ressources - ${project.title}`,
-          projectId: plankaProject.id
+          projectId: plankaProject.id,
+          mock: true,
+          originalError: plankaError.message
         };
         
-        console.log('🎭 Using mock Planka data for development');
+        console.log('🎭 MOCK DATA CREATED:', {
+          projectId: plankaProject.id,
+          boardId: plankaBoard.id,
+          errorHandled: true
+        });
       }
 
       // Get HR resource assignments for this project
