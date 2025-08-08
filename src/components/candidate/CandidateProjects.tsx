@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Check, X } from "lucide-react";
+import { Eye, Check, X, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -40,9 +40,9 @@ const CandidateProjects = () => {
   const [acceptedProjects, setAcceptedProjects] = useState<any[]>([]);
   const [completedProjects, setCompletedProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentCandidateId, setCurrentCandidateId] = useState<string | null>(null);
-
+const [isLoading, setIsLoading] = useState(true);
+const [currentCandidateId, setCurrentCandidateId] = useState<string | null>(null);
+const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({});
   useEffect(() => {
     fetchCurrentCandidate();
   }, []);
@@ -235,37 +235,51 @@ const CandidateProjects = () => {
     }
   };
 
-  const fetchAcceptedProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('project_bookings')
-        .select(`
+const fetchAcceptedProjects = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('project_bookings')
+      .select(`
+        id,
+        status,
+        created_at,
+        projects (
           id,
-          status,
-          created_at,
-          projects (
-            id,
-            title,
-            description,
-            project_date,
-            status
-          ),
-          hr_resource_assignments (
-            hr_profiles (
-              name
-            )
+          title,
+          description,
+          project_date,
+          status
+        ),
+        hr_resource_assignments (
+          hr_profiles (
+            name
           )
-        `)
-        .eq('candidate_id', currentCandidateId)
-        .eq('status', 'accepted')
-        .order('created_at', { ascending: false });
+        )
+      `)
+      .eq('candidate_id', currentCandidateId)
+      .eq('status', 'accepted')
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setAcceptedProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching accepted projects:', error);
+    if (error) throw error;
+    setAcceptedProjects(data || []);
+
+    // Fetch Nextcloud links for these projects
+    const projectIds = (data || []).map((b: any) => b.projects.id);
+    if (projectIds.length > 0) {
+      const { data: ncRows, error: ncErr } = await supabase
+        .from('nextcloud_projects')
+        .select('project_id, nextcloud_url')
+        .in('project_id', projectIds);
+      if (!ncErr && ncRows) {
+        const map: Record<string, string> = {};
+        for (const row of ncRows) map[row.project_id] = row.nextcloud_url;
+        setNextcloudLinks(map);
+      }
     }
-  };
+  } catch (error) {
+    console.error('Error fetching accepted projects:', error);
+  }
+};
 
   const fetchCompletedProjects = async () => {
     try {
@@ -449,23 +463,36 @@ const CandidateProjects = () => {
                       <Badge variant="default">Accepté</Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      {booking.projects.description}
-                    </p>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Poste:</span>
-                      <Badge variant="secondary">
-                        {booking.hr_resource_assignments.hr_profiles.name}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Date du projet:</span>
-                      <span className="text-sm">{formatDate(booking.projects.project_date)}</span>
-                    </div>
-                  </CardContent>
+<CardContent className="space-y-4">
+  <p className="text-sm text-muted-foreground">
+    {booking.projects.description}
+  </p>
+  
+  <div className="flex items-center gap-2">
+    <span className="text-sm font-medium">Poste:</span>
+    <Badge variant="secondary">
+      {booking.hr_resource_assignments.hr_profiles.name}
+    </Badge>
+  </div>
+  
+  <div className="flex items-center gap-2">
+    <span className="text-sm font-medium">Date du projet:</span>
+    <span className="text-sm">{formatDate(booking.projects.project_date)}</span>
+  </div>
+
+  {nextcloudLinks[booking.projects.id] && (
+    <div className="pt-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => window.open(nextcloudLinks[booking.projects.id], '_blank')}
+      >
+        <ExternalLink className="w-4 h-4 mr-2" />
+        Accéder à l’espace Nextcloud
+      </Button>
+    </div>
+  )}
+</CardContent>
                 </Card>
               ))}
             </div>

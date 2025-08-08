@@ -114,6 +114,17 @@ async function ensureProjectFolder(folderName: string) {
   }
 }
 
+async function shareFolderWithGroup(folderName: string, groupId: string) {
+  const body = new URLSearchParams({
+    path: folderName,
+    shareType: '1', // group
+    shareWith: groupId,
+    permissions: '31', // all permissions
+  });
+  const share = await ocsRequest('POST', '/ocs/v2.php/apps/files_sharing/api/v1/shares', body);
+  console.log('[Nextcloud] share folder with group', groupId, share.res.status, share.json || share.text);
+}
+
 async function shareFolderWithUsers(folderName: string, usernames: string[]) {
   for (const username of usernames) {
     const body = new URLSearchParams({
@@ -131,10 +142,10 @@ async function shareFolderWithUsers(folderName: string, usernames: string[]) {
 async function createTalkRoom(name: string, usernames: string[]) {
   // Create a group conversation and invite usernames
   const body = new URLSearchParams();
-  body.set('roomType', '3'); // 3 = group
-  body.set('name', name);
+  body.set('roomType', 'group'); // use string type as per newer API
+  body.set('displayName', name);
   for (const u of usernames) body.append('invite', u);
-  const { res, json, text } = await ocsRequest('POST', '/ocs/v2.php/apps/spreed/api/v1/room', body);
+  const { res, json, text } = await ocsRequest('POST', '/ocs/v2.php/apps/spreed/api/v4/room', body);
   console.log('[Nextcloud] create talk room', res.status, json || text);
   // Return URL/token if available
   const token = json?.ocs?.data?.token || json?.ocs?.data?.roomToken;
@@ -218,13 +229,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch accepted resources for this project
-    const { data: bookings, error: bookErr } = await supabase
-      .from('project_bookings')
-      .select('candidate_profiles(email, first_name, last_name)')
-      .eq('project_id', projectId)
-      .eq('status', 'accepted');
-    if (bookErr) throw bookErr;
+// Fetch accepted resources for this project
+const { data: bookings, error: bookErr } = await supabase
+  .from('project_bookings')
+  .select('candidate_id, resource_assignment_id, candidate_profiles(email, first_name, last_name)')
+  .eq('project_id', projectId)
+  .eq('status', 'accepted');
+if (bookErr) throw bookErr;
 
     const members: { username: string; email: string; displayName?: string; role: 'client' | 'ressource' }[] = [];
     if (clientEmail) {
@@ -250,10 +261,21 @@ Deno.serve(async (req) => {
       await ensureUser(m);
     }
 
-    // Create project folder and share
-    const folderName = `Projet - ${project.title}`;
-    await ensureProjectFolder(folderName);
-    await shareFolderWithUsers(folderName, members.map(m => m.username));
+// Create project group, folder and share with group
+const projectGroupId = `project-${slugify(project.title)}`;
+await ensureGroup(projectGroupId);
+for (const m of members) {
+  const addToProjectGroup = await ocsRequest(
+    'POST',
+    `/ocs/v1.php/cloud/users/${encodeURIComponent(m.username)}/groups`,
+    new URLSearchParams({ groupid: projectGroupId })
+  );
+  console.log('[Nextcloud] add user to project group', m.username, projectGroupId, addToProjectGroup.res.status);
+}
+
+const folderName = `Projet - ${project.title}`;
+await ensureProjectFolder(folderName);
+await shareFolderWithGroup(folderName, projectGroupId);
 
     // Create Talk room (best effort)
     const talk = await createTalkRoom(`Projet - ${project.title}`, members.map(m => m.username)).catch((e) => {
@@ -276,17 +298,44 @@ Deno.serve(async (req) => {
       console.warn('Calendar creation failed', e);
     });
 
-    const webUrl = `${NEXTCLOUD_BASE_URL}/apps/files/?dir=/${encodeURIComponent(folderName)}`;
+const webUrl = `${NEXTCLOUD_BASE_URL}/apps/files/?dir=/${encodeURIComponent(folderName)}`;
 
-    const response = {
-      success: true,
-      projectId,
-      folderPath: `/${folderName}`,
-      webUrl,
-      talkUrl: talk.url,
-    };
+// Persist workspace link
+const { error: upsertErr } = await supabase
+  .from('nextcloud_projects')
+  .upsert(
+    { project_id: projectId, nextcloud_url: webUrl, folder_path: `/${folderName}`, talk_url: talk.url || null },
+    { onConflict: 'project_id' }
+  );
+if (upsertErr) console.warn('Failed to upsert nextcloud_projects', upsertErr);
 
-    return new Response(JSON.stringify(response), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+// Notify all accepted resources
+if (bookings && bookings.length > 0) {
+  const rows = bookings
+    .filter((b: any) => !!b.candidate_id)
+    .map((b: any) => ({
+      project_id: projectId,
+      candidate_id: b.candidate_id,
+      resource_assignment_id: b.resource_assignment_id,
+      title: `Espace Nextcloud prêt`,
+      description: `Votre espace collaboratif Nextcloud pour le projet "${project.title}" est prêt. Accédez-y ici: ${webUrl}`,
+      status: 'unread',
+    }));
+  if (rows.length > 0) {
+    const { error: notifErr } = await supabase.from('candidate_notifications').insert(rows);
+    if (notifErr) console.warn('Failed to insert candidate notifications', notifErr);
+  }
+}
+
+const response = {
+  success: true,
+  projectId,
+  folderPath: `/${folderName}`,
+  webUrl,
+  talkUrl: talk.url,
+};
+
+return new Response(JSON.stringify(response), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   } catch (error) {
     console.error('[nextcloud-integration] Error', error);
     return new Response(JSON.stringify({ success: false, error: String(error) }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });

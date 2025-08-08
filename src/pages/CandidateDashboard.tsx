@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import CandidateProjects from "@/components/candidate/CandidateProjects";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
 import { CandidateNotes } from "@/components/candidate/CandidateNotes";
+import CandidateMessages from "@/components/candidate/CandidateMessages";
 import { StarRating } from "@/components/ui/star-rating";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { useQuery } from "@tanstack/react-query";
@@ -138,12 +139,7 @@ const CandidateDashboard = () => {
       case 'projects':
         return <CandidateProjects />;
       case 'messages':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes messages</h2>
-            <p className="text-muted-foreground">Vos messages apparaîtront ici.</p>
-          </div>
-        );
+return candidateProfile?.id ? <CandidateMessages candidateId={candidateProfile.id} /> : null;
       case 'appointments':
         return (
           <div className="space-y-4">

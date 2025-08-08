@@ -583,6 +583,33 @@ export type Database = {
           },
         ]
       }
+      nextcloud_projects: {
+        Row: {
+          created_at: string
+          folder_path: string | null
+          id: string
+          nextcloud_url: string
+          project_id: string
+          talk_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          folder_path?: string | null
+          id?: string
+          nextcloud_url: string
+          project_id: string
+          talk_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          folder_path?: string | null
+          id?: string
+          nextcloud_url?: string
+          project_id?: string
+          talk_url?: string | null
+        }
+        Relationships: []
+      }
       planka_projects: {
         Row: {
           created_at: string
