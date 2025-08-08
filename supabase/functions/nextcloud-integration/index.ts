@@ -114,15 +114,15 @@ async function ensureProjectFolder(folderName: string) {
   }
 }
 
-async function shareFolderWithGroup(folderName: string, groupId: string) {
+async function shareFolderWithGroup(folderName: string, groupId: string, permissions: number) {
   const body = new URLSearchParams({
     path: folderName,
     shareType: '1', // group
     shareWith: groupId,
-    permissions: '31', // all permissions
+    permissions: String(permissions),
   });
   const share = await ocsRequest('POST', '/ocs/v2.php/apps/files_sharing/api/v1/shares', body);
-  console.log('[Nextcloud] share folder with group', groupId, share.res.status, share.json || share.text);
+  console.log('[Nextcloud] share folder with group', groupId, permissions, share.res.status, share.json || share.text);
 }
 
 async function shareFolderWithUsers(folderName: string, usernames: string[]) {
@@ -137,6 +137,59 @@ async function shareFolderWithUsers(folderName: string, usernames: string[]) {
     console.log('[Nextcloud] share folder with user', username, share.res.status, share.json || share.text);
     // If it already exists, Nextcloud may return an error code; we log and continue
   }
+}
+
+// --- Group Folders (Team folders) helpers ---
+async function getGroupFolderIdByName(mountpoint: string): Promise<string | null> {
+  const { res, json, text } = await ocsRequest('GET', '/ocs/v2.php/apps/groupfolders/folders');
+  if (!res.ok) {
+    console.warn('[Nextcloud] list groupfolders failed', res.status, json || text);
+    return null;
+  }
+  const data = json?.ocs?.data;
+  let items: any[] = [];
+  if (Array.isArray(data)) items = data;
+  else if (data && typeof data === 'object') items = Object.values(data);
+  const found = items.find((f: any) => f?.mount_point === mountpoint || f?.mountpoint === mountpoint || f?.mountPoint === mountpoint);
+  return found?.id ? String(found.id) : null;
+}
+
+async function createGroupFolder(mountpoint: string): Promise<string | null> {
+  const body = new URLSearchParams({ mountpoint });
+  const { res, json, text } = await ocsRequest('POST', '/ocs/v2.php/apps/groupfolders/folders', body);
+  console.log('[Nextcloud] create groupfolder', mountpoint, res.status, json || text);
+  const id = json?.ocs?.data?.id ?? json?.ocs?.data;
+  return id ? String(id) : null;
+}
+
+async function addGroupToGroupFolder(folderId: string, groupId: string) {
+  const body = new URLSearchParams({ groupid: groupId });
+  const { res, json, text } = await ocsRequest('POST', `/ocs/v2.php/apps/groupfolders/folders/${folderId}/groups`, body);
+  console.log('[Nextcloud] add group to groupfolder', folderId, groupId, res.status, json || text);
+}
+
+async function setGroupFolderPermissions(folderId: string, groupId: string, permissions: number) {
+  const body = new URLSearchParams({ permissions: String(permissions) });
+  const { res, json, text } = await ocsRequest('POST', `/ocs/v2.php/apps/groupfolders/folders/${folderId}/groups/${encodeURIComponent(groupId)}`, body);
+  console.log('[Nextcloud] set groupfolder permissions', folderId, groupId, permissions, res.status, json || text);
+}
+
+async function ensureTeamFolder(folderName: string, clientGroupId: string, resGroupId: string): Promise<boolean> {
+  // Try to use Group Folders app first
+  let folderId = await getGroupFolderIdByName(folderName);
+  if (!folderId) {
+    folderId = await createGroupFolder(folderName);
+  }
+  if (!folderId) return false;
+
+  // Attach groups and permissions
+  await addGroupToGroupFolder(folderId, clientGroupId);
+  await setGroupFolderPermissions(folderId, clientGroupId, 31); // full access
+
+  await addGroupToGroupFolder(folderId, resGroupId);
+  await setGroupFolderPermissions(folderId, resGroupId, 5); // read + create
+
+  return true;
 }
 
 async function createTalkRoom(name: string, usernames: string[]) {
@@ -261,22 +314,32 @@ if (bookErr) throw bookErr;
       await ensureUser(m);
     }
 
-// Create project group, folder and share with group
-const projectGroupId = `project-${slugify(project.title)}`;
-await ensureGroup(projectGroupId);
+// Create project-specific groups and assign members
+const clientGroupId = `projet-${slugify(project.title)}-client`;
+const resGroupId = `projet-${slugify(project.title)}-ressources`;
+await ensureGroup(clientGroupId);
+await ensureGroup(resGroupId);
 for (const m of members) {
-  const addToProjectGroup = await ocsRequest(
+  const groupid = m.role === 'client' ? clientGroupId : resGroupId;
+  const add = await ocsRequest(
     'POST',
     `/ocs/v1.php/cloud/users/${encodeURIComponent(m.username)}/groups`,
-    new URLSearchParams({ groupid: projectGroupId })
+    new URLSearchParams({ groupid })
   );
-  console.log('[Nextcloud] add user to project group', m.username, projectGroupId, addToProjectGroup.res.status);
+  console.log('[Nextcloud] add user to project role group', m.username, groupid, add.res.status, add.json || add.text);
 }
 
 const folderName = `Projet - ${project.title}`;
-await ensureProjectFolder(folderName);
-await shareFolderWithGroup(folderName, projectGroupId);
-
+// Prefer Group Folders app if available; fallback to regular shares
+const teamFolderOk = await ensureTeamFolder(folderName, clientGroupId, resGroupId).catch((e) => {
+  console.warn('Groupfolders setup failed', e);
+  return false;
+});
+if (!teamFolderOk) {
+  await ensureProjectFolder(folderName);
+  await shareFolderWithGroup(folderName, clientGroupId, 31);
+  await shareFolderWithGroup(folderName, resGroupId, 5);
+}
     // Create Talk room (best effort)
     const talk = await createTalkRoom(`Projet - ${project.title}`, members.map(m => m.username)).catch((e) => {
       console.warn('Talk room creation failed', e);
