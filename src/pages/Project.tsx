@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
-import { useSupabaseWithAuth } from '@/hooks/useSupabaseWithAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { supabase } from '@/integrations/supabase/client';
 import {
   ReactFlow,
   MiniMap,
@@ -71,7 +72,7 @@ const ensureValidPosition = (position?: { x: number; y: number }) => {
 const Project = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useKeycloakAuth();
-  const { supabase } = useSupabaseWithAuth();
+  useSupabaseAuth(); // Configure Keycloak headers for Supabase
   const navigate = useNavigate();
   const { toast } = useToast();
   

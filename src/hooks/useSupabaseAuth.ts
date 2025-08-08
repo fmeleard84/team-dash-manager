@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,10 +6,11 @@ export const useSupabaseAuth = () => {
   const { user, isAuthenticated } = useKeycloakAuth();
 
   useEffect(() => {
+    // Get the internal supabase client objects
     const restHeaders = (supabase as any)?.rest?.headers as Record<string, string> | undefined;
     const fnHeaders = (supabase as any)?.functions?.headers as Record<string, string> | undefined;
 
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user?.profile) {
       console.log('User authenticated with Keycloak, configuring Supabase headers with Keycloak identity');
 
       // Always use apikey only (no Supabase JWT)
@@ -18,8 +18,8 @@ export const useSupabaseAuth = () => {
         delete restHeaders.Authorization;
       }
 
-      const sub = user?.profile?.sub as string | undefined;
-      const email = user?.profile?.email as string | undefined;
+      const sub = user.profile.sub as string | undefined;
+      const email = user.profile.email as string | undefined;
 
       if (sub) {
         if (restHeaders) restHeaders['x-keycloak-sub'] = sub;
@@ -30,9 +30,11 @@ export const useSupabaseAuth = () => {
         if (fnHeaders) fnHeaders['x-keycloak-email'] = email;
       }
 
-      console.log('Supabase configured with apikey + Keycloak headers', {
+      console.log('🔐 Supabase configured with apikey + Keycloak headers', {
         subSet: !!sub,
         emailSet: !!email,
+        sub,
+        email
       });
     } else {
       console.log('User not authenticated, clearing Supabase custom headers');
