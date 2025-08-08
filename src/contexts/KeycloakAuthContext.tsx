@@ -1,5 +1,6 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useEffect } from 'react';
 import { AuthProvider, useAuth as useOidcAuth } from 'react-oidc-context';
+import { setKeycloakIdentity, clearKeycloakIdentity } from '@/integrations/supabase/client';
 
 interface KeycloakAuthContextType {
   user: any;
@@ -42,7 +43,21 @@ interface KeycloakAuthProviderProps {
 
 const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
   const oidcAuth = useOidcAuth();
-  
+
+  // Synchronize Keycloak identity to Supabase global fetch headers
+  useEffect(() => {
+    const sub = oidcAuth.user?.profile?.sub as string | undefined;
+    const email = oidcAuth.user?.profile?.email as string | undefined;
+
+    if (oidcAuth.isAuthenticated && sub) {
+      setKeycloakIdentity(sub, email);
+      console.log('[Keycloak] Synced identity to Supabase headers', { sub });
+    } else {
+      clearKeycloakIdentity();
+      console.log('[Keycloak] Cleared identity from Supabase headers');
+    }
+  }, [oidcAuth.isAuthenticated, oidcAuth.user]);
+
   const getUserGroups = (): string[] => {
     console.log('=== DEBUG: Getting user groups ===');
     console.log('Full user object:', oidcAuth.user);
@@ -52,7 +67,6 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
     
     if (!oidcAuth.user?.profile?.groups) {
       console.log('No groups found in profile.groups, checking other locations...');
-      // Try different locations where groups might be stored
       const profile = oidcAuth.user?.profile as any;
       
       console.log('Checking resource_access:', profile?.resource_access);
@@ -80,7 +94,6 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
         : [];
     }
     
-    // Clean group names by removing leading "/" and extracting relevant roles
     const cleanedGroups = rawGroups
       .map(group => group.startsWith('/') ? group.substring(1) : group)
       .filter(group => ['client', 'candidate', 'resource', 'admin'].includes(group));
