@@ -50,7 +50,7 @@ const CandidateDashboard = () => {
         .from('candidate_profiles')
         .select('status, first_name, last_name, id, rating')
         .eq('email', user.profile.email)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       return data;

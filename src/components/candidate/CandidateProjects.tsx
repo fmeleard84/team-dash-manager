@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Check, X, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 
 interface ProjectNotification {
   id: string;
@@ -40,9 +41,10 @@ const CandidateProjects = () => {
   const [acceptedProjects, setAcceptedProjects] = useState<any[]>([]);
   const [completedProjects, setCompletedProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
-const [isLoading, setIsLoading] = useState(true);
-const [currentCandidateId, setCurrentCandidateId] = useState<string | null>(null);
-const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentCandidateId, setCurrentCandidateId] = useState<string | null>(null);
+  const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({});
+  const { user } = useKeycloakAuth();
   useEffect(() => {
     fetchCurrentCandidate();
   }, []);
@@ -57,65 +59,32 @@ const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({})
 
   const fetchCurrentCandidate = async () => {
     try {
-      // Vérifier s'il y a des données d'authentification stockées
-      const candidateAuth = localStorage.getItem('candidate-auth');
-      if (!candidateAuth) {
-        // Si pas d'auth, chercher Francis Meleard spécifiquement
-        const { data: candidate, error } = await supabase
-          .from('candidate_profiles')
-          .select('id, first_name, last_name, email')
-          .eq('email', 'fmeleard+a1201@gmail.com')
-          .single();
-
-        if (error) {
-          console.error('Error fetching candidate:', error);
-          toast.error('Erreur lors de la récupération du candidat');
-          return;
-        }
-
-        if (candidate) {
-          setCurrentCandidateId(candidate.id);
-          toast.success(`Connecté en tant que ${candidate.first_name} ${candidate.last_name}`);
-          // Stocker temporairement l'ID pour la session
-          localStorage.setItem('candidate-auth', JSON.stringify({ 
-            candidateId: candidate.id,
-            email: candidate.email 
-          }));
-        } else {
-          toast.error('Candidat Francis Meleard non trouvé');
-        }
+      if (!user?.profile?.email) {
+        setIsLoading(false);
         return;
       }
 
-      // Parse les données d'authentification
-      const authData = JSON.parse(candidateAuth);
-      
-      if (authData.candidateId) {
-        setCurrentCandidateId(authData.candidateId);
-      } else if (authData.email) {
-        // Si on a seulement l'email, chercher l'ID
-        const { data: candidate, error } = await supabase
-          .from('candidate_profiles')
-          .select('id, first_name, last_name')
-          .eq('email', authData.email)
-          .single();
+      const { data: candidate, error } = await supabase
+        .from('candidate_profiles')
+        .select('id, first_name, last_name, email')
+        .eq('email', user.profile.email)
+        .maybeSingle();
 
-        if (error || !candidate) {
-          toast.error('Candidat non trouvé');
-          return;
-        }
+      if (error) {
+        console.error('Error fetching candidate:', error);
+        toast.error('Erreur lors de la récupération du candidat');
+        return;
+      }
 
+      if (candidate) {
         setCurrentCandidateId(candidate.id);
-        // Mettre à jour les données d'auth avec l'ID
-        localStorage.setItem('candidate-auth', JSON.stringify({
-          ...authData,
-          candidateId: candidate.id
-        }));
         toast.success(`Connecté en tant que ${candidate.first_name} ${candidate.last_name}`);
       }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Erreur de connexion');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -149,7 +118,7 @@ const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({})
               .from('projects')
               .select('title, description, project_date')
               .eq('id', notification.project_id)
-              .single(),
+              .maybeSingle(),
             supabase
               .from('hr_resource_assignments')
               .select(`
@@ -158,7 +127,7 @@ const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({})
                 )
               `)
               .eq('id', notification.resource_assignment_id)
-              .single()
+              .maybeSingle()
           ]);
 
           return {
