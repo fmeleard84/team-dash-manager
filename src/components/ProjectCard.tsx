@@ -6,7 +6,7 @@ import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
-
+import { KickoffDialog } from "@/components/KickoffDialog";
 interface Project {
   id: string;
   title: string;
@@ -43,7 +43,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   
   const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
   const [isBookingTeam, setIsBookingTeam] = useState(false);
-
+  const [showKickoff, setShowKickoff] = useState(false);
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
@@ -90,28 +90,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
 
     const newStatus = project.status === 'play' ? 'pause' : 'play';
     
-    // If switching to play, create Keycloak project and sync with Planka
     if (newStatus === 'play') {
-      try {
-        setIsSyncing(true);
-        
-        // Create Keycloak project group and add team members
-        await createKeycloakProjectGroup();
-        
-        // Setup Nextcloud collaborative workspace
-        await setupNextcloudWorkspace();
-
-        // Update project status
-        await onStatusToggle(project.id, newStatus);
-        
-        toast.success('Projet démarré avec succès ! Équipe créée et espace de travail prêt.');
-      } catch (error) {
-        console.error('Error starting project:', error);
-        toast.error('Erreur lors du démarrage du projet');
-        return;
-      } finally {
-        setIsSyncing(false);
-      }
+      setShowKickoff(true);
     } else {
       // Simple pause
       await onStatusToggle(project.id, newStatus);
@@ -141,22 +121,39 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     }
   };
 
+  const startProject = async (kickoffISO: string) => {
+    try {
+      setIsSyncing(true);
+      await createKeycloakProjectGroup();
+      await setupNextcloudWorkspace(kickoffISO);
+      await onStatusToggle(project.id, 'play');
+      toast.success('Projet démarré avec succès ! Équipe créée et espace de travail prêt.');
+    } catch (error) {
+      console.error('Error starting project:', error);
+      toast.error('Erreur lors du démarrage du projet');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const createKeycloakProjectGroup = async () => {
     try {
-      console.log('Creating Keycloak project group...');
-      
-      // Create the project group
-      const { data: groupData, error: groupError } = await supabase.functions.invoke('keycloak-user-management', {
-        body: {
-          action: 'create-project-group',
-          projectId: project.id,
-          groupName: `Projet-${project.title.replace(/\s+/g, '-')}`
-        }
-      });
+      console.log('Creating Keycloak project groups...');
+      const baseGroup = `Projet-${project.title.replace(/\s+/g, '-')}`;
 
-      if (groupError) throw groupError;
-      
-      console.log('Project group created:', groupData);
+      // Create two groups: client and ressource
+      const [{ data: clientGroup, error: clientGroupError }, { data: resGroup, error: resGroupError }] = await Promise.all([
+        supabase.functions.invoke('keycloak-user-management', {
+          body: { action: 'create-project-group', projectId: project.id, groupName: `${baseGroup}-client` }
+        }),
+        supabase.functions.invoke('keycloak-user-management', {
+          body: { action: 'create-project-group', projectId: project.id, groupName: `${baseGroup}-ressource` }
+        })
+      ]);
+
+      if (clientGroupError || resGroupError) {
+        throw clientGroupError || resGroupError;
+      }
 
       // Get all booked resources for this project
       const { data: bookedResources, error: resourceError } = await supabase
@@ -187,53 +184,38 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
 
       if (projectError) throw projectError;
 
-      // Add each team member to the group
-      const members = [];
-      
-      // Add client to the group
-      if (projectData?.keycloak_user_id) {
+      const members: string[] = [];
+
+      // Add client to client group
+      if (projectData?.keycloak_user_id && clientGroup?.groupId) {
         try {
-          const { data: addClientData, error: addClientError } = await supabase.functions.invoke('keycloak-user-management', {
-            body: {
-              action: 'add-user-to-group',
-              userId: projectData.keycloak_user_id,
-              groupId: groupData.groupId
-            }
+          await supabase.functions.invoke('keycloak-user-management', {
+            body: { action: 'add-user-to-group', userId: projectData.keycloak_user_id, groupId: clientGroup.groupId }
           });
-          
-          if (!addClientError) {
-            members.push('Client (propriétaire)');
-          }
+          members.push('Client (propriétaire)');
         } catch (error) {
-          console.warn('Failed to add client to group:', error);
+          console.warn('Failed to add client to client group:', error);
         }
       }
 
-      // Add each booked resource to the group
-      if (bookedResources) {
+      // Add each booked resource to resource group
+      if (bookedResources && resGroup?.groupId) {
         for (const booking of bookedResources) {
           const candidate = booking.candidate_profiles;
           if (candidate?.keycloak_user_id) {
             try {
-              const { data: addMemberData, error: addMemberError } = await supabase.functions.invoke('keycloak-user-management', {
-                body: {
-                  action: 'add-user-to-group',
-                  userId: candidate.keycloak_user_id,
-                  groupId: groupData.groupId
-                }
+              await supabase.functions.invoke('keycloak-user-management', {
+                body: { action: 'add-user-to-group', userId: candidate.keycloak_user_id, groupId: resGroup.groupId }
               });
-              
-              if (!addMemberError) {
-                members.push(`${candidate.first_name} ${candidate.last_name}`);
-              }
+              members.push(`${candidate.first_name} ${candidate.last_name}`);
             } catch (error) {
-              console.warn(`Failed to add ${candidate.email} to group:`, error);
+              console.warn(`Failed to add ${candidate.email} to ressource group:`, error);
             }
           }
         }
       }
 
-      console.log(`Keycloak project group created with ${members.length} members:`, members);
+      console.log(`Keycloak project groups created with ${members.length} members.`);
       return { success: true, members };
       
     } catch (error) {
@@ -243,12 +225,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     }
   };
 
-  const setupNextcloudWorkspace = async () => {
+  const setupNextcloudWorkspace = async (kickoffISO?: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('nextcloud-integration', {
         body: {
           action: 'setup-workspace',
           projectId: project.id,
+          kickoffStart: kickoffISO,
         }
       });
 
@@ -290,114 +273,123 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   const allResourcesBooked = resourceAssignments.every(assignment => assignment.booking_status === 'booké');
 
   return (
-    <Card className="w-full max-w-md bg-background border border-border shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">{project.title}</h3>
-          <Badge variant={project.status === 'play' ? 'default' : 'secondary'}>
-            {project.status === 'play' ? 'En cours' : 'En pause'}
-          </Badge>
-        </div>
-        {project.description && (
-          <p className="text-sm text-muted-foreground mt-2">{project.description}</p>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Prix total:</span>
-          <span className="font-medium text-foreground">{project.price}€</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Date:</span>
-          <span className="text-foreground">{formatDate(project.date)}</span>
-        </div>
-        
-        {/* Resource assignments section */}
-        {resourceAssignments.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Équipe:</span>
-              <span className="text-foreground">{bookingProgress.text}</span>
-            </div>
-            <div className="w-full bg-secondary rounded-full h-2">
-              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-300" 
-                style={{ width: `${bookingProgress.percentage}%` }}
-              />
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {resourceAssignments.map((assignment) => (
-                <Badge 
-                  key={assignment.id} 
-                  variant={assignment.booking_status === 'booké' ? 'default' : 'outline'}
-                  className="text-xs"
-                >
-                  {assignment.hr_profiles.name}
-                  {assignment.booking_status === 'booké' && ' ✓'}
-                </Badge>
-              ))}
-            </div>
+    <>
+      <Card className="w-full max-w-md bg-background border border-border shadow-sm hover:shadow-md transition-shadow">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-foreground">{project.title}</h3>
+            <Badge variant={project.status === 'play' ? 'default' : 'secondary'}>
+              {project.status === 'play' ? 'En cours' : 'En pause'}
+            </Badge>
           </div>
-        )}
+          {project.description && (
+            <p className="text-sm text-muted-foreground mt-2">{project.description}</p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Prix total:</span>
+            <span className="font-medium text-foreground">{project.price}€</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Date:</span>
+            <span className="text-foreground">{formatDate(project.date)}</span>
+          </div>
+          
+          {/* Resource assignments section */}
+          {resourceAssignments.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Équipe:</span>
+                <span className="text-foreground">{bookingProgress.text}</span>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-2">
+                <div 
+                  className="bg-primary h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${bookingProgress.percentage}%` }}
+                />
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {resourceAssignments.map((assignment) => (
+                  <Badge 
+                    key={assignment.id} 
+                    variant={assignment.booking_status === 'booké' ? 'default' : 'outline'}
+                    className="text-xs"
+                  >
+                    {assignment.hr_profiles.name}
+                    {assignment.booking_status === 'booké' && ' ✓'}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleStatusToggle}
-            className="flex-1"
-            disabled={project.status === 'pause' && !allResourcesBooked}
-          >
-            {project.status === 'play' ? (
-              <>
-                <Pause className="w-4 h-4 mr-2" />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4 mr-2" />
-                Play
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleStatusToggle}
+              className="flex-1"
+              disabled={project.status === 'pause' && !allResourcesBooked}
+           >
+              {project.status === 'play' ? (
+                <>
+                  <Pause className="w-4 h-4 mr-2" />
+                  Pause
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  Play
+                </>
+              )}
+            </Button>
 
-          <Button variant="outline" size="sm" onClick={() => onView(project.id)}>
-            <Eye className="w-4 h-4" />
-          </Button>
+            <Button variant="outline" size="sm" onClick={() => onView(project.id)}>
+              <Eye className="w-4 h-4" />
+            </Button>
 
-          <Button variant="destructive" size="sm" onClick={() => onDelete(project.id)}>
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
+            <Button variant="destructive" size="sm" onClick={() => onDelete(project.id)}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
 
-        {/* Booking Team button - only show when resources exist but not all are booked */}
-        {resourceAssignments.length > 0 && !allResourcesBooked && project.status === 'pause' && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleBookingTeam}
-            disabled={isBookingTeam}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-          >
-            <Users className="w-4 h-4 mr-2" />
-            {isBookingTeam ? 'Recherche en cours...' : 'Rejoindre l\'équipe'}
-          </Button>
-        )}
+          {/* Booking Team button - only show when resources exist but not all are booked */}
+          {resourceAssignments.length > 0 && !allResourcesBooked && project.status === 'pause' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleBookingTeam}
+              disabled={isBookingTeam}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              {isBookingTeam ? 'Recherche en cours...' : 'Rejoindre l\'équipe'}
+            </Button>
+          )}
 
-        {/* My Workspace button - only show when project is active (play) */}
-        {project.status === 'play' && plankaProject?.planka_url && (
-          <Button
-            variant="default"
-            size="sm"
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-            onClick={() => window.open(plankaProject.planka_url, '_blank')}
-          >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Accéder à l’espace collaboratif
-          </Button>
-        )}
+          {/* My Workspace button - only show when project is active (play) */}
+          {project.status === 'play' && plankaProject?.planka_url && (
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+              onClick={() => window.open(plankaProject.planka_url, '_blank')}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Accéder à l’espace collaboratif
+            </Button>
+          )}
 
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <KickoffDialog
+        open={showKickoff}
+        projectTitle={project.title}
+        onClose={() => setShowKickoff(false)}
+        onConfirm={(iso) => startProject(iso)}
+      />
+    </>
   );
 }

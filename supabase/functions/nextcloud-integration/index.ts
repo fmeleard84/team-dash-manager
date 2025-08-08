@@ -219,7 +219,7 @@ function formatICSDate(date: Date) {
   );
 }
 
-async function createCalendarAndEvent(calendarName: string, eventTitle: string, eventDescription: string, start: Date, end: Date) {
+async function createCalendarAndEvent(calendarName: string, eventTitle: string, eventDescription: string, start: Date, end: Date, attendees?: string[]) {
   const calSlug = slugify(calendarName);
   const calBase = `/remote.php/dav/calendars/${encodeURIComponent(NEXTCLOUD_ADMIN_USERNAME)}/${encodePath(calSlug)}`;
 
@@ -234,7 +234,8 @@ async function createCalendarAndEvent(calendarName: string, eventTitle: string, 
 
   // Create first event
   const uid = crypto.randomUUID();
-  const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//HaaS//Nextcloud Integration//EN\nBEGIN:VEVENT\nUID:${uid}\nDTSTAMP:${formatICSDate(new Date())}\nDTSTART:${formatICSDate(start)}\nDTEND:${formatICSDate(end)}\nSUMMARY:${eventTitle}\nDESCRIPTION:${eventDescription.replace(/\n/g, '\\n')}\nEND:VEVENT\nEND:VCALENDAR\n`;
+  const attendeesLines = (attendees || []).map((e) => `ATTENDEE;CN=${e};ROLE=REQ-PARTICIPANT:mailto:${e}`).join('\n');
+  const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//HaaS//Nextcloud Integration//EN\nBEGIN:VEVENT\nUID:${uid}\nDTSTAMP:${formatICSDate(new Date())}\nDTSTART:${formatICSDate(start)}\nDTEND:${formatICSDate(end)}\nSUMMARY:${eventTitle}\nDESCRIPTION:${eventDescription.replace(/\n/g, '\\n')}\n${attendeesLines}\nEND:VEVENT\nEND:VCALENDAR\n`;
   const eventPath = `${calBase}/${uid}.ics`;
   const putEvent = await davRequest('PUT', eventPath, ics, 'text/calendar; charset=utf-8');
   console.log('[Nextcloud] PUT event', putEvent.res.status, putEvent.text);
@@ -247,7 +248,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, projectId } = await req.json();
+    const { action, projectId, kickoffStart } = await req.json();
     if (action !== 'setup-workspace') {
       return new Response(JSON.stringify({ success: false, message: 'Unsupported action' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
@@ -347,17 +348,22 @@ if (!teamFolderOk) {
     });
 
     // Create calendar and first kickoff event (best effort)
-    const now = new Date();
-    const start = new Date(now.getTime());
-    start.setUTCDate(start.getUTCDate() + 1);
-    start.setUTCHours(10, 0, 0, 0);
-    const end = new Date(start.getTime());
-    end.setUTCHours(11, 0, 0, 0);
+    let start: Date;
+    if (kickoffStart) {
+      start = new Date(kickoffStart);
+    } else {
+      const now = new Date();
+      start = new Date(now.getTime());
+      start.setUTCDate(start.getUTCDate() + 1);
+      start.setUTCHours(10, 0, 0, 0);
+    }
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
 
-    const eventTitle = `Lancement du projet ${project.title}`;
-    const eventDesc = `Réunion de lancement du projet.\nDétails: ${project.description || ''}\nVisio: ${talk.url || 'À définir'}`;
+    const eventTitle = `Réunion de lancement – Projet ${project.title}`;
+    const owner = clientDisplay || clientEmail || 'Client';
+    const eventDesc = `Réunion de lancement organisée par ${owner}.\nDétails: ${project.description || ''}\nVisio: ${talk.url || 'À définir'}`;
 
-    await createCalendarAndEvent(`Projet - ${project.title}`, eventTitle, eventDesc, start, end).catch((e) => {
+    await createCalendarAndEvent(`Projet - ${project.title}`, eventTitle, eventDesc, start, end, (members || []).map(m => m.email).filter(Boolean)).catch((e) => {
       console.warn('Calendar creation failed', e);
     });
 

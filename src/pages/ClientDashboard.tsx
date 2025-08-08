@@ -28,6 +28,7 @@ import {
   Settings, 
   LogOut 
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ClientDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
@@ -66,18 +67,31 @@ const ClientDashboard = () => {
   const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useQuery({
     queryKey: ['user-projects', user?.profile?.sub],
     queryFn: async () => {
-      if (!user?.profile?.sub) return [];
-      
+      if (!user?.profile?.sub) return [] as any[];
       const { data, error } = await supabase
         .from('projects')
         .select('*')
         .eq('keycloak_user_id', user.profile.sub)
         .order('created_at', { ascending: false });
-      
       if (error) throw error;
       return data;
     },
     enabled: !!user?.profile?.sub
+  });
+
+  // Fetch resource assignments for user's projects to categorize booking state
+  const { data: assignments } = useQuery({
+    queryKey: ['assignments-by-project', projects?.map(p => p.id).join(',')],
+    queryFn: async () => {
+      const ids = (projects || []).map(p => p.id);
+      if (!ids.length) return [] as any[];
+      const { data, error } = await supabase
+        .from('hr_resource_assignments')
+        .select('project_id, booking_status');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projects && projects.length > 0
   });
 
   const menuItems = [
@@ -188,11 +202,30 @@ const ClientDashboard = () => {
 
     switch (activeSection) {
       case 'projects':
+        const asgByProject = (assignments || []).reduce((acc: Record<string, { total: number; booked: number }>, a: any) => {
+          acc[a.project_id] = acc[a.project_id] || { total: 0, booked: 0 };
+          acc[a.project_id].total += 1;
+          if (a.booking_status === 'booké') acc[a.project_id].booked += 1;
+          return acc;
+        }, {});
+
+        const filterBy = (predicate: (p: any) => boolean) => (projects || []).filter(predicate);
+        const ongoing = filterBy(p => p.status === 'play');
+        const booking = filterBy(p => {
+          const a = asgByProject[p.id];
+          return p.status === 'pause' && a && a.total > 0 && a.booked < a.total;
+        });
+        const paused = filterBy(p => {
+          const a = asgByProject[p.id];
+          return p.status === 'pause' && (!a || a.total === 0 || a.booked === a.total);
+        });
+        const done = filterBy(p => p.status === 'completed');
+
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes projets</h2>
             <p className="text-muted-foreground">Gérez vos projets et suivez leur avancement.</p>
-            
+
             {projectsLoading ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Chargement des projets...</p>
@@ -204,26 +237,72 @@ const ClientDashboard = () => {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {projects.map((project) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={{
-                      id: project.id,
-                      title: project.title,
-                      description: project.description,
-                      price: 0, // Will be calculated based on resources
-                      date: project.project_date,
-                      status: project.status
-                    }}
-                    onStatusToggle={handleStatusToggle}
-                    onDelete={handleDeleteProject}
-                    onView={handleViewProject}
-                  />
-                ))}
-              </div>
+              <Tabs defaultValue="ongoing" className="w-full">
+                <TabsList className="grid grid-cols-4 w-full max-w-xl">
+                  <TabsTrigger value="ongoing">Projets en cours</TabsTrigger>
+                  <TabsTrigger value="booking">En cours de booking</TabsTrigger>
+                  <TabsTrigger value="paused">En pause</TabsTrigger>
+                  <TabsTrigger value="done">Terminés</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="ongoing">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {ongoing.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        onStatusToggle={handleStatusToggle}
+                        onDelete={handleDeleteProject}
+                        onView={handleViewProject}
+                      />
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="booking">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {booking.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        onStatusToggle={handleStatusToggle}
+                        onDelete={handleDeleteProject}
+                        onView={handleViewProject}
+                      />
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="paused">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {paused.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        onStatusToggle={handleStatusToggle}
+                        onDelete={handleDeleteProject}
+                        onView={handleViewProject}
+                      />
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="done">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {done.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        onStatusToggle={handleStatusToggle}
+                        onDelete={handleDeleteProject}
+                        onView={handleViewProject}
+                      />
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
             )}
-            
+
             <div className="flex justify-center mt-6">
               <Button 
                 onClick={() => setIsModalOpen(true)}
