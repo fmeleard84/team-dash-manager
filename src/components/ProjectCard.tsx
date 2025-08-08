@@ -237,8 +237,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
       return { success: true, members };
       
     } catch (error) {
-      console.error('Error creating Keycloak project group:', error);
-      throw error;
+      console.warn('Keycloak project group step failed, continuing without it:', error);
+      toast.warning('Groupes Keycloak non créés, poursuite de la mise en place Nextcloud.');
+      return { success: false, members: [] };
     }
   };
 
