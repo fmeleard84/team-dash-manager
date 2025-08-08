@@ -1,0 +1,294 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// CORS headers for browser calls
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Helpers
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const NEXTCLOUD_BASE_URL = Deno.env.get('NEXTCLOUD_BASE_URL')!; // e.g. https://cloud.ialla.fr
+const NEXTCLOUD_ADMIN_USERNAME = Deno.env.get('NEXTCLOUD_ADMIN_USERNAME')!;
+const NEXTCLOUD_ADMIN_PASSWORD = Deno.env.get('NEXTCLOUD_ADMIN_PASSWORD')!;
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+function basicAuthHeader() {
+  const token = btoa(`${NEXTCLOUD_ADMIN_USERNAME}:${NEXTCLOUD_ADMIN_PASSWORD}`);
+  return `Basic ${token}`;
+}
+
+function slugify(input: string) {
+  return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .toLowerCase();
+}
+
+function encodePath(path: string) {
+  // Encode each segment to avoid issues with spaces and special chars
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+async function ocsRequest(method: string, path: string, body?: URLSearchParams) {
+  const url = `${NEXTCLOUD_BASE_URL}${path}`;
+  const headers: Record<string, string> = {
+    'OCS-APIRequest': 'true',
+    'Accept': 'application/json',
+    'Authorization': basicAuthHeader(),
+  };
+  let init: RequestInit = { method, headers };
+  if (body) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    init.body = body.toString();
+  }
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let json: any = null;
+  try { json = JSON.parse(text); } catch { /* keep text */ }
+  return { res, json, text };
+}
+
+async function davRequest(method: string, path: string, body?: string, contentType?: string) {
+  const url = `${NEXTCLOUD_BASE_URL}${path}`;
+  const headers: Record<string, string> = {
+    'Authorization': basicAuthHeader(),
+  };
+  if (contentType) headers['Content-Type'] = contentType;
+  const res = await fetch(url, { method, headers, body });
+  const text = await res.text().catch(() => '');
+  return { res, text };
+}
+
+async function ensureGroup(groupId: string) {
+  // Try to create the group, if it already exists Nextcloud returns failure code 102
+  const body = new URLSearchParams({ groupid: groupId });
+  const { res, json, text } = await ocsRequest('POST', '/ocs/v1.php/cloud/groups', body);
+  console.log('[Nextcloud] ensureGroup', groupId, res.status, json || text);
+  // Ignore errors if group exists already
+}
+
+async function ensureUser(user: { username: string; email: string; displayName?: string; role?: 'client' | 'ressource' }) {
+  // Check existence
+  const check = await ocsRequest('GET', `/ocs/v1.php/cloud/users/${encodeURIComponent(user.username)}`);
+  console.log('[Nextcloud] check user', user.username, check.res.status);
+
+  if (check.res.status !== 200) {
+    // Create user with random strong password (SSO will be used for auth)
+    const password = crypto.randomUUID() + '_' + crypto.randomUUID();
+    const body = new URLSearchParams({
+      userid: user.username,
+      password,
+      email: user.email,
+    });
+    if (user.displayName) body.set('displayName', user.displayName);
+
+    const create = await ocsRequest('POST', '/ocs/v1.php/cloud/users', body);
+    console.log('[Nextcloud] create user', user.username, create.res.status, create.json || create.text);
+    if (!create.res.ok) {
+      throw new Error(`Failed to create user ${user.username}: ${create.text}`);
+    }
+  }
+
+  // Ensure role-based groups exist and add user
+  if (user.role) {
+    const groupId = user.role === 'client' ? 'clients' : 'ressources';
+    await ensureGroup(groupId);
+    const addToGroup = await ocsRequest('POST', `/ocs/v1.php/cloud/users/${encodeURIComponent(user.username)}/groups`, new URLSearchParams({ groupid: groupId }));
+    console.log('[Nextcloud] add user to group', user.username, groupId, addToGroup.res.status, addToGroup.json || addToGroup.text);
+  }
+}
+
+async function ensureProjectFolder(folderName: string) {
+  const davPath = `/remote.php/dav/files/${encodeURIComponent(NEXTCLOUD_ADMIN_USERNAME)}/${encodePath(folderName)}`;
+  const mkcol = await davRequest('MKCOL', davPath);
+  console.log('[Nextcloud] MKCOL folder', folderName, mkcol.res.status, mkcol.text);
+  // 201 Created or 405/409 if already exists -> acceptable
+  if (mkcol.res.status !== 201 && mkcol.res.status !== 405 && mkcol.res.status !== 409) {
+    throw new Error(`Failed to create/ensure folder: ${mkcol.res.status} ${mkcol.text}`);
+  }
+}
+
+async function shareFolderWithUsers(folderName: string, usernames: string[]) {
+  for (const username of usernames) {
+    const body = new URLSearchParams({
+      path: folderName,
+      shareType: '0', // user
+      shareWith: username,
+      permissions: '31', // all permissions
+    });
+    const share = await ocsRequest('POST', '/ocs/v2.php/apps/files_sharing/api/v1/shares', body);
+    console.log('[Nextcloud] share folder with user', username, share.res.status, share.json || share.text);
+    // If it already exists, Nextcloud may return an error code; we log and continue
+  }
+}
+
+async function createTalkRoom(name: string, usernames: string[]) {
+  // Create a group conversation and invite usernames
+  const body = new URLSearchParams();
+  body.set('roomType', '3'); // 3 = group
+  body.set('name', name);
+  for (const u of usernames) body.append('invite', u);
+  const { res, json, text } = await ocsRequest('POST', '/ocs/v2.php/apps/spreed/api/v1/room', body);
+  console.log('[Nextcloud] create talk room', res.status, json || text);
+  // Return URL/token if available
+  const token = json?.ocs?.data?.token || json?.ocs?.data?.roomToken;
+  const url = token ? `${NEXTCLOUD_BASE_URL}/call/${token}` : undefined;
+  return { token, url };
+}
+
+function formatICSDate(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // Use UTC
+  return (
+    date.getUTCFullYear().toString() +
+    pad(date.getUTCMonth() + 1) +
+    pad(date.getUTCDate()) + 'T' +
+    pad(date.getUTCHours()) +
+    pad(date.getUTCMinutes()) +
+    pad(date.getUTCSeconds()) + 'Z'
+  );
+}
+
+async function createCalendarAndEvent(calendarName: string, eventTitle: string, eventDescription: string, start: Date, end: Date) {
+  const calSlug = slugify(calendarName);
+  const calBase = `/remote.php/dav/calendars/${encodeURIComponent(NEXTCLOUD_ADMIN_USERNAME)}/${encodePath(calSlug)}`;
+
+  // Create calendar (MKCALENDAR)
+  const mkCalBody = `<?xml version="1.0" encoding="utf-8"?>\n<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">\n  <D:set>\n    <D:prop>\n      <D:displayname>${calendarName}</D:displayname>\n      <C:supported-calendar-component-set>\n        <C:comp name="VEVENT"/>\n      </C:supported-calendar-component-set>\n    </D:prop>\n  </D:set>\n</C:mkcalendar>`;
+  const mkCal = await davRequest('MKCALENDAR', calBase, mkCalBody, 'application/xml; charset=utf-8');
+  console.log('[Nextcloud] MKCALENDAR', calendarName, mkCal.res.status, mkCal.text);
+  // 201 Created or 405 if already exists
+  if (mkCal.res.status !== 201 && mkCal.res.status !== 405) {
+    console.warn('Calendar creation returned non-success code, continuing');
+  }
+
+  // Create first event
+  const uid = crypto.randomUUID();
+  const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//HaaS//Nextcloud Integration//EN\nBEGIN:VEVENT\nUID:${uid}\nDTSTAMP:${formatICSDate(new Date())}\nDTSTART:${formatICSDate(start)}\nDTEND:${formatICSDate(end)}\nSUMMARY:${eventTitle}\nDESCRIPTION:${eventDescription.replace(/\n/g, '\\n')}\nEND:VEVENT\nEND:VCALENDAR\n`;
+  const eventPath = `${calBase}/${uid}.ics`;
+  const putEvent = await davRequest('PUT', eventPath, ics, 'text/calendar; charset=utf-8');
+  console.log('[Nextcloud] PUT event', putEvent.res.status, putEvent.text);
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { action, projectId } = await req.json();
+    if (action !== 'setup-workspace') {
+      return new Response(JSON.stringify({ success: false, message: 'Unsupported action' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+    if (!projectId) {
+      return new Response(JSON.stringify({ success: false, message: 'Missing projectId' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
+    // Fetch project info
+    const { data: project, error: projErr } = await supabase
+      .from('projects')
+      .select('id, title, description, keycloak_user_id')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (projErr) throw projErr;
+    if (!project) throw new Error('Project not found');
+
+    // Fetch client profile by keycloak_user_id
+    let clientEmail: string | null = null;
+    let clientDisplay: string | null = null;
+    let clientUsername: string | null = null;
+    if (project.keycloak_user_id) {
+      const { data: client, error: clientErr } = await supabase
+        .from('client_profiles')
+        .select('email, first_name, last_name, keycloak_user_id')
+        .eq('keycloak_user_id', project.keycloak_user_id)
+        .maybeSingle();
+      if (clientErr) console.warn('Fetch client profile error', clientErr);
+      if (client) {
+        clientEmail = client.email;
+        clientDisplay = `${client.first_name || ''} ${client.last_name || ''}`.trim();
+        clientUsername = (client.email?.split('@')[0] || `client-${project.id}`).toLowerCase();
+      }
+    }
+
+    // Fetch accepted resources for this project
+    const { data: bookings, error: bookErr } = await supabase
+      .from('project_bookings')
+      .select('candidate_profiles(email, first_name, last_name)')
+      .eq('project_id', projectId)
+      .eq('status', 'accepted');
+    if (bookErr) throw bookErr;
+
+    const members: { username: string; email: string; displayName?: string; role: 'client' | 'ressource' }[] = [];
+    if (clientEmail) {
+      members.push({
+        username: clientUsername!,
+        email: clientEmail,
+        displayName: clientDisplay || clientEmail,
+        role: 'client',
+      });
+    }
+    for (const b of bookings || []) {
+      const c = b.candidate_profiles;
+      if (!c?.email) continue;
+      const username = (c.email.split('@')[0] || crypto.randomUUID()).toLowerCase();
+      const displayName = `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email;
+      members.push({ username, email: c.email, displayName, role: 'ressource' });
+    }
+
+    console.log('[Workspace] Members derived', members);
+
+    // Ensure users exist and in proper groups
+    for (const m of members) {
+      await ensureUser(m);
+    }
+
+    // Create project folder and share
+    const folderName = `Projet - ${project.title}`;
+    await ensureProjectFolder(folderName);
+    await shareFolderWithUsers(folderName, members.map(m => m.username));
+
+    // Create Talk room (best effort)
+    const talk = await createTalkRoom(`Projet - ${project.title}`, members.map(m => m.username)).catch((e) => {
+      console.warn('Talk room creation failed', e);
+      return { url: undefined };
+    });
+
+    // Create calendar and first kickoff event (best effort)
+    const now = new Date();
+    const start = new Date(now.getTime());
+    start.setUTCDate(start.getUTCDate() + 1);
+    start.setUTCHours(10, 0, 0, 0);
+    const end = new Date(start.getTime());
+    end.setUTCHours(11, 0, 0, 0);
+
+    const eventTitle = `Lancement du projet ${project.title}`;
+    const eventDesc = `Réunion de lancement du projet.\nDétails: ${project.description || ''}\nVisio: ${talk.url || 'À définir'}`;
+
+    await createCalendarAndEvent(`Projet - ${project.title}`, eventTitle, eventDesc, start, end).catch((e) => {
+      console.warn('Calendar creation failed', e);
+    });
+
+    const webUrl = `${NEXTCLOUD_BASE_URL}/apps/files/?dir=/${encodeURIComponent(folderName)}`;
+
+    const response = {
+      success: true,
+      projectId,
+      folderPath: `/${folderName}`,
+      webUrl,
+      talkUrl: talk.url,
+    };
+
+    return new Response(JSON.stringify(response), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  } catch (error) {
+    console.error('[nextcloud-integration] Error', error);
+    return new Response(JSON.stringify({ success: false, error: String(error) }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  }
+});

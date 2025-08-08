@@ -40,7 +40,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   const { user } = useKeycloakAuth();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
+  
   const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
   const [isBookingTeam, setIsBookingTeam] = useState(false);
 
@@ -49,7 +49,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   };
 
   useEffect(() => {
-    checkPlankaProject();
     fetchResourceAssignments();
   }, [project.id]);
 
@@ -78,30 +77,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     }
   };
 
-  const checkPlankaProject = async () => {
-    if (isChecked) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('planka_projects')
-        .select('planka_url')
-        .eq('project_id', project.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error checking Planka project:', error);
-        return;
-      }
-
-      if (data) {
-        setPlankaProject({ planka_url: data.planka_url });
-      }
-      
-      setIsChecked(true);
-    } catch (error) {
-      console.error('Error checking Planka project:', error);
-    }
-  };
+  // Nextcloud: workspace existence check handled by backend; no client-side check needed.
 
   const handleStatusToggle = async () => {
     // Check if all resources are booked before allowing play
@@ -122,9 +98,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
         // Create Keycloak project group and add team members
         await createKeycloakProjectGroup();
         
-        // Sync with Planka
-        await syncWithPlanka();
-        
+        // Setup Nextcloud collaborative workspace
+        await setupNextcloudWorkspace();
+
         // Update project status
         await onStatusToggle(project.id, newStatus);
         
@@ -266,63 +242,27 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     }
   };
 
-  const syncWithPlanka = async () => {
+  const setupNextcloudWorkspace = async () => {
     try {
-      // Get the Keycloak access token
-      const token = user?.access_token;
-      console.log('🔐 SYNC PLANKA - Token Debug:');
-      console.log('User object:', user);
-      console.log('Access token length:', token?.length || 'UNDEFINED');
-      console.log('Token preview:', token ? `${token.substring(0, 50)}...` : 'NO TOKEN');
-      
-      if (!token) {
-        console.error('❌ No authentication token available');
-        throw new Error('No authentication token available');
-      }
-
-      console.log('🚀 Calling planka-integration with Keycloak token...');
-      
-      // Create a temporary Supabase client without auth for this request  
-      // We need to bypass Supabase's automatic auth to use our Keycloak token instead
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://egdelmcijszuapcpglsy.supabase.co'}/functions/v1/planka-integration`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxNjIyMDAsImV4cCI6MjA2OTczODIwMH0.JYV-JxosrfE7kMtFw3XLs27PGf3Fn-rDyJLDWeYXF_U',
-        },
-        body: JSON.stringify({
-          action: 'sync-project',
+      const { data, error } = await supabase.functions.invoke('nextcloud-integration', {
+        body: {
+          action: 'setup-workspace',
           projectId: project.id,
-        }),
+        }
       });
 
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
+      if (error) throw error;
 
-      const data = await response.json();
-      console.log('✅ Success response:', data);
-
-      if (data.success) {
-        if (data.exists) {
-          console.log('Projet Planka déjà existant');
-        } else {
-          console.log('Projet créé avec succès dans Planka');
+      if (data?.success) {
+        if (data.webUrl) {
+          setPlankaProject({ planka_url: data.webUrl });
         }
-        
-        setPlankaProject({ planka_url: data.plankaUrl });
-        return { success: true, plankaUrl: data.plankaUrl };
+        return { success: true };
       } else {
-        throw new Error('Échec de la synchronisation');
+        throw new Error(data?.message || 'Échec de la configuration Nextcloud');
       }
     } catch (error) {
-      console.error('Error syncing with Planka:', error);
+      console.error('Error setting up Nextcloud workspace:', error);
       throw error;
     }
   };
