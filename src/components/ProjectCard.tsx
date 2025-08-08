@@ -392,25 +392,10 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
             onClick={() => window.open(plankaProject.planka_url, '_blank')}
           >
             <ExternalLink className="w-4 h-4 mr-2" />
-            Mon espace de travail
+            Accéder à l’espace collaboratif
           </Button>
         )}
 
-        {/* Sync with Planka button - only show for admins when not checked and project is paused */}
-        {!isChecked && project.status === 'pause' && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={syncWithPlanka}
-              disabled={isSyncing}
-              className="flex-1"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              {isSyncing ? 'Synchronisation...' : 'Synchroniser avec Planka'}
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
