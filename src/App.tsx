@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +14,7 @@ import ClientDashboard from "./pages/ClientDashboard";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
 import { KeycloakAuthProvider } from "./contexts/KeycloakAuthContext";
+import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +22,9 @@ const AppContent = () => {
   const location = useLocation();
   const dashboardPaths = ['/candidate-dashboard', '/client-dashboard', '/admin/resources'];
   const showHeader = !dashboardPaths.includes(location.pathname);
+
+  // Activate Supabase header injection globally (no UI output)
+  useSupabaseAuth();
 
   return (
     <>
