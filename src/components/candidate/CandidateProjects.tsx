@@ -230,10 +230,18 @@ const fetchAcceptedProjects = async () => {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    setAcceptedProjects(data || []);
+    
+    // Filter out bookings with null projects or resource assignments
+    const validBookings = (data || []).filter((booking: any) => 
+      booking.projects && 
+      booking.hr_resource_assignments && 
+      booking.hr_resource_assignments.hr_profiles
+    );
+    
+    setAcceptedProjects(validBookings);
 
     // Fetch Nextcloud links for these projects
-    const projectIds = (data || []).map((b: any) => b.projects.id);
+    const projectIds = validBookings.map((b: any) => b.projects.id).filter(Boolean);
     if (projectIds.length > 0) {
       const { data: ncRows, error: ncErr } = await supabase
         .from('nextcloud_projects')
@@ -276,7 +284,15 @@ const fetchAcceptedProjects = async () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCompletedProjects(data || []);
+      
+      // Filter out bookings with null projects or resource assignments
+      const validBookings = (data || []).filter((booking: any) => 
+        booking.projects && 
+        booking.hr_resource_assignments && 
+        booking.hr_resource_assignments.hr_profiles
+      );
+      
+      setCompletedProjects(validBookings);
     } catch (error) {
       console.error('Error fetching completed projects:', error);
     }
@@ -428,28 +444,28 @@ const fetchAcceptedProjects = async () => {
                 <Card key={booking.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{booking.projects.title}</CardTitle>
+                      <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
                       <Badge variant="default">Accepté</Badge>
                     </div>
                   </CardHeader>
 <CardContent className="space-y-4">
   <p className="text-sm text-muted-foreground">
-    {booking.projects.description}
+    {booking.projects?.description || 'Aucune description disponible'}
   </p>
   
   <div className="flex items-center gap-2">
     <span className="text-sm font-medium">Poste:</span>
     <Badge variant="secondary">
-      {booking.hr_resource_assignments.hr_profiles.name}
+      {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
     </Badge>
   </div>
   
   <div className="flex items-center gap-2">
     <span className="text-sm font-medium">Date du projet:</span>
-    <span className="text-sm">{formatDate(booking.projects.project_date)}</span>
+    <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
   </div>
 
-  {nextcloudLinks[booking.projects.id] && (
+  {booking.projects?.id && nextcloudLinks[booking.projects.id] && (
     <div className="pt-2">
       <Button
         variant="outline"
@@ -479,25 +495,25 @@ const fetchAcceptedProjects = async () => {
                 <Card key={booking.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{booking.projects.title}</CardTitle>
+                      <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
                       <Badge variant="secondary">Terminé</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                      {booking.projects.description}
+                      {booking.projects?.description || 'Aucune description disponible'}
                     </p>
                     
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">Poste:</span>
                       <Badge variant="secondary">
-                        {booking.hr_resource_assignments.hr_profiles.name}
+                        {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
                       </Badge>
                     </div>
                     
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">Date du projet:</span>
-                      <span className="text-sm">{formatDate(booking.projects.project_date)}</span>
+                      <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
                     </div>
                   </CardContent>
                 </Card>
