@@ -147,12 +147,13 @@ async function getKeycloakAdminToken(): Promise<string> {
   const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
 
   console.log(`=== Keycloak Admin Token Request ===`);
-  console.log(`Keycloak URL: ${keycloakBaseUrl}`);
-  console.log(`Admin Realm: ${adminRealm}`);
-  console.log(`Client Id: ${clientId}`);
-  console.log(`Has Client Secret: ${!!clientSecret}`);
-  console.log(`Has Username: ${!!adminUsername}`);
-  console.log(`Has Password: ${!!adminPassword}`);
+  console.log(`Environment Variables Check:`);
+  console.log(`- KEYCLOAK_BASE_URL: ${keycloakBaseUrl || 'NOT SET'}`);
+  console.log(`- KEYCLOAK_ADMIN_REALM: ${adminRealm}`);
+  console.log(`- KEYCLOAK_CLIENT_ID: ${clientId}`);
+  console.log(`- KEYCLOAK_CLIENT_SECRET: ${clientSecret ? 'SET (length: ' + clientSecret.length + ')' : 'NOT SET'}`);
+  console.log(`- KEYCLOAK_ADMIN_USERNAME: ${adminUsername || 'NOT SET'}`);
+  console.log(`- KEYCLOAK_ADMIN_PASSWORD: ${adminPassword ? 'SET' : 'NOT SET'}`);
 
   if (!keycloakBaseUrl) {
     throw new Error('Missing KEYCLOAK_BASE_URL environment variable');
