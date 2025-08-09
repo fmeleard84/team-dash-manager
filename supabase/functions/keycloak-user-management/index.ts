@@ -169,15 +169,33 @@ async function getKeycloakAdminToken(): Promise<string> {
     const tokenUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
     console.log(`Attempting admin token on realm='${realm}' -> ${tokenUrl}`);
 
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+    // For master realm with admin-cli, try client credentials first, then password grant
+    let authParams: URLSearchParams;
+    
+    if (realm === 'master' && clientId === 'admin-cli') {
+      // Try direct admin credentials for master realm
+      authParams = new URLSearchParams({
+        grant_type: 'password',
+        client_id: 'admin-cli',
+        username: adminUsername!,
+        password: adminPassword!,
+      });
+    } else {
+      // For application realm, use the configured client
+      authParams = new URLSearchParams({
         grant_type: 'password',
         client_id: clientId,
         username: adminUsername!,
         password: adminPassword!,
-      }),
+      });
+    }
+
+    console.log(`Auth params for ${realm}:`, Object.fromEntries(authParams.entries()));
+
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: authParams,
     });
 
     const errorText = !response.ok ? await response.text() : '';
@@ -188,8 +206,10 @@ async function getKeycloakAdminToken(): Promise<string> {
         const errorData = JSON.parse(errorText);
         console.error(`=== Keycloak Token Error on realm '${realm}' ===`);
         console.error(`Error details:`, errorData);
-        throw new Error(`${response.status} ${response.statusText}: ${errorData.error} - ${errorData.error_description || 'no_description'}`);
-      } catch {
+        console.error(`SUGGESTION: Verify credentials and realm accessibility: ${keycloakBaseUrl}/realms/${realm}/.well-known/openid_configuration`);
+        throw new Error(`${response.status} ${response.statusText}: ${JSON.stringify(errorData)}`);
+      } catch (parseError) {
+        console.error(`Failed to parse error response:`, parseError);
         throw new Error(`${response.status} ${response.statusText}: ${errorText || 'unknown_error'}`);
       }
     }
