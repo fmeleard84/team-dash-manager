@@ -139,7 +139,7 @@ serve(async (req) => {
 async function getKeycloakAdminToken(): Promise<string> {
   const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
   const adminRealm = Deno.env.get('KEYCLOAK_ADMIN_REALM') || 'master';
-  const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'admin-cli';
+  const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'svc-supabase-admin';
   const clientSecret = Deno.env.get('KEYCLOAK_CLIENT_SECRET');
   
   // Fallback to username/password if no client secret provided
@@ -163,8 +163,15 @@ async function getKeycloakAdminToken(): Promise<string> {
 
   let authParams: URLSearchParams;
   
-  // Prefer client_credentials if we have a client secret
-  if (clientSecret) {
+  // For service account client (svc-supabase-admin), use client_credentials
+  if (clientId === 'svc-supabase-admin' && clientSecret) {
+    console.log('Using client_credentials grant type for service account');
+    authParams = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+  } else if (clientSecret) {
     console.log('Using client_credentials grant type with client secret');
     authParams = new URLSearchParams({
       grant_type: 'client_credentials',
@@ -175,7 +182,7 @@ async function getKeycloakAdminToken(): Promise<string> {
     console.log('Using password grant type with admin credentials');
     authParams = new URLSearchParams({
       grant_type: 'password',
-      client_id: clientId,
+      client_id: 'admin-cli',
       username: adminUsername,
       password: adminPassword,
     });
@@ -196,6 +203,9 @@ async function getKeycloakAdminToken(): Promise<string> {
     console.error(`=== Keycloak Token Error ===`);
     console.error(`Status: ${response.status} ${response.statusText}`);
     console.error(`Response body: ${errorText}`);
+    console.error(`Token URL used: ${tokenUrl}`);
+    console.error(`Client ID used: ${clientId}`);
+    console.error(`Grant type: ${authParams.get('grant_type')}`);
     console.error(`SUGGESTION: Check credentials and realm accessibility: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid_configuration`);
     
     // Return the actual Keycloak error instead of 500
