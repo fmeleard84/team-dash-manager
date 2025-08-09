@@ -138,7 +138,7 @@ serve(async (req) => {
 
 async function getKeycloakAdminToken(): Promise<string> {
   const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
-  const adminRealm = Deno.env.get('KEYCLOAK_ADMIN_REALM') || 'master';
+  const adminRealm = Deno.env.get('KEYCLOAK_ADMIN_REALM') || Deno.env.get('KEYCLOAK_REALM') || 'haas';
   const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'svc-supabase-admin';
   const clientSecret = Deno.env.get('KEYCLOAK_CLIENT_SECRET');
   
@@ -560,25 +560,35 @@ interface StoreProfileParams {
   companyName?: string;
 }
 
-async function createGroupIfNotExists(token: string, groupName: string): Promise<{ success: boolean; groupId?: string; error?: string }> {
+async function createGroupIfNotExists(token: string, groupName: string): Promise<{ success: boolean; groupId?: string; error?: string; status?: number }> {
   try {
     const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
     const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
+    const listUrl = `${keycloakBaseUrl}/admin/realms/${realm}/groups`;
     // Check if group exists
-    const groupsResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups`, {
+    const groupsResponse = await fetch(listUrl, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
+    const groupsText = await groupsResponse.text();
+    console.log('LIST groups status', groupsResponse.status, groupsResponse.statusText, groupsText);
+
     if (!groupsResponse.ok) {
-      console.error('Failed to fetch groups');
-      return { success: false, error: 'Failed to fetch groups' };
+      return { success: false, error: `Failed to fetch groups (${groupsResponse.status}): ${groupsText}`, status: groupsResponse.status };
     }
 
-    const groups = await groupsResponse.json();
+    let groups: any[] = [];
+    try {
+      groups = JSON.parse(groupsText);
+    } catch (e) {
+      console.error('Failed to parse groups list JSON:', e);
+      return { success: false, error: 'Failed to parse groups list response', status: 500 };
+    }
+
     const existingGroup = groups.find((group: any) => group.name === groupName);
 
     if (existingGroup) {
@@ -587,22 +597,22 @@ async function createGroupIfNotExists(token: string, groupName: string): Promise
     }
 
     // Create the group
+    const createUrl = `${keycloakBaseUrl}/admin/realms/${realm}/groups`;
     console.log(`Creating group: ${groupName}`);
-    const createGroupResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups`, {
+    const createGroupResponse = await fetch(createUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: groupName,
-      }),
+      body: JSON.stringify({ name: groupName }),
     });
 
+    const createText = await createGroupResponse.text();
+    console.log('CREATE group status', createGroupResponse.status, createGroupResponse.statusText, createText);
+
     if (!createGroupResponse.ok) {
-      const errorText = await createGroupResponse.text();
-      console.error('Failed to create group:', errorText);
-      return { success: false, error: `Failed to create group: ${errorText}` };
+      return { success: false, error: `Failed to create group (${createGroupResponse.status}): ${createText}`, status: createGroupResponse.status };
     }
 
     // Get the created group ID from the location header
@@ -614,7 +624,7 @@ async function createGroupIfNotExists(token: string, groupName: string): Promise
     }
 
     // If no location header, fetch the group again to get its ID
-    const newGroupsResponse = await fetch(`${keycloakBaseUrl}/admin/realms/${realm}/groups`, {
+    const newGroupsResponse = await fetch(listUrl, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -629,10 +639,10 @@ async function createGroupIfNotExists(token: string, groupName: string): Promise
       }
     }
 
-    return { success: false, error: 'Failed to get group ID after creation' };
+    return { success: false, error: 'Failed to get group ID after creation', status: 500 };
   } catch (error) {
     console.error(`Failed to create group ${groupName}: ${error.message}`);
-    return { success: false, error: `Failed to create group: ${error.message}` };
+    return { success: false, error: `Failed to create group: ${error.message}`, status: 500 };
   }
 }
 
@@ -763,7 +773,11 @@ async function handleCreateProjectGroup(body: CreateProjectGroupRequest, supabas
     const groupResult = await createGroupIfNotExists(adminToken, body.groupName);
     
     if (!groupResult.success || !groupResult.groupId) {
-      throw new Error(groupResult.error || 'Failed to create project group');
+      console.error('createGroupIfNotExists failed', groupResult);
+      return new Response(
+        JSON.stringify({ success: false, error: groupResult.error || 'Failed to create project group' }),
+        { status: groupResult.status ?? 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Store the project group mapping in Supabase
@@ -785,7 +799,10 @@ async function handleCreateProjectGroup(body: CreateProjectGroupRequest, supabas
 
       if (insertError) {
         console.error('Failed to store project group mapping:', insertError);
-        throw new Error('Failed to store project group mapping');
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to store project group mapping' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 
@@ -802,9 +819,15 @@ async function handleCreateProjectGroup(body: CreateProjectGroupRequest, supabas
 
   } catch (error) {
     console.error('Error creating project group:', error);
+    // Try to extract a status code from known Keycloak error pattern
+    let status = 500;
+    const match = /Keycloak auth failed \((\d{3})\)/.exec(error.message || '');
+    if (match) {
+      status = parseInt(match[1], 10);
+    }
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error.message }),
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 }
