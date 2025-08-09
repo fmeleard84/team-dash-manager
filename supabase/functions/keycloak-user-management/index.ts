@@ -140,13 +140,19 @@ async function getKeycloakAdminToken(): Promise<string> {
   const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
   const adminUsername = Deno.env.get('KEYCLOAK_ADMIN_USERNAME');
   const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
-  
-  // IMPORTANT: Admin authentication MUST use master realm
-  const adminRealm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
+
+  // Use a dedicated admin realm (default to 'master'), with fallback to the application realm
+  const adminRealm = Deno.env.get('KEYCLOAK_ADMIN_REALM') || 'master';
+  const fallbackRealm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
+
+  // Support custom client id, default to admin-cli
+  const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'admin-cli';
 
   console.log(`=== Keycloak Admin Token Request ===`);
   console.log(`Keycloak URL: ${keycloakBaseUrl}`);
-  console.log(`Admin Realm: ${adminRealm}`);
+  console.log(`Admin Realm (primary): ${adminRealm}`);
+  console.log(`Fallback Realm: ${fallbackRealm}`);
+  console.log(`Client Id: ${clientId}`);
   console.log(`Username: ${adminUsername}`);
   console.log(`Password length: ${adminPassword?.length || 0} chars`);
 
@@ -159,75 +165,60 @@ async function getKeycloakAdminToken(): Promise<string> {
     throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
   }
 
-  const tokenUrl = `${keycloakBaseUrl}/realms/${adminRealm}/protocol/openid-connect/token`;
-  console.log(`Token URL: ${tokenUrl}`);
-  
-  try {
+  const requestToken = async (realm: string) => {
+    const tokenUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
+    console.log(`Attempting admin token on realm='${realm}' -> ${tokenUrl}`);
+
     const response = await fetch(tokenUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'password',
-        client_id: 'admin-cli',
-        username: adminUsername,
-        password: adminPassword,
+        client_id: clientId,
+        username: adminUsername!,
+        password: adminPassword!,
       }),
     });
 
-    console.log(`Token response status: ${response.status} ${response.statusText}`);
+    const errorText = !response.ok ? await response.text() : '';
+    console.log(`Token response status (${realm}): ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`=== Keycloak Token Error ===`);
-      console.error(`Status: ${response.status} ${response.statusText}`);
-      console.error(`Response body: ${errorText}`);
-      
-      // Try to parse error for more details
       try {
         const errorData = JSON.parse(errorText);
+        console.error(`=== Keycloak Token Error on realm '${realm}' ===`);
         console.error(`Error details:`, errorData);
-        
-        if (errorData.error === 'invalid_grant') {
-          throw new Error(`KEYCLOAK AUTH FAILED: Invalid credentials for username '${adminUsername}' in realm '${adminRealm}'. Please verify your KEYCLOAK_ADMIN_USERNAME and KEYCLOAK_ADMIN_PASSWORD secrets.`);
-        }
-        if (errorData.error === 'unauthorized_client') {
-          throw new Error(`KEYCLOAK CLIENT ERROR: The admin-cli client is not configured properly in realm '${adminRealm}'.`);
-        }
-        if (errorData.error === 'invalid_client') {
-          throw new Error(`KEYCLOAK CLIENT ERROR: Invalid client configuration for admin-cli in realm '${adminRealm}'.`);
-        }
-      } catch (parseError) {
-        // Error response is not JSON, use original error
+        throw new Error(`${response.status} ${response.statusText}: ${errorData.error} - ${errorData.error_description || 'no_description'}`);
+      } catch {
+        throw new Error(`${response.status} ${response.statusText}: ${errorText || 'unknown_error'}`);
       }
-      
-      // Provide actionable error message
-      if (response.status === 401) {
-        throw new Error(`KEYCLOAK UNAUTHORIZED: Please check your admin credentials and ensure the user '${adminUsername}' has admin permissions in realm '${adminRealm}'.`);
-      }
-      if (response.status === 404) {
-        throw new Error(`KEYCLOAK REALM NOT FOUND: Realm '${adminRealm}' does not exist. Please verify KEYCLOAK_BASE_URL is correct.`);
-      }
-      
-      throw new Error(`KEYCLOAK ERROR: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const tokenData = await response.json();
-    console.log(`Successfully obtained Keycloak admin token from realm '${adminRealm}'`);
-    return tokenData.access_token;
-    
-  } catch (error) {
-    console.error(`=== Keycloak Connection Error ===`);
-    console.error(`Error type: ${error.name}`);
-    console.error(`Error message: ${error.message}`);
-    
-    // Add connectivity test suggestion
-    if (error.message.includes('fetch')) {
-      console.error(`SUGGESTION: Test Keycloak connectivity by visiting: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid_configuration`);
+    console.log(`Successfully obtained Keycloak admin token from realm '${realm}'`);
+    return tokenData.access_token as string;
+  };
+
+  try {
+    // First try the dedicated admin realm (default: master)
+    return await requestToken(adminRealm);
+  } catch (primaryErr) {
+    console.warn(`Primary admin realm '${adminRealm}' failed: ${primaryErr instanceof Error ? primaryErr.message : primaryErr}`);
+    // Fallback to application realm
+    if (fallbackRealm && fallbackRealm !== adminRealm) {
+      try {
+        console.log(`Falling back to application realm '${fallbackRealm}' for admin token...`);
+        return await requestToken(fallbackRealm);
+      } catch (fallbackErr) {
+        console.error(`Fallback realm '${fallbackRealm}' failed: ${fallbackErr instanceof Error ? fallbackErr.message : fallbackErr}`);
+        // Add connectivity suggestion
+        console.error(`SUGGESTION: Verify credentials and realm accessibility: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid_configuration`);
+        throw new Error(`KEYCLOAK AUTH FAILED on both realms. Primary='${adminRealm}' error='${(primaryErr as Error).message}'. Fallback='${fallbackRealm}' error='${(fallbackErr as Error).message}'.`);
+      }
     }
-    
-    throw error;
+    // No fallback available or same realm
+    console.error(`SUGGESTION: Verify credentials and realm accessibility: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid_configuration`);
+    throw primaryErr;
   }
 }
 
