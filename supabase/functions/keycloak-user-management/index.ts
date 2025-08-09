@@ -142,11 +142,11 @@ async function getKeycloakAdminToken(): Promise<string> {
   const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
   
   // IMPORTANT: Admin authentication MUST use master realm
-  const adminRealm = 'master';
+  const adminRealm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
   console.log(`=== Keycloak Admin Token Request ===`);
   console.log(`Keycloak URL: ${keycloakBaseUrl}`);
-  console.log(`Admin Realm: ${adminRealm} (fixed for admin API)`);
+  console.log(`Admin Realm: ${adminRealm}`);
   console.log(`Username: ${adminUsername}`);
   console.log(`Password length: ${adminPassword?.length || 0} chars`);
 
