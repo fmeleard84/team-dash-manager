@@ -181,7 +181,7 @@ async function shareFolderWithGroup(folderName: string, groupName: string, permi
 }
 
 async function createTalkRoom(title: string, invites: string[], trace: boolean) {
-  const params = new URLSearchParams({ roomType: "2", roomName: title });
+  const params = new URLSearchParams({ roomType: "2", name: title });
   const r = await ocsRequest("POST", "/ocs/v2.php/apps/spreed/api/v4/room", params);
   if (trace) console.log("[NC] talk room", title, r.status, r.json?.ocs?.meta || r.text);
   const token = r.json?.ocs?.data?.token || null;
@@ -354,13 +354,22 @@ const talk = await createTalkRoom(title, allUsers, trace).catch(() => ({ token: 
 // Invite project groups and post welcome message
 if (talk?.token) {
   try {
-    const inviteClient = new URLSearchParams({ shareType: '1', shareWith: clientGroup });
-    const inviteRes = new URLSearchParams({ shareType: '1', shareWith: resGroup });
+    const inviteClient = new URLSearchParams({ newParticipant: clientGroup, source: 'groups' });
+    const inviteRes = new URLSearchParams({ newParticipant: resGroup, source: 'groups' });
     const i1 = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, inviteClient);
     const i2 = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, inviteRes);
-    if (trace) console.log('[NC] talk group invites', i1.status, i2.status);
+    if (trace) console.log('[NC] talk group invites', i1.status, i2.status, i1.json?.ocs?.meta, i2.json?.ocs?.meta);
+
+    if (!i1.ok || !i2.ok) {
+      const userList = [...(members.clientUsernames || []), ...(members.resourceUsernames || [])];
+      for (const u of userList) {
+        const body = new URLSearchParams({ newParticipant: u, source: 'users' });
+        const ir = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, body);
+        if (trace) console.log('[NC] talk user invite', u, ir.status, ir.json?.ocs?.meta);
+      }
+    }
   } catch (e) {
-    if (trace) console.warn('[NC] talk group invite failed', e);
+    if (trace) console.warn('[NC] talk invites failed', e);
   }
   try {
     await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v1/chat/${encodeURIComponent(talk.token)}`, new URLSearchParams({ message: 'Bienvenue à la Team !!' }));
