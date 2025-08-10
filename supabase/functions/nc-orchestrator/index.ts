@@ -180,6 +180,19 @@ async function shareFolderWithGroup(folderName: string, groupName: string, permi
   return true;
 }
 
+// Attempt to share a calendar via OCS DAV shares (best-effort)
+async function shareCalendarWithGroup(calDavPath: string, groupName: string, permissions: number, trace: boolean) {
+  const params = new URLSearchParams({
+    path: `/${calDavPath}`,
+    shareType: "1", // group
+    shareWith: groupName,
+    permissions: String(permissions),
+  });
+  const r = await ocsRequest("POST", "/ocs/v2.php/apps/dav/api/v1/shares", params);
+  if (trace) console.log("[NC] share calendar", calDavPath, groupName, permissions, r.status, r.json?.ocs?.meta || r.text);
+  return r.ok;
+}
+
 async function createTalkRoom(title: string, invites: string[], trace: boolean) {
   const params = new URLSearchParams({ roomType: "2", name: title });
   const r = await ocsRequest("POST", "/ocs/v2.php/apps/spreed/api/v4/room", params);
@@ -348,7 +361,7 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
   }
 
 // Talk (best-effort) with group invites
-const allUsers = [...members.client, ...members.resources];
+const allUsers = [...(members.client || []), ...(members.resources || [])].filter(Boolean);
 const talk = await createTalkRoom(title, allUsers, trace).catch(() => ({ token: null, url: null }));
 
 // Invite project groups and post welcome message
@@ -361,7 +374,7 @@ if (talk?.token) {
     if (trace) console.log('[NC] talk group invites', i1.status, i2.status, i1.json?.ocs?.meta, i2.json?.ocs?.meta);
 
     if (!i1.ok || !i2.ok) {
-      const userList = [...(members.clientUsernames || []), ...(members.resourceUsernames || [])];
+      const userList = [...(members.clientUsernames || []), ...(members.resourceUsernames || [])].filter(Boolean);
       for (const u of userList) {
         const body = new URLSearchParams({ newParticipant: u, source: 'users' });
         const ir = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, body);
@@ -396,41 +409,78 @@ try {
 // Deck board with lists per category and cards per resource
 let deckUrl: string | null = null;
 try {
-  const bRes = await deckRequest('POST', '/boards', { title });
+  const bRes = await deckRequest('POST', '/boards', { title, color: '9e86ed' });
   const boardId = bRes.json?.id;
   if (trace) console.log('[NC] deck board', bRes.status, bRes.json || bRes.text);
   if (boardId) {
     deckUrl = `${NEXTCLOUD_BASE_URL}/apps/deck/#/board/${boardId}`;
     const stacks: Record<string, number> = {};
+
+    // 'Objectif' list for the client comes first
+    const objectifStack = await deckRequest('POST', `/boards/${boardId}/stacks`, { title: 'Objectif', order: 0 });
+    const objectifStackId = objectifStack.json?.id;
+    if (objectifStackId) {
+      await deckRequest('POST', `/boards/${boardId}/stacks/${objectifStackId}/cards`, {
+        title: 'Brief initial',
+        type: 'plain',
+        description: "Objectifs du projet à valider avec l’équipe"
+      });
+    }
+
+    // Category stacks with ascending order
+    let order = 1;
     for (const cat of categories) {
-      const sRes = await deckRequest('POST', `/boards/${boardId}/stacks`, { title: cat });
+      const sRes = await deckRequest('POST', `/boards/${boardId}/stacks`, { title: cat, order });
       const stackId = sRes.json?.id;
       if (stackId) stacks[cat] = stackId;
+      order += 1;
     }
-    // Client stack with objectif card
-    const clientStack = await deckRequest('POST', `/boards/${boardId}/stacks`, { title: 'Client' });
-    const clientStackId = clientStack.json?.id;
-    if (clientStackId) {
-      await deckRequest('POST', `/boards/${boardId}/stacks/${clientStackId}/cards`, { title: 'Objectif', type: 0 });
-    }
-    // Cards for resources
+
+    // Cards for resources per category
     for (const cat of categories) {
       const stackId = stacks[cat];
       if (!stackId) continue;
       const names = categoryToProfiles[cat] || [];
       for (const n of names) {
-        await deckRequest('POST', `/boards/${boardId}/stacks/${stackId}/cards`, { title: n, type: 0 });
+        await deckRequest('POST', `/boards/${boardId}/stacks/${stackId}/cards`, { title: n, type: 'plain' });
       }
     }
-    // Deck ACLs for project groups
-    await deckRequest('POST', `/boards/${boardId}/acl`, {
-      participant: { type: 'group', id: clientGroup },
-      permission: { read: true, edit: false, share: false, manage: false }
+
+    // Deck ACLs via OCS API (matching requested format)
+    const aclUrl = `${NEXTCLOUD_BASE_URL}/ocs/v2.php/apps/deck/api/v1.0/boards/${boardId}/acl?format=json`;
+    const commonHeaders = {
+      Authorization: basicAuthHeader(),
+      'OCS-APIREQUEST': 'true',
+      'Content-Type': 'application/json'
+    } as Record<string, string>;
+
+    // Client group: read-only
+    const aclClient = await fetch(aclUrl, {
+      method: 'POST',
+      headers: commonHeaders,
+      body: JSON.stringify({
+        participant: clientGroup,
+        type: 1,
+        permissionEdit: false,
+        permissionManage: false,
+        permissionShare: false
+      })
     });
-    await deckRequest('POST', `/boards/${boardId}/acl`, {
-      participant: { type: 'group', id: resGroup },
-      permission: { read: true, edit: true, share: false, manage: false }
+    if (trace) console.log('[NC] deck ACL client', aclClient.status, await aclClient.text());
+
+    // Resources group: can edit
+    const aclRes = await fetch(aclUrl, {
+      method: 'POST',
+      headers: commonHeaders,
+      body: JSON.stringify({
+        participant: resGroup,
+        type: 1,
+        permissionEdit: true,
+        permissionManage: false,
+        permissionShare: false
+      })
     });
+    if (trace) console.log('[NC] deck ACL resources', aclRes.status, await aclRes.text());
   }
 } catch (e) {
   if (trace) console.warn('[NC] deck setup failed', e);
