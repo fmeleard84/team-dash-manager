@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { KickoffDialog } from "@/components/KickoffDialog";
+import { buildFunctionHeaders } from "@/lib/functionAuth";
 interface Project {
   id: string;
   title: string;
@@ -144,9 +145,17 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
       // Create two groups: client and ressource
       const [{ data: clientGroup, error: clientGroupError }, { data: resGroup, error: resGroupError }] = await Promise.all([
         supabase.functions.invoke('keycloak-user-management', {
+          headers: buildFunctionHeaders({
+            sub: (user?.profile as any)?.sub,
+            email: (user?.profile as any)?.email,
+          }),
           body: { action: 'create-project-group', projectId: project.id, groupName: `${baseGroup}-client` }
         }),
         supabase.functions.invoke('keycloak-user-management', {
+          headers: buildFunctionHeaders({
+            sub: (user?.profile as any)?.sub,
+            email: (user?.profile as any)?.email,
+          }),
           body: { action: 'create-project-group', projectId: project.id, groupName: `${baseGroup}-ressource` }
         })
       ]);
@@ -190,6 +199,10 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
       if (projectData?.keycloak_user_id && clientGroup?.groupId) {
         try {
           await supabase.functions.invoke('keycloak-user-management', {
+            headers: buildFunctionHeaders({
+              sub: (user?.profile as any)?.sub,
+              email: (user?.profile as any)?.email,
+            }),
             body: { action: 'add-user-to-group', userId: projectData.keycloak_user_id, groupId: clientGroup.groupId }
           });
           members.push('Client (propriétaire)');
@@ -205,6 +218,10 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
           if (candidate?.keycloak_user_id) {
             try {
               await supabase.functions.invoke('keycloak-user-management', {
+                headers: buildFunctionHeaders({
+                  sub: (user?.profile as any)?.sub,
+                  email: (user?.profile as any)?.email,
+                }),
                 body: { action: 'add-user-to-group', userId: candidate.keycloak_user_id, groupId: resGroup.groupId }
               });
               members.push(`${candidate.first_name} ${candidate.last_name}`);

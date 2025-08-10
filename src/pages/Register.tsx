@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
+import { buildFunctionHeaders } from '@/lib/functionAuth';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -78,6 +79,7 @@ const Register = () => {
       console.log('Testing edge function connectivity...');
       try {
         const healthCheck = await supabase.functions.invoke('keycloak-user-management', {
+          headers: buildFunctionHeaders(),
           body: { action: 'health-check' }
         });
         console.log('Health check result:', healthCheck);
@@ -106,6 +108,7 @@ const Register = () => {
       });
       
       const { data, error } = await supabase.functions.invoke('keycloak-user-management', {
+        headers: buildFunctionHeaders(),
         body: {
           action: 'create-user',
           email: formData.email,
