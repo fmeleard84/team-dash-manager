@@ -47,9 +47,18 @@ serve(async (req) => {
 
     console.log('Parsing request body...');
     const body = await req.json();
-    const { action } = body;
+    const actionRaw = body?.action as string | undefined;
 
-    console.log(`Keycloak user management request: ${action}`);
+    // Normalize/alias some actions for backward-compatibility
+    const aliasMap: Record<string, string> = {
+      'ping': 'health-check',
+      'create_project_group': 'create-project-group',
+      'createProjectGroup': 'create-project-group',
+      'create-project-groups': 'create-project-group', // plural variant (see guidance below)
+    };
+    const action = (actionRaw && aliasMap[actionRaw]) ? aliasMap[actionRaw] : actionRaw;
+
+    console.log(`Keycloak user management request: ${action} (raw: ${actionRaw})`);
     console.log(`Request body:`, JSON.stringify(body, null, 2));
 
     // Verify Keycloak environment variables
@@ -99,7 +108,7 @@ serve(async (req) => {
     }
 
     switch (action) {
-      case 'create-user':
+      case 'create-user': {
         const createResult = await handleCreateUser(body, supabase);
         return new Response(
           JSON.stringify(createResult),
@@ -108,15 +117,42 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         );
+      }
       case 'add-user-to-group':
         return await handleAddUserToGroup(body, supabase);
       case 'create-project-group':
         return await handleCreateProjectGroup(body, supabase);
-      default:
+      // Deprecated/unsupported bulk alias with different payload shape
+      case 'create_project_groups':
+      case 'create-project-groups': {
+        const supported = ['health-check','test-connection','create-user','add-user-to-group','create-project-group'];
+        const examples = {
+          'health-check': { action: 'health-check' },
+          'test-connection': { action: 'test-connection' },
+          'create-project-group': { action: 'create-project-group', projectId: 'uuid-project', groupName: 'project-slug-client' },
+        };
         return new Response(
-          JSON.stringify({ error: 'Invalid action' }),
+          JSON.stringify({
+            error: 'Invalid payload for bulk group creation. Use "create-project-group" and call it per group (client, ressource).',
+            supported,
+            examples,
+            note: 'Expected body for create-project-group: { projectId, groupName }',
+          }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+      default: {
+        const supported = ['health-check','test-connection','create-user','add-user-to-group','create-project-group'];
+        const examples = {
+          'health-check': { action: 'health-check' },
+          'test-connection': { action: 'test-connection' },
+          'create-project-group': { action: 'create-project-group', projectId: 'uuid-project', groupName: 'project-slug-client' },
+        };
+        return new Response(
+          JSON.stringify({ error: 'Invalid action', supported, examples }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
   } catch (error) {
     console.error('=== FATAL ERROR in Keycloak function ===');
