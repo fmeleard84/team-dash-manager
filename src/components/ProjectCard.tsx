@@ -140,29 +140,34 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   const createKeycloakProjectGroup = async () => {
     try {
       console.log('Creating Keycloak project groups...');
-      const baseGroup = `Projet-${project.title.replace(/\s+/g, '-')}`;
+      const projectSlug = project.title
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      const clientGroupName = `${projectSlug}-client`;
+      const resGroupName = `${projectSlug}-ressource`;
 
-      // Create two groups: client and ressource
-      const [{ data: clientGroup, error: clientGroupError }, { data: resGroup, error: resGroupError }] = await Promise.all([
-        supabase.functions.invoke('keycloak-user-management', {
-          headers: buildFunctionHeaders({
-            sub: (user?.profile as any)?.sub,
-            email: (user?.profile as any)?.email,
-          }),
-          body: { action: 'create-project-group', projectId: project.id, groupName: `${baseGroup}-client` }
+      // Create two groups sequentially to match Edge Function expectations
+      const { error: clientGroupError } = await supabase.functions.invoke('keycloak-user-management', {
+        headers: buildFunctionHeaders({
+          sub: (user?.profile as any)?.sub,
+          email: (user?.profile as any)?.email,
         }),
-        supabase.functions.invoke('keycloak-user-management', {
-          headers: buildFunctionHeaders({
-            sub: (user?.profile as any)?.sub,
-            email: (user?.profile as any)?.email,
-          }),
-          body: { action: 'create-project-group', projectId: project.id, groupName: `${baseGroup}-ressource` }
-        })
-      ]);
+        body: { action: 'create-project-group', projectId: project.id, groupName: clientGroupName }
+      });
+      if (clientGroupError) throw clientGroupError;
 
-      if (clientGroupError || resGroupError) {
-        throw clientGroupError || resGroupError;
-      }
+      const { error: resGroupError } = await supabase.functions.invoke('keycloak-user-management', {
+        headers: buildFunctionHeaders({
+          sub: (user?.profile as any)?.sub,
+          email: (user?.profile as any)?.email,
+        }),
+        body: { action: 'create-project-group', projectId: project.id, groupName: resGroupName }
+      });
+      if (resGroupError) throw resGroupError;
+
 
       // Get all booked resources for this project
       const { data: bookedResources, error: resourceError } = await supabase
@@ -195,15 +200,15 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
 
       const members: string[] = [];
 
-      // Add client to client group
-      if (projectData?.keycloak_user_id && clientGroup?.groupId) {
+      // Add client to client group via email
+      if ((user?.profile as any)?.email) {
         try {
           await supabase.functions.invoke('keycloak-user-management', {
             headers: buildFunctionHeaders({
               sub: (user?.profile as any)?.sub,
               email: (user?.profile as any)?.email,
             }),
-            body: { action: 'add-user-to-group', userId: projectData.keycloak_user_id, groupId: clientGroup.groupId }
+            body: { action: 'add-user-to-group', groupName: clientGroupName, userEmail: (user?.profile as any)?.email }
           });
           members.push('Client (propriétaire)');
         } catch (error) {
@@ -211,18 +216,18 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
         }
       }
 
-      // Add each booked resource to resource group
-      if (bookedResources && resGroup?.groupId) {
+      // Add each booked resource to resource group via email
+      if (bookedResources) {
         for (const booking of bookedResources) {
           const candidate = booking.candidate_profiles;
-          if (candidate?.keycloak_user_id) {
+          if (candidate?.email) {
             try {
               await supabase.functions.invoke('keycloak-user-management', {
                 headers: buildFunctionHeaders({
                   sub: (user?.profile as any)?.sub,
                   email: (user?.profile as any)?.email,
                 }),
-                body: { action: 'add-user-to-group', userId: candidate.keycloak_user_id, groupId: resGroup.groupId }
+                body: { action: 'add-user-to-group', groupName: resGroupName, userEmail: candidate.email }
               });
               members.push(`${candidate.first_name} ${candidate.last_name}`);
             } catch (error) {

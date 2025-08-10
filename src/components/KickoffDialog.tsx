@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,14 +36,14 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent aria-describedby="kickoff-desc">
         <DialogHeader>
           <DialogTitle>Planifier la réunion de lancement</DialogTitle>
+          <DialogDescription id="kickoff-desc">
+            Deux groupes seront créés : {'<slug>'}-client et {'<slug>'}-ressource. Indiquez la date et l’heure de la première réunion du « {projectTitle} ».
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Indiquez la date et l’heure de la première réunion du « {projectTitle} ».
-          </p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="kickoff-date">Jour</Label>
