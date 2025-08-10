@@ -263,7 +263,7 @@ async function getKeycloakAdminToken(): Promise<string> {
     console.error(`Token URL used: ${tokenUrl}`);
     console.error(`Client ID used: ${clientId}`);
     console.error(`Grant type: ${authParams.get('grant_type')}`);
-    console.error(`SUGGESTION: Check credentials and realm accessibility: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid_configuration`);
+    console.error(`SUGGESTION: Check credentials and realm accessibility: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid-configuration`);
     
     // Return the actual Keycloak error instead of 500
     throw new Error(`Keycloak auth failed (${response.status}): ${errorText}`);
@@ -285,33 +285,57 @@ async function testKeycloakConnection(): Promise<{ success: boolean; message: st
       return { success: false, message: 'KEYCLOAK_BASE_URL not configured' };
     }
     
-    // Test realm accessibility
-    const realmUrl = `${keycloakBaseUrl}/realms/${realm}/.well-known/openid_configuration`;
-    console.log(`Testing realm accessibility: ${realmUrl}`);
-    
-    const response = await fetch(realmUrl);
-    if (!response.ok) {
-      return { 
-        success: false, 
-        message: `Realm '${realm}' not accessible: ${response.status} ${response.statusText}`,
-        details: { url: realmUrl, status: response.status }
-      };
+    // Test realm accessibility with proper OIDC path + fallback
+    const base = keycloakBaseUrl;
+    const wellKnownHyphen = `${base}/realms/${realm}/.well-known/openid-configuration`;
+    const wellKnownUnderscore = `${base}/realms/${realm}/.well-known/openid_configuration`;
+    console.log(`Testing realm accessibility (hyphen first): ${wellKnownHyphen}`);
+
+    let wkRes = await fetch(wellKnownHyphen);
+    if (wkRes.status === 404) {
+      console.log('[Keycloak] .well-known 404 on hyphen, trying underscore…');
+      wkRes = await fetch(wellKnownUnderscore);
     }
-    
-    const realmInfo = await response.json();
-    console.log(`Realm '${realm}' is accessible`);
-    
-    // Test admin token
-    try {
-      await getKeycloakAdminToken();
-      return { success: true, message: 'Keycloak connection and authentication successful' };
-    } catch (authError) {
-      return { 
-        success: false, 
-        message: `Authentication failed: ${authError.message}`,
-        details: { realmAccessible: true, authError: authError.message }
-      };
+
+    if (wkRes.ok) {
+      const realmInfo = await wkRes.json();
+      console.log(`Realm '${realm}' is accessible via .well-known`);
+      // Test admin token as final check
+      try {
+        await getKeycloakAdminToken();
+        return { success: true, message: 'Keycloak connection and authentication successful' };
+      } catch (authError) {
+        return {
+          success: false,
+          message: `Authentication failed: ${authError.message}`,
+          details: { realmAccessible: true, authError: authError.message }
+        };
+      }
     }
+
+    // Fallback: even if well-known fails (proxy issue), try token endpoint directly
+    console.log('[Keycloak] .well-known failed, falling back to token endpoint check');
+    const adminRealm = Deno.env.get('KEYCLOAK_ADMIN_REALM') || Deno.env.get('KEYCLOAK_REALM') || 'haas';
+    const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'svc-supabase-admin';
+    const clientSecret = Deno.env.get('KEYCLOAK_CLIENT_SECRET');
+    const tokenUrl = `${base}/realms/${adminRealm}/protocol/openid-connect/token`;
+
+    const tokenRes = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret ?? '' })
+    });
+
+    if (tokenRes.ok) {
+      console.log('[Keycloak] Token endpoint reachable, likely proxy blocks .well-known');
+      return { success: true, message: 'Keycloak reachable via token endpoint (well-known blocked by proxy?)' };
+    }
+
+    return {
+      success: false,
+      message: `Realm '${realm}' not accessible and token check failed: ${tokenRes.status} ${tokenRes.statusText}`,
+      details: { hyphen: wellKnownHyphen, underscore: wellKnownUnderscore, tokenUrl, status: tokenRes.status }
+    };
     
   } catch (error) {
     return { 
