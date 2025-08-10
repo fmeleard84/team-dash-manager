@@ -125,10 +125,26 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   const startProject = async (kickoffISO: string) => {
     try {
       setIsSyncing(true);
-      await createKeycloakProjectGroup();
-      await setupNextcloudWorkspace(kickoffISO);
+
+      // Single orchestration call
+      const { data, error } = await supabase.functions.invoke('nc-orchestrator', {
+        body: {
+          action: 'project-start',
+          projectId: project.id,
+          projectTitle: project.title,
+          kickoffAt: kickoffISO,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.code || 'nc-orchestrator failed');
+
+      if (data?.nextcloud?.filesUrl) {
+        setPlankaProject({ planka_url: data.nextcloud.filesUrl });
+      }
+
       await onStatusToggle(project.id, 'play');
-      toast.success('Projet démarré avec succès ! Équipe créée et espace de travail prêt.');
+      toast.success('Espace Nextcloud prêt. Projet démarré.');
     } catch (error) {
       console.error('Error starting project:', error);
       toast.error('Erreur lors du démarrage du projet');

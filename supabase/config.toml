@@ -98,3 +98,6 @@ verify_jwt = false
 [functions.nextcloud-integration]
 verify_jwt = false
 
+[functions.nc-orchestrator]
+verify_jwt = false
+
