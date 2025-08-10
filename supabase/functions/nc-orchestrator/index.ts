@@ -225,8 +225,8 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
 
   // Folder + shares
   const { folderName } = await ensureProjectFolder(title, trace);
-  await shareFolderWithGroup(folderName, clientGroup, 31, trace); // full
-  await shareFolderWithGroup(folderName, resGroup, 5, trace); // read + create
+  await shareFolderWithGroup(folderName, clientGroup, 1, trace); // read-only
+  await shareFolderWithGroup(folderName, resGroup, 31, trace); // full: read+write+create+delete+share
 
   // Talk (best-effort)
   const talk = await createTalkRoom(`Projet - ${title}`, trace).catch(() => ({ token: null, url: null }));
