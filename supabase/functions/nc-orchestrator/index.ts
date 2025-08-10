@@ -19,6 +19,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const NEXTCLOUD_BASE_URL = Deno.env.get("NEXTCLOUD_BASE_URL")!;
 const NEXTCLOUD_ADMIN_USERNAME = Deno.env.get("NEXTCLOUD_ADMIN_USERNAME")!;
 const NEXTCLOUD_ADMIN_PASSWORD = Deno.env.get("NEXTCLOUD_ADMIN_PASSWORD")!;
+const NEXTCLOUD_SSO_PREFIX = Deno.env.get("NEXTCLOUD_SSO_PREFIX") || "keycloak-";
 
 // Mailjet (optional)
 const MJ_API_KEY = Deno.env.get("MJ_API_KEY");
@@ -211,43 +212,51 @@ async function createCalendarAndEvent(title: string, kickoffAt?: string, trace?:
 }
 
 async function getProjectMembers(projectId: string, provided?: { client?: string[]; resources?: string[] }, trace?: boolean) {
-  const members = { client: [] as string[], resources: [] as string[] };
+  const members = { client: [] as string[], resources: [] as string[], clientUsernames: [] as string[], resourceUsernames: [] as string[] };
 
   if (provided?.client?.length) members.client = provided.client;
   if (provided?.resources?.length) members.resources = provided.resources;
 
-  if (!members.client.length || !members.resources.length) {
-    const { data: project } = await supabase
-      .from("projects")
-      .select("id, keycloak_user_id, title")
-      .eq("id", projectId)
-      .maybeSingle();
+  // Fetch client and resources with Keycloak IDs to build SSO usernames
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id, keycloak_user_id, title')
+    .eq('id', projectId)
+    .maybeSingle();
 
-    if (!members.client.length && project?.keycloak_user_id) {
-      const { data: clientProfiles } = await supabase
-        .from("client_profiles")
-        .select("email")
-        .eq("keycloak_user_id", project.keycloak_user_id);
-      if (clientProfiles && clientProfiles.length) members.client = [clientProfiles[0].email];
+  if ((!members.client.length || !members.clientUsernames.length) && project?.keycloak_user_id) {
+    const { data: clientProfiles } = await supabase
+      .from('client_profiles')
+      .select('email, keycloak_user_id')
+      .eq('keycloak_user_id', project.keycloak_user_id);
+    if (clientProfiles && clientProfiles.length) {
+      const cp = clientProfiles[0];
+      if (cp.email) members.client = [cp.email];
+      const uname = cp.keycloak_user_id ? `${NEXTCLOUD_SSO_PREFIX}${cp.keycloak_user_id}` : (cp.email?.split('@')[0] || '');
+      if (uname) members.clientUsernames = [uname];
     }
+  }
 
-    if (!members.resources.length) {
-      const { data: assignments } = await supabase
-        .from("candidate_project_assignments")
-        .select("candidate_id")
-        .eq("project_id", projectId);
-      const ids = (assignments || []).map(a => a.candidate_id).filter(Boolean);
-      if (ids.length) {
-        const { data: candidates } = await supabase
-          .from("candidate_profiles")
-          .select("email")
-          .in("id", ids);
-        members.resources = (candidates || []).map(c => c.email).filter(Boolean);
+  if (!members.resources.length || !members.resourceUsernames.length) {
+    const { data: assignments } = await supabase
+      .from('candidate_project_assignments')
+      .select('candidate_id')
+      .eq('project_id', projectId);
+    const ids = (assignments || []).map(a => a.candidate_id).filter(Boolean);
+    if (ids.length) {
+      const { data: candidates } = await supabase
+        .from('candidate_profiles')
+        .select('email, keycloak_user_id')
+        .in('id', ids);
+      for (const c of candidates || []) {
+        if (c.email) members.resources.push(c.email);
+        const uname = (c as any).keycloak_user_id ? `${NEXTCLOUD_SSO_PREFIX}${(c as any).keycloak_user_id}` : (c.email?.split('@')[0] || '');
+        if (uname) members.resourceUsernames.push(uname);
       }
     }
   }
 
-  if (trace) console.log("[Workspace] Members", members);
+  if (trace) console.log('[Workspace] Members', members);
   return members;
 }
 
@@ -265,15 +274,18 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
   await ensureGroup(clientGroup, trace);
   await ensureGroup(resGroup, trace);
 
-  // Ensure users and group membership
-  for (const email of members.client) {
-    await ensureUser(email, trace);
-    await addUserToGroup(email, clientGroup, trace);
+  // Add SSO usernames to project groups (best-effort)
+  for (const u of (members.clientUsernames || [])) {
+    const params = new URLSearchParams({ groupid: clientGroup });
+    const r = await ocsRequest('POST', `/ocs/v1.php/cloud/users/${encodeURIComponent(u)}/groups`, params);
+    if (trace) console.log('[NC] add SSO user to client group', u, r.status, r.json?.ocs?.meta || r.text);
   }
-  for (const email of members.resources) {
-    await ensureUser(email, trace);
-    await addUserToGroup(email, resGroup, trace);
+  for (const u of (members.resourceUsernames || [])) {
+    const params = new URLSearchParams({ groupid: resGroup });
+    const r = await ocsRequest('POST', `/ocs/v1.php/cloud/users/${encodeURIComponent(u)}/groups`, params);
+    if (trace) console.log('[NC] add SSO user to res group', u, r.status, r.json?.ocs?.meta || r.text);
   }
+
 
   // Folder + shares
   const { folderName } = await ensureProjectFolder(title, trace);
@@ -335,20 +347,20 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
     if (trace) console.warn('[NC] brief creation failed', e);
   }
 
-// Talk (best-effort) with invites
+// Talk (best-effort) with group invites
 const allUsers = [...members.client, ...members.resources];
 const talk = await createTalkRoom(title, allUsers, trace).catch(() => ({ token: null, url: null }));
 
-// Invite participants individually and post welcome message
+// Invite project groups and post welcome message
 if (talk?.token) {
-  for (const u of allUsers) {
-    try {
-      const inviteParams = new URLSearchParams({ shareType: "0", shareWith: u });
-      const inv = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, inviteParams);
-      if (trace) console.log('[NC] talk invite', u, inv.status, inv.json?.ocs?.meta);
-    } catch (e) {
-      if (trace) console.warn('[NC] talk invite failed', u, e);
-    }
+  try {
+    const inviteClient = new URLSearchParams({ shareType: '1', shareWith: clientGroup });
+    const inviteRes = new URLSearchParams({ shareType: '1', shareWith: resGroup });
+    const i1 = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, inviteClient);
+    const i2 = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, inviteRes);
+    if (trace) console.log('[NC] talk group invites', i1.status, i2.status);
+  } catch (e) {
+    if (trace) console.warn('[NC] talk group invite failed', e);
   }
   try {
     await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v1/chat/${encodeURIComponent(talk.token)}`, new URLSearchParams({ message: 'Bienvenue à la Team !!' }));
@@ -358,8 +370,19 @@ if (talk?.token) {
   }
 }
 
-  // Calendar (best-effort)
-  const calendar = await createCalendarAndEvent(title, kickoffAt, trace).catch(() => ({ calendarUrl: `${NEXTCLOUD_BASE_URL}/apps/calendar/` }));
+
+// Calendar (best-effort)
+const calendar = await createCalendarAndEvent(title, kickoffAt, trace).catch(() => ({ calendarUrl: `${NEXTCLOUD_BASE_URL}/apps/calendar/` }));
+// Share calendar to project groups
+try {
+  const calId = `projet-${slug}`;
+  const calPathDav = `calendars/${NEXTCLOUD_ADMIN_USERNAME}/${calId}/`;
+  await shareCalendarWithGroup(calPathDav, clientGroup, 1, trace); // read-only for client
+  await shareCalendarWithGroup(calPathDav, resGroup, 31, trace);   // full for resources
+} catch (e) {
+  if (trace) console.warn('[NC] calendar share failed', e);
+}
+
 
 // Deck board with lists per category and cards per resource
 let deckUrl: string | null = null;
@@ -390,6 +413,15 @@ try {
         await deckRequest('POST', `/boards/${boardId}/stacks/${stackId}/cards`, { title: n, type: 0 });
       }
     }
+    // Deck ACLs for project groups
+    await deckRequest('POST', `/boards/${boardId}/acl`, {
+      participant: { type: 'group', id: clientGroup },
+      permission: { read: true, edit: false, share: false, manage: false }
+    });
+    await deckRequest('POST', `/boards/${boardId}/acl`, {
+      participant: { type: 'group', id: resGroup },
+      permission: { read: true, edit: true, share: false, manage: false }
+    });
   }
 } catch (e) {
   if (trace) console.warn('[NC] deck setup failed', e);
