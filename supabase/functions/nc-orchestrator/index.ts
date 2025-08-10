@@ -323,7 +323,17 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
 
   // Talk (best-effort) with invites
   const allUsers = [...members.client, ...members.resources];
-  const talk = await createTalkRoom(`Projet - ${title}`, allUsers, trace).catch(() => ({ token: null, url: null }));
+  const talk = await createTalkRoom(title, allUsers, trace).catch(() => ({ token: null, url: null }));
+
+  // Post welcome message to Talk room (resources and client will see it)
+  if (talk?.token) {
+    try {
+      await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v1/chat/${encodeURIComponent(talk.token)}`, new URLSearchParams({ message: 'Bienvenue à la Team !!' }));
+      if (trace) console.log('[NC] talk welcome message sent');
+    } catch (e) {
+      if (trace) console.warn('[NC] talk welcome failed', e);
+    }
+  }
 
   // Calendar (best-effort)
   const calendar = await createCalendarAndEvent(title, kickoffAt, trace).catch(() => ({ calendarUrl: `${NEXTCLOUD_BASE_URL}/apps/calendar/` }));
@@ -331,7 +341,7 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
   // Deck board with lists per category and cards per resource
   let deckUrl: string | null = null;
   try {
-    const boardParams = new URLSearchParams({ title: `Projet - ${title}` });
+    const boardParams = new URLSearchParams({ title });
     const bRes = await ocsRequest('POST', '/ocs/v2.php/apps/deck/api/v1/boards', boardParams);
     const boardId = bRes.json?.ocs?.data?.id;
     if (trace) console.log('[NC] deck board', bRes.status, bRes.json?.ocs?.meta);
