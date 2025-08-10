@@ -766,8 +766,10 @@ export type Database = {
       }
       projects: {
         Row: {
+          client_budget: number | null
           created_at: string
           description: string | null
+          due_date: string | null
           id: string
           keycloak_user_id: string | null
           price_per_minute: number
@@ -778,8 +780,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_budget?: number | null
           created_at?: string
           description?: string | null
+          due_date?: string | null
           id?: string
           keycloak_user_id?: string | null
           price_per_minute?: number
@@ -790,8 +794,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_budget?: number | null
           created_at?: string
           description?: string | null
+          due_date?: string | null
           id?: string
           keycloak_user_id?: string | null
           price_per_minute?: number

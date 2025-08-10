@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,8 @@ interface CreateProjectModalProps {
     title: string;
     description?: string;
     project_date: string;
+    client_budget?: number;
+    due_date?: string;
   }) => void;
   isCreating: boolean;
 }
@@ -34,24 +37,27 @@ const CreateProjectModal = ({
   const [projectDate, setProjectDate] = useState(
     new Date().toISOString().split('T')[0]
   );
+  const [clientBudget, setClientBudget] = useState<string>("");
+  const [dueDate, setDueDate] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!title.trim()) {
-      return;
-    }
+    if (!title.trim()) return;
 
     onCreateProject({
       title: title.trim(),
       description: description.trim() || undefined,
       project_date: projectDate,
+      client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : undefined,
+      due_date: dueDate.trim() !== "" ? dueDate : undefined,
     });
 
     // Reset form
     setTitle("");
     setDescription("");
     setProjectDate(new Date().toISOString().split('T')[0]);
+    setClientBudget("");
+    setDueDate("");
   };
 
   const handleClose = () => {
@@ -59,13 +65,15 @@ const CreateProjectModal = ({
       setTitle("");
       setDescription("");
       setProjectDate(new Date().toISOString().split('T')[0]);
+      setClientBudget("");
+      setDueDate("");
       onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Créer un nouveau projet</DialogTitle>
           <DialogDescription>
@@ -98,14 +106,42 @@ const CreateProjectModal = ({
             />
           </div>
           
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="project_date">Date de début</Label>
+              <Input
+                id="project_date"
+                type="date"
+                value={projectDate}
+                onChange={(e) => setProjectDate(e.target.value)}
+                required
+                disabled={isCreating}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="due_date">Date de fin souhaitée (optionnel)</Label>
+              <Input
+                id="due_date"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                disabled={isCreating}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="project_date">Date de début</Label>
+            <Label htmlFor="client_budget">Budget prévu (optionnel)</Label>
             <Input
-              id="project_date"
-              type="date"
-              value={projectDate}
-              onChange={(e) => setProjectDate(e.target.value)}
-              required
+              id="client_budget"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              placeholder="Ex: 15000"
+              value={clientBudget}
+              onChange={(e) => setClientBudget(e.target.value)}
               disabled={isCreating}
             />
           </div>

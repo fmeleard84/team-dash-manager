@@ -107,6 +107,8 @@ const ClientDashboard = () => {
     title: string;
     description?: string;
     project_date: string;
+    client_budget?: number;
+    due_date?: string;
   }) => {
     if (!user?.profile?.sub) {
       toast.error('Utilisateur non connecté');
@@ -124,7 +126,9 @@ const ClientDashboard = () => {
           user_id: user.profile.sub, // Temporarily using user_id field with keycloak sub
           keycloak_user_id: user.profile.sub,
           status: 'pause',
-          project_date: projectData.project_date
+          project_date: projectData.project_date,
+          client_budget: projectData.client_budget ?? null,
+          due_date: projectData.due_date ?? null,
         })
         .select()
         .single();
@@ -250,7 +254,15 @@ const ClientDashboard = () => {
                     {ongoing.map((project) => (
                       <ProjectCard
                         key={project.id}
-                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        project={{
+                          id: project.id,
+                          title: project.title,
+                          description: project.description,
+                          date: project.project_date,
+                          status: project.status,
+                          clientBudget: project.client_budget,
+                          dueDate: project.due_date,
+                        }}
                         onStatusToggle={handleStatusToggle}
                         onDelete={handleDeleteProject}
                         onView={handleViewProject}
@@ -264,7 +276,15 @@ const ClientDashboard = () => {
                     {booking.map((project) => (
                       <ProjectCard
                         key={project.id}
-                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        project={{
+                          id: project.id,
+                          title: project.title,
+                          description: project.description,
+                          date: project.project_date,
+                          status: project.status,
+                          clientBudget: project.client_budget,
+                          dueDate: project.due_date,
+                        }}
                         onStatusToggle={handleStatusToggle}
                         onDelete={handleDeleteProject}
                         onView={handleViewProject}
@@ -278,7 +298,15 @@ const ClientDashboard = () => {
                     {paused.map((project) => (
                       <ProjectCard
                         key={project.id}
-                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        project={{
+                          id: project.id,
+                          title: project.title,
+                          description: project.description,
+                          date: project.project_date,
+                          status: project.status,
+                          clientBudget: project.client_budget,
+                          dueDate: project.due_date,
+                        }}
                         onStatusToggle={handleStatusToggle}
                         onDelete={handleDeleteProject}
                         onView={handleViewProject}
@@ -292,7 +320,15 @@ const ClientDashboard = () => {
                     {done.map((project) => (
                       <ProjectCard
                         key={project.id}
-                        project={{ id: project.id, title: project.title, description: project.description, price: 0, date: project.project_date, status: project.status }}
+                        project={{
+                          id: project.id,
+                          title: project.title,
+                          description: project.description,
+                          date: project.project_date,
+                          status: project.status,
+                          clientBudget: project.client_budget,
+                          dueDate: project.due_date,
+                        }}
                         onStatusToggle={handleStatusToggle}
                         onDelete={handleDeleteProject}
                         onView={handleViewProject}
@@ -384,7 +420,10 @@ const ClientDashboard = () => {
               <SidebarGroupLabel>Navigation</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {menuItems.map((item) => (
+                  {[
+                    { id: 'projects', label: 'Mes projets', icon: FolderOpen },
+                    { id: 'invoices', label: 'Mes factures', icon: Receipt },
+                  ].map((item) => (
                     <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton
                         onClick={() => setActiveSection(item.id)}

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -8,13 +9,16 @@ import { toast } from "sonner";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { buildFunctionHeaders } from "@/lib/functionAuth";
+
 interface Project {
   id: string;
   title: string;
   description?: string;
-  price: number;
+  price?: number;
   date: string;
   status: string;
+  clientBudget?: number | null;
+  dueDate?: string | null;
 }
 
 interface ResourceAssignment {
@@ -45,6 +49,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
   const [isBookingTeam, setIsBookingTeam] = useState(false);
   const [showKickoff, setShowKickoff] = useState(false);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
@@ -153,142 +158,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     }
   };
 
-  const createKeycloakProjectGroup = async () => {
-    try {
-      console.log('Creating Keycloak project groups...');
-      const projectSlug = project.title
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-      const clientGroupName = `${projectSlug}-client`;
-      const resGroupName = `${projectSlug}-ressource`;
-
-      // Create two groups sequentially to match Edge Function expectations
-      const { error: clientGroupError } = await supabase.functions.invoke('keycloak-user-management', {
-        headers: buildFunctionHeaders({
-          sub: (user?.profile as any)?.sub,
-          email: (user?.profile as any)?.email,
-        }),
-        body: { action: 'create-project-group', projectId: project.id, groupName: clientGroupName }
-      });
-      if (clientGroupError) throw clientGroupError;
-
-      const { error: resGroupError } = await supabase.functions.invoke('keycloak-user-management', {
-        headers: buildFunctionHeaders({
-          sub: (user?.profile as any)?.sub,
-          email: (user?.profile as any)?.email,
-        }),
-        body: { action: 'create-project-group', projectId: project.id, groupName: resGroupName }
-      });
-      if (resGroupError) throw resGroupError;
-
-
-      // Get all booked resources for this project
-      const { data: bookedResources, error: resourceError } = await supabase
-        .from('project_bookings')
-        .select(`
-          candidate_id,
-          candidate_profiles (
-            keycloak_user_id,
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('project_id', project.id)
-        .eq('status', 'accepted');
-
-      if (resourceError) throw resourceError;
-
-      // Get project owner (client)
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select(`
-          keycloak_user_id,
-          title
-        `)
-        .eq('id', project.id)
-        .single();
-
-      if (projectError) throw projectError;
-
-      const members: string[] = [];
-
-      // Add client to client group via email
-      if ((user?.profile as any)?.email) {
-        try {
-          await supabase.functions.invoke('keycloak-user-management', {
-            headers: buildFunctionHeaders({
-              sub: (user?.profile as any)?.sub,
-              email: (user?.profile as any)?.email,
-            }),
-            body: { action: 'add-user-to-group', groupName: clientGroupName, userEmail: (user?.profile as any)?.email }
-          });
-          members.push('Client (propriétaire)');
-        } catch (error) {
-          console.warn('Failed to add client to client group:', error);
-        }
-      }
-
-      // Add each booked resource to resource group via email
-      if (bookedResources) {
-        for (const booking of bookedResources) {
-          const candidate = booking.candidate_profiles;
-          if (candidate?.email) {
-            try {
-              await supabase.functions.invoke('keycloak-user-management', {
-                headers: buildFunctionHeaders({
-                  sub: (user?.profile as any)?.sub,
-                  email: (user?.profile as any)?.email,
-                }),
-                body: { action: 'add-user-to-group', groupName: resGroupName, userEmail: candidate.email }
-              });
-              members.push(`${candidate.first_name} ${candidate.last_name}`);
-            } catch (error) {
-              console.warn(`Failed to add ${candidate.email} to ressource group:`, error);
-            }
-          }
-        }
-      }
-
-      console.log(`Keycloak project groups created with ${members.length} members.`);
-      return { success: true, members };
-      
-    } catch (error) {
-      console.warn('Keycloak project group step failed, continuing without it:', error);
-      toast.warning('Groupes Keycloak non créés, poursuite de la mise en place Nextcloud.');
-      return { success: false, members: [] };
-    }
-  };
-
-  const setupNextcloudWorkspace = async (kickoffISO?: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('nextcloud-integration', {
-        body: {
-          action: 'setup-workspace',
-          projectId: project.id,
-          kickoffStart: kickoffISO,
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        if (data.webUrl) {
-          setPlankaProject({ planka_url: data.webUrl });
-        }
-        return { success: true };
-      } else {
-        throw new Error(data?.message || 'Échec de la configuration Nextcloud');
-      }
-    } catch (error) {
-      console.error('Error setting up Nextcloud workspace:', error);
-      throw error;
-    }
-  };
-
   const openPlanka = () => {
     if (plankaProject?.planka_url) {
       window.open(plankaProject.planka_url, '_blank');
@@ -310,6 +179,15 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   const bookingProgress = getBookingProgress();
   const allResourcesBooked = resourceAssignments.every(assignment => assignment.booking_status === 'booké');
 
+  const formatCurrency = (n?: number | null) => {
+    if (typeof n !== 'number') return '—';
+    try {
+      return n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+    } catch {
+      return `${n}€`;
+    }
+  };
+
   return (
     <>
       <Card className="w-full max-w-md bg-background border border-border shadow-sm hover:shadow-md transition-shadow">
@@ -326,13 +204,26 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Prix total:</span>
-            <span className="font-medium text-foreground">{project.price}€</span>
+            <span className="text-muted-foreground">Estimation équipe:</span>
+            <span className="font-medium text-foreground">{formatCurrency(project.price)}</span>
           </div>
+
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Date:</span>
+            <span className="text-muted-foreground">Budget client:</span>
+            <span className="font-medium text-foreground">{formatCurrency(project.clientBudget ?? null)}</span>
+          </div>
+
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Début:</span>
             <span className="text-foreground">{formatDate(project.date)}</span>
           </div>
+
+          {project.dueDate && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Fin souhaitée:</span>
+              <span className="text-foreground">{formatDate(project.dueDate)}</span>
+            </div>
+          )}
           
           {/* Resource assignments section */}
           {resourceAssignments.length > 0 && (
@@ -362,14 +253,24 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/* Éditer l’équipe */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onView(project.id)}
+            >
+              Éditer l’équipe
+            </Button>
+
+            {/* Play/Pause */}
             <Button
               variant="outline"
               size="sm"
               onClick={handleStatusToggle}
               className="flex-1"
               disabled={(project.status === 'pause' && !allResourcesBooked) || isSyncing}
-           >
+            >
               {isSyncing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -383,15 +284,17 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               ) : (
                 <>
                   <Play className="w-4 h-4 mr-2" />
-                  Play
+                  Démarrer
                 </>
               )}
             </Button>
 
+            {/* Voir */}
             <Button variant="outline" size="sm" onClick={() => onView(project.id)} disabled={isSyncing}>
               <Eye className="w-4 h-4" />
             </Button>
 
+            {/* Supprimer */}
             <Button variant="destructive" size="sm" onClick={() => onDelete(project.id)}>
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -407,7 +310,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               className="w-full bg-orange-500 hover:bg-orange-600 text-white"
             >
               <Users className="w-4 h-4 mr-2" />
-              {isBookingTeam ? 'Recherche en cours...' : 'Rejoindre l\'équipe'}
+              {isBookingTeam ? 'Envoi des demandes...' : 'Booker l’équipe'}
             </Button>
           )}
 
