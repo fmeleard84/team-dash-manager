@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-keycloak-sub, x-keycloak-email',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-keycloak-sub, x-keycloak-email, x-debug-trace',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -35,7 +35,7 @@ serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log('CORS preflight request handled');
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -46,7 +46,40 @@ serve(async (req) => {
     );
 
     console.log('Parsing request body...');
-    const body = await req.json();
+    // Defensive JSON parsing to avoid crashes on empty/invalid body
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return new Response(
+        JSON.stringify({ error: 'Unsupported content-type', expected: 'application/json' }),
+        { status: 415, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const raw = await req.text();
+    const dbg = req.headers.get('x-debug-trace') === 'true';
+    if (dbg) {
+      console.log('Request headers (debug):', Object.fromEntries(req.headers));
+      console.log('Raw body length (debug):', raw?.length ?? 0);
+      if (raw) console.log('Raw body preview (debug):', raw.slice(0, 300));
+    }
+
+    if (!raw || raw.trim() === '') {
+      return new Response(
+        JSON.stringify({ error: 'Empty request body', hint: 'Send a JSON payload with an action field' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON', details: String((e as any)?.message || e) }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const actionRaw = body?.action as string | undefined;
 
     // Normalize/alias some actions for backward-compatibility
@@ -59,7 +92,7 @@ serve(async (req) => {
     const action = (actionRaw && aliasMap[actionRaw]) ? aliasMap[actionRaw] : actionRaw;
 
     console.log(`Keycloak user management request: ${action} (raw: ${actionRaw})`);
-    console.log(`Request body:`, JSON.stringify(body, null, 2));
+    if (dbg) console.log(`Request body (parsed):`, body);
 
     // Verify Keycloak environment variables
     const keycloakUrl = Deno.env.get('KEYCLOAK_BASE_URL');
