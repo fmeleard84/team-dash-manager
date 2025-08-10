@@ -86,8 +86,8 @@ serve(async (req) => {
     const aliasMap: Record<string, string> = {
       'ping': 'health-check',
       'create_project_group': 'create-project-group',
-      'createProjectGroup': 'create-project-group',
-      'create-project-groups': 'create-project-group', // plural variant (see guidance below)
+      'createProjectGroup': 'create-project-group'
+      // note: 'create-project-groups' is handled separately as bulk
     };
     const action = (actionRaw && aliasMap[actionRaw]) ? aliasMap[actionRaw] : actionRaw;
 
@@ -155,31 +155,18 @@ serve(async (req) => {
         return await handleAddUserToGroup(body, supabase);
       case 'create-project-group':
         return await handleCreateProjectGroup(body, supabase);
-      // Deprecated/unsupported bulk alias with different payload shape
+      // Bulk creation handler (creates client and ressource groups)
       case 'create_project_groups':
       case 'create-project-groups': {
-        const supported = ['health-check','test-connection','create-user','add-user-to-group','create-project-group'];
-        const examples = {
-          'health-check': { action: 'health-check' },
-          'test-connection': { action: 'test-connection' },
-          'create-project-group': { action: 'create-project-group', projectId: 'uuid-project', groupName: 'project-slug-client' },
-        };
-        return new Response(
-          JSON.stringify({
-            error: 'Invalid payload for bulk group creation. Use "create-project-group" and call it per group (client, ressource).',
-            supported,
-            examples,
-            note: 'Expected body for create-project-group: { projectId, groupName }',
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return await handleCreateProjectGroups(body, supabase);
       }
       default: {
-        const supported = ['health-check','test-connection','create-user','add-user-to-group','create-project-group'];
+        const supported = ['health-check','test-connection','create-user','add-user-to-group','create-project-group','create_project_groups'];
         const examples = {
           'health-check': { action: 'health-check' },
           'test-connection': { action: 'test-connection' },
-          'create-project-group': { action: 'create-project-group', projectId: 'uuid-project', groupName: 'project-slug-client' },
+          'create-project-group': { action: 'create-project-group', projectId: 'uuid-project', groupName: 'Projet-slug-client' },
+          'create_project_groups': { action: 'create_project_groups', projectId: 'uuid-project', projectSlug: 'slug' }
         };
         return new Response(
           JSON.stringify({ error: 'Invalid action', supported, examples }),
@@ -897,6 +884,76 @@ async function handleCreateProjectGroup(body: CreateProjectGroupRequest, supabas
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+// Bulk groups creation: creates both client and ressource groups for a project
+async function handleCreateProjectGroups(body: any, supabase: any) {
+  console.log('Bulk create project groups payload:', body);
+  try {
+    const adminToken = await getKeycloakAdminToken();
+    const projectId = body?.projectId as string | undefined;
+    const slug = (body?.projectSlug as string | undefined) || (body?.projectName ? String(body.projectName).replace(/\s+/g, '-') : undefined);
+
+    if (!projectId || !slug) {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing required fields',
+          required: ['projectId', 'projectSlug | projectName'],
+          received: { projectId, projectSlug: body?.projectSlug, projectName: body?.projectName }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const baseGroup = `Projet-${slug}`;
+    const groupNames = [`${baseGroup}-client`, `${baseGroup}-ressource`];
+
+    const results: Array<{ name: string; groupId?: string; error?: string; warning?: string }> = [];
+
+    for (const name of groupNames) {
+      const groupResult = await createGroupIfNotExists(adminToken, name);
+      if (!groupResult.success || !groupResult.groupId) {
+        results.push({ name, error: groupResult.error || 'Failed to create group' });
+        continue;
+      }
+
+      // Store mapping in Supabase if not present
+      const { data: existingGroup } = await supabase
+        .from('project_groups')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('keycloak_group_id', groupResult.groupId)
+        .maybeSingle();
+
+      if (!existingGroup) {
+        const { error: insertError } = await supabase
+          .from('project_groups')
+          .insert({
+            project_id: projectId,
+            keycloak_group_id: groupResult.groupId,
+            keycloak_group_name: name
+          });
+        if (insertError) {
+          results.push({ name, groupId: groupResult.groupId, warning: `Mapping insert failed: ${String(insertError.message || insertError)}` });
+          continue;
+        }
+      }
+
+      results.push({ name, groupId: groupResult.groupId });
+    }
+
+    const success = results.every(r => !!r.groupId);
+    return new Response(
+      JSON.stringify({ success, baseGroup, projectId, groups: results }),
+      { status: success ? 200 : 207, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error in handleCreateProjectGroups:', error);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 }
