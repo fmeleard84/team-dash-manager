@@ -20,6 +20,12 @@ const NEXTCLOUD_BASE_URL = Deno.env.get("NEXTCLOUD_BASE_URL")!;
 const NEXTCLOUD_ADMIN_USERNAME = Deno.env.get("NEXTCLOUD_ADMIN_USERNAME")!;
 const NEXTCLOUD_ADMIN_PASSWORD = Deno.env.get("NEXTCLOUD_ADMIN_PASSWORD")!;
 
+// Mailjet (optional)
+const MJ_API_KEY = Deno.env.get("MJ_API_KEY");
+const MJ_SECRET_KEY = Deno.env.get("MJ_SECRET_KEY");
+const MJ_FROM_EMAIL = Deno.env.get("MJ_FROM_EMAIL");
+const MJ_FROM_NAME = Deno.env.get("MJ_FROM_NAME") || "Cercle Vaya";
+
 // Helpers
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -73,6 +79,34 @@ async function davRequest(method: string, path: string, body?: string, contentTy
   });
   const text = await res.text();
   return { status: res.status, ok: res.ok, text };
+}
+
+// Mailjet email sender
+async function sendMailjetEmail(subject: string, html: string, to: string[], trace?: boolean) {
+  if (!MJ_API_KEY || !MJ_SECRET_KEY || !MJ_FROM_EMAIL) {
+    if (trace) console.warn('[Mailjet] missing configuration');
+    return;
+  }
+  const payload = {
+    Messages: [
+      {
+        From: { Email: MJ_FROM_EMAIL, Name: MJ_FROM_NAME },
+        To: to.map((Email) => ({ Email })),
+        Subject: subject,
+        HTMLPart: html,
+      },
+    ],
+  };
+  const res = await fetch('https://api.mailjet.com/v3.1/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Basic ' + btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`),
+    },
+    body: JSON.stringify(payload),
+  });
+  const mjText = await res.text();
+  if (trace) console.log('[Mailjet] send', res.status, mjText);
 }
 
 async function ensureGroup(groupName: string, trace: boolean) {
@@ -359,6 +393,25 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
     await supabase
       .from('nextcloud_projects')
       .insert({ project_id: projectId, nextcloud_url: filesUrl, folder_path: `/${folderName}`, talk_url: talk.url || null });
+  }
+
+  // Email notifications via Mailjet (best-effort)
+  try {
+    const subject = `Votre accès au projet ${title}`;
+    const cta = `<a href="${filesUrl}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Rejoindre le projet</a>`;
+    const talkPart = talk.url ? `<p>Salon Talk: <a href="${talk.url}">${talk.url}</a></p>` : '';
+    const html = `
+      <div style="font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;line-height:1.5;color:#111827">
+        <h2 style="margin:0 0 12px">${title}</h2>
+        <p>Votre espace Nextcloud a été créé. Cliquez ci-dessous pour y accéder directement (SSO).</p>
+        <p style="margin:16px 0">${cta}</p>
+        ${talkPart}
+        <p style="color:#6b7280;font-size:12px;margin-top:24px">Vous recevez cet email car vous avez été ajouté au projet.</p>
+      </div>`;
+    const recipients = Array.from(new Set(allUsers.filter(Boolean)));
+    if (recipients.length) await sendMailjetEmail(subject, html, recipients, trace);
+  } catch (e) {
+    if (trace) console.warn('[Mailjet] notifications failed', e);
   }
 
   return json({ ok: true, nextcloud: { filesUrl, talkUrl: talk.url, calendarUrl: calendar.calendarUrl, deckUrl }, correlationId });
