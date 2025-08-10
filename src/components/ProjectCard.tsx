@@ -289,10 +289,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               )}
             </Button>
 
-            {/* Voir */}
-            <Button variant="outline" size="sm" onClick={() => onView(project.id)} disabled={isSyncing}>
-              <Eye className="w-4 h-4" />
-            </Button>
 
             {/* Supprimer */}
             <Button variant="destructive" size="sm" onClick={() => onDelete(project.id)}>

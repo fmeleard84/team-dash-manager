@@ -79,7 +79,7 @@ const Register = () => {
       console.log('Testing edge function connectivity...');
       try {
         const healthCheck = await supabase.functions.invoke('keycloak-user-management', {
-          headers: buildFunctionHeaders(),
+          headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
           body: { action: 'health-check' }
         });
         console.log('Health check result:', healthCheck);
@@ -108,7 +108,7 @@ const Register = () => {
       });
       
       const { data, error } = await supabase.functions.invoke('keycloak-user-management', {
-        headers: buildFunctionHeaders(),
+        headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
         body: {
           action: 'create-user',
           email: formData.email,
