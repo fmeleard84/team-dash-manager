@@ -81,6 +81,24 @@ async function davRequest(method: string, path: string, body?: string, contentTy
   return { status: res.status, ok: res.ok, text };
 }
 
+// Deck REST API request helper
+async function deckRequest(method: string, path: string, body?: any) {
+  const url = `${NEXTCLOUD_BASE_URL}/index.php/apps/deck/api/v1.0${path}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: basicAuthHeader(),
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let json: any = null;
+  try { json = JSON.parse(text); } catch { /* ignore */ }
+  return { status: res.status, ok: res.ok, text, json };
+}
+
 // Mailjet email sender
 async function sendMailjetEmail(subject: string, html: string, to: string[], trace?: boolean) {
   if (!MJ_API_KEY || !MJ_SECRET_KEY || !MJ_FROM_EMAIL) {
@@ -162,11 +180,7 @@ async function shareFolderWithGroup(folderName: string, groupName: string, permi
 }
 
 async function createTalkRoom(title: string, invites: string[], trace: boolean) {
-  const params = new URLSearchParams({ roomType: "2", name: title });
-  if (invites && invites.length) {
-    // Invite users by their Nextcloud user ids (we use emails as user ids)
-    params.append("invite", invites.join(","));
-  }
+  const params = new URLSearchParams({ roomType: "2", roomName: title });
   const r = await ocsRequest("POST", "/ocs/v2.php/apps/spreed/api/v4/room", params);
   if (trace) console.log("[NC] talk room", title, r.status, r.json?.ocs?.meta || r.text);
   const token = r.json?.ocs?.data?.token || null;
@@ -321,57 +335,65 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
     if (trace) console.warn('[NC] brief creation failed', e);
   }
 
-  // Talk (best-effort) with invites
-  const allUsers = [...members.client, ...members.resources];
-  const talk = await createTalkRoom(title, allUsers, trace).catch(() => ({ token: null, url: null }));
+// Talk (best-effort) with invites
+const allUsers = [...members.client, ...members.resources];
+const talk = await createTalkRoom(title, allUsers, trace).catch(() => ({ token: null, url: null }));
 
-  // Post welcome message to Talk room (resources and client will see it)
-  if (talk?.token) {
+// Invite participants individually and post welcome message
+if (talk?.token) {
+  for (const u of allUsers) {
     try {
-      await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v1/chat/${encodeURIComponent(talk.token)}`, new URLSearchParams({ message: 'Bienvenue à la Team !!' }));
-      if (trace) console.log('[NC] talk welcome message sent');
+      const inviteParams = new URLSearchParams({ shareType: "0", shareWith: u });
+      const inv = await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v4/room/${encodeURIComponent(talk.token)}/participants`, inviteParams);
+      if (trace) console.log('[NC] talk invite', u, inv.status, inv.json?.ocs?.meta);
     } catch (e) {
-      if (trace) console.warn('[NC] talk welcome failed', e);
+      if (trace) console.warn('[NC] talk invite failed', u, e);
     }
   }
+  try {
+    await ocsRequest('POST', `/ocs/v2.php/apps/spreed/api/v1/chat/${encodeURIComponent(talk.token)}`, new URLSearchParams({ message: 'Bienvenue à la Team !!' }));
+    if (trace) console.log('[NC] talk welcome message sent');
+  } catch (e) {
+    if (trace) console.warn('[NC] talk welcome failed', e);
+  }
+}
 
   // Calendar (best-effort)
   const calendar = await createCalendarAndEvent(title, kickoffAt, trace).catch(() => ({ calendarUrl: `${NEXTCLOUD_BASE_URL}/apps/calendar/` }));
 
-  // Deck board with lists per category and cards per resource
-  let deckUrl: string | null = null;
-  try {
-    const boardParams = new URLSearchParams({ title });
-    const bRes = await ocsRequest('POST', '/ocs/v2.php/apps/deck/api/v1/boards', boardParams);
-    const boardId = bRes.json?.ocs?.data?.id;
-    if (trace) console.log('[NC] deck board', bRes.status, bRes.json?.ocs?.meta);
-    if (boardId) {
-      deckUrl = `${NEXTCLOUD_BASE_URL}/apps/deck/#/board/${boardId}`;
-      const stacks: Record<string, number> = {};
-      for (const cat of categories) {
-        const sRes = await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks`, new URLSearchParams({ title: cat }));
-        const stackId = sRes.json?.ocs?.data?.id;
-        if (stackId) stacks[cat] = stackId;
-      }
-      // Client stack with objectif card
-      const clientStack = await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks`, new URLSearchParams({ title: 'Client' }));
-      const clientStackId = clientStack.json?.ocs?.data?.id;
-      if (clientStackId) {
-        await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks/${clientStackId}/cards`, new URLSearchParams({ title: 'Objectif' }));
-      }
-      // Cards for resources
-      for (const cat of categories) {
-        const stackId = stacks[cat];
-        if (!stackId) continue;
-        const names = categoryToProfiles[cat] || [];
-        for (const n of names) {
-          await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks/${stackId}/cards`, new URLSearchParams({ title: n }));
-        }
+// Deck board with lists per category and cards per resource
+let deckUrl: string | null = null;
+try {
+  const bRes = await deckRequest('POST', '/boards', { title });
+  const boardId = bRes.json?.id;
+  if (trace) console.log('[NC] deck board', bRes.status, bRes.json || bRes.text);
+  if (boardId) {
+    deckUrl = `${NEXTCLOUD_BASE_URL}/apps/deck/#/board/${boardId}`;
+    const stacks: Record<string, number> = {};
+    for (const cat of categories) {
+      const sRes = await deckRequest('POST', `/boards/${boardId}/stacks`, { title: cat });
+      const stackId = sRes.json?.id;
+      if (stackId) stacks[cat] = stackId;
+    }
+    // Client stack with objectif card
+    const clientStack = await deckRequest('POST', `/boards/${boardId}/stacks`, { title: 'Client' });
+    const clientStackId = clientStack.json?.id;
+    if (clientStackId) {
+      await deckRequest('POST', `/boards/${boardId}/stacks/${clientStackId}/cards`, { title: 'Objectif', type: 0 });
+    }
+    // Cards for resources
+    for (const cat of categories) {
+      const stackId = stacks[cat];
+      if (!stackId) continue;
+      const names = categoryToProfiles[cat] || [];
+      for (const n of names) {
+        await deckRequest('POST', `/boards/${boardId}/stacks/${stackId}/cards`, { title: n, type: 0 });
       }
     }
-  } catch (e) {
-    if (trace) console.warn('[NC] deck setup failed', e);
   }
+} catch (e) {
+  if (trace) console.warn('[NC] deck setup failed', e);
+}
 
   // Nextcloud notifications (best-effort)
   try {
@@ -405,24 +427,76 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
       .insert({ project_id: projectId, nextcloud_url: filesUrl, folder_path: `/${folderName}`, talk_url: talk.url || null });
   }
 
-  // Email notifications via Mailjet (best-effort)
-  try {
-    const subject = `Votre accès au projet ${title}`;
-    const cta = `<a href="${filesUrl}" style="background:#4f46e5;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Rejoindre le projet</a>`;
-    const talkPart = talk.url ? `<p>Salon Talk: <a href="${talk.url}">${talk.url}</a></p>` : '';
-    const html = `
-      <div style="font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;line-height:1.5;color:#111827">
-        <h2 style="margin:0 0 12px">${title}</h2>
-        <p>Votre espace Nextcloud a été créé. Cliquez ci-dessous pour y accéder directement (SSO).</p>
-        <p style="margin:16px 0">${cta}</p>
-        ${talkPart}
-        <p style="color:#6b7280;font-size:12px;margin-top:24px">Vous recevez cet email car vous avez été ajouté au projet.</p>
-      </div>`;
-    const recipients = Array.from(new Set(allUsers.filter(Boolean)));
-    if (recipients.length) await sendMailjetEmail(subject, html, recipients, trace);
-  } catch (e) {
-    if (trace) console.warn('[Mailjet] notifications failed', e);
+// Email notifications via Mailjet (best-effort)
+try {
+  const subject = `Accès à votre projet – ${title}`;
+  const projectUrl = talk.url || filesUrl || (deckUrl || filesUrl);
+  const year = new Date().getFullYear();
+  const categoriesText = (categories && categories.length) ? categories.join(', ') : 'Général';
+  const nameFromEmail = (e: string) => e?.split('@')[0] || 'membre';
+
+  const renderEmail = (recipientName: string, role: string, url: string) => `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Accès à votre projet – ${title}</title>
+  <meta name="viewport" content="width=device-width">
+  <style>
+    body{margin:0;background:#f6f7fb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+    .container{max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;}
+    .header{background:#0f172a;color:#fff;padding:24px 28px;font-size:18px;font-weight:700;}
+    .content{padding:28px;color:#0f172a;line-height:1.55;}
+    .pill{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:999px;padding:2px 10px;font-size:12px;margin-top:4px}
+    .btn{display:inline-block;margin:18px 0 8px;background:#0ea5e9;color:#fff;text-decoration:none;
+         padding:12px 18px;border-radius:10px;font-weight:600}
+    .muted{color:#64748b;font-size:13px}
+    .divider{height:1px;background:#e5e7eb;margin:24px 0}
+    .footer{color:#94a3b8;font-size:12px;padding:18px 28px;text-align:center}
+  </style>
+</head>
+<body>
+  <div style="padding:20px">
+    <div class="container">
+      <div class="header">Cercle Vaya — Nouveau projet</div>
+      <div class="content">
+        <p>Bonjour ${recipientName},</p>
+        <p>Votre accès au projet <strong>${title}</strong> a été créé.</p>
+        <p>
+          Rôle : <strong>${role}</strong><br>
+          Catégories : <span class="pill">${categoriesText}</span>
+        </p>
+
+        <a class="btn" href="${url}" target="_blank" rel="noopener">
+          Rejoindre le projet
+        </a>
+        <div class="muted">Accès direct, sans reconnexion.</div>
+
+        <div class="divider"></div>
+        <p class="muted">
+          Vous retrouverez : le dossier du projet, les sous‑dossiers par catégorie,
+          une note “Brief du besoin”, un tableau Deck avec cartes, et une conversation Talk.
+        </p>
+      </div>
+      <div class="footer">
+        © ${year} Cercle Vaya — Notification automatique
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  // Send personalized emails
+  for (const email of members.client) {
+    const html = renderEmail(nameFromEmail(email), 'Client', projectUrl);
+    await sendMailjetEmail(subject, html, [email], trace);
   }
+  for (const email of members.resources) {
+    const html = renderEmail(nameFromEmail(email), 'Ressource', projectUrl);
+    await sendMailjetEmail(subject, html, [email], trace);
+  }
+} catch (e) {
+  if (trace) console.warn('[Mailjet] notifications failed', e);
+}
 
   return json({ ok: true, nextcloud: { filesUrl, talkUrl: talk.url, calendarUrl: calendar.calendarUrl, deckUrl }, correlationId });
 }
