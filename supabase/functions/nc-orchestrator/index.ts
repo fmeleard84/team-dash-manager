@@ -127,8 +127,12 @@ async function shareFolderWithGroup(folderName: string, groupName: string, permi
   return true;
 }
 
-async function createTalkRoom(title: string, trace: boolean) {
-  const params = new URLSearchParams({ roomType: "1", name: title });
+async function createTalkRoom(title: string, invites: string[], trace: boolean) {
+  const params = new URLSearchParams({ roomType: "2", name: title });
+  if (invites && invites.length) {
+    // Invite users by their Nextcloud user ids (we use emails as user ids)
+    params.append("invite", invites.join(","));
+  }
   const r = await ocsRequest("POST", "/ocs/v2.php/apps/spreed/api/v4/room", params);
   if (trace) console.log("[NC] talk room", title, r.status, r.json?.ocs?.meta || r.text);
   const token = r.json?.ocs?.data?.token || null;
@@ -228,33 +232,136 @@ async function handleProjectStart(body: any, trace: boolean, correlationId: stri
   await shareFolderWithGroup(folderName, clientGroup, 1, trace); // read-only
   await shareFolderWithGroup(folderName, resGroup, 31, trace); // full: read+write+create+delete+share
 
-  // Talk (best-effort)
-  const talk = await createTalkRoom(`Projet - ${title}`, trace).catch(() => ({ token: null, url: null }));
+  // Subfolders by category + client brief markdown + Talk + Deck + Notifications
+  // Compute Nextcloud Files URL early
+  const filesUrl = `${NEXTCLOUD_BASE_URL}/apps/files?dir=/${encodeURIComponent(folderName)}`;
+
+  // Gather resource categories and profile names
+  let categories: string[] = [];
+  const categoryToProfiles: Record<string, string[]> = {};
+  try {
+    const { data: ra } = await supabase
+      .from('hr_resource_assignments')
+      .select('profile_id')
+      .eq('project_id', projectId);
+    const profileIds = Array.from(new Set((ra || []).map(r => r.profile_id).filter(Boolean)));
+    if (profileIds.length) {
+      const { data: profs } = await supabase
+        .from('hr_profiles')
+        .select('id, name, category_id')
+        .in('id', profileIds);
+      const catIds = Array.from(new Set((profs || []).map(p => p.category_id).filter(Boolean)));
+      let catMap: Record<string, string> = {};
+      if (catIds.length) {
+        const { data: cats } = await supabase
+          .from('hr_categories')
+          .select('id, name')
+          .in('id', catIds);
+        catMap = Object.fromEntries((cats || []).map(c => [c.id, c.name]));
+      }
+      for (const p of profs || []) {
+        const catName = catMap[p.category_id as unknown as string] || 'Général';
+        if (!categoryToProfiles[catName]) categoryToProfiles[catName] = [];
+        categoryToProfiles[catName].push(p.name);
+      }
+      categories = Object.keys(categoryToProfiles);
+    }
+  } catch (e) {
+    if (trace) console.warn('[NC] categories fetch failed', e);
+  }
+
+  // Create subfolders per category (best-effort)
+  for (const cat of categories) {
+    const subPath = encodePath(`files/${NEXTCLOUD_ADMIN_USERNAME}/${folderName}/${cat}`);
+    const mk = await davRequest('MKCOL', subPath);
+    if (trace) console.log('[NC] MKCOL sub', cat, mk.status);
+  }
+
+  // Create client brief as Markdown (visible to both groups via root share)
+  try {
+    const briefContent = `# Brief du besoin\n\nProjet: ${title}\n\nObjectif\n- Décrivez l'objectif principal.\n\nContexte\n- Contexte et enjeux.\n\nLivrables attendus\n- Liste des livrables.\n\nRisques & contraintes\n- Points d'attention.\n`;
+    const briefPath = encodePath(`files/${NEXTCLOUD_ADMIN_USERNAME}/${folderName}/Brief du besoin.md`);
+    const putBrief = await davRequest('PUT', briefPath, briefContent, 'text/markdown');
+    if (trace) console.log('[NC] PUT brief markdown', putBrief.status);
+  } catch (e) {
+    if (trace) console.warn('[NC] brief creation failed', e);
+  }
+
+  // Talk (best-effort) with invites
+  const allUsers = [...members.client, ...members.resources];
+  const talk = await createTalkRoom(`Projet - ${title}`, allUsers, trace).catch(() => ({ token: null, url: null }));
 
   // Calendar (best-effort)
   const calendar = await createCalendarAndEvent(title, kickoffAt, trace).catch(() => ({ calendarUrl: `${NEXTCLOUD_BASE_URL}/apps/calendar/` }));
 
-  const filesUrl = `${NEXTCLOUD_BASE_URL}/apps/files?dir=/${encodeURIComponent(folderName)}`;
+  // Deck board with lists per category and cards per resource
+  let deckUrl: string | null = null;
+  try {
+    const boardParams = new URLSearchParams({ title: `Projet - ${title}` });
+    const bRes = await ocsRequest('POST', '/ocs/v2.php/apps/deck/api/v1/boards', boardParams);
+    const boardId = bRes.json?.ocs?.data?.id;
+    if (trace) console.log('[NC] deck board', bRes.status, bRes.json?.ocs?.meta);
+    if (boardId) {
+      deckUrl = `${NEXTCLOUD_BASE_URL}/apps/deck/#/board/${boardId}`;
+      const stacks: Record<string, number> = {};
+      for (const cat of categories) {
+        const sRes = await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks`, new URLSearchParams({ title: cat }));
+        const stackId = sRes.json?.ocs?.data?.id;
+        if (stackId) stacks[cat] = stackId;
+      }
+      // Client stack with objectif card
+      const clientStack = await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks`, new URLSearchParams({ title: 'Client' }));
+      const clientStackId = clientStack.json?.ocs?.data?.id;
+      if (clientStackId) {
+        await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks/${clientStackId}/cards`, new URLSearchParams({ title: 'Objectif' }));
+      }
+      // Cards for resources
+      for (const cat of categories) {
+        const stackId = stacks[cat];
+        if (!stackId) continue;
+        const names = categoryToProfiles[cat] || [];
+        for (const n of names) {
+          await ocsRequest('POST', `/ocs/v2.php/apps/deck/api/v1/boards/${boardId}/stacks/${stackId}/cards`, new URLSearchParams({ title: n }));
+        }
+      }
+    }
+  } catch (e) {
+    if (trace) console.warn('[NC] deck setup failed', e);
+  }
+
+  // Nextcloud notifications (best-effort)
+  try {
+    const notify = async (user: string, shortMessage: string, longMessage: string) => {
+      const params = new URLSearchParams({ shortMessage, longMessage, user, link: filesUrl });
+      const r = await ocsRequest('POST', '/ocs/v2.php/apps/notifications/api/v2/admin/notifications', params);
+      if (trace) console.log('[NC] notify', user, r.status, r.json?.ocs?.meta);
+    };
+    for (const u of allUsers) {
+      await notify(u, `Projet prêt: ${title}`, 'Votre espace collaboratif est disponible.');
+    }
+  } catch (e) {
+    if (trace) console.warn('[NC] notifications failed', e);
+  }
 
   // Persist in DB (upsert-like)
   const { data: existing } = await supabase
-    .from("nextcloud_projects")
-    .select("id")
-    .eq("project_id", projectId)
+    .from('nextcloud_projects')
+    .select('id')
+    .eq('project_id', projectId)
     .maybeSingle();
 
   if (existing?.id) {
     await supabase
-      .from("nextcloud_projects")
+      .from('nextcloud_projects')
       .update({ nextcloud_url: filesUrl, folder_path: `/${folderName}`, talk_url: talk.url || null })
-      .eq("id", existing.id);
+      .eq('id', existing.id);
   } else {
     await supabase
-      .from("nextcloud_projects")
+      .from('nextcloud_projects')
       .insert({ project_id: projectId, nextcloud_url: filesUrl, folder_path: `/${folderName}`, talk_url: talk.url || null });
   }
 
-  return json({ ok: true, nextcloud: { filesUrl, talkUrl: talk.url, calendarUrl: calendar.calendarUrl }, correlationId });
+  return json({ ok: true, nextcloud: { filesUrl, talkUrl: talk.url, calendarUrl: calendar.calendarUrl, deckUrl }, correlationId });
 }
 
 async function handleUserSwap(body: any, trace: boolean, correlationId: string) {

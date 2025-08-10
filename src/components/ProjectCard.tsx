@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-import { Play, Pause, Eye, Trash2, ExternalLink, Users } from "lucide-react";
+import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -368,9 +368,14 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               size="sm"
               onClick={handleStatusToggle}
               className="flex-1"
-              disabled={project.status === 'pause' && !allResourcesBooked}
+              disabled={(project.status === 'pause' && !allResourcesBooked) || isSyncing}
            >
-              {project.status === 'play' ? (
+              {isSyncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Mise en place...
+                </>
+              ) : project.status === 'play' ? (
                 <>
                   <Pause className="w-4 h-4 mr-2" />
                   Pause
@@ -383,7 +388,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               )}
             </Button>
 
-            <Button variant="outline" size="sm" onClick={() => onView(project.id)}>
+            <Button variant="outline" size="sm" onClick={() => onView(project.id)} disabled={isSyncing}>
               <Eye className="w-4 h-4" />
             </Button>
 
