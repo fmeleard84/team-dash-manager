@@ -101,3 +101,6 @@ verify_jwt = false
 [functions.nc-orchestrator]
 verify_jwt = false
 
+[functions.project-details]
+verify_jwt = false
+

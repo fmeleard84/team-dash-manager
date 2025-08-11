@@ -34,6 +34,8 @@ interface ProjectDetail {
   title: string;
   description: string;
   project_date: string;
+  due_date?: string | null;
+  client_budget?: number | null;
   resourceProfile: string;
 }
 
@@ -173,15 +175,42 @@ const CandidateProjects = () => {
     }
   };
 
-  const handleViewDetails = (notification: ProjectNotification) => {
-    setSelectedProject({
-      id: notification.project_id,
-      title: notification.projects.title,
-      description: notification.projects.description,
-      project_date: notification.projects.project_date,
-      resourceProfile: notification.hr_resource_assignments.hr_profiles.name
+const handleViewDetails = async (notification: ProjectNotification) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('project-details', {
+      body: {
+        action: 'get_candidate_project_details',
+        projectId: notification.project_id,
+        resourceAssignmentId: notification.resource_assignment_id,
+      },
     });
-  };
+    if (error) throw error;
+    if (data?.success && data?.project) {
+      const p = data.project;
+      setSelectedProject({
+        id: p.id,
+        title: p.title,
+        description: p.description || '',
+        project_date: p.project_date,
+        due_date: p.due_date ?? null,
+        client_budget: p.client_budget ?? null,
+        resourceProfile: p.resourceProfile || notification.hr_resource_assignments.hr_profiles.name,
+      });
+    } else {
+      // fallback to local enrichment
+      setSelectedProject({
+        id: notification.project_id,
+        title: notification.projects.title,
+        description: notification.projects.description,
+        project_date: notification.projects.project_date,
+        resourceProfile: notification.hr_resource_assignments.hr_profiles.name,
+      });
+    }
+  } catch (e) {
+    console.error('Erreur chargement détails projet:', e);
+    toast.error("Impossible de charger les détails du projet");
+  }
+};
 
   const handleAcceptMission = async (notification: ProjectNotification) => {
     try {
@@ -325,9 +354,19 @@ const fetchAcceptedProjects = async () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR');
-  };
+const formatDate = (dateString: string) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleDateString('fr-FR');
+};
+
+const formatCurrency = (n?: number | null) => {
+  if (typeof n !== 'number') return '—';
+  try {
+    return n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+  } catch {
+    return `${n}€`;
+  }
+};
 
   if (isLoading) {
     return <div className="p-6">Chargement...</div>;
@@ -367,20 +406,29 @@ const fetchAcceptedProjects = async () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h4 className="font-semibold mb-2">Description</h4>
-              <p className="text-muted-foreground">{selectedProject.description}</p>
+              <h4 className="font-semibold mb-2">Description du projet</h4>
+              <p className="text-muted-foreground">{selectedProject.description || '—'}</p>
             </div>
-            
-            <div>
-              <h4 className="font-semibold mb-2">Poste</h4>
-              <Badge variant="secondary">{selectedProject.resourceProfile}</Badge>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-semibold mb-2">Date de début</h4>
+                <p className="text-muted-foreground">{formatDate(selectedProject.project_date)}</p>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Délai demandé (date cible)</h4>
+                <p className="text-muted-foreground">{formatDate(selectedProject.due_date || '')}</p>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Budget global</h4>
+                <p className="text-muted-foreground">{formatCurrency(selectedProject.client_budget)}</p>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Poste</h4>
+                <Badge variant="secondary">{selectedProject.resourceProfile}</Badge>
+              </div>
             </div>
-            
-            <div>
-              <h4 className="font-semibold mb-2">Date du projet</h4>
-              <p className="text-muted-foreground">{formatDate(selectedProject.project_date)}</p>
-            </div>
-            
+
             {notification && (
               <div className="flex gap-4 pt-4">
                 <Button 
