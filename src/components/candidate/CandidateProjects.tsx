@@ -7,6 +7,7 @@ import { Eye, Check, X, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ProjectNotification {
   id: string;
@@ -57,6 +58,30 @@ const CandidateProjects = () => {
     }
   }, [currentCandidateId]);
 
+  // Realtime updates for notifications
+  useEffect(() => {
+    if (!currentCandidateId) return;
+    const channel = supabase
+      .channel(`candidate-notifs-${currentCandidateId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'candidate_notifications',
+          filter: `candidate_id=eq.${currentCandidateId}`,
+        },
+        () => {
+          fetchNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentCandidateId]);
+
   const fetchCurrentCandidate = async () => {
     try {
       if (!user?.profile?.email) {
@@ -79,6 +104,8 @@ const CandidateProjects = () => {
       if (candidate) {
         setCurrentCandidateId(candidate.id);
         toast.success(`Connecté en tant que ${candidate.first_name} ${candidate.last_name}`);
+      } else {
+        toast.info("Aucun profil candidat trouvé pour votre compte. Veuillez vérifier votre email ou contacter un administrateur.");
       }
     } catch (error) {
       console.error('Error:', error);
@@ -304,6 +331,22 @@ const fetchAcceptedProjects = async () => {
 
   if (isLoading) {
     return <div className="p-6">Chargement...</div>;
+  }
+
+  if (!currentCandidateId) {
+    return (
+      <div className="p-6 space-y-4">
+        <h2 className="text-2xl font-bold">Mes projets</h2>
+        <Alert>
+          <AlertTitle>Aucun profil candidat associé</AlertTitle>
+          <AlertDescription>
+            Aucun profil candidat n'a été trouvé pour l'email {user?.profile?.email || 'inconnu'}.<br />
+            Vérifiez que vous êtes connecté avec le bon compte, ou contactez un administrateur.
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" onClick={fetchCurrentCandidate}>Rafraîchir</Button>
+      </div>
+    );
   }
 
   if (selectedProject) {
