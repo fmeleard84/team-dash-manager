@@ -91,6 +91,39 @@ Deno.serve(async (req) => {
     }
 
     // Action router
+    if (action === 'get_candidate_projects_details') {
+      const { projectIds } = body;
+      
+      if (!projectIds || !Array.isArray(projectIds)) {
+        return new Response(
+          JSON.stringify({ error: 'projectIds array is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        const projectsData: any[] = [];
+        
+        for (const projectId of projectIds) {
+          const projectDetails = await getProjectDetails(supabase, projectId);
+          if (projectDetails) {
+            projectsData.push(projectDetails);
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ projectsData }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Error fetching project details:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch project details' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     if (action === "get_candidate_project_details") {
       if (!projectId) {
         return new Response(JSON.stringify({ success: false, message: "projectId requis" }), {

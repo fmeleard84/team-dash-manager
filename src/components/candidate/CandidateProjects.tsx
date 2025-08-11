@@ -47,6 +47,7 @@ const CandidateProjects = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentCandidateId, setCurrentCandidateId] = useState<string | null>(null);
   const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({});
+  const [projectsData, setProjectsData] = useState<{ [key: string]: any }>({});
   const { user } = useKeycloakAuth();
   useEffect(() => {
     fetchCurrentCandidate();
@@ -294,11 +295,12 @@ const fetchAcceptedProjects = async () => {
     // Conserver toutes les lignes, même si les relations imbriquées sont nulles (pas de FK)
     setAcceptedProjects(data || []);
 
-    // Récupérer les liens Nextcloud pour ces projets via la fonction (utilise service role)
+    // Récupérer les détails des projets et les liens Nextcloud
     const projectIds = (data || [])
-      .map((b: any) => b.projects?.id || b.project_id)
+      .map((b: any) => b.project_id)
       .filter(Boolean);
     if (projectIds.length > 0) {
+      await fetchProjectsDetails(projectIds);
       try {
         const { data: linksResp, error: linksErr } = await supabase.functions.invoke('project-details', {
           body: {
@@ -361,6 +363,32 @@ const fetchAcceptedProjects = async () => {
 const formatDate = (dateString: string) => {
   if (!dateString) return '—';
   return new Date(dateString).toLocaleDateString('fr-FR');
+};
+
+const fetchProjectsDetails = async (projectIds: string[]) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('project-details', {
+      body: { 
+        action: 'get_candidate_projects_details',
+        projectIds 
+      }
+    });
+
+    if (error) {
+      console.error('Error fetching projects details:', error);
+      return;
+    }
+
+    if (data?.projectsData) {
+      const projectsMap: { [key: string]: any } = {};
+      data.projectsData.forEach((project: any) => {
+        projectsMap[project.id] = project;
+      });
+      setProjectsData(projectsMap);
+    }
+  } catch (error) {
+    console.error('Error calling projects details function:', error);
+  }
 };
 
 const formatCurrency = (n?: number | null) => {
@@ -539,13 +567,13 @@ const formatCurrency = (n?: number | null) => {
                 <Card key={booking.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
+                     <CardTitle className="text-lg">{projectsData[booking.project_id]?.title || 'Projet sans titre'}</CardTitle>
                       <Badge variant="default">Accepté</Badge>
                     </div>
                   </CardHeader>
 <CardContent className="space-y-4">
   <p className="text-sm text-muted-foreground">
-    {booking.projects?.description || 'Aucune description disponible'}
+    {projectsData[booking.project_id]?.description || 'Aucune description disponible'}
   </p>
   
   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -557,26 +585,26 @@ const formatCurrency = (n?: number | null) => {
     </div>
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium">Date du projet:</span>
-      <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
+      <span className="text-sm">{projectsData[booking.project_id]?.project_date ? formatDate(projectsData[booking.project_id].project_date) : 'Non spécifiée'}</span>
     </div>
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium">Fin prévue:</span>
-      <span className="text-sm">{booking.projects?.due_date ? formatDate(booking.projects.due_date) : 'Non spécifiée'}</span>
+      <span className="text-sm">{projectsData[booking.project_id]?.due_date ? formatDate(projectsData[booking.project_id].due_date) : 'Non spécifiée'}</span>
     </div>
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium">Budget estimé:</span>
       <Badge variant="outline">
-        {formatCurrency(booking.projects?.client_budget)}
+        {formatCurrency(projectsData[booking.project_id]?.client_budget)}
       </Badge>
     </div>
   </div>
 
-  {booking.projects?.id && nextcloudLinks[booking.projects.id] && (
+  {booking.project_id && nextcloudLinks[booking.project_id] && (
     <div className="pt-2">
       <Button
         variant="outline"
         size="sm"
-        onClick={() => window.open(nextcloudLinks[booking.projects.id], '_blank')}
+        onClick={() => window.open(nextcloudLinks[booking.project_id], '_blank')}
       >
         <ExternalLink className="w-4 h-4 mr-2" />
         Rejoindre le projet sur Nextcloud
