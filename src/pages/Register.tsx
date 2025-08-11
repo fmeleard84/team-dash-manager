@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
-import { buildFunctionHeaders } from '@/lib/functionAuth';
+
 
 const Register = () => {
   const navigate = useNavigate();
@@ -79,7 +79,7 @@ const Register = () => {
       console.log('Testing edge function connectivity...');
       try {
         const healthCheck = await supabase.functions.invoke('keycloak-user-management', {
-          headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
+          headers: { 'x-debug-trace': 'true' },
           body: { action: 'health-check' }
         });
         console.log('Health check result:', healthCheck);
@@ -108,7 +108,7 @@ const Register = () => {
       });
       
       const { data, error } = await supabase.functions.invoke('keycloak-user-management', {
-        headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
+        headers: { 'x-debug-trace': 'true' },
         body: {
           action: 'create-user',
           email: formData.email,
@@ -142,7 +142,7 @@ const Register = () => {
         // Add the user to the selected group explicitly (email + group)
         const group = formData.profileType === 'client' ? 'client' : 'ressources';
         const addGroup = await supabase.functions.invoke('keycloak-user-management', {
-          headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
+          headers: { 'x-debug-trace': 'true' },
           body: {
             action: 'add-user-to-group',
             email: formData.email,
@@ -343,7 +343,7 @@ const Register = () => {
               onClick={async () => {
                 try {
                   const res = await supabase.functions.invoke('keycloak-user-management', {
-                    headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
+                    headers: { 'x-debug-trace': 'true' },
                     body: { action: 'test-connection' },
                   });
                   if (res.error || res.data?.success === false) {

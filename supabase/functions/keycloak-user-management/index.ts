@@ -253,6 +253,7 @@ if (!response.ok) {
 const tokenData = await response.json();
 console.log(`Successfully obtained Keycloak admin token from realm '${adminRealm}'`);
 return tokenData.access_token as string;
+}
 
 // Add test function for Keycloak connectivity
 async function testKeycloakConnection(): Promise<{ success: boolean; message: string; details?: any }> {
