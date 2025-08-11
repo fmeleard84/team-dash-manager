@@ -394,10 +394,57 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
     if (checkUserResponse.ok) {
       const existingUsers = await checkUserResponse.json();
       if (existingUsers && existingUsers.length > 0) {
-        console.log('User already exists:', existingUsers[0]);
+        const existing = existingUsers[0];
+        console.log('User already exists:', existing);
+        const existingId = existing.id as string;
+
+        // Optionally reset password if provided
+        if (body.password) {
+          try {
+            await setUserPassword(keycloakBaseUrl!, realm, existingId, body.password, adminToken);
+          } catch (e) {
+            console.warn('Failed to set password for existing user:', (e as any)?.message || e);
+          }
+        }
+
+        // Assign to group if requested
+        if (body.profileType) {
+          const assignRes = await assignUserToGroup(adminToken, existingId, body.profileType);
+          if (!assignRes.success) {
+            console.warn('Failed to assign existing user to group:', assignRes.error);
+          }
+        }
+
+        // Upsert profile in Supabase (will merge if already exists)
+        let profileStored = { success: false, error: 'Unknown error' } as { success: boolean; error?: string };
+        if (body.profileType === 'client') {
+          profileStored = await storeClientProfile({
+            keycloakUserId: existingId,
+            email: body.email,
+            firstName: body.firstName,
+            lastName: body.lastName,
+            phoneNumber: body.phoneNumber,
+            companyName: body.companyName,
+          });
+        } else {
+          profileStored = await storeCandidateProfile({
+            keycloakUserId: existingId,
+            email: body.email,
+            firstName: body.firstName,
+            lastName: body.lastName,
+            phoneNumber: body.phoneNumber,
+          });
+        }
+        if (!profileStored.success) {
+          console.warn('Profile upsert failed for existing user:', profileStored.error);
+        }
+
         return {
-          success: false,
-          error: `User with email ${body.email} already exists in Keycloak`
+          success: true,
+          message: 'User already existed, synchronized',
+          alreadyExisted: true,
+          keycloakUserId: existingId,
+          userDetails: existing,
         };
       }
     } else {
@@ -458,13 +505,39 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
       
       // Provide specific error messages based on status
       if (createUserResponse.status === 409) {
+        // Treat as success: user exists, synchronize password/group/profile
+        try {
+          const searchRes = await fetch(
+            `${keycloakBaseUrl}/admin/realms/${realm}/users?email=${encodeURIComponent(body.email)}`,
+            { method: 'GET', headers: { 'Authorization': `Bearer ${adminToken}`, 'Content-Type': 'application/json' } }
+          );
+          if (searchRes.ok) {
+            const users = await searchRes.json();
+            if (users && users.length > 0) {
+              const existing = users[0];
+              const existingId = existing.id as string;
+              if (body.password) {
+                try { await setUserPassword(keycloakBaseUrl!, realm, existingId, body.password, adminToken); } catch {}
+              }
+              if (body.profileType) {
+                await assignUserToGroup(adminToken, existingId, body.profileType);
+              }
+              if (body.profileType === 'client') {
+                await storeClientProfile({ keycloakUserId: existingId, email: body.email, firstName: body.firstName, lastName: body.lastName, phoneNumber: body.phoneNumber, companyName: body.companyName });
+              } else {
+                await storeCandidateProfile({ keycloakUserId: existingId, email: body.email, firstName: body.firstName, lastName: body.lastName, phoneNumber: body.phoneNumber });
+              }
+              return { success: true, message: 'User already existed, synchronized', alreadyExisted: true, keycloakUserId: existingId, userDetails: existing };
+            }
+          }
+        } catch {}
         return { success: false, error: `User with email ${body.email} already exists` };
       } else if (createUserResponse.status === 400) {
-        return { success: false, error: `Invalid user data provided: ${errorText}` };
+         return { success: false, error: `Invalid user data provided: ${errorText}` };
       } else if (createUserResponse.status === 403) {
-        return { success: false, error: `Insufficient permissions to create user` };
+         return { success: false, error: `Insufficient permissions to create user` };
       } else {
-        return { success: false, error: `Failed to create user in Keycloak (${createUserResponse.status}): ${errorText}` };
+         return { success: false, error: `Failed to create user in Keycloak (${createUserResponse.status}): ${errorText}` };
       }
     }
 
@@ -829,12 +902,13 @@ async function storeCandidateProfile(params: StoreProfileParams): Promise<{ succ
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    const response = await fetch(`${supabaseUrl}/rest/v1/candidate_profiles`, {
+    const response = await fetch(`${supabaseUrl}/rest/v1/candidate_profiles?on_conflict=keycloak_user_id`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
         'apikey': supabaseKey,
+        'Prefer': 'resolution=merge-duplicates'
       },
       body: JSON.stringify({
         keycloak_user_id: keycloakUserId,
@@ -869,12 +943,13 @@ async function storeClientProfile(params: StoreProfileParams): Promise<{ success
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    const response = await fetch(`${supabaseUrl}/rest/v1/client_profiles`, {
+    const response = await fetch(`${supabaseUrl}/rest/v1/client_profiles?on_conflict=keycloak_user_id`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
         'apikey': supabaseKey,
+        'Prefer': 'resolution=merge-duplicates'
       },
       body: JSON.stringify({
         keycloak_user_id: keycloakUserId,
