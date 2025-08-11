@@ -602,12 +602,13 @@ const formatCurrency = (n?: number | null) => {
   {booking.project_id && nextcloudLinks[booking.project_id] && (
     <div className="pt-2">
       <Button
-        variant="outline"
+        variant="default"
         size="sm"
+        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
         onClick={() => window.open(nextcloudLinks[booking.project_id], '_blank')}
       >
         <ExternalLink className="w-4 h-4 mr-2" />
-        Rejoindre le projet sur Nextcloud
+        Accéder à l'espace collaboratif
       </Button>
     </div>
   )}
