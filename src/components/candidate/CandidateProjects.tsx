@@ -268,6 +268,8 @@ const fetchAcceptedProjects = async () => {
         id,
         status,
         created_at,
+        project_id,
+        resource_assignment_id,
         projects (
           id,
           title,
@@ -287,17 +289,13 @@ const fetchAcceptedProjects = async () => {
 
     if (error) throw error;
     
-    // Filter out bookings with null projects or resource assignments
-    const validBookings = (data || []).filter((booking: any) => 
-      booking.projects && 
-      booking.hr_resource_assignments && 
-      booking.hr_resource_assignments.hr_profiles
-    );
-    
-    setAcceptedProjects(validBookings);
+    // Conserver toutes les lignes, même si les relations imbriquées sont nulles (pas de FK)
+    setAcceptedProjects(data || []);
 
-    // Fetch Nextcloud links for these projects via edge function (bypasses RLS safely)
-    const projectIds = validBookings.map((b: any) => b.projects.id).filter(Boolean);
+    // Récupérer les liens Nextcloud pour ces projets via la fonction (utilise service role)
+    const projectIds = (data || [])
+      .map((b: any) => b.projects?.id || b.project_id)
+      .filter(Boolean);
     if (projectIds.length > 0) {
       try {
         const { data: linksResp, error: linksErr } = await supabase.functions.invoke('project-details', {
