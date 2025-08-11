@@ -200,17 +200,15 @@ Deno.serve(async (req) => {
           redirectPath = `/apps/files?dir=${dir}`;
         }
 
-        // Use Social Login by default, fallback to OIDC if no provider ID
         const loginPath = providerId
           ? `/index.php/apps/sociallogin/custom_oauth2/${providerId}`
           : `/index.php/apps/sociallogin/custom_oauth2/keycloak`;
 
-        // Build SSO init URL (falls back to stored web URL if base URL not configured)
-        const ssoUrl = baseUrl
+        const link = baseUrl
           ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
-          : row.nextcloud_url; // Fallback to stored URL if base URL is not configured
+          : (row.nextcloud_url || null);
 
-        links[row.project_id] = ssoUrl;
+        links[row.project_id] = link;
       }
 
       return new Response(JSON.stringify({ success: true, links }), {
