@@ -139,7 +139,24 @@ const Register = () => {
       console.log('User created successfully:', data);
 
       if (data.success) {
-        toast.success("Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.");
+        // Add the user to the selected group explicitly (email + group)
+        const group = formData.profileType === 'client' ? 'client' : 'ressources';
+        const addGroup = await supabase.functions.invoke('keycloak-user-management', {
+          headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
+          body: {
+            action: 'add-user-to-group',
+            email: formData.email,
+            group,
+          },
+        });
+
+        if (addGroup.error || addGroup.data?.error) {
+          console.error('Group assignment failed:', addGroup.error || addGroup.data?.error);
+          toast.error(`Compte créé mais l'ajout au groupe a échoué: ${addGroup.data?.error || addGroup.error?.message || ''}`);
+        } else {
+          toast.success("Votre compte a été créé et ajouté au groupe avec succès. Vous pouvez maintenant vous connecter.");
+        }
+
         setActiveTab('login');
       } else {
         console.error('User creation failed:', data);
@@ -316,10 +333,31 @@ const Register = () => {
             </TabsContent>
           </Tabs>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 flex items-center justify-between">
             <Link to="/" className="text-sm text-primary hover:underline">
               Retour à l'accueil
             </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const res = await supabase.functions.invoke('keycloak-user-management', {
+                    headers: { ...buildFunctionHeaders(), 'x-debug-trace': 'true' },
+                    body: { action: 'test-connection' },
+                  });
+                  if (res.error || res.data?.success === false) {
+                    toast.error(`Diagnostic: ${res.data?.message || res.error?.message || 'Erreur'}`);
+                  } else {
+                    toast.success(`Diagnostic OK: ${res.data?.message || 'Connecté à Keycloak'}`);
+                  }
+                } catch (err: any) {
+                  toast.error(`Diagnostic échoué: ${err?.message || 'Erreur inconnue'}`);
+                }
+              }}
+            >
+              Diagnostic
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -12,14 +12,16 @@ interface CreateUserRequest {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
-  password: string;
+  password?: string;
   profileType?: string;
   companyName?: string;
 }
 
 interface AddUserToGroupRequest {
-  userId: string;
-  groupId: string;
+  userId?: string;
+  groupId?: string;
+  email?: string;
+  group?: string;
 }
 
 interface CreateProjectGroupRequest {
@@ -198,82 +200,59 @@ async function getKeycloakAdminToken(): Promise<string> {
   const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'haas-backend';
   const clientSecret = Deno.env.get('KEYCLOAK_CLIENT_SECRET');
   
-  // Fallback to username/password if no client secret provided
-  const adminUsername = Deno.env.get('KEYCLOAK_ADMIN_USERNAME');
-  const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
+// Enforce client_credentials only
+const adminUsername = Deno.env.get('KEYCLOAK_ADMIN_USERNAME');
+const adminPassword = Deno.env.get('KEYCLOAK_ADMIN_PASSWORD');
 
-  console.log(`=== Keycloak Admin Token Request ===`);
-  console.log(`Environment Variables Check:`);
-  console.log(`- KEYCLOAK_BASE_URL: ${keycloakBaseUrl || 'NOT SET'}`);
-  console.log(`- KEYCLOAK_ADMIN_REALM: ${adminRealm}`);
-  console.log(`- KEYCLOAK_CLIENT_ID: ${clientId}`);
-  console.log(`- KEYCLOAK_CLIENT_SECRET: ${clientSecret ? 'SET (length: ' + clientSecret.length + ')' : 'NOT SET'}`);
-  console.log(`- KEYCLOAK_ADMIN_USERNAME: ${adminUsername || 'NOT SET'}`);
-  console.log(`- KEYCLOAK_ADMIN_PASSWORD: ${adminPassword ? 'SET' : 'NOT SET'}`);
+console.log(`=== Keycloak Admin Token Request ===`);
+console.log(`Environment Variables Check:`);
+console.log(`- KEYCLOAK_BASE_URL: ${keycloakBaseUrl || 'NOT SET'}`);
+console.log(`- KEYCLOAK_ADMIN_REALM: ${adminRealm}`);
+console.log(`- KEYCLOAK_CLIENT_ID: ${clientId}`);
+console.log(`- KEYCLOAK_CLIENT_SECRET: ${clientSecret ? 'SET (length: ' + clientSecret.length + ')' : 'NOT SET'}`);
+console.log(`- KEYCLOAK_ADMIN_USERNAME: ${adminUsername || 'NOT SET'}`);
+console.log(`- KEYCLOAK_ADMIN_PASSWORD: ${adminPassword ? 'SET' : 'NOT SET'}`);
 
-  if (!keycloakBaseUrl) {
-    throw new Error('Missing KEYCLOAK_BASE_URL environment variable');
-  }
-
-  const tokenUrl = `${keycloakBaseUrl}/realms/${adminRealm}/protocol/openid-connect/token`;
-  console.log(`Token URL: ${tokenUrl}`);
-
-  let authParams: URLSearchParams;
-  
-  // For service account client (svc-supabase-admin), use client_credentials
-  if (clientId === 'svc-supabase-admin' && clientSecret) {
-    console.log('Using client_credentials grant type for service account');
-    authParams = new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
-  } else if (clientSecret) {
-    console.log('Using client_credentials grant type with client secret');
-    authParams = new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
-  } else if (adminUsername && adminPassword) {
-    console.log('Using password grant type with admin credentials');
-    authParams = new URLSearchParams({
-      grant_type: 'password',
-      client_id: 'admin-cli',
-      username: adminUsername,
-      password: adminPassword,
-    });
-  } else {
-    throw new Error('Either KEYCLOAK_CLIENT_SECRET or both KEYCLOAK_ADMIN_USERNAME and KEYCLOAK_ADMIN_PASSWORD must be provided');
-  }
-
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: authParams,
-  });
-
-  console.log(`Token response status: ${response.status} ${response.statusText}`);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`=== Keycloak Token Error ===`);
-    console.error(`Status: ${response.status} ${response.statusText}`);
-    console.error(`Response body: ${errorText}`);
-    console.error(`Token URL used: ${tokenUrl}`);
-    console.error(`Client ID used: ${clientId}`);
-    console.error(`Grant type: ${authParams.get('grant_type')}`);
-    console.error(`SUGGESTION: Check credentials and realm accessibility: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid-configuration`);
-    
-    // Return the actual Keycloak error instead of 500
-    throw new Error(`Keycloak auth failed (${response.status}): ${errorText}`);
-  }
-
-  const tokenData = await response.json();
-  console.log(`Successfully obtained Keycloak admin token from realm '${adminRealm}'`);
-  return tokenData.access_token as string;
-
+if (!keycloakBaseUrl) {
+  throw new Error('Missing KEYCLOAK_BASE_URL environment variable');
 }
+
+const tokenUrl = Deno.env.get('KEYCLOAK_TOKEN_URL') ?? `${keycloakBaseUrl}/realms/${adminRealm}/protocol/openid-connect/token`;
+console.log(`Token URL: ${tokenUrl}`);
+
+if (!clientId || !clientSecret) {
+  throw new Error('Missing KEYCLOAK_CLIENT_ID or KEYCLOAK_CLIENT_SECRET. Only client_credentials is supported.');
+}
+
+const authParams = new URLSearchParams({
+  grant_type: 'client_credentials',
+  client_id: clientId,
+  client_secret: clientSecret,
+});
+
+const response = await fetch(tokenUrl, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: authParams,
+});
+
+console.log(`Token response status: ${response.status} ${response.statusText}`);
+
+if (!response.ok) {
+  const errorText = await response.text();
+  console.error(`=== Keycloak Token Error ===`);
+  console.error(`Status: ${response.status} ${response.statusText}`);
+  console.error(`Response body: ${errorText}`);
+  console.error(`Token URL used: ${tokenUrl}`);
+  console.error(`Client ID used: ${clientId}`);
+  console.error(`Grant type: ${authParams.get('grant_type')}`);
+  console.error(`SUGGESTION: Check credentials and realm accessibility: ${keycloakBaseUrl}/realms/${adminRealm}/.well-known/openid-configuration`);
+  throw new Error(`Keycloak auth failed (${response.status}): ${errorText}`);
+}
+
+const tokenData = await response.json();
+console.log(`Successfully obtained Keycloak admin token from realm '${adminRealm}'`);
+return tokenData.access_token as string;
 
 // Add test function for Keycloak connectivity
 async function testKeycloakConnection(): Promise<{ success: boolean; message: string; details?: any }> {
@@ -385,6 +364,11 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
   });
   
   try {
+    // Validate required fields
+    if (!body?.email || !body?.firstName || !body?.lastName) {
+      return { success: false, error: 'Missing required fields: email, firstName, lastName' };
+    }
+
     // Get admin token
     const adminToken = await getKeycloakAdminToken();
     const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
@@ -511,8 +495,10 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
           console.log('Found created user:', foundUser);
           const foundUserId = foundUser.id;
           
-          // Set password for the found user
-          await setUserPassword(keycloakBaseUrl, realm, foundUserId, body.password, adminToken);
+          // Set password for the found user (optional)
+          if (body.password) {
+            await setUserPassword(keycloakBaseUrl, realm, foundUserId, body.password, adminToken);
+          }
           
           return {
             success: true,
@@ -527,8 +513,10 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
     }
 
     console.log('Setting password for user:', keycloakUserId);
-    // Set password
-    await setUserPassword(keycloakBaseUrl, realm, keycloakUserId, body.password, adminToken);
+    // Set password (optional)
+    if (body.password) {
+      await setUserPassword(keycloakBaseUrl, realm, keycloakUserId, body.password, adminToken);
+    }
     
     // Assign user to appropriate group
     if (body.profileType) {
@@ -594,32 +582,102 @@ async function handleCreateUser(body: CreateUserRequest, supabase: any) {
 
 
 async function handleAddUserToGroup(body: AddUserToGroupRequest, supabase: any) {
-  
   try {
     const adminToken = await getKeycloakAdminToken();
     const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
     const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
-    // Add user to group in Keycloak
-    const addToGroupResponse = await fetch(
-      `${keycloakBaseUrl}/admin/realms/${realm}/users/${body.userId}/groups/${body.groupId}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${adminToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Validate payload
+    if (!body) {
+      return new Response(
+        JSON.stringify({ error: 'Missing request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    if (!addToGroupResponse.ok) {
-      const errorText = await addToGroupResponse.text();
-      throw new Error(`Failed to add user to group: ${errorText}`);
+    // Case 1: Email + group name (preferred contract)
+    if (body.email && body.group) {
+      // Find user by email
+      const searchRes = await fetch(
+        `${keycloakBaseUrl}/admin/realms/${realm}/users?email=${encodeURIComponent(body.email)}`,
+        { headers: { 'Authorization': `Bearer ${adminToken}`, 'Content-Type': 'application/json' } }
+      );
+      if (!searchRes.ok) {
+        const t = await searchRes.text();
+        return new Response(
+          JSON.stringify({ error: 'Failed to search user by email', details: t }),
+          { status: searchRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const users = await searchRes.json();
+      if (!users || users.length === 0) {
+        return new Response(
+          JSON.stringify({ error: `User not found for email ${body.email}` }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const userId = users[0].id as string;
+
+      // Assign using normalized group name, ensuring existence
+      const assignRes = await assignUserToGroup(adminToken, userId, body.group);
+      if (!assignRes.success) {
+        return new Response(
+          JSON.stringify({ error: assignRes.error || 'Failed to assign user to group' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, userId, group: body.group }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Case 2: userId + groupId direct
+    if (body.userId && body.groupId) {
+      const addToGroupResponse = await fetch(
+        `${keycloakBaseUrl}/admin/realms/${realm}/users/${body.userId}/groups/${body.groupId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!addToGroupResponse.ok) {
+        const errorText = await addToGroupResponse.text();
+        return new Response(
+          JSON.stringify({ error: 'Failed to add user to group', details: errorText }),
+          { status: addToGroupResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, userId: body.userId, groupId: body.groupId }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Case 3: userId + group name
+    if (body.userId && body.group) {
+      const assignRes = await assignUserToGroup(adminToken, body.userId, body.group);
+      if (!assignRes.success) {
+        return new Response(
+          JSON.stringify({ error: assignRes.error || 'Failed to assign user to group' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: true, userId: body.userId, group: body.group }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Invalid payload. Provide either {email, group} or {userId, groupId} or {userId, group}.' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
