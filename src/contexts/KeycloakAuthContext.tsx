@@ -25,10 +25,10 @@ export const useKeycloakAuth = () => {
 
 const keycloakConfig = {
   authority: 'https://keycloak.ialla.fr/realms/haas',
-  client_id: 'backoffice',
+  client_id: 'react-app',
   redirect_uri: `${window.location.origin}/register?tab=login`,
   response_type: 'code',
-  scope: 'openid profile email',
+  scope: 'openid profile email groups',
   automaticSilentRenew: true,
   includeIdTokenInSilentRenew: true,
   onSigninCallback: () => {
@@ -70,16 +70,16 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
       const profile = oidcAuth.user?.profile as any;
       
       console.log('Checking resource_access:', profile?.resource_access);
-      if (profile?.resource_access?.backoffice?.roles) {
-        console.log('Found roles in resource_access.backoffice:', profile.resource_access.backoffice.roles);
-        rawGroups = profile.resource_access.backoffice.roles as string[];
+      if (profile?.resource_access?.['react-app']?.roles) {
+        console.log('Found roles in resource_access.react-app:', profile.resource_access['react-app'].roles);
+        rawGroups = profile.resource_access['react-app'].roles as string[];
       } else {
         console.log('Checking realm_access:', profile?.realm_access);
         if (profile?.realm_access?.roles) {
-          console.log('Found roles in realm_access:', profile.realm_access.roles);
-          rawGroups = (profile.realm_access.roles as string[]).filter((role: string) => 
-            ['client', 'candidate', 'resource', 'admin'].includes(role)
-          );
+           console.log('Found roles in realm_access:', profile.realm_access.roles);
+           rawGroups = (profile.realm_access.roles as string[]).filter((role: string) => 
+             ['client', 'candidate', 'resource', 'ressources', 'admin'].includes(role)
+           );
         }
       }
       
@@ -96,6 +96,7 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
     
     const cleanedGroups = rawGroups
       .map(group => group.startsWith('/') ? group.substring(1) : group)
+      .map(group => (group === 'ressources' || group === 'ressource') ? 'resource' : group)
       .filter(group => ['client', 'candidate', 'resource', 'admin'].includes(group));
     
     console.log('Raw groups:', rawGroups);

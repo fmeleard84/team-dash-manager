@@ -195,7 +195,7 @@ serve(async (req) => {
 async function getKeycloakAdminToken(): Promise<string> {
   const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
   const adminRealm = Deno.env.get('KEYCLOAK_ADMIN_REALM') || Deno.env.get('KEYCLOAK_REALM') || 'haas';
-  const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'svc-supabase-admin';
+  const clientId = Deno.env.get('KEYCLOAK_CLIENT_ID') || 'haas-backend';
   const clientSecret = Deno.env.get('KEYCLOAK_CLIENT_SECRET');
   
   // Fallback to username/password if no client secret provided
@@ -731,10 +731,11 @@ async function assignUserToGroup(token: string, userId: string, profileType: str
     const keycloakBaseUrl = Deno.env.get('KEYCLOAK_BASE_URL');
     const realm = Deno.env.get('KEYCLOAK_REALM') || 'haas';
 
-    // Ensure the group exists, create if it doesn't
-    const groupResult = await createGroupIfNotExists(token, profileType);
+    // Ensure the group exists, normalize profileType to Keycloak groups
+    const normalized = (profileType === 'resource' || profileType === 'ressource' || profileType === 'ressources') ? 'ressources' : (profileType === 'client' ? 'client' : profileType);
+    const groupResult = await createGroupIfNotExists(token, normalized);
     if (!groupResult.success || !groupResult.groupId) {
-      console.error(`Failed to ensure group ${profileType} exists:`, groupResult.error);
+      console.error(`Failed to ensure group ${normalized} exists:`, groupResult.error);
       return { success: false, error: groupResult.error || 'Failed to create group' };
     }
 
@@ -753,7 +754,7 @@ async function assignUserToGroup(token: string, userId: string, profileType: str
       return { success: false, error: 'Failed to assign user to group' };
     }
 
-    console.log(`User assigned to ${profileType} group successfully`);
+    console.log(`User assigned to ${normalized} group successfully`);
     return { success: true };
 
   } catch (error) {
@@ -932,7 +933,7 @@ async function handleCreateProjectGroups(body: any, supabase: any) {
     }
 
     const baseGroup = `Projet-${slug}`;
-    const groupNames = [`${baseGroup}-client`, `${baseGroup}-ressource`];
+    const groupNames = [`${baseGroup}-client`, `${baseGroup}-ressources`];
 
     const results: Array<{ name: string; groupId?: string; error?: string; warning?: string }> = [];
 
