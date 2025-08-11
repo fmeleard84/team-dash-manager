@@ -184,13 +184,28 @@ Deno.serve(async (req) => {
 
       const { data: ncRows, error: ncErr } = await supabase
         .from("nextcloud_projects")
-        .select("project_id, nextcloud_url")
+        .select("project_id, nextcloud_url, folder_path")
         .in("project_id", allowedProjectIds);
       if (ncErr) throw ncErr;
 
+      const baseUrl = (Deno.env.get("NEXTCLOUD_BASE_URL") || "").replace(/\/$/, "");
+      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
+
       const links: Record<string, string> = {};
       for (const row of ncRows || []) {
-        links[row.project_id] = row.nextcloud_url;
+        // Build redirect path to Files app, optionally to the project folder
+        let redirectPath = "/apps/files";
+        if (row.folder_path) {
+          const dir = row.folder_path.startsWith("/") ? row.folder_path : `/${row.folder_path}`;
+          redirectPath = `/apps/files?dir=${encodeURIComponent(dir)}`;
+        }
+
+        // Build Social Login init URL
+        const ssoUrl = baseUrl
+          ? `${baseUrl}/index.php/apps/sociallogin/custom_oauth2/${providerId}?redirect_url=${encodeURIComponent(redirectPath)}`
+          : row.nextcloud_url; // Fallback to stored URL if base URL is not configured
+
+        links[row.project_id] = ssoUrl;
       }
 
       return new Response(JSON.stringify({ success: true, links }), {
