@@ -28,7 +28,7 @@ const keycloakConfig = {
   client_id: 'react-app',
   redirect_uri: `${window.location.origin}/register?tab=login`,
   response_type: 'code',
-  scope: 'openid profile email groups',
+  scope: 'openid profile email',
   automaticSilentRenew: true,
   includeIdTokenInSilentRenew: true,
   onSigninCallback: () => {
