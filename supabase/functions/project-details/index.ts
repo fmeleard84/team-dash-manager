@@ -72,21 +72,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = getSupabaseClient();
     const body = await req.json().catch(() => ({}));
-    const { action, projectId, resourceAssignmentId } = body || {};
-
-    if (action !== "get_candidate_project_details") {
-      return new Response(JSON.stringify({ success: false, message: "Invalid action" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
-    }
-
-    if (!projectId) {
-      return new Response(JSON.stringify({ success: false, message: "projectId requis" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
-    }
+    const { action, projectId, resourceAssignmentId, projectIds } = body || {};
 
     const keycloakEmail = req.headers.get("x-keycloak-email") || "";
     if (!keycloakEmail) {
@@ -96,8 +82,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log("[project-details] Request", { projectId, resourceAssignmentId, keycloakEmail });
-
     const candidate = await getCandidateByEmail(supabase, keycloakEmail);
     if (!candidate?.id) {
       return new Response(JSON.stringify({ success: false, message: "Candidat introuvable" }), {
@@ -106,28 +90,85 @@ Deno.serve(async (req) => {
       });
     }
 
-    const hasNotif = await hasNotificationForProject(supabase, candidate.id, projectId);
-    if (!hasNotif) {
-      return new Response(JSON.stringify({ success: false, message: "Aucune notification liée à ce projet" }), {
+    // Action router
+    if (action === "get_candidate_project_details") {
+      if (!projectId) {
+        return new Response(JSON.stringify({ success: false, message: "projectId requis" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      console.log("[project-details] Details", { projectId, resourceAssignmentId, keycloakEmail });
+
+      const hasNotif = await hasNotificationForProject(supabase, candidate.id, projectId);
+      if (!hasNotif) {
+        return new Response(JSON.stringify({ success: false, message: "Aucune notification liée à ce projet" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 403,
+        });
+      }
+
+      const project = await getProjectDetails(supabase, projectId);
+      if (!project) {
+        return new Response(JSON.stringify({ success: false, message: "Projet introuvable" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        });
+      }
+
+      const resourceProfile = await getResourceProfileName(supabase, resourceAssignmentId);
+
+      return new Response(
+        JSON.stringify({ success: true, project: { ...project, resourceProfile } }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "get_candidate_nextcloud_links") {
+      if (!Array.isArray(projectIds) || projectIds.length === 0) {
+        return new Response(JSON.stringify({ success: false, message: "projectIds requis" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      // Only return links for projects where the candidate has accepted/completed a booking
+      const { data: bookings, error: bookingsErr } = await supabase
+        .from("project_bookings")
+        .select("project_id, status")
+        .in("project_id", projectIds)
+        .eq("candidate_id", candidate.id)
+        .in("status", ["accepted", "completed"]);
+      if (bookingsErr) throw bookingsErr;
+
+      const allowedProjectIds = (bookings || []).map((b: any) => b.project_id);
+      if (allowedProjectIds.length === 0) {
+        return new Response(JSON.stringify({ success: true, links: {} }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: ncRows, error: ncErr } = await supabase
+        .from("nextcloud_projects")
+        .select("project_id, nextcloud_url")
+        .in("project_id", allowedProjectIds);
+      if (ncErr) throw ncErr;
+
+      const links: Record<string, string> = {};
+      for (const row of ncRows || []) {
+        links[row.project_id] = row.nextcloud_url;
+      }
+
+      return new Response(JSON.stringify({ success: true, links }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 403,
       });
     }
 
-    const project = await getProjectDetails(supabase, projectId);
-    if (!project) {
-      return new Response(JSON.stringify({ success: false, message: "Projet introuvable" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 404,
-      });
-    }
-
-    const resourceProfile = await getResourceProfileName(supabase, resourceAssignmentId);
-
-    return new Response(
-      JSON.stringify({ success: true, project: { ...project, resourceProfile } }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: false, message: "Invalid action" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+    });
   } catch (err) {
     console.error("[project-details] Error", err);
     return new Response(JSON.stringify({ success: false, message: "Erreur serveur" }), {

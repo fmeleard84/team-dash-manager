@@ -58,6 +58,26 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     fetchResourceAssignments();
   }, [project.id]);
 
+  // Fetch Nextcloud workspace URL when project is active (client side CTA)
+  useEffect(() => {
+    const fetchNextcloud = async () => {
+      try {
+        if (project.status !== 'play') return;
+        const { data, error } = await supabase
+          .from('nextcloud_projects')
+          .select('nextcloud_url')
+          .eq('project_id', project.id)
+          .maybeSingle();
+        if (!error && data?.nextcloud_url) {
+          setPlankaProject({ planka_url: data.nextcloud_url });
+        }
+      } catch (e) {
+        console.error('Error fetching Nextcloud URL:', e);
+      }
+    };
+    fetchNextcloud();
+  }, [project.id, project.status]);
+
   const fetchResourceAssignments = async () => {
     try {
       const { data, error } = await supabase

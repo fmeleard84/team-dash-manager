@@ -296,17 +296,21 @@ const fetchAcceptedProjects = async () => {
     
     setAcceptedProjects(validBookings);
 
-    // Fetch Nextcloud links for these projects
+    // Fetch Nextcloud links for these projects via edge function (bypasses RLS safely)
     const projectIds = validBookings.map((b: any) => b.projects.id).filter(Boolean);
     if (projectIds.length > 0) {
-      const { data: ncRows, error: ncErr } = await supabase
-        .from('nextcloud_projects')
-        .select('project_id, nextcloud_url')
-        .in('project_id', projectIds);
-      if (!ncErr && ncRows) {
-        const map: Record<string, string> = {};
-        for (const row of ncRows) map[row.project_id] = row.nextcloud_url;
-        setNextcloudLinks(map);
+      try {
+        const { data: linksResp, error: linksErr } = await supabase.functions.invoke('project-details', {
+          body: {
+            action: 'get_candidate_nextcloud_links',
+            projectIds,
+          },
+        });
+        if (!linksErr && linksResp?.success && linksResp.links) {
+          setNextcloudLinks(linksResp.links as Record<string, string>);
+        }
+      } catch (e) {
+        console.error('Error fetching Nextcloud links via function:', e);
       }
     }
   } catch (error) {
