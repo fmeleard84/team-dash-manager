@@ -58,24 +58,22 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     fetchResourceAssignments();
   }, [project.id]);
 
-  // Fetch Nextcloud workspace URL when project is active (client side CTA)
+  // Fetch Nextcloud SSO link for client when project is active (client side CTA)
   useEffect(() => {
-    const fetchNextcloud = async () => {
+    const fetchOwnerNextcloudLink = async () => {
       try {
         if (project.status !== 'play') return;
-        const { data, error } = await supabase
-          .from('nextcloud_projects')
-          .select('nextcloud_url')
-          .eq('project_id', project.id)
-          .maybeSingle();
-        if (!error && data?.nextcloud_url) {
-          setPlankaProject({ planka_url: data.nextcloud_url });
+        const { data, error } = await supabase.functions.invoke('project-details', {
+          body: { action: 'get_owner_nextcloud_link', projectId: project.id },
+        });
+        if (!error && data?.success && data.link) {
+          setPlankaProject({ planka_url: data.link });
         }
       } catch (e) {
-        console.error('Error fetching Nextcloud URL:', e);
+        console.error('Error fetching owner Nextcloud SSO link:', e);
       }
     };
-    fetchNextcloud();
+    fetchOwnerNextcloudLink();
   }, [project.id, project.status]);
 
   const fetchResourceAssignments = async () => {

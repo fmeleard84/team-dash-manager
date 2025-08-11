@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
       if (ncErr) throw ncErr;
 
       const baseUrl = (Deno.env.get("NEXTCLOUD_BASE_URL") || "").replace(/\/$/, "");
-      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
+      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID");
 
       const links: Record<string, string> = {};
       for (const row of ncRows || []) {
@@ -197,12 +197,17 @@ Deno.serve(async (req) => {
         let redirectPath = "/apps/files";
         if (row.folder_path) {
           const dir = row.folder_path.startsWith("/") ? row.folder_path : `/${row.folder_path}`;
-          redirectPath = `/apps/files?dir=${encodeURIComponent(dir)}`;
+          redirectPath = `/apps/files?dir=${dir}`;
         }
 
-        // Build Social Login init URL
+        // Choose SSO init path based on configuration
+        const loginPath = providerId
+          ? `/index.php/apps/sociallogin/custom_oauth2/${providerId}`
+          : `/index.php/apps/oidc_login/redirect`;
+
+        // Build SSO init URL (falls back to stored web URL if base URL not configured)
         const ssoUrl = baseUrl
-          ? `${baseUrl}/index.php/apps/sociallogin/custom_oauth2/${providerId}?redirect_url=${encodeURIComponent(redirectPath)}`
+          ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
           : row.nextcloud_url; // Fallback to stored URL if base URL is not configured
 
         links[row.project_id] = ssoUrl;
@@ -213,6 +218,66 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "get_owner_nextcloud_link") {
+      if (!projectId) {
+        return new Response(JSON.stringify({ success: false, message: "projectId requis" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      const keycloakSub = req.headers.get("x-keycloak-sub") || "";
+      if (!keycloakSub) {
+        return new Response(JSON.stringify({ success: false, message: "Non authentifié" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        });
+      }
+
+      // Ensure requester owns the project
+      const { data: proj, error: projErr } = await supabase
+        .from("projects")
+        .select("id, keycloak_user_id")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (projErr) throw projErr;
+      if (!proj || proj.keycloak_user_id !== keycloakSub) {
+        return new Response(JSON.stringify({ success: false, message: "Accès refusé" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 403,
+        });
+      }
+
+      const { data: nc, error: ncErr2 } = await supabase
+        .from("nextcloud_projects")
+        .select("folder_path, nextcloud_url")
+        .eq("project_id", projectId)
+        .maybeSingle();
+      if (ncErr2) throw ncErr2;
+
+      const baseUrl = (Deno.env.get("NEXTCLOUD_BASE_URL") || "").replace(/\/$/, "");
+      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID");
+
+      // Build redirect path to Files app
+      let redirectPath = "/apps/files";
+      if (nc?.folder_path) {
+        const dir = nc.folder_path.startsWith("/") ? nc.folder_path : `/${nc.folder_path}`;
+        redirectPath = `/apps/files?dir=${dir}`;
+      }
+
+      const loginPath = providerId
+        ? `/index.php/apps/sociallogin/custom_oauth2/${providerId}`
+        : `/index.php/apps/oidc_login/redirect`;
+
+      const link = baseUrl
+        ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
+        : (nc?.nextcloud_url || null);
+
+      return new Response(JSON.stringify({ success: true, link }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
     return new Response(JSON.stringify({ success: false, message: "Invalid action" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
