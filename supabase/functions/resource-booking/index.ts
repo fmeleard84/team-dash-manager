@@ -99,7 +99,7 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
       `)
       .eq('profile_id', assignment.profile_id)
       .eq('seniority', assignment.seniority)
-      .eq('is_email_verified', true)
+      .or('is_email_verified.eq.true,keycloak_user_id.not.is.null')
       .eq('status', 'disponible')
 
     if (candidatesError) {
