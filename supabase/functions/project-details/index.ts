@@ -200,10 +200,10 @@ Deno.serve(async (req) => {
           redirectPath = `/apps/files?dir=${dir}`;
         }
 
-        // Choose SSO init path based on configuration
+        // Use Social Login by default, fallback to OIDC if no provider ID
         const loginPath = providerId
           ? `/index.php/apps/sociallogin/custom_oauth2/${providerId}`
-          : `/index.php/apps/oidc_login/redirect`;
+          : `/index.php/apps/sociallogin/custom_oauth2/keycloak`;
 
         // Build SSO init URL (falls back to stored web URL if base URL not configured)
         const ssoUrl = baseUrl
@@ -267,7 +267,7 @@ Deno.serve(async (req) => {
 
       const loginPath = providerId
         ? `/index.php/apps/sociallogin/custom_oauth2/${providerId}`
-        : `/index.php/apps/oidc_login/redirect`;
+        : `/index.php/apps/sociallogin/custom_oauth2/keycloak`;
 
       const link = baseUrl
         ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
