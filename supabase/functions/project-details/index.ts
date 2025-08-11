@@ -188,27 +188,35 @@ Deno.serve(async (req) => {
         .in("project_id", allowedProjectIds);
       if (ncErr) throw ncErr;
 
-      const baseUrl = (Deno.env.get("NEXTCLOUD_BASE_URL") || "").replace(/\/$/, "");
+      const baseUrl = Deno.env.get("NEXTCLOUD_BASE_URL") || "https://cloud.ialla.fr";
       const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
+
+      // Get project titles for proper folder naming
+      const projectIds = allowedProjectIds;
+      const { data: projects, error: projectsErr } = await supabase
+        .from("projects")
+        .select("id, title")
+        .in("id", projectIds);
+      if (projectsErr) throw projectsErr;
+
+      const projectTitles: Record<string, string> = {};
+      (projects || []).forEach((p: any) => {
+        projectTitles[p.id] = p.title;
+      });
 
       const links: Record<string, string> = {};
       for (const row of ncRows || []) {
-        // Build redirect path to Files app, optionally to the project folder
-        let redirectPath = "/apps/files";
-        if (row.folder_path) {
-          const dir = row.folder_path.startsWith("/") ? row.folder_path : `/${row.folder_path}`;
-          redirectPath = `/apps/files?dir=${dir}`;
-        }
+        const projectTitle = projectTitles[row.project_id];
+        if (!projectTitle) continue;
+
+        // Build redirect path to project folder: /Projet - <nom_projet>
+        const projectFolderName = `Projet - ${projectTitle}`;
+        const redirectPath = `/apps/files?dir=${encodeURIComponent(`/${projectFolderName}`)}`;
 
         const loginPath = `/index.php/apps/sociallogin/custom_oauth2/${providerId}`;
+        const link = `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`;
 
-        const link = baseUrl
-          ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
-          : (row.nextcloud_url || null);
-
-        if (link) {
-          links[row.project_id] = link;
-        }
+        links[row.project_id] = link;
       }
 
       return new Response(JSON.stringify({ success: true, links }), {
@@ -253,21 +261,30 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (ncErr2) throw ncErr2;
 
-      const baseUrl = (Deno.env.get("NEXTCLOUD_BASE_URL") || "").replace(/\/$/, "");
+      const baseUrl = Deno.env.get("NEXTCLOUD_BASE_URL") || "https://cloud.ialla.fr";
       const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
 
-      // Build redirect path to Files app
-      let redirectPath = "/apps/files";
-      if (nc?.folder_path) {
-        const dir = nc.folder_path.startsWith("/") ? nc.folder_path : `/${nc.folder_path}`;
-        redirectPath = `/apps/files?dir=${dir}`;
+      // Get project title for proper folder naming
+      const { data: project, error: projDetailsErr } = await supabase
+        .from("projects")
+        .select("title")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (projDetailsErr) throw projDetailsErr;
+
+      if (!project?.title) {
+        return new Response(JSON.stringify({ success: false, message: "Titre du projet introuvable" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        });
       }
 
-      const loginPath = `/index.php/apps/sociallogin/custom_oauth2/${providerId}`;
+      // Build redirect path to project folder: /Projet - <nom_projet>
+      const projectFolderName = `Projet - ${project.title}`;
+      const redirectPath = `/apps/files?dir=${encodeURIComponent(`/${projectFolderName}`)}`;
 
-      const link = baseUrl
-        ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
-        : (nc?.nextcloud_url || null);
+      const loginPath = `/index.php/apps/sociallogin/custom_oauth2/${providerId}`;
+      const link = `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`;
 
       return new Response(JSON.stringify({ success: true, link }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
