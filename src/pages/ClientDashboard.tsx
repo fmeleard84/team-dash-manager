@@ -26,7 +26,8 @@ import {
   FolderOpen, 
   Receipt, 
   Settings, 
-  LogOut 
+  LogOut,
+  ExternalLink 
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -339,13 +340,27 @@ const ClientDashboard = () => {
               </Tabs>
             )}
 
-            <div className="flex justify-center mt-6">
+            <div className="flex justify-center gap-4 mt-6">
               <Button 
                 onClick={() => setIsModalOpen(true)}
                 disabled={isCreatingProject}
               >
                 Créer un projet
               </Button>
+              
+              {clientProfile && (
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    const url = `https://cloud.ialla.fr/index.php/apps/sociallogin/custom_oauth2/keycloak?redirect_url=%2Fapps%2Ffiles`;
+                    window.open(url, '_blank');
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Accéder à l'espace collaboratif
+                </Button>
+              )}
             </div>
           </div>
         );
