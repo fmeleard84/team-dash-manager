@@ -275,6 +275,8 @@ const fetchAcceptedProjects = async () => {
           title,
           description,
           project_date,
+          due_date,
+          client_budget,
           status
         ),
         hr_resource_assignments (
@@ -546,16 +548,27 @@ const formatCurrency = (n?: number | null) => {
     {booking.projects?.description || 'Aucune description disponible'}
   </p>
   
-  <div className="flex items-center gap-2">
-    <span className="text-sm font-medium">Poste:</span>
-    <Badge variant="secondary">
-      {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
-    </Badge>
-  </div>
-  
-  <div className="flex items-center gap-2">
-    <span className="text-sm font-medium">Date du projet:</span>
-    <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Poste:</span>
+      <Badge variant="secondary">
+        {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
+      </Badge>
+    </div>
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Date du projet:</span>
+      <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Fin prévue:</span>
+      <span className="text-sm">{booking.projects?.due_date ? formatDate(booking.projects.due_date) : 'Non spécifiée'}</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Budget estimé:</span>
+      <Badge variant="outline">
+        {formatCurrency(booking.projects?.client_budget)}
+      </Badge>
+    </div>
   </div>
 
   {booking.projects?.id && nextcloudLinks[booking.projects.id] && (
@@ -566,7 +579,7 @@ const formatCurrency = (n?: number | null) => {
         onClick={() => window.open(nextcloudLinks[booking.projects.id], '_blank')}
       >
         <ExternalLink className="w-4 h-4 mr-2" />
-        Accéder à l’espace Nextcloud
+        Rejoindre le projet sur Nextcloud
       </Button>
     </div>
   )}
