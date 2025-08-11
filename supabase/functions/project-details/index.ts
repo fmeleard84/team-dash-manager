@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
       if (ncErr) throw ncErr;
 
       const baseUrl = (Deno.env.get("NEXTCLOUD_BASE_URL") || "").replace(/\/$/, "");
-      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID");
+      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
 
       const links: Record<string, string> = {};
       for (const row of ncRows || []) {
@@ -200,15 +200,15 @@ Deno.serve(async (req) => {
           redirectPath = `/apps/files?dir=${dir}`;
         }
 
-        const loginPath = providerId
-          ? `/index.php/apps/sociallogin/custom_oauth2/${providerId}`
-          : `/index.php/apps/sociallogin/custom_oauth2/keycloak`;
+        const loginPath = `/index.php/apps/sociallogin/custom_oauth2/${providerId}`;
 
         const link = baseUrl
           ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
           : (row.nextcloud_url || null);
 
-        links[row.project_id] = link;
+        if (link) {
+          links[row.project_id] = link;
+        }
       }
 
       return new Response(JSON.stringify({ success: true, links }), {
@@ -254,7 +254,7 @@ Deno.serve(async (req) => {
       if (ncErr2) throw ncErr2;
 
       const baseUrl = (Deno.env.get("NEXTCLOUD_BASE_URL") || "").replace(/\/$/, "");
-      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID");
+      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
 
       // Build redirect path to Files app
       let redirectPath = "/apps/files";
@@ -263,9 +263,7 @@ Deno.serve(async (req) => {
         redirectPath = `/apps/files?dir=${dir}`;
       }
 
-      const loginPath = providerId
-        ? `/index.php/apps/sociallogin/custom_oauth2/${providerId}`
-        : `/index.php/apps/sociallogin/custom_oauth2/keycloak`;
+      const loginPath = `/index.php/apps/sociallogin/custom_oauth2/${providerId}`;
 
       const link = baseUrl
         ? `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`
