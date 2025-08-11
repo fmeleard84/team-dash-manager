@@ -192,11 +192,10 @@ Deno.serve(async (req) => {
       const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
 
       // Get project titles for proper folder naming
-      const projectIds = allowedProjectIds;
       const { data: projects, error: projectsErr } = await supabase
         .from("projects")
         .select("id, title")
-        .in("id", projectIds);
+        .in("id", allowedProjectIds);
       if (projectsErr) throw projectsErr;
 
       const projectTitles: Record<string, string> = {};
