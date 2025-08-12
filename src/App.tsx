@@ -12,23 +12,21 @@ import Header from "./components/Header";
 import CandidateDashboard from "./pages/CandidateDashboard";
 import ClientDashboard from "./pages/ClientDashboard";
 import NotFound from "./pages/NotFound";
-import Register from "./pages/Register";
-import { KeycloakAuthProvider } from "./contexts/KeycloakAuthContext";
-import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
+import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
+import NotificationsPage from "./pages/NotificationsPage";
+import KanbanPage from "./pages/KanbanPage";
+import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
-import AuthCheck from "./pages/auth-check";
 import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const location = useLocation();
-  const dashboardPaths = ['/candidate-dashboard', '/client-dashboard', '/admin/resources'];
-  const showHeader = !dashboardPaths.includes(location.pathname);
-
-  // Activate Supabase header injection globally (no UI output)
-  useSupabaseAuth();
+  const dashboardPaths = ['/candidate-dashboard', '/client-dashboard', '/admin/resources', '/kanban'];
+  const showHeader = !dashboardPaths.includes(location.pathname) && location.pathname !== '/auth';
 
   return (
     <>
@@ -37,12 +35,14 @@ const AppContent = () => {
         <Route path="/" element={<Index />} />
         <Route path="/project/:id" element={<Project />} />
         <Route path="/admin/resources" element={<ProtectedRoute><AdminResources /></ProtectedRoute>} />
-          <Route path="/auth-check" element={<AuthCheck />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
+        <Route path="/auth" element={<Auth />} />
         <Route path="/candidate-dashboard" element={<ProtectedRoute><CandidateDashboard /></ProtectedRoute>} />
         <Route path="/client-dashboard" element={<ProtectedRoute><ClientDashboard /></ProtectedRoute>} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/kanban" element={<ProtectedRoute><KanbanPage /></ProtectedRoute>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -53,13 +53,13 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <KeycloakAuthProvider>
+      <AuthProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
           <AppContent />
         </BrowserRouter>
-      </KeycloakAuthProvider>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

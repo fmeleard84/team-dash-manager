@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Candidate Profile</title>
+</head>
+<body>
+    <h1>Debug Candidate Profile Creation</h1>
+    <button onclick="testCreateProfile()">Test Create Profile</button>
+    <button onclick="testFetchProfile()">Test Fetch Profile</button>
+    <div id="results"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = "https://egdelmcijszuapcpglsy.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxNjIyMDAsImV4cCI6MjA2OTczODIwMH0.JYV-JxosrfE7kMtFw3XLs27PGf3Fn-rDyJLDWeYXF_U";
+        
+        // Custom fetch with headers
+        const customFetch = (url, options = {}) => {
+            const headers = {
+                ...options.headers,
+                'x-keycloak-email': 'fmeleard+ressource@gmail.com',
+                'x-keycloak-sub': 'test-sub-123'
+            };
+            return fetch(url, { ...options, headers });
+        };
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            global: { fetch: customFetch }
+        });
+        
+        async function testCreateProfile() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing profile creation...</p>';
+            
+            try {
+                // First get a profile to use as foreign key
+                const { data: profiles } = await supabase
+                    .from('hr_profiles')
+                    .select('id')
+                    .limit(1);
+                    
+                if (!profiles || profiles.length === 0) {
+                    results.innerHTML += '<p>ERROR: No hr_profiles found!</p>';
+                    return;
+                }
+                
+                const { data, error } = await supabase
+                    .from('candidate_profiles')
+                    .insert({
+                        email: 'fmeleard+ressource@gmail.com',
+                        first_name: 'Florian',
+                        last_name: 'Test',
+                        status: 'disponible',
+                        profile_id: profiles[0].id,
+                        password_hash: '',
+                        daily_rate: 0,
+                        seniority: 'junior',
+                        rating: 0
+                    })
+                    .select()
+                    .single();
+                
+                results.innerHTML += '<pre>Create result: ' + JSON.stringify({ data, error }, null, 2) + '</pre>';
+            } catch (err) {
+                results.innerHTML += '<p>ERROR: ' + err.message + '</p>';
+            }
+        }
+        
+        async function testFetchProfile() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing profile fetch...</p>';
+            
+            try {
+                const { data, error } = await supabase
+                    .from('candidate_profiles')
+                    .select('status, first_name, last_name, id, rating, email, profile_id')
+                    .eq('email', 'fmeleard+ressource@gmail.com')
+                    .maybeSingle();
+                
+                results.innerHTML += '<pre>Fetch result: ' + JSON.stringify({ data, error }, null, 2) + '</pre>';
+            } catch (err) {
+                results.innerHTML += '<p>ERROR: ' + err.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

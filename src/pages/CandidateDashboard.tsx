@@ -1,18 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import CandidateProjects from "@/components/candidate/CandidateProjects";
-import { CandidateSettings } from "@/components/candidate/CandidateSettings";
-import { CandidateNotes } from "@/components/candidate/CandidateNotes";
-import CandidateMessages from "@/components/candidate/CandidateMessages";
-import { StarRating } from "@/components/ui/star-rating";
-import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { MessageSystem } from "@/components/messages/MessageSystem";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -38,32 +29,7 @@ import {
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
-  const { user, logout, isLoading, login } = useKeycloakAuth();
-
-  // Auto-redirect to Keycloak if not authenticated
-  useEffect(() => {
-    if (!isLoading && !user) {
-      login();
-    }
-  }, [isLoading, user, login]);
-
-  // Fetch candidate profile for status
-  const { data: candidateProfile, refetch: refetchProfile } = useQuery({
-    queryKey: ['candidate-profile-status', user?.profile?.sub],
-    queryFn: async () => {
-      if (!user?.profile?.email) return null;
-      
-      const { data, error } = await supabase
-        .from('candidate_profiles')
-        .select('status, first_name, last_name, id, rating')
-        .eq('email', user.profile.email)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.profile?.email
-  });
+  const { user, logout } = useAuth();
 
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
@@ -74,105 +40,169 @@ const CandidateDashboard = () => {
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
   ];
 
-  const handleLogout = () => {
-    logout();
-  };
-
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      if (!candidateProfile?.id) return;
-      
-      const { error } = await supabase
-        .from('candidate_profiles')
-        .update({ status: newStatus })
-        .eq('id', candidateProfile.id);
-
-      if (error) throw error;
-
-      refetchProfile();
-      toast.success('Statut mis à jour');
-    } catch (error: any) {
-      toast.error('Erreur lors de la modification: ' + error.message);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'disponible':
-        return 'bg-green-500 text-white';
-      case 'en_pause':
-        return 'bg-gray-500 text-white';
-      case 'en_mission':
-        return 'bg-red-500 text-white';
-      default:
-        return 'bg-gray-500 text-white';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'disponible':
-        return 'Disponible';
-      case 'en_pause':
-        return 'En pause';
-      case 'en_mission':
-        return 'En mission';
-      default:
-        return status;
-    }
-  };
-
   const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="p-6 text-center">
-          <p className="text-muted-foreground">Chargement...</p>
-        </div>
-      );
-    }
-
-    if (!user) {
-      return (
-        <div className="p-6 text-center">
-          <p className="text-destructive mb-4">Non authentifié</p>
-          <Button onClick={login}>
-            Se connecter
-          </Button>
-        </div>
-      );
-    }
-
     switch (activeSection) {
       case 'projects':
-        return <CandidateProjects />;
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Mes projets</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Site E-commerce</CardTitle>
+                  <Badge variant="default">En cours</Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Développement d'une boutique en ligne avec React et Node.js
+                  </p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>75%</span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div className="bg-primary h-2 rounded-full" style={{ width: '75%' }}></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">App Mobile</CardTitle>
+                  <Badge variant="secondary">À commencer</Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Application mobile React Native pour la gestion de tâches
+                  </p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>10%</span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div className="bg-primary h-2 rounded-full" style={{ width: '10%' }}></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        );
+        
       case 'messages':
-return candidateProfile?.id ? <CandidateMessages candidateId={candidateProfile.id} /> : null;
+        return <MessageSystem />;
+        
       case 'appointments':
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes rendez-vous</h2>
-            <p className="text-muted-foreground">Vos rendez-vous apparaîtront ici.</p>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">
+                  Aucun rendez-vous planifié pour le moment.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         );
+        
       case 'deliverables':
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes livrables</h2>
-            <p className="text-muted-foreground">Vos livrables apparaîtront ici.</p>
+            <div className="grid gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Maquettes UI/UX</CardTitle>
+                  <Badge variant="outline">En révision</Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Maquettes complètes pour l'application mobile
+                  </p>
+                  <Button variant="outline" size="sm">
+                    Télécharger
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         );
+        
       case 'notes':
-        return candidateProfile?.id ? <CandidateNotes currentCandidateId={candidateProfile.id} /> : null;
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Mes notes</h2>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">
+                  Aucune note pour le moment.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+        
       case 'invoices':
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes factures</h2>
-            <p className="text-muted-foreground">Vos factures apparaîtront ici.</p>
+            <div className="grid gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Facture #2024-001</CardTitle>
+                  <Badge variant="default">Payée</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Montant:</span>
+                      <span className="font-semibold">1 500€</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Date:</span>
+                      <span className="text-sm">15/01/2024</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         );
+        
       case 'settings':
-        return candidateProfile?.id ? <CandidateSettings currentCandidateId={candidateProfile.id} /> : null;
-       
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Paramètres</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle>Informations personnelles</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Nom complet</label>
+                  <p className="text-muted-foreground">
+                    {user?.firstName} {user?.lastName}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <p className="text-muted-foreground">{user?.email}</p>
+                </div>
+                {user?.phone && (
+                  <div>
+                    <label className="text-sm font-medium">Téléphone</label>
+                    <p className="text-muted-foreground">{user.phone}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+        
       default:
         return null;
     }
@@ -185,11 +215,9 @@ return candidateProfile?.id ? <CandidateMessages candidateId={candidateProfile.i
           <SidebarContent>
             <div className="p-4">
               <h3 className="font-semibold text-lg">Espace Candidat</h3>
-              {candidateProfile && candidateProfile.rating > 0 && (
-                <div className="mt-2">
-                  <StarRating rating={candidateProfile.rating} size={14} />
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground">
+                {user?.firstName} {user?.lastName}
+              </p>
             </div>
             
             <SidebarGroup>
@@ -220,7 +248,7 @@ return candidateProfile?.id ? <CandidateMessages candidateId={candidateProfile.i
                 <span>Paramètres</span>
               </SidebarMenuButton>
               
-              <SidebarMenuButton onClick={handleLogout} className="text-destructive">
+              <SidebarMenuButton onClick={logout} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Déconnexion</span>
               </SidebarMenuButton>
@@ -234,35 +262,18 @@ return candidateProfile?.id ? <CandidateMessages candidateId={candidateProfile.i
               <SidebarTrigger />
               <div className="ml-4">
                 <h1 className="text-xl font-semibold">Tableau de bord candidat</h1>
-                {candidateProfile && (
-                  <p className="text-sm text-muted-foreground">
-                    {candidateProfile.first_name} {candidateProfile.last_name}
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  Bienvenue {user?.firstName}
+                </p>
               </div>
             </div>
             
-            {candidateProfile && (
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">Statut :</span>
-                <Badge className={getStatusColor(candidateProfile.status)}>
-                  {getStatusLabel(candidateProfile.status)}
-                </Badge>
-                <Select
-                  value={candidateProfile.status}
-                  onValueChange={handleStatusChange}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="disponible">Disponible</SelectItem>
-                    <SelectItem value="en_pause">En pause</SelectItem>
-                    <SelectItem value="en_mission">En mission</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              <Badge variant="outline">Candidat</Badge>
+              <Badge className="bg-green-500 text-white">
+                Disponible
+              </Badge>
+            </div>
           </header>
           
           <div className="p-6">

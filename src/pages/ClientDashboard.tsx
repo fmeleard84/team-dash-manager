@@ -1,15 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
-import { useNavigate } from "react-router-dom";
-import { ProjectCard } from "@/components/ProjectCard";
-import CreateProjectModal from "@/components/CreateProjectModal";
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -27,403 +21,224 @@ import {
   Receipt, 
   Settings, 
   LogOut,
-  ExternalLink 
+  Kanban
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ClientDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const { user, logout, isLoading, login } = useKeycloakAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
-  // Auto-redirect to Keycloak if not authenticated
-  useEffect(() => {
-    if (!isLoading && !user) {
-      login();
-    }
-  }, [isLoading, user, login]);
-
-  // Configure Supabase auth with Keycloak tokens
-  useSupabaseAuth();
-
-  // Fetch client profile
-  const { data: clientProfile, refetch: refetchProfile } = useQuery({
-    queryKey: ['client-profile', user?.profile?.sub],
-    queryFn: async () => {
-      if (!user?.profile?.sub) return null;
-      
-      console.log('Fetching client profile for user:', user.profile.sub);
-      const { data, error } = await supabase
-        .from('client_profiles')
-        .select('*')
-        .eq('keycloak_user_id', user.profile.sub)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching client profile:', error);
-        throw error;
-      }
-      console.log('Client profile result:', data);
-      return data;
-    },
-    enabled: !!user?.profile?.sub
-  });
-
-  // Fetch user projects
-  const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useQuery({
-    queryKey: ['user-projects', user?.profile?.sub],
-    queryFn: async () => {
-      if (!user?.profile?.sub) return [] as any[];
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('keycloak_user_id', user.profile.sub)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.profile?.sub
-  });
-
-  // Fetch resource assignments for user's projects to categorize booking state
-  const { data: assignments } = useQuery({
-    queryKey: ['assignments-by-project', projects?.map(p => p.id).join(',')],
-    queryFn: async () => {
-      const ids = (projects || []).map(p => p.id);
-      if (!ids.length) return [] as any[];
-      const { data, error } = await supabase
-        .from('hr_resource_assignments')
-        .select('project_id, booking_status');
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!projects && projects.length > 0
-  });
 
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
+    { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
   ];
 
-  const handleLogout = () => {
-    logout();
-  };
-
-  const handleCreateProject = async (projectData: {
-    title: string;
-    description?: string;
-    project_date: string;
-    client_budget?: number;
-    due_date?: string;
-  }) => {
-    if (!user?.profile?.sub) {
-      toast.error('Utilisateur non connecté');
-      return;
-    }
-
-    setIsCreatingProject(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert({
-          title: projectData.title,
-          description: projectData.description || null,
-          user_id: user.profile.sub, // Temporarily using user_id field with keycloak sub
-          keycloak_user_id: user.profile.sub,
-          status: 'pause',
-          project_date: projectData.project_date,
-          client_budget: projectData.client_budget ?? null,
-          due_date: projectData.due_date ?? null,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast.success('Projet créé avec succès');
-      setIsModalOpen(false);
-      refetchProjects();
-      navigate(`/project/${data.id}`);
-    } catch (error: any) {
-      toast.error('Erreur lors de la création: ' + error.message);
-    } finally {
-      setIsCreatingProject(false);
-    }
-  };
-
-  const handleStatusToggle = async (id: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('projects')
-        .update({ status: newStatus })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast.success(`Projet ${newStatus === 'play' ? 'démarré' : 'mis en pause'}`);
-      refetchProjects();
-    } catch (error: any) {
-      toast.error('Erreur lors de la mise à jour: ' + error.message);
-    }
-  };
-
-  const handleDeleteProject = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce projet ?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast.success('Projet supprimé');
-      refetchProjects();
-    } catch (error: any) {
-      toast.error('Erreur lors de la suppression: ' + error.message);
-    }
-  };
-
-  const handleViewProject = (id: string) => {
-    navigate(`/project/${id}`);
-  };
-
   const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="p-6 text-center">
-          <p className="text-muted-foreground">Chargement...</p>
-        </div>
-      );
-    }
-
-    if (!user) {
-      return (
-        <div className="p-6 text-center">
-          <p className="text-destructive mb-4">Non authentifié</p>
-          <Button onClick={login}>
-            Se connecter
-          </Button>
-        </div>
-      );
-    }
-
     switch (activeSection) {
       case 'projects':
-        const asgByProject = (assignments || []).reduce((acc: Record<string, { total: number; booked: number }>, a: any) => {
-          acc[a.project_id] = acc[a.project_id] || { total: 0, booked: 0 };
-          acc[a.project_id].total += 1;
-          if (a.booking_status === 'booké') acc[a.project_id].booked += 1;
-          return acc;
-        }, {});
-
-        const filterBy = (predicate: (p: any) => boolean) => (projects || []).filter(predicate);
-        const ongoing = filterBy(p => p.status === 'play');
-        const booking = filterBy(p => {
-          const a = asgByProject[p.id];
-          return p.status === 'pause' && a && a.total > 0 && a.booked < a.total;
-        });
-        const paused = filterBy(p => {
-          const a = asgByProject[p.id];
-          return p.status === 'pause' && (!a || a.total === 0 || a.booked === a.total);
-        });
-        const done = filterBy(p => p.status === 'completed');
-
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes projets</h2>
-            <p className="text-muted-foreground">Gérez vos projets et suivez leur avancement.</p>
-
-            {projectsLoading ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Chargement des projets...</p>
-              </div>
-            ) : !projects || projects.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  Aucun projet pour le moment. Créez votre premier projet !
-                </p>
-              </div>
-            ) : (
-              <Tabs defaultValue="ongoing" className="w-full">
-                <TabsList className="grid grid-cols-4 w-full max-w-xl">
-                  <TabsTrigger value="ongoing">Projets en cours</TabsTrigger>
-                  <TabsTrigger value="booking">En cours de booking</TabsTrigger>
-                  <TabsTrigger value="paused">En pause</TabsTrigger>
-                  <TabsTrigger value="done">Terminés</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="ongoing">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {ongoing.map((project) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={{
-                          id: project.id,
-                          title: project.title,
-                          description: project.description,
-                          date: project.project_date,
-                          status: project.status,
-                          clientBudget: project.client_budget,
-                          dueDate: project.due_date,
-                        }}
-                        onStatusToggle={handleStatusToggle}
-                        onDelete={handleDeleteProject}
-                        onView={handleViewProject}
-                      />
-                    ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Refonte site web</CardTitle>
+                  <Badge variant="default">En cours</Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Modernisation complète du site corporate avec nouvelle identité visuelle
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Budget</span>
+                      <span className="font-semibold">15 000€</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Candidat</span>
+                      <span>Jean Martin</span>
+                    </div>
                   </div>
-                </TabsContent>
+                </CardContent>
+              </Card>
 
-                <TabsContent value="booking">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {booking.map((project) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={{
-                          id: project.id,
-                          title: project.title,
-                          description: project.description,
-                          date: project.project_date,
-                          status: project.status,
-                          clientBudget: project.client_budget,
-                          dueDate: project.due_date,
-                        }}
-                        onStatusToggle={handleStatusToggle}
-                        onDelete={handleDeleteProject}
-                        onView={handleViewProject}
-                      />
-                    ))}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Application mobile</CardTitle>
+                  <Badge variant="secondary">En attente</Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Développement d'une app iOS/Android pour la gestion client
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Budget</span>
+                      <span className="font-semibold">25 000€</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Candidat</span>
+                      <span className="text-muted-foreground">À assigner</span>
+                    </div>
                   </div>
-                </TabsContent>
-
-                <TabsContent value="paused">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {paused.map((project) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={{
-                          id: project.id,
-                          title: project.title,
-                          description: project.description,
-                          date: project.project_date,
-                          status: project.status,
-                          clientBudget: project.client_budget,
-                          dueDate: project.due_date,
-                        }}
-                        onStatusToggle={handleStatusToggle}
-                        onDelete={handleDeleteProject}
-                        onView={handleViewProject}
-                      />
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="done">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {done.map((project) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={{
-                          id: project.id,
-                          title: project.title,
-                          description: project.description,
-                          date: project.project_date,
-                          status: project.status,
-                          clientBudget: project.client_budget,
-                          dueDate: project.due_date,
-                        }}
-                        onStatusToggle={handleStatusToggle}
-                        onDelete={handleDeleteProject}
-                        onView={handleViewProject}
-                      />
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            )}
-
-            <div className="flex justify-center gap-4 mt-6">
-              <Button 
-                onClick={() => setIsModalOpen(true)}
-                disabled={isCreatingProject}
-              >
-                Créer un projet
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="mt-6">
+              <Button>
+                Créer un nouveau projet
               </Button>
-              
-              {clientProfile && (
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    const { openNextcloud } = require('@/lib/auth');
-                    openNextcloud('client', '');
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Accéder à l'espace collaboratif
-                </Button>
-              )}
             </div>
           </div>
         );
+        
       case 'invoices':
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes factures</h2>
-            <p className="text-muted-foreground">Consultez et téléchargez vos factures.</p>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-center text-muted-foreground">
-                  Aucune facture disponible.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="grid gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Facture #2024-INV-001</CardTitle>
+                  <Badge variant="default">Payée</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Projet:</span>
+                      <span>Refonte site web</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Montant:</span>
+                      <span className="font-semibold">7 500€</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Date:</span>
+                      <span className="text-sm">15/01/2024</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Facture #2024-INV-002</CardTitle>
+                  <Badge variant="outline">En attente</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Projet:</span>
+                      <span>Application mobile</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Montant:</span>
+                      <span className="font-semibold">12 500€</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Date:</span>
+                      <span className="text-sm">01/02/2024</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         );
+
+      case 'kanban':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Tableau Kanban</h2>
+            <div className="grid gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Gestion de projet Kanban</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Organisez vos tâches et suivez l'avancement de vos projets avec notre tableau Kanban interactif.
+                  </p>
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                      <span>✓ Drag & drop intuitif</span>
+                      <span>✓ Colonnes personnalisables</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>✓ Gestion d'équipe</span>
+                      <span>✓ Commentaires et fichiers</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>✓ Priorités et labels</span>
+                      <span>✓ Suivi des échéances</span>
+                    </div>
+                  </div>
+                  <Button onClick={() => navigate('/kanban')} className="w-full">
+                    Ouvrir le tableau Kanban
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Boards récents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm">Projet de développement web</span>
+                      <Badge variant="secondary">3 colonnes • 8 cartes</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm">Sprint Planning Q1</span>
+                      <Badge variant="secondary">4 colonnes • 12 cartes</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        );
+        
       case 'settings':
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Paramètres</h2>
             <Card>
               <CardHeader>
-                <CardTitle>Informations du profil</CardTitle>
+                <CardTitle>Informations de l'entreprise</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {clientProfile && (
-                  <>
-                    <div>
-                      <label className="text-sm font-medium">Nom complet</label>
-                      <p className="text-muted-foreground">
-                        {clientProfile.first_name} {clientProfile.last_name}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Email</label>
-                      <p className="text-muted-foreground">{clientProfile.email}</p>
-                    </div>
-                    {clientProfile.company_name && (
-                      <div>
-                        <label className="text-sm font-medium">Entreprise</label>
-                        <p className="text-muted-foreground">{clientProfile.company_name}</p>
-                      </div>
-                    )}
-                    {clientProfile.phone && (
-                      <div>
-                        <label className="text-sm font-medium">Téléphone</label>
-                        <p className="text-muted-foreground">{clientProfile.phone}</p>
-                      </div>
-                    )}
-                  </>
+                <div>
+                  <label className="text-sm font-medium">Nom complet</label>
+                  <p className="text-muted-foreground">
+                    {user?.firstName} {user?.lastName}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <p className="text-muted-foreground">{user?.email}</p>
+                </div>
+                {user?.companyName && (
+                  <div>
+                    <label className="text-sm font-medium">Entreprise</label>
+                    <p className="text-muted-foreground">{user.companyName}</p>
+                  </div>
+                )}
+                {user?.phone && (
+                  <div>
+                    <label className="text-sm font-medium">Téléphone</label>
+                    <p className="text-muted-foreground">{user.phone}</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </div>
         );
+        
       default:
         return null;
     }
@@ -436,16 +251,16 @@ const ClientDashboard = () => {
           <SidebarContent>
             <div className="p-4">
               <h3 className="font-semibold text-lg">Espace Client</h3>
+              <p className="text-sm text-muted-foreground">
+                {user?.firstName} {user?.lastName}
+              </p>
             </div>
             
             <SidebarGroup>
               <SidebarGroupLabel>Navigation</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {[
-                    { id: 'projects', label: 'Mes projets', icon: FolderOpen },
-                    { id: 'invoices', label: 'Mes factures', icon: Receipt },
-                  ].map((item) => (
+                  {menuItems.map((item) => (
                     <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton
                         onClick={() => setActiveSection(item.id)}
@@ -469,7 +284,7 @@ const ClientDashboard = () => {
                 <span>Paramètres</span>
               </SidebarMenuButton>
               
-              <SidebarMenuButton onClick={handleLogout} className="text-destructive">
+              <SidebarMenuButton onClick={logout} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Déconnexion</span>
               </SidebarMenuButton>
@@ -483,16 +298,14 @@ const ClientDashboard = () => {
               <SidebarTrigger />
               <div className="ml-4">
                 <h1 className="text-xl font-semibold">Tableau de bord client</h1>
-                {clientProfile && (
-                  <p className="text-sm text-muted-foreground">
-                    {clientProfile.first_name} {clientProfile.last_name}
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  Bienvenue {user?.firstName}
+                </p>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
-              <Badge variant="default">Client</Badge>
+              <Badge variant="outline">Client</Badge>
             </div>
           </header>
           
@@ -501,13 +314,6 @@ const ClientDashboard = () => {
           </div>
         </main>
       </div>
-      
-      <CreateProjectModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onCreateProject={handleCreateProject}
-        isCreating={isCreatingProject}
-      />
     </SidebarProvider>
   );
 };

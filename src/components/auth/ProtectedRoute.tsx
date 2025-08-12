@@ -1,18 +1,20 @@
 import { ReactNode, useEffect } from "react";
-import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { isLoading, isAuthenticated, login } = useKeycloakAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      login();
+      navigate('/auth');
     }
-  }, [isLoading, isAuthenticated, login]);
+  }, [isLoading, isAuthenticated, navigate]);
 
   if (isLoading) {
     return (
@@ -26,13 +28,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <p className="text-muted-foreground">Redirection vers Keycloak…</p>
-          <button
-            onClick={login}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-          >
-            Se connecter
-          </button>
+          <p className="text-muted-foreground">Redirection vers la connexion…</p>
         </div>
       </main>
     );

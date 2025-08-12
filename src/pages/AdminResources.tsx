@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ interface Expertise {
 }
 
 const AdminResources = () => {
-  const { user, login } = useKeycloakAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -73,11 +73,11 @@ const AdminResources = () => {
 
   useEffect(() => {
     if (!user) {
-      login();
+      navigate('/auth');
       return;
     }
     fetchAllData();
-  }, [user, login]);
+  }, [user, navigate]);
 
   const fetchAllData = async () => {
     setIsLoading(true);
