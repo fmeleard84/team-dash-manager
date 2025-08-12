@@ -1,7 +1,6 @@
 import { createContext, useContext, ReactNode, useEffect, useMemo, useState } from 'react';
 import Keycloak from 'keycloak-js';
 import { setKeycloakIdentity, clearKeycloakIdentity } from '@/integrations/supabase/client';
-import { keycloak } from '@/main';
 
 interface KeycloakAuthContextType {
   user: any;
@@ -24,7 +23,12 @@ export const useKeycloakAuth = () => {
   return context;
 };
 
-// Keycloak instance is imported above and initialized in main.tsx
+// Initialize Keycloak instance once
+const keycloak = new Keycloak({
+  url: 'https://keycloak.ialla.fr',
+  realm: 'haas',
+  clientId: 'react-app',
+});
 
 interface KeycloakAuthProviderProps {
   children: ReactNode;
@@ -35,18 +39,28 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // Since Keycloak is already initialized in main.tsx, just sync state
+  // Init Keycloak on mount with silent SSO
   useEffect(() => {
     let cancelled = false;
 
-    const syncKeycloakState = async () => {
+    const initKeycloak = async () => {
       try {
-        console.log('[DEBUG] Syncing Keycloak state from pre-initialized instance');
+        console.log('[DEBUG] Initializing Keycloak with config:', {
+          url: 'https://keycloak.ialla.fr',
+          realm: 'haas',
+          clientId: 'react-app'
+        });
         
-        const authenticated = keycloak.authenticated || false;
+        const authenticated = await keycloak.init({
+          onLoad: 'check-sso',
+          pkceMethod: 'S256',
+          silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+        });
+        
+        console.log('[DEBUG] Keycloak init result:', { authenticated, cancelled });
         
         if (cancelled) return;
-        setIsAuthenticated(authenticated);
+        setIsAuthenticated(!!authenticated);
 
         // Load profile to enrich token data (optional)
         try {
@@ -84,7 +98,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
       }
     };
 
-    syncKeycloakState();
+    initKeycloak();
 
     // Token refresh success keeps session valid
     keycloak.onTokenExpired = async () => {
