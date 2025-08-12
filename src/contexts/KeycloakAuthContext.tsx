@@ -125,8 +125,43 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
   const hasGroup = (groupName: string): boolean => getUserGroups().includes(groupName);
   const hasAdminRole = (): boolean => hasGroup('admin');
 
-  const login = () => keycloak.login();
-  const logout = () => keycloak.logout({ redirectUri: window.location.origin + '/' });
+  // Clean up any stale Supabase auth state before redirecting to Keycloak
+  const cleanupAuthState = () => {
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+          localStorage.removeItem(key);
+        }
+      });
+      Object.keys(sessionStorage || {}).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } catch {}
+  };
+
+  const login = () => {
+    // Prevent limbo states before redirecting to Keycloak
+    cleanupAuthState();
+    try {
+      const loginUrl = (keycloak as any).createLoginUrl ? (keycloak as any).createLoginUrl() : undefined;
+      if (loginUrl) {
+        if (window.top) {
+          (window.top as Window).location.href = loginUrl;
+        } else {
+          window.location.href = loginUrl;
+        }
+        return;
+      }
+    } catch {}
+    keycloak.login();
+  };
+
+  const logout = () => {
+    cleanupAuthState();
+    keycloak.logout({ redirectUri: window.location.origin + '/' });
+  };
 
   const contextValue: KeycloakAuthContextType = useMemo(() => ({
     user,
