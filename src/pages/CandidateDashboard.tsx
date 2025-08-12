@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,14 @@ import {
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
-  const { user, logout, isLoading } = useKeycloakAuth();
+  const { user, logout, isLoading, login } = useKeycloakAuth();
+
+  // Auto-redirect to Keycloak if not authenticated
+  useEffect(() => {
+    if (!isLoading && !user) {
+      login();
+    }
+  }, [isLoading, user, login]);
 
   // Fetch candidate profile for status
   const { data: candidateProfile, refetch: refetchProfile } = useQuery({
@@ -128,7 +135,7 @@ const CandidateDashboard = () => {
       return (
         <div className="p-6 text-center">
           <p className="text-destructive mb-4">Non authentifié</p>
-          <Button onClick={() => window.location.href = '/register'}>
+          <Button onClick={login}>
             Se connecter
           </Button>
         </div>

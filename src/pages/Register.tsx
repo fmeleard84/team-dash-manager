@@ -339,32 +339,6 @@ const Register = () => {
             </TabsContent>
           </Tabs>
 
-          <div className="mt-6 flex items-center justify-between">
-            <Link to="/" className="text-sm text-primary hover:underline">
-              Retour à l'accueil
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const res = await supabase.functions.invoke('keycloak-user-management', {
-                    headers: { 'x-debug-trace': 'true' },
-                    body: { action: 'test-connection' },
-                  });
-                  if (res.error || res.data?.success === false) {
-                    toast.error(`Diagnostic: ${res.data?.message || res.error?.message || 'Erreur'}`);
-                  } else {
-                    toast.success(`Diagnostic OK: ${res.data?.message || 'Connecté à Keycloak'}`);
-                  }
-                } catch (err: any) {
-                  toast.error(`Diagnostic échoué: ${err?.message || 'Erreur inconnue'}`);
-                }
-              }}
-            >
-              Diagnostic
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

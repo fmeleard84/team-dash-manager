@@ -48,7 +48,7 @@ interface Expertise {
 }
 
 const AdminResources = () => {
-  const { user } = useKeycloakAuth();
+  const { user, login } = useKeycloakAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -73,12 +73,11 @@ const AdminResources = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/admin');
+      login();
       return;
     }
-    
     fetchAllData();
-  }, [user, navigate]);
+  }, [user, login]);
 
   const fetchAllData = async () => {
     setIsLoading(true);

@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogIn, UserPlus } from "lucide-react";
-
+import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 const Header = () => {
+  const { login } = useKeycloakAuth();
   return (
     <header className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
@@ -11,11 +12,9 @@ const Header = () => {
         </Link>
         
         <div className="flex items-center gap-4">
-          <Button variant="ghost" asChild>
-            <Link to="/register?tab=login" className="flex items-center gap-2">
-              <LogIn className="h-4 w-4" />
-              Connexion
-            </Link>
+          <Button variant="ghost" onClick={login} className="flex items-center gap-2">
+            <LogIn className="h-4 w-4" />
+            Connexion
           </Button>
           
           <Button asChild>

@@ -15,7 +15,7 @@ import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
 import { KeycloakAuthProvider } from "./contexts/KeycloakAuthContext";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
-
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -32,10 +32,10 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/project/:id" element={<Project />} />
-        <Route path="/admin/resources" element={<AdminResources />} />
+        <Route path="/admin/resources" element={<ProtectedRoute><AdminResources /></ProtectedRoute>} />
         
-        <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
-        <Route path="/client-dashboard" element={<ClientDashboard />} />
+        <Route path="/candidate-dashboard" element={<ProtectedRoute><CandidateDashboard /></ProtectedRoute>} />
+        <Route path="/client-dashboard" element={<ProtectedRoute><ClientDashboard /></ProtectedRoute>} />
         <Route path="/register" element={<Register />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />

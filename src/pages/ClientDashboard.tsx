@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,9 +35,16 @@ const ClientDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { user, logout, isLoading } = useKeycloakAuth();
+  const { user, logout, isLoading, login } = useKeycloakAuth();
   const navigate = useNavigate();
   
+  // Auto-redirect to Keycloak if not authenticated
+  useEffect(() => {
+    if (!isLoading && !user) {
+      login();
+    }
+  }, [isLoading, user, login]);
+
   // Configure Supabase auth with Keycloak tokens
   useSupabaseAuth();
 
@@ -198,7 +205,7 @@ const ClientDashboard = () => {
       return (
         <div className="p-6 text-center">
           <p className="text-destructive mb-4">Non authentifié</p>
-          <Button onClick={() => window.location.href = '/register'}>
+          <Button onClick={login}>
             Se connecter
           </Button>
         </div>
