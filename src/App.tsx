@@ -18,6 +18,7 @@ import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 import AuthCheck from "./pages/auth-check";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const AppContent = () => {
         <Route path="/project/:id" element={<Project />} />
         <Route path="/admin/resources" element={<ProtectedRoute><AdminResources /></ProtectedRoute>} />
           <Route path="/auth-check" element={<AuthCheck />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
         <Route path="/candidate-dashboard" element={<ProtectedRoute><CandidateDashboard /></ProtectedRoute>} />
         <Route path="/client-dashboard" element={<ProtectedRoute><ClientDashboard /></ProtectedRoute>} />

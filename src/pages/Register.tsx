@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
-import { keycloak } from '@/lib/keycloak';
+import { loginRedirect } from '@/lib/oidc';
 
 
 const Register = () => {
@@ -167,7 +167,7 @@ const Register = () => {
         try {
           const target = formData.profileType === 'client' ? '/client-dashboard' : '/candidate-dashboard';
           console.log('[Register] Auto-login after registration to target:', target);
-          await keycloak.login({ redirectUri: window.location.origin + target, scope: 'openid profile email groups' });
+          await loginRedirect(target);
         } catch (e) {
           console.error('[Register] Auto-login failed, falling back to manual login tab:', e);
           setActiveTab('login');
@@ -355,12 +355,6 @@ const Register = () => {
                       userSub: user?.profile?.sub
                     });
                     
-                    // Additional Keycloak debug info
-                    console.log('[Register] Direct Keycloak state check:', {
-                      authenticated: (window as any).keycloak?.authenticated,
-                      token: !!(window as any).keycloak?.token,
-                      tokenParsed: !!(window as any).keycloak?.tokenParsed
-                    });
                     
                     try {
                       console.log('[Register] Calling login()...');

@@ -1,27 +1,26 @@
 // src/pages/AuthCheck.tsx
-import { keycloak } from "@/lib/keycloak";
+import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
 
 export default function AuthCheck() {
-  const tp: any = keycloak.tokenParsed;
+  const { isAuthenticated, user, login, logout, getUserGroups } = useKeycloakAuth();
+  const tp: any = user?.profile;
 
   return (
     <div style={{padding:20, fontFamily:"monospace"}}>
       <h2>AuthCheck</h2>
-      <div>authenticated: {String(!!keycloak.authenticated)}</div>
-      <div>token: {keycloak.token ? "yes" : "no"}</div>
+      <div>authenticated: {String(!!isAuthenticated)}</div>
+      <div>token: {isAuthenticated ? "yes" : "no"}</div>
       <div>email: {tp?.email ?? "-"}</div>
       <div>sub: {tp?.sub ?? "-"}</div>
       <div>groups: {Array.isArray(tp?.groups) ? tp.groups.join(", ") : "-"}</div>
 
       <div style={{marginTop:16}}>
-        <button onClick={() => keycloak.login({
-          redirectUri: window.location.origin + "/auth-check",
-          scope: "openid profile email groups"
-        })}>Login</button>
+        <button onClick={() => login()}>Login</button>
+        <button onClick={() => logout()} style={{marginLeft:8}}>Logout</button>
+      </div>
 
-        <button onClick={() => keycloak.logout({
-          redirectUri: window.location.origin + "/auth-check"
-        })} style={{marginLeft:8}}>Logout</button>
+      <div style={{marginTop:16}}>
+        <div>normalized groups: {getUserGroups().join(', ') || '-'}</div>
       </div>
     </div>
   );
