@@ -329,12 +329,25 @@ const Register = () => {
                   Connectez-vous avec votre compte Keycloak
                 </p>
                 <Button 
-                  onClick={login} 
+                  onClick={() => {
+                    console.log('[DEBUG] Login button clicked');
+                    console.log('[DEBUG] Current auth state:', { isAuthenticated, isLoading });
+                    login();
+                  }} 
                   className="w-full"
                   size="lg"
                 >
                   Se connecter
                 </Button>
+                
+                <div className="mt-4 p-3 bg-muted rounded-md">
+                  <p className="text-sm font-medium mb-2">État de l'authentification :</p>
+                  <div className="text-xs space-y-1">
+                    <div>En cours de chargement : {isLoading ? 'Oui' : 'Non'}</div>
+                    <div>Authentifié : {isAuthenticated ? 'Oui' : 'Non'}</div>
+                    <div>Groupes utilisateur : {isAuthenticated ? getUserGroups().join(', ') || 'Aucun' : 'Non connecté'}</div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
           </Tabs>

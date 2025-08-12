@@ -45,26 +45,52 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
 
     (async () => {
       try {
+        console.log('[DEBUG] Initializing Keycloak with config:', {
+          url: 'https://keycloak.ialla.fr',
+          realm: 'haas',
+          clientId: 'react-app'
+        });
+        
         const authenticated = await keycloak.init({
           onLoad: 'check-sso',
           pkceMethod: 'S256',
           silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
         });
+        
+        console.log('[DEBUG] Keycloak init result:', { authenticated, cancelled });
+        
         if (cancelled) return;
         setIsAuthenticated(!!authenticated);
 
         // Load profile to enrich token data (optional)
         try {
           if (authenticated) {
+            console.log('[DEBUG] Loading user profile...');
             await keycloak.loadUserProfile();
+            console.log('[DEBUG] User profile loaded:', keycloak.profile);
           }
-        } catch {}
+        } catch (profileError) {
+          console.error('[DEBUG] Failed to load profile:', profileError);
+        }
 
         const tokenParsed: any = keycloak.tokenParsed || {};
+        console.log('[DEBUG] Token parsed:', {
+          sub: tokenParsed.sub,
+          email: tokenParsed.email,
+          groups: tokenParsed.groups,
+          hasProfile: !!keycloak.profile
+        });
+        
         const composedUser = { profile: tokenParsed, keycloakProfile: (keycloak as any).profile };
         setUser(authenticated ? composedUser : null);
+        
+        console.log('[DEBUG] Auth state set:', { 
+          authenticated, 
+          hasUser: !!composedUser, 
+          userGroups: tokenParsed.groups || [] 
+        });
       } catch (e) {
-        // Silent init error handling
+        console.error('[DEBUG] Keycloak init error:', e);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -72,9 +98,12 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
 
     // Token refresh success keeps session valid
     keycloak.onTokenExpired = async () => {
+      console.log('[DEBUG] Token expired, attempting refresh...');
       try {
-        await keycloak.updateToken(30);
+        const refreshed = await keycloak.updateToken(30);
+        console.log('[DEBUG] Token refresh result:', refreshed);
       } catch (e) {
+        console.error('[DEBUG] Token refresh failed:', e);
         // Token refresh failed - user will need to login again
       }
     };
@@ -89,10 +118,18 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     const sub = user?.profile?.sub as string | undefined;
     const email = user?.profile?.email as string | undefined;
 
+    console.log('[DEBUG] Sync effect triggered:', { 
+      isAuthenticated, 
+      hasSub: !!sub, 
+      hasEmail: !!email 
+    });
+
     if (isAuthenticated && sub) {
       setKeycloakIdentity(sub, email);
+      console.log('[DEBUG] Keycloak identity synced to Supabase');
     } else {
       clearKeycloakIdentity();
+      console.log('[DEBUG] Keycloak identity cleared from Supabase');
     }
   }, [isAuthenticated, user]);
 
@@ -140,11 +177,17 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
   };
 
   const login = () => {
+    console.log('[DEBUG] Login initiated');
     // Prevent limbo states before redirecting to Keycloak
     cleanupAuthState();
+    console.log('[DEBUG] Auth state cleaned up');
+    
     try {
       const loginUrl = (keycloak as any).createLoginUrl ? (keycloak as any).createLoginUrl() : undefined;
+      console.log('[DEBUG] Login URL created:', !!loginUrl);
+      
       if (loginUrl) {
+        console.log('[DEBUG] Using direct URL redirection');
         if (window.top) {
           (window.top as Window).location.href = loginUrl;
         } else {
@@ -152,12 +195,18 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
         }
         return;
       }
-    } catch {}
+    } catch (urlError) {
+      console.error('[DEBUG] Error creating login URL:', urlError);
+    }
+    
+    console.log('[DEBUG] Falling back to keycloak.login()');
     keycloak.login();
   };
 
   const logout = () => {
+    console.log('[DEBUG] Logout initiated');
     cleanupAuthState();
+    console.log('[DEBUG] Auth state cleaned up for logout');
     keycloak.logout({ redirectUri: window.location.origin + '/' });
   };
 
