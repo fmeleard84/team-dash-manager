@@ -1,29 +1,55 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface User {
+// App roles aligned with DB enum public.app_role
+type AppRole = 'admin' | 'client' | 'candidate' | 'hr_manager';
+
+type ProfileRow = {
+  id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  company_name: string | null;
+  role: AppRole;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export interface ContextUser {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   phone?: string;
   companyName?: string;
-  role: 'admin' | 'client' | 'candidate' | 'hr_manager';
+  role: AppRole;
   isActive: boolean;
   emailVerified: boolean;
   createdAt: string;
+  // Compatibility layer for code expecting user.profile.*
+  profile: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    companyName?: string;
+    role: AppRole;
+  };
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: ContextUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   hasRole: (role: string) => boolean;
-  updateProfile: (data: Partial<User>) => Promise<boolean>;
+  updateProfile: (data: Partial<Pick<ContextUser, 'firstName' | 'lastName' | 'phone' | 'companyName' | 'role'>>) => Promise<boolean>;
 }
 
 interface RegisterData {
@@ -40,9 +66,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
 
@@ -51,183 +75,210 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ContextUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const isAuthenticated = !!user;
 
-  // Check if user is logged in on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  // Maps DB profile + session to our ContextUser with compatibility user.profile
+  const mapToContextUser = (profile: ProfileRow, sessionUserId: string): ContextUser => {
+    const email = profile.email ?? '';
+    const firstName = profile.first_name ?? '';
+    const lastName = profile.last_name ?? '';
+    const createdAt = profile.created_at ?? new Date().toISOString();
 
-  const checkAuth = async () => {
-    try {
-      const userData = localStorage.getItem('user_data');
-      if (!userData) {
+    const base = {
+      id: sessionUserId,
+      email,
+      firstName,
+      lastName,
+      phone: profile.phone ?? undefined,
+      companyName: profile.company_name ?? undefined,
+      role: profile.role ?? 'candidate',
+      isActive: true,
+      emailVerified: true,
+      createdAt,
+    };
+
+    return {
+      ...base,
+      profile: {
+        id: sessionUserId,
+        email,
+        firstName,
+        lastName,
+        phone: base.phone,
+        companyName: base.companyName,
+        role: base.role,
+      },
+    };
+  };
+
+  const fetchProfile = async (uid: string): Promise<ProfileRow | null> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, first_name, last_name, phone, company_name, role, created_at, updated_at')
+      .eq('id', uid)
+      .maybeSingle();
+
+    if (error) {
+      console.error('fetchProfile error:', error);
+      return null;
+    }
+    return data as ProfileRow | null;
+  };
+
+  // Initialize auth listener and session
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Sync state synchronously as recommended
+      if (!session) {
+        setUser(null);
         setIsLoading(false);
         return;
       }
 
-      // For now, use localStorage-based session management
-      // In production, you would want server-side session validation
-      const user = JSON.parse(userData);
-      setUser(user);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      localStorage.removeItem('user_data');
-      setUser(null);
-    } finally {
+      // Defer DB fetch to avoid deadlocks
+      setTimeout(async () => {
+        const profile = await fetchProfile(session.user.id);
+        if (profile) {
+          setUser(mapToContextUser(profile, session.user.id));
+        } else {
+          // If profile missing (rare), create minimal row
+          const { error: upsertErr } = await supabase.from('profiles').upsert({
+            id: session.user.id,
+            email: session.user.email,
+            first_name: session.user.user_metadata?.first_name ?? '',
+            last_name: session.user.user_metadata?.last_name ?? '',
+            role: (session.user.user_metadata?.role as AppRole) ?? 'candidate',
+          });
+          if (upsertErr) {
+            console.error('profiles upsert failed:', upsertErr);
+          }
+          const profile2 = await fetchProfile(session.user.id);
+          if (profile2) setUser(mapToContextUser(profile2, session.user.id));
+        }
+        setIsLoading(false);
+      }, 0);
+    });
+
+    // Check existing session after registering listener
+    supabase.auth.getSession().then(async ({ data }) => {
+      const session = data.session ?? null;
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        if (profile) {
+          setUser(mapToContextUser(profile, session.user.id));
+        }
+      }
       setIsLoading(false);
-    }
-  };
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      // Get registered users from localStorage
-      const registeredUsers = JSON.parse(localStorage.getItem('registered_users') || '[]');
-      
-      // Demo credentials - replace with real authentication
-      const demoUsers = [
-        {
-          id: '1',
-          email: 'admin@example.com',
-          password: 'admin123',
-          firstName: 'Admin',
-          lastName: 'User',
-          role: 'admin' as const,
-          isActive: true,
-          emailVerified: true,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: '2', 
-          email: 'client@example.com',
-          password: 'client123',
-          firstName: 'Marie',
-          lastName: 'Dupont',
-          companyName: 'Entreprise ABC',
-          role: 'client' as const,
-          isActive: true,
-          emailVerified: true,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: '3',
-          email: 'candidate@example.com', 
-          password: 'candidate123',
-          firstName: 'Jean',
-          lastName: 'Martin',
-          role: 'candidate' as const,
-          isActive: true,
-          emailVerified: true,
-          createdAt: new Date().toISOString()
-        }
-      ];
+    setIsLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase(),
+      password,
+    });
 
-      // Combine demo users and registered users
-      const allUsers = [...demoUsers, ...registeredUsers];
-      const user = allUsers.find(u => u.email === email.toLowerCase() && u.password === password);
-      
-      if (!user) {
-        toast.error('Email ou mot de passe incorrect');
-        return false;
-      }
-
-      // Store user data in localStorage
-      localStorage.setItem('user_data', JSON.stringify(user));
-      setUser(user);
-      
-      toast.success('Connexion réussie');
-      return true;
-    } catch (error) {
+    if (error) {
       console.error('Login failed:', error);
-      toast.error('Erreur de connexion');
+      toast.error('Email ou mot de passe incorrect');
+      setIsLoading(false);
       return false;
     }
+
+    // Profile and user state will be set by onAuthStateChange
+    toast.success('Connexion réussie');
+    setIsLoading(false);
+    return !!data.session;
   };
 
   const register = async (userData: RegisterData): Promise<boolean> => {
-    try {
-      // Validation
-      if (!userData.email || !userData.password || !userData.firstName || !userData.lastName || !userData.role) {
-        toast.error('Tous les champs requis doivent être remplis');
-        return false;
-      }
-
-      if (userData.password.length < 6) {
-        toast.error('Le mot de passe doit faire au moins 6 caractères');
-        return false;
-      }
-
-      // Get existing registered users
-      const registeredUsers = JSON.parse(localStorage.getItem('registered_users') || '[]');
-      
-      // Check if email already exists
-      const emailExists = registeredUsers.some((user: any) => user.email === userData.email.toLowerCase());
-      if (emailExists) {
-        toast.error('Cet email est déjà utilisé');
-        return false;
-      }
-
-      // Create new user object
-      const newUser = {
-        id: Date.now().toString(), // Simple ID generation
-        email: userData.email.toLowerCase(),
-        password: userData.password, // In production, this should be hashed
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        phone: userData.phone,
-        companyName: userData.companyName,
-        role: userData.role,
-        isActive: true,
-        emailVerified: false,
-        createdAt: new Date().toISOString()
-      };
-
-      // Add to registered users
-      registeredUsers.push(newUser);
-      localStorage.setItem('registered_users', JSON.stringify(registeredUsers));
-      
-      toast.success('Inscription réussie ! Vous pouvez maintenant vous connecter.');
-      return true;
-    } catch (error) {
-      console.error('Registration failed:', error);
-      toast.error('Erreur lors de l\'inscription');
+    // Basic validation
+    if (!userData.email || !userData.password || !userData.firstName || !userData.lastName || !userData.role) {
+      toast.error('Tous les champs requis doivent être remplis');
       return false;
     }
+    if (userData.password.length < 6) {
+      toast.error('Le mot de passe doit faire au moins 6 caractères');
+      return false;
+    }
+
+    const redirectUrl = `${window.location.origin}/`;
+    const { error } = await supabase.auth.signUp({
+      email: userData.email.toLowerCase(),
+      password: userData.password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          role: userData.role,
+          phone: userData.phone ?? undefined,
+          company_name: userData.companyName ?? undefined,
+        },
+      },
+    });
+
+    if (error) {
+      console.error('Registration failed:', error);
+      toast.error("Erreur lors de l'inscription");
+      return false;
+    }
+
+    toast.success('Inscription réussie ! Vérifiez votre email pour confirmer votre compte.');
+    return true;
   };
 
-  const logout = () => {
-    localStorage.removeItem('user_data');
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     toast.info('Déconnexion réussie');
     window.location.href = '/';
   };
 
   const hasRole = (role: string): boolean => {
-    return user?.role === role;
+    return (user?.role ?? '') === role;
   };
 
-  const updateProfile = async (data: Partial<User>): Promise<boolean> => {
+  const updateProfile = async (data: Partial<Pick<ContextUser, 'firstName' | 'lastName' | 'phone' | 'companyName' | 'role'>>): Promise<boolean> => {
     if (!user) return false;
 
-    try {
-      // Update user data in localStorage (demo implementation)
-      const updatedUser = { ...user, ...data };
-      localStorage.setItem('user_data', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      
-      toast.success('Profil mis à jour');
-      return true;
-    } catch (error) {
+    const payload: Partial<ProfileRow> = {
+      first_name: data.firstName ?? undefined,
+      last_name: data.lastName ?? undefined,
+      phone: data.phone ?? undefined,
+      company_name: data.companyName ?? undefined,
+      role: (data.role as AppRole | undefined) ?? undefined,
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('id', user.id);
+
+    if (error) {
       console.error('Profile update failed:', error);
       toast.error('Erreur lors de la mise à jour');
       return false;
     }
+
+    // Refresh local user
+    const fresh = await fetchProfile(user.id);
+    if (fresh) {
+      setUser(mapToContextUser(fresh, user.id));
+    }
+    toast.success('Profil mis à jour');
+    return true;
   };
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     user,
     isLoading,
     isAuthenticated,
@@ -236,7 +287,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     logout,
     hasRole,
     updateProfile,
-  };
+  }), [user, isLoading]);
 
   return (
     <AuthContext.Provider value={value}>
