@@ -1,20 +1,17 @@
-// src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { initKeycloakWithStoredTokens, keycloak } from "@/lib/keycloak";
+import { initKeycloak } from "@/lib/keycloak";
 
 async function bootstrap() {
-  const isCallback = window.location.pathname.startsWith("/auth/callback");
-
-  if (!isCallback) {
-    console.log("[Bootstrap] KC passive init with stored tokens…");
-    await initKeycloakWithStoredTokens();
-    console.log("[Bootstrap] authenticated =", !!keycloak.authenticated);
-  } else {
-    console.log("[Bootstrap] skip KC init on /auth/callback");
+  console.log("[Bootstrap] Starting React app...");
+  console.log("[Bootstrap] Initializing Keycloak before React...");
+  try {
+    const ok = await initKeycloak();
+    console.log("[Bootstrap] Keycloak initialized:", { authenticated: ok });
+  } catch (e) {
+    console.warn("[Bootstrap] Keycloak init failed (continuing):", e);
   }
-
   ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
 }
 bootstrap();

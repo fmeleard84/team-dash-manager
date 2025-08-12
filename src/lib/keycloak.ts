@@ -1,45 +1,33 @@
-// src/lib/keycloak.ts
-import Keycloak from "keycloak-js";
+import Keycloak, { KeycloakInitOptions } from "keycloak-js";
 
-const g = globalThis as any;
-const existing = g.__KC__ as Keycloak | undefined;
-const instance: Keycloak = existing ?? new Keycloak({
+export const keycloak = new Keycloak({
   url: "https://keycloak.ialla.fr",
   realm: "haas",
   clientId: "react-app",
 });
-if (!existing) g.__KC__ = instance;
 
-export const keycloak = instance;
+export async function initKeycloak() {
+  const hasCode = new URLSearchParams(window.location.search).has("code");
+  const baseOpts: KeycloakInitOptions = {
+    onLoad: "check-sso",     // best-effort, non bloquant
+    pkceMethod: "S256",
+    checkLoginIframe: false, // pas d'iframe de session
+    // IMPORTANT: pas de silentCheckSsoRedirectUri -> évite l’iframe 3rd-party
+  };
 
-let initStarted = false;  // <<< garde
-export async function initKeycloakWithStoredTokens() {
-  if (initStarted) return;    // <<< empêche un 2e init
-  initStarted = true;
-
-  const at = sessionStorage.getItem("kc_access_token");
-  const rt = sessionStorage.getItem("kc_refresh_token");
-
-  if (at && rt) {
-    await keycloak.init({
-      pkceMethod: "S256",
-      checkLoginIframe: false,
-      token: at,
-      refreshToken: rt,
-    });
-  } else {
-    await keycloak.init({
-      pkceMethod: "S256",
-      checkLoginIframe: false,
-    });
+  try {
+    const ok = await keycloak.init(baseOpts);
+    return ok;
+  } catch (e) {
+    console.warn("[Keycloak] init failed, retrying:", e);
+    if (hasCode) {
+      const ok2 = await keycloak.init({
+        onLoad: "login-required",
+        pkceMethod: "S256",
+        checkLoginIframe: false,
+      });
+      return ok2;
+    }
+    return false;
   }
-}
-
-export function storeTokensFromKC() {
-  if (keycloak.token) sessionStorage.setItem("kc_access_token", keycloak.token);
-  if (keycloak.refreshToken) sessionStorage.setItem("kc_refresh_token", keycloak.refreshToken);
-}
-export function clearStoredTokens() {
-  sessionStorage.removeItem("kc_access_token");
-  sessionStorage.removeItem("kc_refresh_token");
 }
