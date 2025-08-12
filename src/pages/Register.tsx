@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
+import { keycloak } from '@/lib/keycloak';
 
 
 const Register = () => {
@@ -163,7 +164,14 @@ const Register = () => {
           toast.success("Ce compte existe déjà et a été synchronisé. Vous pouvez maintenant vous connecter.");
         }
 
-        setActiveTab('login');
+        const target = formData.profileType === 'client' ? '/client-dashboard' : '/candidate-dashboard';
+        try {
+          console.log('[Register] Auto-login after registration to target:', target);
+          await keycloak.login({ redirectUri: window.location.origin + target });
+        } catch (e) {
+          console.error('[Register] Auto-login failed, falling back to manual login tab:', e);
+          setActiveTab('login');
+        }
       } else {
         console.error('User creation failed:', data);
         toast.error(data.error || "L'inscription a échoué");
