@@ -1,5 +1,5 @@
-import { createContext, useContext, ReactNode, useEffect } from 'react';
-import { AuthProvider, useAuth as useOidcAuth } from 'react-oidc-context';
+import { createContext, useContext, ReactNode, useEffect, useMemo, useState } from 'react';
+import Keycloak from 'keycloak-js';
 import { setKeycloakIdentity, clearKeycloakIdentity } from '@/integrations/supabase/client';
 
 interface KeycloakAuthContextType {
@@ -23,114 +23,121 @@ export const useKeycloakAuth = () => {
   return context;
 };
 
-const keycloakConfig = {
-  authority: 'https://keycloak.ialla.fr/realms/haas',
-  client_id: 'react-app',
-  redirect_uri: `${window.location.origin}/register?tab=login`,
-  response_type: 'code',
-  scope: 'openid profile email',
-  automaticSilentRenew: true,
-  includeIdTokenInSilentRenew: true,
-  onSigninCallback: () => {
-    // Clean up the URL after successful login
-    window.history.replaceState({}, document.title, '/register?tab=login');
-  },
-};
+// Initialize Keycloak instance once
+const keycloak = new Keycloak({
+  url: 'https://keycloak.ialla.fr',
+  realm: 'haas',
+  clientId: 'react-app',
+});
 
 interface KeycloakAuthProviderProps {
   children: ReactNode;
 }
 
-const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
-  const oidcAuth = useOidcAuth();
+export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
-  // Synchronize Keycloak identity to Supabase global fetch headers
+  // Init Keycloak on mount with silent SSO
   useEffect(() => {
-    const sub = oidcAuth.user?.profile?.sub as string | undefined;
-    const email = oidcAuth.user?.profile?.email as string | undefined;
+    let cancelled = false;
 
-    if (oidcAuth.isAuthenticated && sub) {
+    (async () => {
+      try {
+        const authenticated = await keycloak.init({
+          onLoad: 'check-sso',
+          pkceMethod: 'S256',
+          silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+        });
+        if (cancelled) return;
+        setIsAuthenticated(!!authenticated);
+
+        // Load profile to enrich token data (optional)
+        try {
+          if (authenticated) {
+            await keycloak.loadUserProfile();
+          }
+        } catch {}
+
+        const tokenParsed: any = keycloak.tokenParsed || {};
+        const composedUser = { profile: tokenParsed, keycloakProfile: (keycloak as any).profile };
+        setUser(authenticated ? composedUser : null);
+      } catch (e) {
+        console.error('[Keycloak] init error', e);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    // Token refresh success keeps session valid
+    keycloak.onTokenExpired = async () => {
+      try {
+        await keycloak.updateToken(30);
+      } catch (e) {
+        console.warn('[Keycloak] token refresh failed, forcing login');
+      }
+    };
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Sync Keycloak identity to Supabase headers
+  useEffect(() => {
+    const sub = user?.profile?.sub as string | undefined;
+    const email = user?.profile?.email as string | undefined;
+
+    if (isAuthenticated && sub) {
       setKeycloakIdentity(sub, email);
-      console.log('[Keycloak] Synced identity to Supabase headers', { sub });
+      console.info('[Keycloak] Synced identity to Supabase headers', { sub });
     } else {
       clearKeycloakIdentity();
-      console.log('[Keycloak] Cleared identity from Supabase headers');
+      console.info('[Keycloak] Cleared identity from Supabase headers');
     }
-  }, [oidcAuth.isAuthenticated, oidcAuth.user]);
+  }, [isAuthenticated, user]);
 
   const getUserGroups = (): string[] => {
-    console.log('=== DEBUG: Getting user groups ===');
-    console.log('Full user object:', oidcAuth.user);
-    console.log('User profile:', oidcAuth.user?.profile);
-    
+    const profile = user?.profile as any;
+    if (!profile) return [];
+
     let rawGroups: string[] = [];
-    
-    if (!oidcAuth.user?.profile?.groups) {
-      console.log('No groups found in profile.groups, checking other locations...');
-      const profile = oidcAuth.user?.profile as any;
-      
-      console.log('Checking resource_access:', profile?.resource_access);
-      if (profile?.resource_access?.['react-app']?.roles) {
-        console.log('Found roles in resource_access.react-app:', profile.resource_access['react-app'].roles);
-        rawGroups = profile.resource_access['react-app'].roles as string[];
-      } else {
-        console.log('Checking realm_access:', profile?.realm_access);
-        if (profile?.realm_access?.roles) {
-           console.log('Found roles in realm_access:', profile.realm_access.roles);
-           rawGroups = (profile.realm_access.roles as string[]).filter((role: string) => 
-             ['client', 'candidate', 'resource', 'ressources', 'admin'].includes(role)
-           );
-        }
-      }
-      
-      if (rawGroups.length === 0) {
-        console.log('No groups found anywhere in token');
-        return [];
-      }
-    } else {
-      console.log('Found groups in profile.groups:', oidcAuth.user.profile.groups);
-      rawGroups = Array.isArray(oidcAuth.user.profile.groups) 
-        ? oidcAuth.user.profile.groups as string[]
-        : [];
+
+    if (Array.isArray(profile.groups) && profile.groups.length > 0) {
+      rawGroups = profile.groups as string[];
+    } else if (profile?.resource_access?.['react-app']?.roles) {
+      rawGroups = profile.resource_access['react-app'].roles as string[];
+    } else if (profile?.realm_access?.roles) {
+      rawGroups = (profile.realm_access.roles as string[]).filter((role: string) =>
+        ['client', 'candidate', 'resource', 'ressources', 'admin'].includes(role)
+      );
     }
-    
+
     const cleanedGroups = rawGroups
-      .map(group => group.startsWith('/') ? group.substring(1) : group)
-      .map(group => (group === 'ressources' || group === 'ressource') ? 'resource' : group)
-      .filter(group => ['client', 'candidate', 'resource', 'admin'].includes(group));
-    
-    console.log('Raw groups:', rawGroups);
-    console.log('Cleaned groups:', cleanedGroups);
-    
+      .map((g) => (g.startsWith('/') ? g.substring(1) : g))
+      .map((g) => (g === 'ressources' || g === 'ressource' ? 'resource' : g))
+      .filter((g) => ['client', 'candidate', 'resource', 'admin'].includes(g));
+
     return cleanedGroups;
   };
 
-  const hasGroup = (groupName: string): boolean => {
-    return getUserGroups().includes(groupName);
-  };
+  const hasGroup = (groupName: string): boolean => getUserGroups().includes(groupName);
+  const hasAdminRole = (): boolean => hasGroup('admin');
 
-  const hasAdminRole = (): boolean => {
-    return hasGroup('admin');
-  };
+  const login = () => keycloak.login();
+  const logout = () => keycloak.logout({ redirectUri: window.location.origin + '/' });
 
-  const login = () => {
-    oidcAuth.signinRedirect();
-  };
-
-  const logout = () => {
-    oidcAuth.signoutRedirect();
-  };
-
-  const contextValue: KeycloakAuthContextType = {
-    user: oidcAuth.user,
+  const contextValue: KeycloakAuthContextType = useMemo(() => ({
+    user,
     login,
     logout,
-    isLoading: oidcAuth.isLoading,
-    isAuthenticated: oidcAuth.isAuthenticated,
+    isLoading,
+    isAuthenticated,
     getUserGroups,
     hasGroup,
     hasAdminRole,
-  };
+  }), [user, isLoading, isAuthenticated]);
 
   return (
     <KeycloakAuthContext.Provider value={contextValue}>
@@ -139,12 +146,3 @@ const KeycloakAuthWrapper = ({ children }: KeycloakAuthProviderProps) => {
   );
 };
 
-export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) => {
-  return (
-    <AuthProvider {...keycloakConfig}>
-      <KeycloakAuthWrapper>
-        {children}
-      </KeycloakAuthWrapper>
-    </AuthProvider>
-  );
-};

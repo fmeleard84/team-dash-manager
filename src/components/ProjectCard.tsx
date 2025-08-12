@@ -57,46 +57,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     fetchResourceAssignments();
   }, [project.id]);
 
-  // Fetch Nextcloud SSO link for client when project is active (client side CTA)
-  useEffect(() => {
-    const fetchOwnerNextcloudLink = async () => {
-      try {
-        console.log('[ProjectCard] Fetching Nextcloud link for project:', project.id, 'status:', project.status);
-        
-        // Only fetch for active projects (play status)
-        if (project.status !== 'play') {
-          console.log('[ProjectCard] Project not active, skipping Nextcloud link fetch');
-          setPlankaProject(null);
-          return;
-        }
-
-        console.log('[ProjectCard] Calling project-details edge function...');
-        const { data, error } = await supabase.functions.invoke('project-details', {
-          body: { action: 'get_owner_nextcloud_link', projectId: project.id },
-        });
-        
-        console.log('[ProjectCard] Edge function response:', { data, error });
-        
-        if (error) {
-          console.error('[ProjectCard] Error from edge function:', error);
-          return;
-        }
-        
-        if (data?.success && data.link) {
-          console.log('[ProjectCard] Setting Nextcloud link:', data.link);
-          setPlankaProject({ planka_url: data.link });
-        } else {
-          console.log('[ProjectCard] No valid link received:', data);
-          setPlankaProject(null);
-        }
-      } catch (e) {
-        console.error('[ProjectCard] Error fetching owner Nextcloud SSO link:', e);
-        setPlankaProject(null);
-      }
-    };
-    
-    fetchOwnerNextcloudLink();
-  }, [project.id, project.status]);
+  // Direct Nextcloud URL is used; no edge function call needed for clients.
 
   const fetchResourceAssignments = async () => {
     try {
@@ -357,19 +318,10 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               size="sm"
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
               onClick={() => {
-                console.log('[ProjectCard] Opening Nextcloud workspace:', plankaProject?.planka_url);
-                if (plankaProject?.planka_url) {
-                  window.open(plankaProject.planka_url, '_blank');
-                } else {
-                  // Fallback - generate SSO link manually if edge function failed
-                  const projectTitle = project.title;
-                  const projectFolderName = `Projet - ${projectTitle}`;
-                  const redirectPath = `/apps/files?dir=${encodeURIComponent(`/${projectFolderName}`)}`;
-                  const loginPath = `/index.php/apps/sociallogin/custom_oauth2/keycloak`;
-                  const fallbackUrl = `https://cloud.ialla.fr${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`;
-                  console.log('[ProjectCard] Using fallback URL:', fallbackUrl);
-                  window.open(fallbackUrl, '_blank');
-                }
+                const projectFolderName = `Projet - ${project.title}`;
+                const filesUrl = `https://cloud.ialla.fr/apps/files?dir=${encodeURIComponent(`/${projectFolderName}`)}`;
+                window.open(filesUrl, '_blank');
+
               }}
             >
               <ExternalLink className="w-4 h-4 mr-2" />
