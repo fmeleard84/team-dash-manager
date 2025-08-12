@@ -40,7 +40,7 @@ async function bootstrap() {
     
   } catch (error) {
     console.error('[Bootstrap] Keycloak init error:', error);
-    console.error('[Bootstrap] Error details:', error.message);
+    console.error('[Bootstrap] Error details:', error?.message || 'Unknown error');
   }
 
   // Render React app after Keycloak init
