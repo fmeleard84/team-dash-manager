@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -23,6 +24,7 @@ export type Database = {
           updated_at: string;
           members: string[];
           team_members: any; // JSON field
+          project_id: string | null; // NEW: project binding
         };
         Insert: {
           id?: string;
@@ -33,6 +35,7 @@ export type Database = {
           updated_at?: string;
           members?: string[];
           team_members?: any;
+          project_id?: string; // NEW: project binding
         };
         Update: {
           id?: string;
@@ -43,6 +46,7 @@ export type Database = {
           updated_at?: string;
           members?: string[];
           team_members?: any;
+          project_id?: string; // NEW: project binding
         };
       };
       kanban_columns: {
