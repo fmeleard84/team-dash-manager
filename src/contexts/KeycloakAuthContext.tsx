@@ -1,6 +1,6 @@
 
 import { createContext, useContext, ReactNode, useEffect, useMemo, useState } from 'react';
-import Keycloak from 'keycloak-js';
+import { keycloak } from '@/lib/keycloak';
 import { setKeycloakIdentity, clearKeycloakIdentity } from '@/integrations/supabase/client';
 
 interface KeycloakAuthContextType {
@@ -24,12 +24,7 @@ export const useKeycloakAuth = () => {
   return context;
 };
 
-// Initialize Keycloak instance once
-const keycloak = new Keycloak({
-  url: 'https://keycloak.ialla.fr',
-  realm: 'haas',
-  clientId: 'react-app',
-});
+// Using shared Keycloak instance from '@/lib/keycloak'
 
 // Expose for debugging in pages (e.g. Register.tsx)
 ;(window as any).keycloak = keycloak;
@@ -43,68 +38,34 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // Init Keycloak on mount with silent SSO
+  // Consume pre-initialized Keycloak (initialized in main.tsx)
   useEffect(() => {
-    let cancelled = false;
+    // After bootstrap, keycloak is ready when React mounts
+    try {
+      const authenticated = !!keycloak.authenticated;
+      setIsAuthenticated(authenticated);
 
-    const initKeycloak = async () => {
-      try {
-        console.log('[DEBUG] Initializing Keycloak with config:', {
-          url: 'https://keycloak.ialla.fr',
-          realm: 'haas',
-          clientId: 'react-app'
-        });
-        
-        const authenticated = await keycloak.init({
-          onLoad: 'check-sso',
-          pkceMethod: 'S256',
-          silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
-          checkLoginIframe: false, // important for some environments to avoid iframe errors
-        });
-        
-        console.log('[DEBUG] Keycloak init result:', { authenticated, cancelled });
-        
-        if (cancelled) return;
-        setIsAuthenticated(!!authenticated);
-
-        // Load profile to enrich token data (optional)
+      // Optionally load profile for richer data
+      const loadProfile = async () => {
         try {
           if (authenticated && !keycloak.profile) {
-            console.log('[DEBUG] Loading user profile...');
             await keycloak.loadUserProfile();
-            console.log('[DEBUG] User profile loaded:', keycloak.profile);
           }
         } catch (profileError) {
           console.error('[DEBUG] Failed to load profile:', profileError);
         }
+      };
 
+      void loadProfile().then(() => {
         const tokenParsed: any = keycloak.tokenParsed || {};
-        console.log('[DEBUG] Current Keycloak state:', {
-          authenticated,
-          sub: tokenParsed.sub,
-          email: tokenParsed.email,
-          groups: tokenParsed.groups,
-          hasProfile: !!keycloak.profile,
-          tokenExists: !!keycloak.token
-        });
-        
         const composedUser = { profile: tokenParsed, keycloakProfile: (keycloak as any).profile };
         setUser(authenticated ? composedUser : null);
-        
-        console.log('[DEBUG] Auth state synced:', { 
-          authenticated, 
-          hasUser: !!composedUser, 
-          userGroups: tokenParsed.groups || [] 
-        });
-      } catch (e: any) {
-        const msg = e?.message || (typeof e === 'string' ? e : e?.toString?.()) || 'Unknown error';
-        console.error('[DEBUG] Error syncing Keycloak state:', e, msg);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    initKeycloak();
+        setIsLoading(false);
+      });
+    } catch (e) {
+      console.error('[DEBUG] Error reading Keycloak state after bootstrap:', e);
+      setIsLoading(false);
+    }
 
     // Token events and refresh handling
     keycloak.onAuthSuccess = () => console.log('[DEBUG] Keycloak onAuthSuccess');
@@ -119,11 +80,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
         console.log('[DEBUG] Token refresh result:', refreshed);
       } catch (e) {
         console.error('[DEBUG] Token refresh failed:', e);
-        // Token refresh failed - user will need to login again
       }
-    };
-    return () => {
-      cancelled = true;
     };
   }, []);
 
