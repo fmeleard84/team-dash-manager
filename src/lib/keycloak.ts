@@ -1,34 +1,54 @@
-import Keycloak, { KeycloakInitOptions } from "keycloak-js";
+import Keycloak from "keycloak-js";
 
-declare global {
-  var __KC__: ReturnType<typeof Keycloak> | undefined;
-}
-
-export const keycloak = globalThis.__KC__ ?? (globalThis.__KC__ = new Keycloak({
+// --- Singleton robuste (évite les doubles instances en dev/HMR) ---
+const g = globalThis as any;
+const existing = g.__KC__ as Keycloak | undefined;
+const instance: Keycloak = existing ?? new Keycloak({
   url: "https://keycloak.ialla.fr",
   realm: "haas",
   clientId: "react-app",
-}));
+});
+if (!existing) g.__KC__ = instance;
 
+export const keycloak = instance;
+
+// --- Gestion simple des jetons (stockés par nous) ---
 function getStoredTokens() {
-  const at = sessionStorage.getItem("kc_access_token");
-  const rt = sessionStorage.getItem("kc_refresh_token");
-  return { at, rt };
+  return {
+    at: sessionStorage.getItem("kc_access_token"),
+    rt: sessionStorage.getItem("kc_refresh_token"),
+  };
 }
 
 export async function initKeycloakWithStoredTokens() {
   const { at, rt } = getStoredTokens();
-  const opts: KeycloakInitOptions = {
-    pkceMethod: "S256",
-    checkLoginIframe: false,
-  };
+
   try {
     if (at && rt) {
-      // injecte les jetons que NOUS avons stockés
-      await keycloak.init({ ...opts, token: at, refreshToken: rt });
+      await keycloak.init({
+        pkceMethod: "S256",
+        checkLoginIframe: false,
+        token: at,
+        refreshToken: rt,
+      });
     } else {
-      await keycloak.init(opts);
+      await keycloak.init({
+        pkceMethod: "S256",
+        checkLoginIframe: false,
+      });
     }
   } catch {
-    // en dernier recours, démarre sans (l’app forcera un login si nécessaire)
-    await keycloak.init({ pkceMethod: "S256", checkLoginIframe: false }
+    // Dernier recours : repartir “propre”
+    await keycloak.init({ pkceMethod: "S256", checkLoginIframe: false });
+  }
+}
+
+export function storeTokensFromKC() {
+  if (keycloak.token) sessionStorage.setItem("kc_access_token", keycloak.token);
+  if (keycloak.refreshToken) sessionStorage.setItem("kc_refresh_token", keycloak.refreshToken);
+}
+
+export function clearStoredTokens() {
+  sessionStorage.removeItem("kc_access_token");
+  sessionStorage.removeItem("kc_refresh_token");
+}
