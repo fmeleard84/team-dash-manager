@@ -789,6 +789,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          drive_url: string | null
           end_at: string | null
           id: string
           location: string | null
@@ -802,6 +803,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          drive_url?: string | null
           end_at?: string | null
           id?: string
           location?: string | null
@@ -815,6 +817,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          drive_url?: string | null
           end_at?: string | null
           id?: string
           location?: string | null

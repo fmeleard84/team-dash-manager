@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ interface EventRow {
   end_at?: string | null;
   location?: string | null;
   video_url?: string | null;
+  drive_url?: string | null; // NEW
   project_id: string;
 }
 
@@ -33,6 +35,7 @@ export default function PlanningView() {
   const [endTime, setEndTime] = useState<string>(""); // HH:mm
   const [location, setLocation] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [driveUrl, setDriveUrl] = useState(""); // NEW
   const [attendeesEmails, setAttendeesEmails] = useState("");
 
   const suggestedVideoUrl = useMemo(() => {
@@ -64,7 +67,7 @@ export default function PlanningView() {
     setLoading(true);
     const { data, error } = await supabase
       .from("project_events")
-      .select("id,title,description,start_at,end_at,location,video_url,project_id")
+      .select("id,title,description,start_at,end_at,location,video_url,drive_url,project_id") // + drive_url
       .eq("project_id", pid)
       .order("start_at", { ascending: true });
     setLoading(false);
@@ -103,6 +106,7 @@ export default function PlanningView() {
         end_at: endISO,
         location: location || null,
         video_url: finalVideoUrl,
+        drive_url: driveUrl || null, // NEW
         created_by: uid,
       })
       .select("id")
@@ -130,7 +134,7 @@ export default function PlanningView() {
     }
 
     toast({ title: "Événement créé" });
-    setTitle(""); setDescription(""); setDate(""); setStartTime(""); setEndTime(""); setLocation(""); setVideoUrl(""); setAttendeesEmails("");
+    setTitle(""); setDescription(""); setDate(""); setStartTime(""); setEndTime(""); setLocation(""); setVideoUrl(""); setDriveUrl(""); setAttendeesEmails("");
     if (projectId) loadEvents(projectId);
   };
 
@@ -203,6 +207,11 @@ export default function PlanningView() {
             </div>
 
             <div className="space-y-2">
+              <label className="text-sm font-medium">Lien Google Drive (optionnel)</label>
+              <Input value={driveUrl} onChange={(e) => setDriveUrl(e.target.value)} placeholder="URL Google Drive / Docs" />
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-medium">Invités (emails, séparés par virgules)</label>
               <Textarea value={attendeesEmails} onChange={(e) => setAttendeesEmails(e.target.value)} placeholder="email1@ex.com, email2@ex.com" />
             </div>
@@ -229,9 +238,14 @@ export default function PlanningView() {
                       <div className="text-sm text-muted-foreground">
                         {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
                       </div>
-                      {ev.video_url && (
-                        <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
-                      )}
+                      <div className="flex gap-3">
+                        {ev.video_url && (
+                          <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
+                        )}
+                        {ev.drive_url && (
+                          <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
+                        )}
+                      </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
                       <Trash2 className="h-4 w-4" />

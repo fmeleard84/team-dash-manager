@@ -102,6 +102,22 @@ const ClientDashboard = () => {
           </div>
         );
         
+      case 'planning':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Planning</h2>
+            <PlanningView />
+          </div>
+        );
+
+      case 'drive':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Drive</h2>
+            <DriveView />
+          </div>
+        );
+
       case 'invoices':
         return (
           <div className="space-y-4">
