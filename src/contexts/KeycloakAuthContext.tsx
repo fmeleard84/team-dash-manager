@@ -153,10 +153,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     cleanupAuthState();
     console.log('[DEBUG] Auth state cleaned up');
 
-    // Prefer returning to the exact current URL after login
-    const redirectUri = window.location.href;
-
-    // Optionally keep a fallback target
+    // Memorize the current path to restore after login (we redirect via root)
     try {
       const currentPath = window.location.pathname + window.location.search + window.location.hash;
       localStorage.setItem('postLoginRedirect', currentPath || '/');
@@ -164,6 +161,9 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     } catch (e) {
       console.warn('[DEBUG] Unable to save postLoginRedirect:', e);
     }
+
+    // Always force a safe redirect back to app root (must be allowed in Keycloak client)
+    const redirectUri = window.location.origin + '/';
 
     try {
       const loginUrl = (keycloak as any).createLoginUrl

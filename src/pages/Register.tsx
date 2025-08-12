@@ -164,10 +164,9 @@ const Register = () => {
           toast.success("Ce compte existe déjà et a été synchronisé. Vous pouvez maintenant vous connecter.");
         }
 
-        const target = formData.profileType === 'client' ? '/client-dashboard' : '/candidate-dashboard';
         try {
-          console.log('[Register] Auto-login after registration to target:', target);
-          await keycloak.login({ redirectUri: window.location.origin + target });
+          console.log('[Register] Auto-login after registration to root (post-login redirect will route to dashboard)');
+          await keycloak.login({ redirectUri: window.location.origin + '/' });
         } catch (e) {
           console.error('[Register] Auto-login failed, falling back to manual login tab:', e);
           setActiveTab('login');

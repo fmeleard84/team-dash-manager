@@ -9,7 +9,9 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { isLoading, isAuthenticated, login } = useKeycloakAuth();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    const url = new URL(window.location.href);
+    const hasOidcParams = url.searchParams.has('code') || url.searchParams.has('session_state') || url.searchParams.has('state');
+    if (!isLoading && !isAuthenticated && !hasOidcParams) {
       login();
     }
   }, [isLoading, isAuthenticated, login]);
