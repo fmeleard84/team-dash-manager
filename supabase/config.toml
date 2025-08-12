@@ -104,3 +104,5 @@ verify_jwt = false
 [functions.project-details]
 verify_jwt = false
 
+[functions.sync-profile]
+verify_jwt = false
