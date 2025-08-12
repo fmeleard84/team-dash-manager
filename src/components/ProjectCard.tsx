@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -62,17 +61,40 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
   useEffect(() => {
     const fetchOwnerNextcloudLink = async () => {
       try {
-        if (project.status !== 'play') return;
+        console.log('[ProjectCard] Fetching Nextcloud link for project:', project.id, 'status:', project.status);
+        
+        // Only fetch for active projects (play status)
+        if (project.status !== 'play') {
+          console.log('[ProjectCard] Project not active, skipping Nextcloud link fetch');
+          setPlankaProject(null);
+          return;
+        }
+
+        console.log('[ProjectCard] Calling project-details edge function...');
         const { data, error } = await supabase.functions.invoke('project-details', {
           body: { action: 'get_owner_nextcloud_link', projectId: project.id },
         });
-        if (!error && data?.success && data.link) {
+        
+        console.log('[ProjectCard] Edge function response:', { data, error });
+        
+        if (error) {
+          console.error('[ProjectCard] Error from edge function:', error);
+          return;
+        }
+        
+        if (data?.success && data.link) {
+          console.log('[ProjectCard] Setting Nextcloud link:', data.link);
           setPlankaProject({ planka_url: data.link });
+        } else {
+          console.log('[ProjectCard] No valid link received:', data);
+          setPlankaProject(null);
         }
       } catch (e) {
-        console.error('Error fetching owner Nextcloud SSO link:', e);
+        console.error('[ProjectCard] Error fetching owner Nextcloud SSO link:', e);
+        setPlankaProject(null);
       }
     };
+    
     fetchOwnerNextcloudLink();
   }, [project.id, project.status]);
 
@@ -139,7 +161,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
       await fetchResourceAssignments();
     } catch (error) {
       console.error('Error booking team:', error);
-      toast.error('Erreur lors de la recherche d\'équipe');
+      toast.error("Erreur lors de la recherche d'équipe");
     } finally {
       setIsBookingTeam(false);
     }
@@ -272,13 +294,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
           )}
 
           <div className="flex flex-wrap gap-2">
-            {/* Éditer l’équipe */}
+            {/* Éditer l'équipe */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => onView(project.id)}
             >
-              Éditer l’équipe
+              Éditer l'équipe
             </Button>
 
             {/* Play/Pause */}
@@ -324,20 +346,34 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               className="w-full bg-orange-500 hover:bg-orange-600 text-white"
             >
               <Users className="w-4 h-4 mr-2" />
-              {isBookingTeam ? 'Envoi des demandes...' : 'Booker l’équipe'}
+              {isBookingTeam ? "Envoi des demandes..." : "Booker l'équipe"}
             </Button>
           )}
 
-          {/* My Workspace button - only show when project is active (play) */}
-          {project.status === 'play' && plankaProject?.planka_url && (
+          {/* My Workspace button - show when project is active (play) */}
+          {project.status === 'play' && (
             <Button
               variant="default"
               size="sm"
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-              onClick={() => window.open(plankaProject.planka_url, '_blank')}
+              onClick={() => {
+                console.log('[ProjectCard] Opening Nextcloud workspace:', plankaProject?.planka_url);
+                if (plankaProject?.planka_url) {
+                  window.open(plankaProject.planka_url, '_blank');
+                } else {
+                  // Fallback - generate SSO link manually if edge function failed
+                  const projectTitle = project.title;
+                  const projectFolderName = `Projet - ${projectTitle}`;
+                  const redirectPath = `/apps/files?dir=${encodeURIComponent(`/${projectFolderName}`)}`;
+                  const loginPath = `/index.php/apps/sociallogin/custom_oauth2/keycloak`;
+                  const fallbackUrl = `https://cloud.ialla.fr${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`;
+                  console.log('[ProjectCard] Using fallback URL:', fallbackUrl);
+                  window.open(fallbackUrl, '_blank');
+                }
+              }}
             >
               <ExternalLink className="w-4 h-4 mr-2" />
-              Accéder à l’espace collaboratif
+              Accéder à l'espace collaboratif
             </Button>
           )}
 
