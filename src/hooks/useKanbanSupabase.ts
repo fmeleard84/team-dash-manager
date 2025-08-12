@@ -91,7 +91,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       setIsLoading(true);
 
       // Fetch board
-      const { data: boardData, error: boardError } = await supabase
+      const { data: boardData, error: boardError } = await (supabase as any)
         .from('kanban_boards')
         .select('*')
         .eq('id', id)
@@ -100,7 +100,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (boardError) throw boardError;
 
       // Fetch columns
-      const { data: columnsData, error: columnsError } = await supabase
+      const { data: columnsData, error: columnsError } = await (supabase as any)
         .from('kanban_columns')
         .select('*')
         .eq('board_id', id)
@@ -109,7 +109,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (columnsError) throw columnsError;
 
       // Fetch cards
-      const { data: cardsData, error: cardsError } = await supabase
+      const { data: cardsData, error: cardsError } = await (supabase as any)
         .from('kanban_cards')
         .select('*')
         .eq('board_id', id)
@@ -178,7 +178,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         }
       ];
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('kanban_boards')
         .insert({
           title,
@@ -210,7 +210,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     if (!board) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('kanban_columns')
         .insert({
           board_id: board.id,
@@ -256,13 +256,13 @@ export const useKanbanSupabase = (boardId?: string) => {
 
     try {
       // First, delete all cards in the column
-      await supabase
+      await (supabase as any)
         .from('kanban_cards')
         .delete()
         .eq('column_id', columnId);
 
       // Then delete the column
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('kanban_columns')
         .delete()
         .eq('id', columnId);
@@ -312,7 +312,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       const column = board.columns.find(col => col.id === input.columnId);
       const maxPosition = column ? column.cardIds.length : 0;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('kanban_cards')
         .insert({
           board_id: board.id,
@@ -411,7 +411,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (input.labels !== undefined) updateData.labels = input.labels;
       if (input.progress !== undefined) updateData.progress = input.progress;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('kanban_cards')
         .update(updateData)
         .eq('id', input.id)
@@ -462,7 +462,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     if (!board) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('kanban_cards')
         .delete()
         .eq('id', cardId);
@@ -526,7 +526,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         }));
 
         for (const update of updates) {
-          await supabase
+          await (supabase as any)
             .from('kanban_cards')
             .update({ position: update.position })
             .eq('id', update.id);
@@ -540,7 +540,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         if (!sourceColumn || !destColumn) return;
 
         // Update card's column
-        await supabase
+         await (supabase as any)
           .from('kanban_cards')
           .update({ 
             column_id: destination.droppableId,
@@ -553,7 +553,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         sourceCardIds.splice(source.index, 1);
         
         for (let i = 0; i < sourceCardIds.length; i++) {
-          await supabase
+           await (supabase as any)
             .from('kanban_cards')
             .update({ position: i })
             .eq('id', sourceCardIds[i]);
@@ -565,7 +565,7 @@ export const useKanbanSupabase = (boardId?: string) => {
 
         for (let i = 0; i < destCardIds.length; i++) {
           if (destCardIds[i] !== draggableId) {
-            await supabase
+             await (supabase as any)
               .from('kanban_cards')
               .update({ position: i })
               .eq('id', destCardIds[i]);
@@ -657,7 +657,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       const importedBoard: KanbanBoard = JSON.parse(jsonString);
       
       // Create board in database
-      const { data: newBoardData, error: boardError } = await supabase
+      const { data: newBoardData, error: boardError } = await (supabase as any)
         .from('kanban_boards')
         .insert({
           title: `${importedBoard.title} (Importé)`,
@@ -674,7 +674,7 @@ export const useKanbanSupabase = (boardId?: string) => {
 
       // Create columns
       const columnsPromises = importedBoard.columns.map(column =>
-        supabase.from('kanban_columns').insert({
+        (supabase as any).from('kanban_columns').insert({
           id: column.id, // Keep original ID to maintain card relationships
           board_id: newBoardData.id,
           title: column.title,
@@ -689,7 +689,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       // Create cards
       // NOTE: We keep original IDs but you must ensure column_id mapping matches the imported structure.
       const cardsPromises = Object.values(importedBoard.cards).map((card, index) =>
-        supabase.from('kanban_cards').insert({
+        (supabase as any).from('kanban_cards').insert({
           id: card.id,
           board_id: newBoardData.id,
           // WARNING: column_id must be set to the actual column containing the card.
