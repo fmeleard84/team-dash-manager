@@ -1,4 +1,4 @@
-import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Auth utilities for the application
@@ -6,8 +6,11 @@ import { useKeycloakAuth } from '@/contexts/KeycloakAuthContext';
 
 // Simple guard function for protecting routes
 export function requireAuth(fn: () => void) {
-  const { isAuthenticated, login } = useKeycloakAuth();
-  if (!isAuthenticated) return login();
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    if (typeof window !== 'undefined') window.location.href = '/auth';
+    return;
+  }
   fn();
 }
 

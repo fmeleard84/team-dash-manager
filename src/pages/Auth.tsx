@@ -121,6 +121,7 @@ const Auth = () => {
                     onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
                     required
                     disabled={isLoading}
+                    autoComplete="email"
                   />
                 </div>
                 
@@ -135,6 +136,7 @@ const Auth = () => {
                       onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
                       required
                       disabled={isLoading}
+                      autoComplete="current-password"
                     />
                     <Button
                       type="button"
@@ -261,6 +263,7 @@ const Auth = () => {
                     required
                     disabled={isLoading}
                     minLength={6}
+                    autoComplete="new-password"
                   />
                 </div>
                 
@@ -274,6 +277,7 @@ const Auth = () => {
                     onChange={(e) => setRegisterForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                     required
                     disabled={isLoading}
+                    autoComplete="new-password"
                   />
                 </div>
                 

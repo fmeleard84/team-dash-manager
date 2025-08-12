@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Check, X, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ProjectNotification {
@@ -48,7 +48,7 @@ const CandidateProjects = () => {
   const [currentCandidateId, setCurrentCandidateId] = useState<string | null>(null);
   const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({});
   const [projectsData, setProjectsData] = useState<{ [key: string]: any }>({});
-  const { user } = useKeycloakAuth();
+  const { user } = useAuth();
   useEffect(() => {
     fetchCurrentCandidate();
   }, []);

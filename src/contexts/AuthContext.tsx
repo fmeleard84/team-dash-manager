@@ -37,7 +37,8 @@ export interface ContextUser {
     lastName: string;
     phone?: string;
     companyName?: string;
-    role: AppRole;
+      role: AppRole;
+      sub?: string;
   };
 }
 
@@ -110,6 +111,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         phone: base.phone,
         companyName: base.companyName,
         role: base.role,
+        sub: sessionUserId,
       },
     };
   };

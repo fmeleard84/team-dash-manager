@@ -5,7 +5,7 @@ import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2 } from "lucide-r
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { buildFunctionHeaders } from "@/lib/functionAuth";
 
@@ -41,7 +41,7 @@ interface PlankaProject {
 }
 
 export function ProjectCard({ project, onStatusToggle, onDelete, onView }: ProjectCardProps) {
-  const { user } = useKeycloakAuth();
+  const { user } = useAuth();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
