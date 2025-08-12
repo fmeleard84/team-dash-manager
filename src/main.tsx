@@ -12,7 +12,6 @@ async function bootstrap() {
       onLoad: 'check-sso',
       pkceMethod: 'S256',
       checkLoginIframe: false,
-      silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
     });
     console.log('[Bootstrap] Keycloak initialized:', { authenticated: !!keycloak.authenticated });
   } catch (e) {
