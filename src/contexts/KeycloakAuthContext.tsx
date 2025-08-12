@@ -91,8 +91,9 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
           hasUser: !!composedUser, 
           userGroups: tokenParsed.groups || [] 
         });
-      } catch (e) {
-        console.error('[DEBUG] Error syncing Keycloak state:', e);
+      } catch (e: any) {
+        const msg = e?.message || (typeof e === 'string' ? e : e?.toString?.()) || 'Unknown error';
+        console.error('[DEBUG] Error syncing Keycloak state:', e, msg);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -100,7 +101,12 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
 
     initKeycloak();
 
-    // Token refresh success keeps session valid
+    // Token events and refresh handling
+    keycloak.onAuthSuccess = () => console.log('[DEBUG] Keycloak onAuthSuccess');
+    keycloak.onAuthError = (errorData) => console.error('[DEBUG] Keycloak onAuthError:', errorData);
+    keycloak.onAuthRefreshSuccess = () => console.log('[DEBUG] Keycloak onAuthRefreshSuccess');
+    keycloak.onAuthRefreshError = () => console.error('[DEBUG] Keycloak onAuthRefreshError');
+
     keycloak.onTokenExpired = async () => {
       console.log('[DEBUG] Token expired, attempting refresh...');
       try {
@@ -111,7 +117,6 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
         // Token refresh failed - user will need to login again
       }
     };
-
     return () => {
       cancelled = true;
     };
@@ -185,11 +190,16 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     // Prevent limbo states before redirecting to Keycloak
     cleanupAuthState();
     console.log('[DEBUG] Auth state cleaned up');
-    
+
+    // Always force a safe redirect back to app root (must be allowed in Keycloak client)
+    const redirectUri = window.location.origin + '/';
+
     try {
-      const loginUrl = (keycloak as any).createLoginUrl ? (keycloak as any).createLoginUrl() : undefined;
+      const loginUrl = (keycloak as any).createLoginUrl
+        ? (keycloak as any).createLoginUrl({ redirectUri })
+        : undefined;
       console.log('[DEBUG] Login URL created:', !!loginUrl);
-      
+
       if (loginUrl) {
         console.log('[DEBUG] Using direct URL redirection');
         if (window.top) {
@@ -202,11 +212,10 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     } catch (urlError) {
       console.error('[DEBUG] Error creating login URL:', urlError);
     }
-    
-    console.log('[DEBUG] Falling back to keycloak.login()');
-    keycloak.login();
-  };
 
+    console.log('[DEBUG] Falling back to keycloak.login() with redirectUri');
+    keycloak.login({ redirectUri });
+  };
   const logout = () => {
     console.log('[DEBUG] Logout initiated');
     cleanupAuthState();
