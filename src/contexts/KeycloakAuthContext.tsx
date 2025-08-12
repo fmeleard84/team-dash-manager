@@ -64,7 +64,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
         const composedUser = { profile: tokenParsed, keycloakProfile: (keycloak as any).profile };
         setUser(authenticated ? composedUser : null);
       } catch (e) {
-        console.error('[Keycloak] init error', e);
+        // Silent init error handling
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -75,7 +75,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
       try {
         await keycloak.updateToken(30);
       } catch (e) {
-        console.warn('[Keycloak] token refresh failed, forcing login');
+        // Token refresh failed - user will need to login again
       }
     };
 
@@ -91,10 +91,8 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
 
     if (isAuthenticated && sub) {
       setKeycloakIdentity(sub, email);
-      console.info('[Keycloak] Synced identity to Supabase headers', { sub });
     } else {
       clearKeycloakIdentity();
-      console.info('[Keycloak] Cleared identity from Supabase headers');
     }
   }, [isAuthenticated, user]);
 

@@ -359,8 +359,8 @@ const ClientDashboard = () => {
                 <Button 
                   variant="outline"
                   onClick={() => {
-                    const url = `https://cloud.ialla.fr/index.php/apps/sociallogin/custom_oauth2/keycloak?redirect_url=%2Fapps%2Ffiles`;
-                    window.open(url, '_blank');
+                    const { openNextcloud } = require('@/lib/auth');
+                    openNextcloud('client', '');
                   }}
                   className="flex items-center gap-2"
                 >

@@ -318,10 +318,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
               size="sm"
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
               onClick={() => {
-                const projectFolderName = `Projet - ${project.title}`;
-                const filesUrl = `https://cloud.ialla.fr/apps/files?dir=${encodeURIComponent(`/${projectFolderName}`)}`;
-                window.open(filesUrl, '_blank');
-
+                const { openNextcloud } = require('@/lib/auth');
+                openNextcloud('project', project.title);
               }}
             >
               <ExternalLink className="w-4 h-4 mr-2" />

@@ -595,9 +595,8 @@ const formatCurrency = (n?: number | null) => {
       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
       onClick={() => {
         const title = projectsData[booking.project_id]?.title || 'Projet';
-        const folderName = `Projet - ${title}`;
-        const url = `https://cloud.ialla.fr/apps/files?dir=${encodeURIComponent('/' + folderName)}`;
-        window.open(url, '_blank');
+        const { openNextcloud } = require('@/lib/auth');
+        openNextcloud('project', title);
       }}
     >
       <ExternalLink className="w-4 h-4 mr-2" />
