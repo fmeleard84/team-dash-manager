@@ -7,8 +7,13 @@
   <body>
     <script>
       // Required by keycloak-js for silent SSO checks
-      // Communicate successful SSO status back to the opener
-      parent.postMessage(location.href, location.origin);
+      // Communicate successful SSO status back to the opener window
+      try {
+        console.log('[Silent SSO] Page loaded, reporting back to parent');
+        parent.postMessage(location.href, location.origin);
+      } catch (e) {
+        console.error('[Silent SSO] Error posting message:', e);
+      }
     </script>
   </body>
 </html>

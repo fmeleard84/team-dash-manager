@@ -330,9 +330,30 @@ const Register = () => {
                 </p>
                 <Button 
                   onClick={() => {
-                    console.log('[DEBUG] Login button clicked');
-                    console.log('[DEBUG] Current auth state:', { isAuthenticated, isLoading });
-                    login();
+                    console.log('[Register] === LOGIN BUTTON CLICKED ===');
+                    console.log('[Register] Current URL:', window.location.href);
+                    console.log('[Register] Auth state:', { 
+                      isAuthenticated, 
+                      isLoading, 
+                      hasUser: !!user,
+                      userGroups: getUserGroups(),
+                      userEmail: user?.profile?.email,
+                      userSub: user?.profile?.sub
+                    });
+                    
+                    // Additional Keycloak debug info
+                    console.log('[Register] Direct Keycloak state check:', {
+                      authenticated: (window as any).keycloak?.authenticated,
+                      token: !!(window as any).keycloak?.token,
+                      tokenParsed: !!(window as any).keycloak?.tokenParsed
+                    });
+                    
+                    try {
+                      console.log('[Register] Calling login()...');
+                      login();
+                    } catch (error) {
+                      console.error('[Register] Login error:', error);
+                    }
                   }} 
                   className="w-full"
                   size="lg"

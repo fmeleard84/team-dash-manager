@@ -1,6 +1,7 @@
 import { createContext, useContext, ReactNode, useEffect, useMemo, useState } from 'react';
 import Keycloak from 'keycloak-js';
 import { setKeycloakIdentity, clearKeycloakIdentity } from '@/integrations/supabase/client';
+import { keycloak } from '@/main';
 
 interface KeycloakAuthContextType {
   user: any;
@@ -23,12 +24,7 @@ export const useKeycloakAuth = () => {
   return context;
 };
 
-// Initialize Keycloak instance once
-const keycloak = new Keycloak({
-  url: 'https://keycloak.ialla.fr',
-  realm: 'haas',
-  clientId: 'react-app',
-});
+// Keycloak instance is imported above and initialized in main.tsx
 
 interface KeycloakAuthProviderProps {
   children: ReactNode;
@@ -39,32 +35,22 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // Init Keycloak on mount with silent SSO
+  // Since Keycloak is already initialized in main.tsx, just sync state
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const syncKeycloakState = async () => {
       try {
-        console.log('[DEBUG] Initializing Keycloak with config:', {
-          url: 'https://keycloak.ialla.fr',
-          realm: 'haas',
-          clientId: 'react-app'
-        });
+        console.log('[DEBUG] Syncing Keycloak state from pre-initialized instance');
         
-        const authenticated = await keycloak.init({
-          onLoad: 'check-sso',
-          pkceMethod: 'S256',
-          silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
-        });
-        
-        console.log('[DEBUG] Keycloak init result:', { authenticated, cancelled });
+        const authenticated = keycloak.authenticated || false;
         
         if (cancelled) return;
-        setIsAuthenticated(!!authenticated);
+        setIsAuthenticated(authenticated);
 
         // Load profile to enrich token data (optional)
         try {
-          if (authenticated) {
+          if (authenticated && !keycloak.profile) {
             console.log('[DEBUG] Loading user profile...');
             await keycloak.loadUserProfile();
             console.log('[DEBUG] User profile loaded:', keycloak.profile);
@@ -74,27 +60,31 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
         }
 
         const tokenParsed: any = keycloak.tokenParsed || {};
-        console.log('[DEBUG] Token parsed:', {
+        console.log('[DEBUG] Current Keycloak state:', {
+          authenticated,
           sub: tokenParsed.sub,
           email: tokenParsed.email,
           groups: tokenParsed.groups,
-          hasProfile: !!keycloak.profile
+          hasProfile: !!keycloak.profile,
+          tokenExists: !!keycloak.token
         });
         
         const composedUser = { profile: tokenParsed, keycloakProfile: (keycloak as any).profile };
         setUser(authenticated ? composedUser : null);
         
-        console.log('[DEBUG] Auth state set:', { 
+        console.log('[DEBUG] Auth state synced:', { 
           authenticated, 
           hasUser: !!composedUser, 
           userGroups: tokenParsed.groups || [] 
         });
       } catch (e) {
-        console.error('[DEBUG] Keycloak init error:', e);
+        console.error('[DEBUG] Error syncing Keycloak state:', e);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
-    })();
+    };
+
+    syncKeycloakState();
 
     // Token refresh success keeps session valid
     keycloak.onTokenExpired = async () => {

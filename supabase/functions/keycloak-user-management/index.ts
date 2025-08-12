@@ -957,8 +957,8 @@ async function storeClientProfile(params: StoreProfileParams): Promise<{ success
         first_name: firstName,
         last_name: lastName,
         phone: phoneNumber,
-        company_name: companyName,
-        user_id: crypto.randomUUID()
+        company_name: companyName
+        // Remove user_id - let PostgreSQL generate it automatically
       }),
     });
 
