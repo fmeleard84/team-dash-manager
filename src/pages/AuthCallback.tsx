@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import { keycloak } from "@/lib/keycloak";
+import { keycloak, storeTokensFromKC } from "@/lib/keycloak";
 
 export default function AuthCallback() {
   useEffect(() => {
     (async () => {
       try {
-        // finalise le code flow ICI (et seulement ici)
+        // finalise le code flow ICI
         const ok = await keycloak.init({
           onLoad: "login-required",
           pkceMethod: "S256",
@@ -13,29 +13,27 @@ export default function AuthCallback() {
         });
 
         if (!ok) {
-          // pas authentifié => relance login sur cette même page
           await keycloak.login({ redirectUri: window.location.href, scope: "openid profile email groups" });
           return;
         }
 
-        // cible de retour (si fournie)
+        // >>> STOCKE les jetons pour les prochaines pages <<<
+        storeTokensFromKC();
+
+        // calcule la cible
         const url = new URL(window.location.href);
         let target = url.searchParams.get("to") || "/";
-
-        // sinon, calcule selon les groupes
-        const groups = (keycloak.tokenParsed?.groups ?? []) as string[];
         if (!url.searchParams.get("to")) {
+          const groups = (keycloak.tokenParsed?.groups ?? []) as string[];
           target =
             groups.includes("/client") ? "/client-dashboard" :
             groups.some(g => ["/resource", "/ressource", "/candidate"].includes(g)) ? "/candidate-dashboard" :
             "/client-dashboard";
         }
 
-        // nettoie l’URL et redirige
         window.location.replace(target);
       } catch (e) {
-        console.error("[AuthCallback] init/login error", e);
-        // fallback: retente un login vers cette page
+        console.error("[AuthCallback] error", e);
         await keycloak.login({ redirectUri: window.location.href, scope: "openid profile email groups" });
       }
     })();

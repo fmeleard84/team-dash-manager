@@ -172,45 +172,16 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
   };
 
   const login = () => {
-    console.log('[DEBUG] Login initiated');
-    // Prevent limbo states before redirecting to Keycloak
-    cleanupAuthState();
-    console.log('[DEBUG] Auth state cleaned up');
+  // cible à atteindre après login (page courante par défaut)
+  const wanted = window.location.pathname + window.location.search + window.location.hash;
+  const redirectUri = `${window.location.origin}/auth/callback?to=${encodeURIComponent(wanted)}`;
 
-    // Memorize the current path to restore after login (we redirect via root)
-    try {
-      const currentPath = window.location.pathname + window.location.search + window.location.hash;
-      localStorage.setItem('postLoginRedirect', currentPath || '/');
-      console.log('[DEBUG] Saved postLoginRedirect:', currentPath);
-    } catch (e) {
-      console.warn('[DEBUG] Unable to save postLoginRedirect:', e);
-    }
+  keycloak.login({
+    redirectUri,
+    scope: "openid profile email groups",
+  });
+};
 
-    // Always force a safe redirect back to app root (must be allowed in Keycloak client)
-    const redirectUri = window.location.origin + '/';
-
-    try {
-      const loginUrl = (keycloak as any).createLoginUrl
-        ? (keycloak as any).createLoginUrl({ redirectUri, scope: 'openid profile email groups' })
-        : undefined;
-      console.log('[DEBUG] Login URL created:', !!loginUrl);
-
-      if (loginUrl) {
-        console.log('[DEBUG] Using direct URL redirection');
-        if (window.top) {
-          (window.top as Window).location.href = loginUrl;
-        } else {
-          window.location.href = loginUrl;
-        }
-        return;
-      }
-    } catch (urlError) {
-      console.error('[DEBUG] Error creating login URL:', urlError);
-    }
-
-    console.log('[DEBUG] Falling back to keycloak.login() with redirectUri');
-    keycloak.login({ redirectUri, scope: 'openid profile email groups' });
-  };
 
   const logout = () => {
     console.log('[DEBUG] Logout initiated');
