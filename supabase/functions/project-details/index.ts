@@ -31,6 +31,16 @@ async function getCandidateByEmail(supabase: any, email: string) {
   return data;
 }
 
+async function getClientByEmail(supabase: any, email: string) {
+  const { data, error } = await supabase
+    .from("client_profiles")
+    .select("id, email, keycloak_user_id")
+    .eq("email", email)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 async function hasNotificationForProject(supabase: any, candidateId: string, projectId: string) {
   const { data, error } = await supabase
     .from("candidate_notifications")
@@ -82,12 +92,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const candidate = await getCandidateByEmail(supabase, keycloakEmail);
-    if (!candidate?.id) {
-      return new Response(JSON.stringify({ success: false, message: "Candidat introuvable" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 404,
-      });
+    // Get candidate for candidate-specific actions
+    let candidate = null;
+    if (action !== "get_owner_nextcloud_link") {
+      candidate = await getCandidateByEmail(supabase, keycloakEmail);
+      if (!candidate?.id) {
+        return new Response(JSON.stringify({ success: false, message: "Candidat introuvable" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        });
+      }
     }
 
     // Action router
@@ -261,8 +275,7 @@ Deno.serve(async (req) => {
       if (ncErr2) throw ncErr2;
 
       const baseUrl = Deno.env.get("NEXTCLOUD_BASE_URL") || "https://cloud.ialla.fr";
-      const providerId = Deno.env.get("NEXTCLOUD_SOCIALLOGIN_PROVIDER_ID") || "keycloak";
-
+      
       // Get project title for proper folder naming
       const { data: project, error: projDetailsErr } = await supabase
         .from("projects")
@@ -282,8 +295,14 @@ Deno.serve(async (req) => {
       const projectFolderName = `Projet - ${project.title}`;
       const redirectPath = `/apps/files?dir=${encodeURIComponent(`/${projectFolderName}`)}`;
 
-      const loginPath = `/index.php/apps/sociallogin/custom_oauth2/${providerId}`;
-      const link = `${baseUrl}${loginPath}?redirect_url=${encodeURIComponent(redirectPath)}`;
+      // Generate direct Keycloak authentication URL for Nextcloud
+      const keycloakBaseUrl = Deno.env.get("KEYCLOAK_BASE_URL") || "https://keycloak.ialla.fr";
+      const keycloakRealm = Deno.env.get("KEYCLOAK_REALM") || "haas";
+      const keycloakClientId = "nextcloud";
+      const nextcloudRedirectUri = encodeURIComponent(`${baseUrl}/index.php/apps/oidc_login/oidc`);
+      const finalRedirectUrl = encodeURIComponent(`${baseUrl}${redirectPath}`);
+      
+      const link = `${keycloakBaseUrl}/realms/${keycloakRealm}/protocol/openid-connect/auth?client_id=${keycloakClientId}&redirect_uri=${nextcloudRedirectUri}&response_type=code&scope=openid%20email%20profile&state=${finalRedirectUrl}`;
 
       return new Response(JSON.stringify({ success: true, link }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
