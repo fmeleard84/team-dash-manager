@@ -1,39 +1,17 @@
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
-import { keycloak } from './lib/keycloak'
-
-console.log('[Bootstrap] Starting React app...');
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import { initKeycloak } from "@/lib/keycloak";
 
 async function bootstrap() {
+  console.log("[Bootstrap] Starting React app...");
+  console.log("[Bootstrap] Initializing Keycloak before React...");
   try {
-    console.log('[Bootstrap] Initializing Keycloak before React...');
-    const hasCode = new URLSearchParams(window.location.search).has('code');
-    try {
-      const ok = await keycloak.init({
-        onLoad: 'check-sso',
-        pkceMethod: 'S256',
-        checkLoginIframe: false,
-      });
-      console.log('[Bootstrap] Keycloak initialized:', { authenticated: !!keycloak.authenticated, ok });
-    } catch (e) {
-      console.warn('[Bootstrap] Keycloak init failed, retrying if OIDC code present:', e);
-      if (hasCode) {
-        try {
-          const ok2 = await keycloak.init({
-            onLoad: 'login-required',
-            pkceMethod: 'S256',
-            checkLoginIframe: false,
-          });
-          console.log('[Bootstrap] Retry Keycloak init:', { authenticated: !!keycloak.authenticated, ok: ok2 });
-        } catch (e2) {
-          console.error('[Bootstrap] Keycloak retry failed:', e2);
-        }
-      }
-    }
-  } finally {
-    createRoot(document.getElementById('root')!).render(<App />);
+    const ok = await initKeycloak();
+    console.log("[Bootstrap] Keycloak initialized:", { authenticated: ok });
+  } catch (e) {
+    console.warn("[Bootstrap] Keycloak init failed (continuing):", e);
   }
-} 
-
+  ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+}
 bootstrap();
