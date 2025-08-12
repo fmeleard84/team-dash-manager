@@ -106,3 +106,12 @@ verify_jwt = false
 
 [functions.sync-profile]
 verify_jwt = false
+
+[functions.auth-login]
+verify_jwt = false
+
+[functions.auth-register]
+verify_jwt = false
+
+[functions.auth-check]
+verify_jwt = false

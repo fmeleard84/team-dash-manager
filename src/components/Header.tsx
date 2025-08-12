@@ -1,20 +1,20 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogIn, UserPlus } from "lucide-react";
-import { useKeycloakAuth } from "@/contexts/KeycloakAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 const Header = () => {
-  const { login, isAuthenticated, getUserGroups } = useKeycloakAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const handleConnect = () => {
-    if (isAuthenticated) {
-      const groups = getUserGroups();
+    if (isAuthenticated && user) {
       let target = '/client-dashboard';
-      if (groups.includes('admin')) target = '/admin/resources';
-      else if (groups.includes('candidate') || groups.includes('resource')) target = '/candidate-dashboard';
-      else if (groups.includes('client')) target = '/client-dashboard';
-      window.location.assign(target);
+      if (user.role === 'admin') target = '/admin/resources';
+      else if (user.role === 'candidate') target = '/candidate-dashboard';
+      else if (user.role === 'client') target = '/client-dashboard';
+      window.location.href = target;
     } else {
-      login();
+      window.location.href = '/auth';
     }
   };
   return (
@@ -25,13 +25,15 @@ const Header = () => {
         </Link>
         
         <div className="flex items-center gap-4">
+          {isAuthenticated && <NotificationCenter />}
+          
           <Button variant="ghost" onClick={handleConnect} className="flex items-center gap-2">
             <LogIn className="h-4 w-4" />
             Connexion
           </Button>
           
           <Button asChild>
-            <Link to="/register?tab=register" className="flex items-center gap-2">
+            <Link to="/auth" className="flex items-center gap-2">
               <UserPlus className="h-4 w-4" />
               S'inscrire
             </Link>
