@@ -17,15 +17,27 @@ export default function AuthCallback() {
           target = returnTo;
         }
 
-        // Fallback: based on groups
+        // Fallback: based on groups (supports groups claim OR realm_access.roles)
         if (!target) {
-          const groups: string[] = Array.isArray(user?.profile?.groups)
-            ? (user!.profile!.groups as unknown as string[])
-            : [];
-          const cleaned = groups.map((g) => (g.startsWith('/') ? g.substring(1) : g));
-          if (cleaned.includes('client')) target = '/client-dashboard';
-          else if (cleaned.includes('candidate') || cleaned.includes('resource') || cleaned.includes('ressource')) target = '/candidate-dashboard';
-          else if (cleaned.includes('admin')) target = '/admin/resources';
+          const profile: any = user?.profile as any;
+          let rawGroups: string[] = [];
+
+          if (Array.isArray(profile?.groups) && profile.groups.length > 0) {
+            rawGroups = profile.groups as string[];
+          } else if (Array.isArray(profile?.realm_access?.roles)) {
+            rawGroups = (profile.realm_access.roles as string[]).filter((role: string) =>
+              ['client', 'candidate', 'resource', 'ressources', 'admin'].includes(role)
+            );
+          }
+
+          const groups = rawGroups
+            .map((g) => (g.startsWith('/') ? g.substring(1) : g))
+            .map((g) => (g === 'ressources' || g === 'ressource' ? 'resource' : g))
+            .filter((g) => ['client', 'candidate', 'resource', 'admin'].includes(g));
+
+          if (groups.includes('admin')) target = '/admin/resources';
+          else if (groups.includes('candidate') || groups.includes('resource')) target = '/candidate-dashboard';
+          else if (groups.includes('client')) target = '/client-dashboard';
           else target = '/client-dashboard';
         }
 
