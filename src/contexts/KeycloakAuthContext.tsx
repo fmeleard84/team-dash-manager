@@ -41,6 +41,9 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
   // Consume pre-initialized Keycloak (initialized in main.tsx)
   useEffect(() => {
     // After bootstrap, keycloak is ready when React mounts
+      
+    //setIsAuthenticated(!!keycloak.authenticated);
+    
     try {
       const authenticated = !!keycloak.authenticated;
       setIsAuthenticated(authenticated);
@@ -93,6 +96,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
       setIsAuthenticated(false);
     };
 
+    
     keycloak.onTokenExpired = async () => {
       console.log('[DEBUG] Token expired, attempting refresh...');
       try {

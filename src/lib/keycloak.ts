@@ -3,18 +3,23 @@ import Keycloak, { KeycloakInitOptions } from "keycloak-js";
 export const keycloak = new Keycloak({
   url: "https://keycloak.ialla.fr",
   realm: "haas",
-  clientId: "react-app", // client public + PKCE
+  clientId: "react-app",   // public + PKCE
 });
 
 export async function initKeycloak() {
-  // important : init neutre, pas de check-sso qui déclenche 3p-cookies
-  const opts: KeycloakInitOptions = {
-    flow: "standard",          // code flow
+  const hasAuthParams = (() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.has("code") || p.has("session_state") || p.has("state");
+  })();
+
+  const base: KeycloakInitOptions = {
     pkceMethod: "S256",
-    checkLoginIframe: false,   // pas d’iframe de session
-    // PAS de silentCheckSsoRedirectUri
-    // PAS de onLoad:"check-sso"
+    checkLoginIframe: false,   // pas d’iframe de session (source d’ennuis)
+    // pas de silentCheckSsoRedirectUri, pas de onLoad:"check-sso"
   };
-  const ok = await keycloak.init(opts);
-  return ok; // true si une session existe déjà SUR CE domaine (rare), sinon false
+
+  // Si on revient de Keycloak avec ?code=..., force l’achèvement du login
+  return hasAuthParams
+    ? keycloak.init({ ...base, onLoad: "login-required" })
+    : keycloak.init(base);
 }
