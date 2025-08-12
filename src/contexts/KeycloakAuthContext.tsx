@@ -1,3 +1,4 @@
+
 import { createContext, useContext, ReactNode, useEffect, useMemo, useState } from 'react';
 import Keycloak from 'keycloak-js';
 import { setKeycloakIdentity, clearKeycloakIdentity } from '@/integrations/supabase/client';
@@ -30,6 +31,9 @@ const keycloak = new Keycloak({
   clientId: 'react-app',
 });
 
+// Expose for debugging in pages (e.g. Register.tsx)
+;(window as any).keycloak = keycloak;
+
 interface KeycloakAuthProviderProps {
   children: ReactNode;
 }
@@ -55,6 +59,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
           onLoad: 'check-sso',
           pkceMethod: 'S256',
           silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+          checkLoginIframe: false, // important for some environments to avoid iframe errors
         });
         
         console.log('[DEBUG] Keycloak init result:', { authenticated, cancelled });
@@ -191,6 +196,15 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     cleanupAuthState();
     console.log('[DEBUG] Auth state cleaned up');
 
+    // Memorize the current path to restore after login (we redirect via root)
+    try {
+      const currentPath = window.location.pathname + window.location.search + window.location.hash;
+      localStorage.setItem('postLoginRedirect', currentPath || '/');
+      console.log('[DEBUG] Saved postLoginRedirect:', currentPath);
+    } catch (e) {
+      console.warn('[DEBUG] Unable to save postLoginRedirect:', e);
+    }
+
     // Always force a safe redirect back to app root (must be allowed in Keycloak client)
     const redirectUri = window.location.origin + '/';
 
@@ -216,12 +230,60 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     console.log('[DEBUG] Falling back to keycloak.login() with redirectUri');
     keycloak.login({ redirectUri });
   };
+
   const logout = () => {
     console.log('[DEBUG] Logout initiated');
     cleanupAuthState();
+    try {
+      localStorage.removeItem('postLoginRedirect');
+    } catch {}
     console.log('[DEBUG] Auth state cleaned up for logout');
     keycloak.logout({ redirectUri: window.location.origin + '/' });
   };
+
+  // Post-login redirect: only on landing pages to avoid hijacking in-app navigation
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+    const path = window.location.pathname;
+    const isLanding = path === '/' || path === '/register' || path === '/auth';
+    if (!isLanding) return;
+
+    // Clean OIDC params (if any) from URL
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('code') || url.searchParams.has('session_state')) {
+      url.searchParams.delete('code');
+      url.searchParams.delete('session_state');
+      url.searchParams.delete('state');
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+      console.log('[DEBUG] Cleaned OIDC params from URL');
+    }
+
+    // Redirect priority: stored path > group-based default
+    let target: string | null = null;
+    try {
+      const stored = localStorage.getItem('postLoginRedirect');
+      if (stored) {
+        localStorage.removeItem('postLoginRedirect');
+        // avoid going back to landing pages again
+        if (!['/', '/register', '/auth'].includes(stored)) {
+          target = stored;
+        }
+      }
+    } catch {}
+
+    if (!target) {
+      const groups = getUserGroups();
+      if (groups.includes('client')) target = '/client-dashboard';
+      else if (groups.includes('candidate') || groups.includes('resource')) target = '/candidate-dashboard';
+      else if (groups.includes('admin')) target = '/admin/resources';
+      else target = '/client-dashboard';
+    }
+
+    if (target && window.location.pathname !== target) {
+      console.log('[DEBUG] Post-login redirect to:', target);
+      window.location.assign(target);
+    }
+  }, [isAuthenticated, isLoading]);
 
   const contextValue: KeycloakAuthContextType = useMemo(() => ({
     user,
@@ -240,4 +302,3 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     </KeycloakAuthContext.Provider>
   );
 };
-

@@ -347,7 +347,7 @@ export type Database = {
           last_name: string
           phone?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           company_name?: string | null

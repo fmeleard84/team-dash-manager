@@ -222,6 +222,7 @@ const Register = () => {
                       type="text"
                       value={formData.firstName}
                       onChange={handleChange}
+                      autoComplete="given-name"
                       required
                     />
                   </div>
@@ -233,6 +234,7 @@ const Register = () => {
                       type="text"
                       value={formData.lastName}
                       onChange={handleChange}
+                      autoComplete="family-name"
                       required
                     />
                   </div>
@@ -246,6 +248,7 @@ const Register = () => {
                     type="email"
                     value={formData.email}
                     onChange={handleChange}
+                    autoComplete="email"
                     required
                   />
                 </div>
@@ -258,6 +261,7 @@ const Register = () => {
                     type="tel"
                     value={formData.phoneNumber}
                     onChange={handleChange}
+                    autoComplete="tel"
                   />
                 </div>
 
@@ -301,6 +305,7 @@ const Register = () => {
                     type="password"
                     value={formData.password}
                     onChange={handleChange}
+                    autoComplete="new-password"
                     required
                   />
                 </div>
@@ -313,6 +318,7 @@ const Register = () => {
                     type="password"
                     value={formData.confirmPassword}
                     onChange={handleChange}
+                    autoComplete="new-password"
                     required
                   />
                 </div>
