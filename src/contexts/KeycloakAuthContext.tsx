@@ -68,10 +68,30 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     }
 
     // Token events and refresh handling
-    keycloak.onAuthSuccess = () => console.log('[DEBUG] Keycloak onAuthSuccess');
+    keycloak.onAuthSuccess = async () => {
+      console.log('[DEBUG] Keycloak onAuthSuccess');
+      try {
+        if (!keycloak.profile) {
+          await keycloak.loadUserProfile();
+        }
+      } catch (profileError) {
+        console.error('[DEBUG] Failed to load profile on success:', profileError);
+      }
+      const tokenParsed: any = keycloak.tokenParsed || {};
+      const composedUser = { profile: tokenParsed, keycloakProfile: (keycloak as any).profile };
+      setUser(composedUser);
+      setIsAuthenticated(true);
+      setIsLoading(false);
+    };
     keycloak.onAuthError = (errorData) => console.error('[DEBUG] Keycloak onAuthError:', errorData);
     keycloak.onAuthRefreshSuccess = () => console.log('[DEBUG] Keycloak onAuthRefreshSuccess');
     keycloak.onAuthRefreshError = () => console.error('[DEBUG] Keycloak onAuthRefreshError');
+
+    keycloak.onAuthLogout = () => {
+      console.log('[DEBUG] Keycloak onAuthLogout');
+      setUser(null);
+      setIsAuthenticated(false);
+    };
 
     keycloak.onTokenExpired = async () => {
       console.log('[DEBUG] Token expired, attempting refresh...');
@@ -167,7 +187,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
 
     try {
       const loginUrl = (keycloak as any).createLoginUrl
-        ? (keycloak as any).createLoginUrl({ redirectUri })
+        ? (keycloak as any).createLoginUrl({ redirectUri, scope: 'openid profile email groups' })
         : undefined;
       console.log('[DEBUG] Login URL created:', !!loginUrl);
 
@@ -185,7 +205,7 @@ export const KeycloakAuthProvider = ({ children }: KeycloakAuthProviderProps) =>
     }
 
     console.log('[DEBUG] Falling back to keycloak.login() with redirectUri');
-    keycloak.login({ redirectUri });
+    keycloak.login({ redirectUri, scope: 'openid profile email groups' });
   };
 
   const logout = () => {

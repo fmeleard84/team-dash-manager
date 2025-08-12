@@ -165,8 +165,9 @@ const Register = () => {
         }
 
         try {
-          console.log('[Register] Auto-login after registration to root (post-login redirect will route to dashboard)');
-          await keycloak.login({ redirectUri: window.location.origin + '/' });
+          const target = formData.profileType === 'client' ? '/client-dashboard' : '/candidate-dashboard';
+          console.log('[Register] Auto-login after registration to target:', target);
+          await keycloak.login({ redirectUri: window.location.origin + target, scope: 'openid profile email groups' });
         } catch (e) {
           console.error('[Register] Auto-login failed, falling back to manual login tab:', e);
           setActiveTab('login');
