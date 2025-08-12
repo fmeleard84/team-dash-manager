@@ -1,17 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { initKeycloak, keycloak } from "@/lib/keycloak";
+import { initKeycloakPassive } from "@/lib/keycloak";
 
 async function bootstrap() {
-  console.log("[Bootstrap] Starting React app...");
-  console.log("[Bootstrap] Initializing Keycloak before React...");
-  try {
-    await initKeycloak();
-    console.log("[Bootstrap] keycloak.authenticated =", !!keycloak.authenticated);
-  } catch (e) {
-    console.warn("[Bootstrap] Keycloak init failed (continuing):", e);
-  }
+  console.log("[Bootstrap] passive KC init…");
+  await initKeycloakPassive();   // ne fait rien de bloquant
   ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
 }
 bootstrap();

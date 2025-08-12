@@ -1,25 +1,26 @@
 import Keycloak, { KeycloakInitOptions } from "keycloak-js";
 
-export const keycloak = new Keycloak({
+declare global {
+  // évite de recréer l'instance en dev/HMR
+  var __KC__: ReturnType<typeof Keycloak> | undefined;
+}
+
+export const keycloak = globalThis.__KC__ ?? (globalThis.__KC__ = new Keycloak({
   url: "https://keycloak.ialla.fr",
   realm: "haas",
-  clientId: "react-app",   // public + PKCE
-});
+  clientId: "react-app",
+}));
 
-export async function initKeycloak() {
-  const hasAuthParams = (() => {
-    const p = new URLSearchParams(window.location.search);
-    return p.has("code") || p.has("session_state") || p.has("state");
-  })();
-
-  const base: KeycloakInitOptions = {
+export async function initKeycloakPassive() {
+  // init "neutre": ne traite PAS le code, ne lance PAS d’iframe
+  const opts: KeycloakInitOptions = {
     pkceMethod: "S256",
-    checkLoginIframe: false,   // pas d’iframe de session (source d’ennuis)
-    // pas de silentCheckSsoRedirectUri, pas de onLoad:"check-sso"
+    checkLoginIframe: false,
   };
-
-  // Si on revient de Keycloak avec ?code=..., force l’achèvement du login
-  return hasAuthParams
-    ? keycloak.init({ ...base, onLoad: "login-required" })
-    : keycloak.init(base);
+  try {
+    await keycloak.init(opts);
+  } catch (e) {
+    // on ignore: c’est passif
+    console.warn("[KC] passive init error (ignored)", e);
+  }
 }
