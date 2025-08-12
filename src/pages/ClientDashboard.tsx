@@ -21,8 +21,13 @@ import {
   Receipt, 
   Settings, 
   LogOut,
-  Kanban
+  Kanban,
+  CalendarClock,
+  Cloud
 } from "lucide-react";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import PlanningView from "@/components/client/PlanningView";
+import DriveView from "@/components/client/DriveView";
 
 const ClientDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
@@ -31,6 +36,8 @@ const ClientDashboard = () => {
 
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
+    { id: 'planning', label: 'Planning', icon: CalendarClock },
+    { id: 'drive', label: 'Drive', icon: Cloud },
     { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
   ];

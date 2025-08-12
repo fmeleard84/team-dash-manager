@@ -736,6 +736,104 @@ export type Database = {
           },
         ]
       }
+      project_event_attendees: {
+        Row: {
+          created_at: string
+          email: string | null
+          event_id: string
+          id: string
+          profile_id: string | null
+          required: boolean
+          response_status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          event_id: string
+          id?: string
+          profile_id?: string | null
+          required?: boolean
+          response_status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          event_id?: string
+          id?: string
+          profile_id?: string | null
+          required?: boolean
+          response_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_event_attendees_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "project_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_event_attendees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_events: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          end_at: string | null
+          id: string
+          location: string | null
+          project_id: string
+          start_at: string
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_at?: string | null
+          id?: string
+          location?: string | null
+          project_id: string
+          start_at: string
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_at?: string | null
+          id?: string
+          location?: string | null
+          project_id?: string
+          start_at?: string
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_flows: {
         Row: {
           created_at: string
