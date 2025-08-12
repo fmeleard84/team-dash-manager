@@ -11,8 +11,10 @@ export default function AuthCallback() {
         // Determine target from state.returnTo or user groups
         let target: string | undefined;
         const state: any = user?.state as any;
-        if (state?.returnTo && typeof state.returnTo === 'string') {
-          target = state.returnTo;
+        const returnTo = typeof state?.returnTo === 'string' ? state.returnTo : undefined;
+        const allowedDirect = ['/client-dashboard', '/candidate-dashboard', '/admin/resources'];
+        if (returnTo && allowedDirect.some((p) => returnTo.startsWith(p))) {
+          target = returnTo;
         }
 
         // Fallback: based on groups
