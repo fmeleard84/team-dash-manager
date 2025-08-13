@@ -37,8 +37,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   global: {
     headers: {},
     fetch: (url, options) => {
-      const mergedHeaders = { ...(options?.headers || {}), ...getLegacyHeaders() } as Record<string, string>;
-      return fetch(url, { ...options, headers: mergedHeaders });
+      const headers = new Headers(options?.headers as HeadersInit);
+      const legacy = getLegacyHeaders();
+      Object.entries(legacy).forEach(([k, v]) => headers.set(k, v));
+      return fetch(url, { ...options, headers });
     },
   },
 });
