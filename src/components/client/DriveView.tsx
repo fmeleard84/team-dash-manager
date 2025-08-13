@@ -236,9 +236,11 @@ export default function DriveView() {
       const { error } = await supabase.storage.from("project-files").move(f, target);
       if (error) console.error("move in renameFolder", f, error);
     }
-    // Remove the old empty folder object and create the new one to keep structure
+    // Remove the old empty folder marker if any and create the new one to keep structure
     await supabase.storage.from("project-files").remove([oldPrefix]);
-    await supabase.storage.from("project-files").createFolder(newPrefix);
+    await supabase.storage
+      .from("project-files")
+      .upload(`${newPrefix}.keep`, new Blob([new Uint8Array()]), { upsert: true, contentType: "text/plain" });
     toast({ title: "Dossier renommé" });
     list(prefix);
   };
