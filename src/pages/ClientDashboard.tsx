@@ -185,8 +185,7 @@ const menuItems = [
             <CreateProjectModal
               isOpen={isCreateOpen}
               onClose={() => setIsCreateOpen(false)}
-              onCreateProject={handleCreateProject}
-              isCreating={isCreating}
+              onProjectCreated={refreshProjects}
             />
           </div>
         );
