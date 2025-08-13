@@ -35,6 +35,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MessageSystem } from "@/components/messages/MessageSystem";
+import { KickoffDialog } from "@/components/KickoffDialog";
+import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 
 const ClientDashboard = () => {
 const [activeSection, setActiveSection] = useState('projects');
@@ -49,6 +51,10 @@ const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [isCreating, setIsCreating] = useState(false);
 const [selectedKanbanProjectId, setSelectedKanbanProjectId] = useState<string>("");
 const [selectedMessagesProjectId, setSelectedMessagesProjectId] = useState<string>("");
+const [kickoffDialogOpen, setKickoffDialogOpen] = useState(false);
+const [kickoffProject, setKickoffProject] = useState<{ id: string; title: string } | null>(null);
+
+const { setupProject, isLoading: isOrchestrating } = useProjectOrchestrator();
 
 useEffect(() => {
   const load = async () => {
@@ -85,6 +91,26 @@ const onToggleStatus = async (id: string, status: string) => {
     toast({ title: 'Erreur', description: 'Mise à jour du statut échouée' });
   } else {
     await refreshProjects();
+  }
+};
+
+const onStartProject = (project: { id: string; title: string }) => {
+  setKickoffProject(project);
+  setKickoffDialogOpen(true);
+};
+
+const handleKickoffConfirm = async (kickoffISO: string) => {
+  if (!kickoffProject) return;
+  
+  const success = await setupProject(kickoffProject.id);
+  if (success) {
+    setKickoffDialogOpen(false);
+    setKickoffProject(null);
+    await refreshProjects();
+    toast({ 
+      title: "Projet configuré avec succès!", 
+      description: "Planning, Kanban, Drive et notifications créés." 
+    });
   }
 };
 
@@ -178,6 +204,7 @@ const menuItems = [
                   onStatusToggle={onToggleStatus}
                   onDelete={onDeleteProject}
                   onView={onViewProject}
+                  onStart={onStartProject}
                 />
               ))}
             </div>
@@ -186,6 +213,16 @@ const menuItems = [
               isOpen={isCreateOpen}
               onClose={() => setIsCreateOpen(false)}
               onProjectCreated={refreshProjects}
+            />
+
+            <KickoffDialog
+              open={kickoffDialogOpen}
+              projectTitle={kickoffProject?.title || ""}
+              onClose={() => {
+                setKickoffDialogOpen(false);
+                setKickoffProject(null);
+              }}
+              onConfirm={handleKickoffConfirm}
             />
           </div>
         );

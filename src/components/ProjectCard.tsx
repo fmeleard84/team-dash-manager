@@ -34,13 +34,14 @@ interface ProjectCardProps {
   onStatusToggle: (id: string, status: string) => void;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
+  onStart?: (project: { id: string; title: string }) => void;
 }
 
 interface PlankaProject {
   planka_url: string;
 }
 
-export function ProjectCard({ project, onStatusToggle, onDelete, onView }: ProjectCardProps) {
+export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart }: ProjectCardProps) {
   const { user } = useAuth();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -98,7 +99,11 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView }: Proje
     const newStatus = project.status === 'play' ? 'pause' : 'play';
     
     if (newStatus === 'play') {
-      setShowKickoff(true);
+      if (onStart) {
+        onStart({ id: project.id, title: project.title });
+      } else {
+        setShowKickoff(true);
+      }
     } else {
       // Simple pause
       await onStatusToggle(project.id, newStatus);
