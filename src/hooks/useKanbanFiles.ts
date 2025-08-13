@@ -119,12 +119,28 @@ export const useKanbanFiles = (cardId: string) => {
     }
   }, [cardId]);
 
+  // Get signed URL for a file
+  const getFileUrl = useCallback(async (fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('kanban-files')
+        .createSignedUrl(`${cardId}/${fileName}`, 3600);
+
+      if (error) throw error;
+      return data?.signedUrl || '';
+    } catch (error) {
+      console.error('Error getting file URL:', error);
+      return '';
+    }
+  }, [cardId]);
+
   return {
     files,
     uploading,
     loadFiles,
     uploadFile,
     deleteFile,
-    downloadFile
+    downloadFile,
+    getFileUrl
   };
 };

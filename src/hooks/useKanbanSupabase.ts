@@ -49,7 +49,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           priority: card.priority,
           status: card.status,
           labels: card.labels || [],
-          attachments: [],
+          attachments: [], // Will be loaded separately via useKanbanFiles
           comments: [],
           progress: card.progress,
           createdAt: card.created_at,

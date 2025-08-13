@@ -133,19 +133,18 @@ export const KanbanBoard = ({
           </Button>
 
           {/* Project Filter */}
-          {availableProjects.length > 0 && (
+          {availableProjects && availableProjects.length > 0 && (
             <Select
-              value={projectFilter || 'all'}
-              onValueChange={(value) => onProjectFilterChange?.(value === 'all' ? '' : value)}
+              value={projectFilter || ''}
+              onValueChange={(value) => onProjectFilterChange?.(value)}
             >
               <SelectTrigger className="w-48">
                 <div className="flex items-center gap-2">
                   <FolderKanban className="w-4 h-4" />
-                  <SelectValue placeholder="Filtrer par projet" />
+                  <SelectValue placeholder="Sélectionner un projet" />
                 </div>
               </SelectTrigger>
               <SelectContent className="bg-background border shadow-lg z-50">
-                <SelectItem value="all">Tous les projets</SelectItem>
                 {availableProjects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.title}

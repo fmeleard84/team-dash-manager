@@ -16,6 +16,7 @@ import {
 import { KanbanCard as KanbanCardType } from '@/types/kanban';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { CardFileAttachments } from './CardFileAttachments';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -189,12 +190,7 @@ export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCar
                   )}
 
                   {/* Attachments count */}
-                  {card.attachments.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Paperclip className="w-3 h-3" />
-                      <span>{card.attachments.length}</span>
-                    </div>
-                  )}
+                  <CardFileAttachments fileCount={card.attachments?.length || 0} />
                 </div>
 
                 <div className="flex items-center gap-2">

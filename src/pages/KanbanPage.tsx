@@ -70,6 +70,9 @@ const KanbanPage = () => {
     downloadFile 
   } = useKanbanFiles(selectedCard?.id || '');
 
+  // File management for new cards
+  const [newCardFiles, setNewCardFiles] = useState<File[]>([]);
+
   // Form states
   const [columnForm, setColumnForm] = useState<CreateColumnInput>({
     title: '',
@@ -199,7 +202,7 @@ const KanbanPage = () => {
     setColumnForm({ title: '', position: 0 });
   };
 
-  const submitCard = () => {
+  const submitCard = async () => {
     if (!cardForm.title.trim()) return;
     
     if (selectedCard) {
@@ -216,10 +219,18 @@ const KanbanPage = () => {
       });
     } else {
       // Create new card
-      addCard({
+      const newCard = addCard({
         ...cardForm,
         columnId: selectedColumnId
       });
+      
+      // Upload files for new card if any
+      if (newCard && newCardFiles.length > 0) {
+        for (const file of newCardFiles) {
+          await uploadFile(file);
+        }
+        setNewCardFiles([]);
+      }
     }
     
     setShowCardDialog(false);
@@ -238,6 +249,8 @@ const KanbanPage = () => {
   // Handle project filter change
   const handleProjectFilterChange = (newProjectId: string) => {
     if (newProjectId && newProjectId !== projectId) {
+      setProjectId(newProjectId);
+      setBoardId(null); // Reset board ID to force reload
       navigate(`/kanban?project_id=${newProjectId}`);
     }
   };
@@ -554,9 +567,9 @@ const KanbanPage = () => {
             </div>
 
             {/* File Upload Section */}
-            {selectedCard && (
-              <div>
-                <Label>Fichiers joints</Label>
+            <div>
+              <Label>Fichiers joints</Label>
+              {selectedCard ? (
                 <FileUploadArea
                   files={files}
                   uploading={uploading}
@@ -568,8 +581,27 @@ const KanbanPage = () => {
                   onFileDelete={deleteFile}
                   onFileDownload={downloadFile}
                 />
-              </div>
-            )}
+              ) : (
+                <FileUploadArea
+                  files={newCardFiles.map(file => ({
+                    id: file.name,
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    url: '',
+                    uploadedAt: new Date().toISOString()
+                  }))}
+                  uploading={false}
+                  onFileUpload={(uploadedFiles) => {
+                    setNewCardFiles(prev => [...prev, ...uploadedFiles]);
+                  }}
+                  onFileDelete={(fileName) => {
+                    setNewCardFiles(prev => prev.filter(f => f.name !== fileName));
+                  }}
+                  onFileDownload={() => {}}
+                />
+              )}
+            </div>
 
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setShowCardDialog(false)}>
