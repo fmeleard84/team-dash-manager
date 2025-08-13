@@ -27,12 +27,14 @@ import { KanbanCard, KanbanColumn, CreateCardInput, CreateColumnInput, TeamMembe
 import { ArrowLeft, Plus, Download, Upload } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { FileUpload } from '@/components/kanban/FileUpload';
 
 const KanbanPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [projectId, setProjectId] = useState<string | null>(null);
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [availableProjects, setAvailableProjects] = useState<Array<{ id: string; title: string }>>([]);
 
   const { 
     board, 
@@ -72,6 +74,24 @@ const KanbanPage = () => {
   });
   
   const [cardProgress, setCardProgress] = useState(0);
+
+  // Load available projects
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const { data: projects, error } = await supabase
+          .from('projects')
+          .select('id, title')
+          .order('title');
+        
+        if (error) throw error;
+        setAvailableProjects(projects || []);
+      } catch (error) {
+        console.error('Error loading projects:', error);
+      }
+    };
+    loadProjects();
+  }, []);
 
   // Bootstrap board based on project_id
   useEffect(() => {
@@ -217,7 +237,7 @@ const KanbanPage = () => {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => navigate('/client-dashboard')}
+            onClick={() => navigate('/client-dashboard?tab=kanban')}
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             Retour
@@ -296,6 +316,13 @@ const KanbanPage = () => {
           onCardClick={handleCardClick}
           onCardEdit={handleCardClick}
           onCardDelete={deleteCard}
+          projectFilter={projectId || ''}
+          onProjectFilterChange={(newProjectId) => {
+            if (newProjectId) {
+              navigate(`/kanban?project_id=${newProjectId}`);
+            }
+          }}
+          availableProjects={availableProjects}
         />
       </div>
 
@@ -488,6 +515,17 @@ const KanbanPage = () => {
                 onChange={(e) => setCardForm(prev => ({ ...prev, dueDate: e.target.value }))}
               />
             </div>
+
+            {/* File Upload Section */}
+            <FileUpload
+              cardId={selectedCard?.id || 'temp'}
+              attachments={selectedCard?.attachments || []}
+              onAttachmentsUpdate={(attachments) => {
+                if (selectedCard) {
+                  setSelectedCard(prev => prev ? { ...prev, attachments } : null);
+                }
+              }}
+            />
 
             <div>
               <Label htmlFor="card-progress">Progression ({cardProgress}%)</Label>
