@@ -48,6 +48,7 @@ interface ProjectDetail {
 const CandidateProjects = () => {
   const [notifications, setNotifications] = useState<ProjectNotification[]>([]);
   const [acceptedProjects, setAcceptedProjects] = useState<any[]>([]);
+  const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [completedProjects, setCompletedProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -304,13 +305,22 @@ const fetchAcceptedProjects = async () => {
 
     if (error) throw error;
     
-    // Conserver toutes les lignes, même si les relations imbriquées sont nulles (pas de FK)
-    setAcceptedProjects(data || []);
+    // Séparer les projets en pause (acceptés) et actifs (en cours)
+    const allProjects = data || [];
+    const acceptedOnly = allProjects.filter((p: any) => p.projects?.status === 'pause');
+    const activeOnly = allProjects.filter((p: any) => p.projects?.status === 'play');
+    
+    setAcceptedProjects(acceptedOnly);
+    setActiveProjects(activeOnly);
 
-    // Récupérer les détails des projets et les liens Nextcloud
-    const projectIds = (data || [])
+    // Récupérer les détails des projets
+    const projectIds = allProjects
       .map((b: any) => b.project_id)
       .filter(Boolean);
+      
+    if (projectIds.length > 0) {
+      await fetchProjectsDetails(projectIds);
+    }
   } catch (error) {
     console.error('Error fetching accepted projects:', error);
   }
@@ -422,9 +432,12 @@ const formatCurrency = (n?: number | null) => {
         <h2 className="text-2xl font-bold">Mes projets</h2>
         
         <Tabs defaultValue="nouvelles" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="nouvelles">
               Nouvelles demandes ({notifications.length})
+            </TabsTrigger>
+            <TabsTrigger value="actifs">
+              Projets en cours ({activeProjects.length})
             </TabsTrigger>
             <TabsTrigger value="acceptes">
               Projets acceptés ({acceptedProjects.length})
@@ -540,6 +553,102 @@ const formatCurrency = (n?: number | null) => {
             )}
           </TabsContent>
 
+          <TabsContent value="actifs" className="space-y-4">
+            {activeProjects.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Aucun projet en cours</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {activeProjects.map((booking) => (
+                  <Card key={booking.id} className="hover:shadow-md transition-shadow border-green-200">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
+                        <Badge variant="default" className="bg-green-600">En cours</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        {booking.projects?.description || 'Aucune description disponible'}
+                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Poste:</span>
+                          <Badge variant="secondary">
+                            {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Date de début:</span>
+                          <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Fin prévue:</span>
+                          <span className="text-sm">{booking.projects?.due_date ? formatDate(booking.projects.due_date) : 'Non spécifiée'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Budget:</span>
+                          <Badge variant="outline">
+                            {formatCurrency(booking.projects?.client_budget)}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/planning?project=${booking.project_id}`, '_blank')}
+                        >
+                          📅 Planning
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/kanban?project_id=${booking.project_id}`, '_blank')}
+                        >
+                          📋 Kanban
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/drive?project=${booking.project_id}`, '_blank')}
+                        >
+                          📁 Drive
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/messages?project=${booking.project_id}`, '_blank')}
+                        >
+                          💬 Messages
+                        </Button>
+                      </div>
+
+                      <div className="pt-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                          onClick={() => {
+                            const title = booking.projects?.title || 'Projet';
+                            const { openNextcloud } = require('@/lib/auth');
+                            openNextcloud('project', title);
+                          }}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Accéder à l'espace collaboratif
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="acceptes" className="space-y-4">
             {acceptedProjects.length === 0 ? (
               <div className="text-center py-8">
@@ -551,13 +660,13 @@ const formatCurrency = (n?: number | null) => {
                   <Card key={booking.id} className="hover:shadow-md transition-shadow">
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                       <CardTitle className="text-lg">{projectsData[booking.project_id]?.title || 'Projet sans titre'}</CardTitle>
-                        <Badge variant="default">Accepté</Badge>
+                        <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
+                        <Badge variant="secondary">En attente</Badge>
                       </div>
                     </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {projectsData[booking.project_id]?.description || 'Aucune description disponible'}
+              {booking.projects?.description || 'Aucune description disponible'}
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -569,34 +678,24 @@ const formatCurrency = (n?: number | null) => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Date du projet:</span>
-                <span className="text-sm">{projectsData[booking.project_id]?.project_date ? formatDate(projectsData[booking.project_id].project_date) : 'Non spécifiée'}</span>
+                <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Fin prévue:</span>
-                <span className="text-sm">{projectsData[booking.project_id]?.due_date ? formatDate(projectsData[booking.project_id].due_date) : 'Non spécifiée'}</span>
+                <span className="text-sm">{booking.projects?.due_date ? formatDate(booking.projects.due_date) : 'Non spécifiée'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Budget estimé:</span>
                 <Badge variant="outline">
-                  {formatCurrency(projectsData[booking.project_id]?.client_budget)}
+                  {formatCurrency(booking.projects?.client_budget)}
                 </Badge>
               </div>
             </div>
 
             <div className="pt-2">
-              <Button
-                variant="default"
-                size="sm"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                onClick={() => {
-                  const title = projectsData[booking.project_id]?.title || 'Projet';
-                  const { openNextcloud } = require('@/lib/auth');
-                  openNextcloud('project', title);
-                }}
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Accéder à l'espace collaboratif
-              </Button>
+              <p className="text-sm text-muted-foreground text-center">
+                En attente de démarrage par le client
+              </p>
             </div>
 
           </CardContent>

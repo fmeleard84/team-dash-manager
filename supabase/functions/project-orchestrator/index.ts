@@ -27,6 +27,7 @@ serve(async (req) => {
         .select(`
           *,
           project_bookings!inner(
+            id,
             candidate_id,
             status,
             candidate_profiles!inner(
@@ -72,17 +73,21 @@ serve(async (req) => {
       } else {
         console.log(`[project-orchestrator] Created kickoff event: ${kickoffEvent.id}`);
 
-        // Ajouter les participants au kickoff
+        // Ajouter les participants au kickoff - utiliser candidate_profiles.id
         const attendees = resources.map((r: any) => ({
           event_id: kickoffEvent.id,
           email: r.candidate_profiles.email,
-          profile_id: r.candidate_profiles.id
+          profile_id: r.candidate_profiles.id  // Utiliser l'ID du profil candidat
         }));
 
         if (attendees.length > 0) {
-          await supabaseClient
+          const { error: attendeesError } = await supabaseClient
             .from('project_event_attendees')
             .insert(attendees);
+          
+          if (attendeesError) {
+            console.error('Erreur ajout attendees:', attendeesError);
+          }
         }
       }
 
@@ -135,7 +140,7 @@ serve(async (req) => {
       const notifications = resources.map((r: any) => ({
         candidate_id: r.candidate_profiles.id,
         project_id: projectId,
-        resource_assignment_id: r.id,
+        resource_assignment_id: r.id,  // Utiliser l'ID du booking, pas du resource assignment
         title: `Bienvenue dans le projet ${project.title} !`,
         description: `Le projet "${project.title}" a été configuré. Vous pouvez maintenant accéder au planning, au kanban et à la messagerie.`,
         status: 'unread'
@@ -156,7 +161,7 @@ serve(async (req) => {
       // 5. Mettre à jour le statut du projet
       await supabaseClient
         .from('projects')
-        .update({ status: 'active' })
+        .update({ status: 'play' })
         .eq('id', projectId);
 
       return new Response(
