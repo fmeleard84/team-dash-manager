@@ -160,58 +160,37 @@ const menuItems = [
       case 'projects':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes projets</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Mes projets</h2>
+              <Button onClick={() => setIsCreateOpen(true)}>Créer un nouveau projet</Button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Refonte site web</CardTitle>
-                  <Badge variant="default">En cours</Badge>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Modernisation complète du site corporate avec nouvelle identité visuelle
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Budget</span>
-                      <span className="font-semibold">15 000€</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Candidat</span>
-                      <span>Jean Martin</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {projects.map((p) => (
+                <ProjectCard
+                  key={p.id}
+                  project={{
+                    id: p.id,
+                    title: p.title,
+                    description: p.description || undefined,
+                    price: undefined,
+                    date: p.project_date,
+                    status: p.status,
+                    clientBudget: p.client_budget ?? undefined,
+                    dueDate: p.due_date ?? undefined,
+                  }}
+                  onStatusToggle={onToggleStatus}
+                  onDelete={onDeleteProject}
+                  onView={onViewProject}
+                />
+              ))}
+            </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Application mobile</CardTitle>
-                  <Badge variant="secondary">En attente</Badge>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Développement d'une app iOS/Android pour la gestion client
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Budget</span>
-                      <span className="font-semibold">25 000€</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Candidat</span>
-                      <span className="text-muted-foreground">À assigner</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div className="mt-6">
-              <Button>
-                Créer un nouveau projet
-              </Button>
-            </div>
+            <CreateProjectModal
+              isOpen={isCreateOpen}
+              onClose={() => setIsCreateOpen(false)}
+              onCreateProject={handleCreateProject}
+              isCreating={isCreating}
+            />
           </div>
         );
         
@@ -228,6 +207,29 @@ const menuItems = [
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Drive</h2>
             <DriveView />
+          </div>
+        );
+
+      case 'messages':
+        return (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Messages</h2>
+            <div className="space-y-4">
+              <div className="w-full md:w-80">
+                <label className="text-sm font-medium">Projet</label>
+                <Select value={selectedMessagesProjectId} onValueChange={setSelectedMessagesProjectId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un projet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <MessageSystem />
+            </div>
           </div>
         );
 
@@ -295,26 +297,33 @@ const menuItems = [
                   <CardTitle className="text-lg">Gestion de projet Kanban</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground mb-4">
-                    Organisez vos tâches et suivez l'avancement de vos projets avec notre tableau Kanban interactif.
-                  </p>
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
-                      <span>✓ Drag & drop intuitif</span>
-                      <span>✓ Colonnes personnalisables</span>
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Projet</label>
+                      <Select value={selectedKanbanProjectId} onValueChange={setSelectedKanbanProjectId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un projet" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projects.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>✓ Gestion d'équipe</span>
-                      <span>✓ Commentaires et fichiers</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>✓ Priorités et labels</span>
-                      <span>✓ Suivi des échéances</span>
-                    </div>
+
+                    <p className="text-muted-foreground">
+                      Organisez vos tâches et suivez l'avancement de vos projets avec notre tableau Kanban interactif.
+                    </p>
+
+                    <Button 
+                      onClick={() => selectedKanbanProjectId && navigate(`/kanban?project_id=${selectedKanbanProjectId}`)} 
+                      className="w-full"
+                      disabled={!selectedKanbanProjectId}
+                    >
+                      Ouvrir le tableau Kanban
+                    </Button>
                   </div>
-                  <Button onClick={() => navigate('/kanban')} className="w-full">
-                    Ouvrir le tableau Kanban
-                  </Button>
                 </CardContent>
               </Card>
 

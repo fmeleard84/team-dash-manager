@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useKanban } from '@/hooks/useKanban';
+import { useKanbanSupabase } from '@/hooks/useKanbanSupabase';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,10 +25,15 @@ import {
 } from '@/components/ui/select';
 import { KanbanCard, KanbanColumn, CreateCardInput, CreateColumnInput, TeamMember } from '@/types/kanban';
 import { ArrowLeft, Plus, Download, Upload } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 const KanbanPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [boardId, setBoardId] = useState<string | null>(null);
+
   const { 
     board, 
     isLoading,
@@ -41,7 +46,7 @@ const KanbanPage = () => {
     handleDragEnd,
     exportBoard,
     importBoard
-  } = useKanban();
+  } = useKanbanSupabase(boardId || undefined);
 
   // Dialog states
   const [showColumnDialog, setShowColumnDialog] = useState(false);
@@ -66,79 +71,34 @@ const KanbanPage = () => {
   
   const [cardProgress, setCardProgress] = useState(0);
 
-  // Initialize demo board
+  // Bootstrap board based on project_id
   useEffect(() => {
-    if (!board) {
-      const newBoard = createBoard(
-        'Projet de développement web',
-        'Tableau de suivi pour le développement de notre application web'
-      );
-      
-      // Add default columns
-      setTimeout(() => {
-        addColumn({
-          title: 'À faire',
-          position: 0,
-          color: '#ef4444'
-        });
-        
-        addColumn({
-          title: 'En cours',
-          position: 1,
-          color: '#f59e0b',
-          limit: 3
-        });
-        
-        addColumn({
-          title: 'En révision',
-          position: 2,
-          color: '#3b82f6'
-        });
-        
-        addColumn({
-          title: 'Terminé',
-          position: 3,
-          color: '#10b981'
-        });
-      }, 100);
+    const pid = searchParams.get('project_id');
+    if (pid) setProjectId(pid);
+  }, [searchParams]);
 
-      // Add demo cards
-      setTimeout(() => {
-        if (newBoard) {
-          addCard({
-            title: 'Créer la page d\'accueil',
-            description: 'Développer la page d\'accueil avec le design responsive',
-            columnId: newBoard.columns?.[0]?.id || '',
-            priority: 'high',
-            status: 'todo',
-            assignedTo: '4', // Sophie Chen (Designer)
-            labels: ['Frontend', 'Design'],
-            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-          });
+  useEffect(() => {
+    const bootstrap = async () => {
+      if (!projectId || boardId) return;
+      // Try to find existing board for this project
+      const { data: existing, error: findErr } = await (supabase as any)
+        .from('kanban_boards')
+        .select('id')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .maybeSingle();
 
-          addCard({
-            title: 'API utilisateurs',
-            description: 'Créer les endpoints pour la gestion des utilisateurs',
-            columnId: newBoard.columns?.[1]?.id || '',
-            priority: 'medium',
-            status: 'in_progress',
-            assignedTo: '3', // Jean Martin (Backend)
-            labels: ['Backend', 'API']
-          });
+      if (existing?.id) {
+        setBoardId(existing.id);
+        return;
+      }
 
-          addCard({
-            title: 'Tests unitaires',
-            description: 'Écrire les tests pour les composants principaux',
-            columnId: newBoard.columns?.[2]?.id || '',
-            priority: 'low',
-            status: 'review',
-            assignedTo: '5', // Alex Rodriguez (QA)
-            labels: ['Tests']
-          });
-        }
-      }, 500);
-    }
-  }, [board, createBoard, addColumn, addCard]);
+      // Create a new board for this project
+      const created = await createBoard('Kanban', 'Tableau du projet', projectId);
+      if (created?.id) setBoardId(created.id);
+    };
+    bootstrap();
+  }, [projectId, boardId, createBoard]);
 
   const handleAddColumn = () => {
     setColumnForm({
@@ -239,7 +199,7 @@ const KanbanPage = () => {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/client-dashboard')}
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             Retour
