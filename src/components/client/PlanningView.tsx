@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Trash2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 
 interface Project { id: string; title: string }
 interface EventRow {
@@ -38,6 +39,20 @@ export default function PlanningView() {
   const [driveUrl, setDriveUrl] = useState(""); // NEW
   const [attendeesEmails, setAttendeesEmails] = useState("");
 
+  // Nouveau: filtre et vues
+  const [filterProjectId, setFilterProjectId] = useState<string>("all");
+  const [allEvents, setAllEvents] = useState<EventRow[]>([]);
+  const eventsToShow = useMemo(
+    () => (filterProjectId === "all" ? allEvents : allEvents.filter((e) => e.project_id === filterProjectId)),
+    [allEvents, filterProjectId]
+  );
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  // Nouveau: membres d'équipe validés pour le projet (invités rapides)
+  const [teamMembers, setTeamMembers] = useState<{ email: string; name: string }[]>([]);
+  const [selectedTeamEmail, setSelectedTeamEmail] = useState<string>("");
+
   const suggestedVideoUrl = useMemo(() => {
     if (!projectId || !date || !startTime) return "";
     const ts = `${date}-${startTime.replace(":", "")}`;
@@ -60,24 +75,58 @@ export default function PlanningView() {
   }, []);
 
   useEffect(() => {
-    if (projectId) loadEvents(projectId);
+    if (projectId) {
+      (async () => {
+        const { data, error } = await supabase
+          .from("candidate_project_assignments")
+          .select("status, candidate_profiles!inner(email, first_name, last_name)")
+          .eq("project_id", projectId)
+          .eq("status", "accepted");
+        if (error) {
+          console.error("load team members error", error);
+          setTeamMembers([]);
+        } else {
+          const members = (data as any[]).map((r) => ({
+            email: r.candidate_profiles?.email as string,
+            name: [r.candidate_profiles?.first_name, r.candidate_profiles?.last_name].filter(Boolean).join(" "),
+          })).filter((m) => m.email);
+          setTeamMembers(members);
+        }
+      })();
+    } else {
+      setTeamMembers([]);
+    }
   }, [projectId]);
 
-  const loadEvents = async (pid: string) => {
+  const loadAllEvents = async () => {
     setLoading(true);
+    const ids = projects.map((p) => p.id);
+    if (!ids.length) {
+      setAllEvents([]);
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("project_events")
-      .select("id,title,description,start_at,end_at,location,video_url,drive_url,project_id") // + drive_url
-      .eq("project_id", pid)
+      .select("id,title,description,start_at,end_at,location,video_url,drive_url,project_id")
+      .in("project_id", ids)
       .order("start_at", { ascending: true });
     setLoading(false);
     if (error) {
-      console.error("load events error", error);
+      console.error("load all events error", error);
       toast({ title: "Erreur", description: "Impossible de charger les événements" });
     } else {
-      setEvents(data as EventRow[]);
+      setAllEvents((data || []) as EventRow[]);
     }
   };
+
+  useEffect(() => {
+    if (projects.length) {
+      loadAllEvents();
+    } else {
+      setAllEvents([]);
+    }
+  }, [projects]);
 
   const handleCreate = async () => {
     if (!projectId || !title || !date || !startTime) {
@@ -135,7 +184,7 @@ export default function PlanningView() {
 
     toast({ title: "Événement créé" });
     setTitle(""); setDescription(""); setDate(""); setStartTime(""); setEndTime(""); setLocation(""); setVideoUrl(""); setDriveUrl(""); setAttendeesEmails("");
-    if (projectId) loadEvents(projectId);
+    await loadAllEvents();
   };
 
   const handleDelete = async (id: string) => {
@@ -145,7 +194,7 @@ export default function PlanningView() {
       toast({ title: "Erreur", description: "Suppression échouée" });
     } else {
       toast({ title: "Événement supprimé" });
-      setEvents((prev) => prev.filter((e) => e.id !== id));
+      setAllEvents((prev) => prev.filter((e) => e.id !== id));
     }
   };
 
@@ -212,7 +261,28 @@ export default function PlanningView() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Invités (emails, séparés par virgules)</label>
+              <label className="text-sm font-medium">Invités</label>
+              <Select
+                value={selectedTeamEmail}
+                onValueChange={(v) => {
+                  setSelectedTeamEmail(v);
+                  setAttendeesEmails((prev) => {
+                    const set = new Set(prev.split(/[\s,\n]+/).filter(Boolean));
+                    set.add(v);
+                    return Array.from(set).join(", ");
+                  });
+                }}
+                disabled={teamMembers.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={teamMembers.length ? "Ajouter depuis l'équipe" : "Aucune équipe"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMembers.map((m) => (
+                    <SelectItem key={m.email} value={m.email}>{m.name || m.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Textarea value={attendeesEmails} onChange={(e) => setAttendeesEmails(e.target.value)} placeholder="email1@ex.com, email2@ex.com" />
             </div>
 
@@ -221,17 +291,81 @@ export default function PlanningView() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle>Événements à venir</CardTitle>
+            <div className="flex items-center gap-2">
+              <Select value={filterProjectId} onValueChange={setFilterProjectId}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Filtrer par projet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les projets</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Vue" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="list">Liste</SelectItem>
+                  <SelectItem value="calendar">Calendrier</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <p className="text-sm text-muted-foreground">Chargement…</p>
-            ) : events.length === 0 ? (
+            ) : viewMode === "calendar" ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <Calendar selected={selectedDate} onSelect={setSelectedDate} mode="single" className="rounded-md border" />
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Événements du {selectedDate ? selectedDate.toLocaleDateString() : "jour sélectionné"}</div>
+                  {eventsToShow.filter((ev) => {
+                    if (!selectedDate) return true;
+                    const d = new Date(ev.start_at);
+                    return d.toDateString() === selectedDate.toDateString();
+                  }).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun événement.</p>
+                  ) : (
+                    eventsToShow
+                      .filter((ev) => {
+                        if (!selectedDate) return true;
+                        const d = new Date(ev.start_at);
+                        return d.toDateString() === selectedDate.toDateString();
+                      })
+                      .map((ev) => (
+                        <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
+                          <div>
+                            <div className="font-medium">{ev.title}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
+                            </div>
+                            <div className="flex gap-3">
+                              {ev.video_url && (
+                                <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
+                              )}
+                              {ev.drive_url && (
+                                <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
+                              )}
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            ) : eventsToShow.length === 0 ? (
               <p className="text-sm text-muted-foreground">Aucun événement.</p>
             ) : (
               <div className="space-y-3">
-                {events.map((ev) => (
+                {eventsToShow.map((ev) => (
                   <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
                     <div>
                       <div className="font-medium">{ev.title}</div>
