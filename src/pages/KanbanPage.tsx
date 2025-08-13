@@ -70,8 +70,46 @@ const KanbanPage = () => {
     downloadFile 
   } = useKanbanFiles(selectedCard?.id || '');
 
+  // Load files when selected card changes
+  useEffect(() => {
+    if (selectedCard?.id) {
+      loadFiles();
+    }
+  }, [selectedCard?.id, loadFiles]);
+
   // File management for new cards
   const [newCardFiles, setNewCardFiles] = useState<File[]>([]);
+
+  // Function to upload files to a specific card
+  const uploadFilesToCard = async (cardId: string, files: File[]) => {
+    for (const file of files) {
+      try {
+        if (!cardId || cardId.trim() === '') {
+          console.error('ID de carte invalide');
+          continue;
+        }
+
+        if (!file || file.size === 0) {
+          console.error('Fichier invalide');
+          continue;
+        }
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${cardId}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('kanban-files')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+        
+        console.log(`Fichier "${file.name}" téléchargé avec succès`);
+      } catch (error) {
+        console.error('Erreur lors du téléchargement du fichier:', error);
+      }
+    }
+  };
 
   // Form states
   const [columnForm, setColumnForm] = useState<CreateColumnInput>({
@@ -178,11 +216,6 @@ const KanbanPage = () => {
     });
     setCardProgress(card.progress);
     setShowCardDialog(true);
-    
-    // Load files for this card
-    setTimeout(() => {
-      if (card.id) loadFiles();
-    }, 100);
   };
 
   const submitColumn = () => {
@@ -237,9 +270,7 @@ const KanbanPage = () => {
       
       // Upload files for new card if any
       if (newCard && newCardFiles.length > 0) {
-        for (const file of newCardFiles) {
-          await uploadFile(file);
-        }
+        await uploadFilesToCard(newCard.id, newCardFiles);
         setNewCardFiles([]);
       }
     }
