@@ -1151,6 +1151,51 @@ export type Database = {
           },
         ]
       }
+      project_teams: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          member_id: string
+          member_type: string
+          profile_type: string | null
+          project_id: string
+          role: string | null
+          seniority: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          member_id: string
+          member_type: string
+          profile_type?: string | null
+          project_id: string
+          role?: string | null
+          seniority?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          member_id?: string
+          member_type?: string
+          profile_type?: string | null
+          project_id?: string
+          role?: string | null
+          seniority?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           client_budget: number | null
