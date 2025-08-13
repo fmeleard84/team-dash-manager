@@ -25,18 +25,24 @@ import {
   Trello
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CandidateProjects from "@/components/candidate/CandidateProjects";
 import CandidatePlanningView from "@/components/candidate/CandidatePlanningView";
 import CandidateDriveView from "@/components/candidate/CandidateDriveView";
 import CandidateKanbanView from "@/components/candidate/CandidateKanbanView";
 import { CandidateNotes } from "@/components/candidate/CandidateNotes";
+import { CandidateSettings } from "@/components/candidate/CandidateSettings";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { useCandidateProjects } from "@/hooks/useCandidateProjects";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
+  const [candidateStatus, setCandidateStatus] = useState('disponible');
   const { user, logout } = useAuth();
   const { candidateId } = useCandidateProjects();
+  const { toast } = useToast();
 
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
@@ -47,6 +53,31 @@ const CandidateDashboard = () => {
     { id: 'notes', label: 'Mes notes', icon: Star },
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
   ];
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!candidateId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('candidate_profiles')
+        .update({ status: newStatus })
+        .eq('id', candidateId);
+
+      if (error) throw error;
+
+      setCandidateStatus(newStatus);
+      toast({
+        title: "Statut mis à jour",
+        description: "Votre statut a été modifié avec succès."
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le statut.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const renderContent = () => {
     switch (activeSection) {
@@ -88,32 +119,11 @@ const CandidateDashboard = () => {
         );
         
       case 'settings':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Paramètres</h2>
-            <Card>
-              <CardHeader>
-                <CardTitle>Informations personnelles</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Nom complet</label>
-                  <p className="text-muted-foreground">
-                    {user?.firstName} {user?.lastName}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Email</label>
-                  <p className="text-muted-foreground">{user?.email}</p>
-                </div>
-                {user?.phone && (
-                  <div>
-                    <label className="text-sm font-medium">Téléphone</label>
-                    <p className="text-muted-foreground">{user.phone}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        return candidateId ? <CandidateSettings currentCandidateId={candidateId} /> : (
+          <div className="p-6">
+            <p className="text-center text-muted-foreground">
+              Aucun profil candidat trouvé.
+            </p>
           </div>
         );
         
@@ -183,10 +193,18 @@ const CandidateDashboard = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              <NotificationCenter />
               <Badge variant="outline">Candidat</Badge>
-              <Badge className="bg-green-500 text-white">
-                Disponible
-              </Badge>
+              <Select value={candidateStatus} onValueChange={handleStatusChange}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="disponible">Disponible</SelectItem>
+                  <SelectItem value="en_pause">En pause</SelectItem>
+                  <SelectItem value="indisponible">Indisponible</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </header>
           
