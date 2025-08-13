@@ -161,6 +161,11 @@ const KanbanPage = () => {
 
   const handleCardClick = (card: KanbanCard) => {
     setSelectedCard(card);
+    
+    // Convert ISO date to YYYY-MM-DD format for date input
+    const formattedDate = card.dueDate ? 
+      new Date(card.dueDate).toISOString().split('T')[0] : '';
+    
     setCardForm({
       title: card.title,
       description: card.description || '',
@@ -168,7 +173,7 @@ const KanbanPage = () => {
       priority: card.priority,
       status: card.status,
       assignedTo: card.assignedTo,
-      dueDate: card.dueDate,
+      dueDate: formattedDate,
       labels: card.labels
     });
     setCardProgress(card.progress);
@@ -205,22 +210,28 @@ const KanbanPage = () => {
   const submitCard = async () => {
     if (!cardForm.title.trim()) return;
     
+    // Convert date from YYYY-MM-DD to proper date format for storage
+    const processedForm = {
+      ...cardForm,
+      dueDate: cardForm.dueDate ? new Date(cardForm.dueDate + 'T00:00:00.000Z').toISOString() : undefined
+    };
+    
     if (selectedCard) {
       // Update existing card
       updateCard({
         id: selectedCard.id,
-        title: cardForm.title,
-        description: cardForm.description,
-        priority: cardForm.priority,
-        status: cardForm.status,
-        assignedTo: cardForm.assignedTo,
-        dueDate: cardForm.dueDate,
+        title: processedForm.title,
+        description: processedForm.description,
+        priority: processedForm.priority,
+        status: processedForm.status,
+        assignedTo: processedForm.assignedTo,
+        dueDate: processedForm.dueDate,
         progress: cardProgress
       });
     } else {
       // Create new card
-      const newCard = addCard({
-        ...cardForm,
+      const newCard = await addCard({
+        ...processedForm,
         columnId: selectedColumnId
       });
       

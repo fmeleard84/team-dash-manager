@@ -365,7 +365,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           assigned_to_name: assignedMember?.name,
           assigned_to_email: assignedMember?.email,
           assigned_to_avatar: assignedMember?.avatar,
-          due_date: input.dueDate || null,
+          due_date: input.dueDate ? input.dueDate.split('T')[0] : null,
           priority: input.priority || 'medium',
           status: input.status || 'todo',
           labels: input.labels || [],
@@ -447,7 +447,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         updateData.assigned_to_email = assignedMember?.email || null;
         updateData.assigned_to_avatar = assignedMember?.avatar || null;
       }
-      if (input.dueDate !== undefined) updateData.due_date = input.dueDate || null;
+      if (input.dueDate !== undefined) updateData.due_date = input.dueDate ? input.dueDate.split('T')[0] : null;
       if (input.priority !== undefined) updateData.priority = input.priority;
       if (input.status !== undefined) updateData.status = input.status;
       if (input.labels !== undefined) updateData.labels = input.labels;
