@@ -26,7 +26,7 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   const location = useLocation();
   const dashboardPaths = ['/candidate-dashboard', '/client-dashboard', '/admin/resources', '/kanban'];
-  const showHeader = !dashboardPaths.includes(location.pathname) && location.pathname !== '/auth';
+  const showHeader = !dashboardPaths.includes(location.pathname);
 
   return (
     <>

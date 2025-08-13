@@ -181,8 +181,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
   }, []);
 
+  // Clean up any previous auth state to prevent limbo
+  const cleanupAuthState = () => {
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) localStorage.removeItem(key);
+      });
+      Object.keys(sessionStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) sessionStorage.removeItem(key);
+      });
+    } catch { /* ignore */ }
+  };
+
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
+    // Cleanup + attempt global sign out before logging in
+    cleanupAuthState();
+    try { await supabase.auth.signOut({ scope: 'global' } as any); } catch {}
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.toLowerCase(),
       password,
@@ -190,7 +205,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     if (error) {
       console.error('Login failed:', error);
-      toast.error('Email ou mot de passe incorrect');
+      toast.error("Email non confirmé ou identifiants incorrects");
       setIsLoading(false);
       return false;
     }
@@ -200,7 +215,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(false);
     return !!data.session;
   };
-
   const register = async (userData: RegisterData): Promise<boolean> => {
     // Basic validation
     if (!userData.email || !userData.password || !userData.firstName || !userData.lastName || !userData.role) {
@@ -211,6 +225,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       toast.error('Le mot de passe doit faire au moins 6 caractères');
       return false;
     }
+
+    // Cleanup before sign up to avoid stale sessions
+    cleanupAuthState();
+    try { await supabase.auth.signOut({ scope: 'global' } as any); } catch {}
 
     const redirectUrl = `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({

@@ -79,11 +79,13 @@ const Auth = () => {
       });
 
       if (success) {
-        // Switch to login tab
-        const loginTab = document.querySelector('[value="login"]') as HTMLButtonElement;
-        loginTab?.click();
-        
-        // Pre-fill login email
+        // Tentative d'auto-connexion puis redirection
+        const loggedIn = await login(registerForm.email, registerForm.password);
+        if (loggedIn) {
+          navigate('/dashboard');
+          return;
+        }
+        // Si l'auto-connexion échoue (email à confirmer), on préremplit l'email
         setLoginForm(prev => ({ ...prev, email: registerForm.email }));
       }
     } finally {
