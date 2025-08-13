@@ -134,57 +134,73 @@ export default function PlanningView() {
       return;
     }
 
-    const { data: auth } = await supabase.auth.getUser();
-    const uid = auth.user?.id;
-    if (!uid) {
-      toast({ title: "Non connecté", description: "Veuillez vous reconnecter" });
-      return;
-    }
-
-    const startISO = new Date(`${date}T${startTime}:00`).toISOString();
-    const endISO = endTime ? new Date(`${date}T${endTime}:00`).toISOString() : null;
-    const finalVideoUrl = videoUrl || suggestedVideoUrl || null;
-
-    const { data: inserted, error } = await supabase
-      .from("project_events")
-      .insert({
-        project_id: projectId,
-        title,
-        description: description || null,
-        start_at: startISO,
-        end_at: endISO,
-        location: location || null,
-        video_url: finalVideoUrl,
-        drive_url: driveUrl || null, // NEW
-        created_by: uid,
-      })
-      .select("id")
-      .maybeSingle();
-
-    if (error) {
-      console.error("create event error", error);
-      toast({ title: "Erreur", description: "Création de l'événement échouée" });
-      return;
-    }
-
-    const eventId = inserted?.id as string | undefined;
-    if (eventId && attendeesEmails.trim()) {
-      const emails = attendeesEmails
-        .split(/[,\n]/)
-        .map((e) => e.trim())
-        .filter(Boolean);
-      if (emails.length) {
-        const rows = emails.map((email) => ({ event_id: eventId, email }));
-        const { error: attErr } = await supabase
-          .from("project_event_attendees")
-          .insert(rows);
-        if (attErr) console.error("attendees insert error", attErr);
+    setLoading(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) {
+        toast({ title: "Non connecté", description: "Veuillez vous reconnecter" });
+        return;
       }
-    }
 
-    toast({ title: "Événement créé" });
-    setTitle(""); setDescription(""); setDate(""); setStartTime(""); setEndTime(""); setLocation(""); setVideoUrl(""); setDriveUrl(""); setAttendeesEmails("");
-    await loadAllEvents();
+      const startISO = new Date(`${date}T${startTime}:00`).toISOString();
+      const endISO = endTime ? new Date(`${date}T${endTime}:00`).toISOString() : null;
+      const finalVideoUrl = videoUrl || suggestedVideoUrl || null;
+
+      const { data: inserted, error } = await supabase
+        .from("project_events")
+        .insert({
+          project_id: projectId,
+          title,
+          description: description || null,
+          start_at: startISO,
+          end_at: endISO,
+          location: location || null,
+          video_url: finalVideoUrl,
+          drive_url: driveUrl || null,
+          created_by: uid,
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (error) {
+        console.error("create event error", error);
+        toast({ title: "Erreur", description: "Création de l'événement échouée" });
+        return;
+      }
+
+      const eventId = inserted?.id as string | undefined;
+      if (eventId && attendeesEmails.trim()) {
+        const emails = attendeesEmails
+          .split(/[,\n]/)
+          .map((e) => e.trim())
+          .filter(Boolean);
+        if (emails.length) {
+          const rows = emails.map((email) => ({ event_id: eventId, email }));
+          const { error: attErr } = await supabase
+            .from("project_event_attendees")
+            .insert(rows);
+          if (attErr) console.error("attendees insert error", attErr);
+        }
+      }
+
+      toast({ title: "Événement créé" });
+      setTitle(""); 
+      setDescription(""); 
+      setDate(""); 
+      setStartTime(""); 
+      setEndTime(""); 
+      setLocation(""); 
+      setVideoUrl(""); 
+      setDriveUrl(""); 
+      setAttendeesEmails("");
+      await loadAllEvents();
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({ title: "Erreur", description: "Une erreur inattendue est survenue" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (id: string) => {

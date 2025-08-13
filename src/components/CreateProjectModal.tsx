@@ -12,56 +12,87 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateProject: (projectData: {
-    title: string;
-    description?: string;
-    project_date: string;
-    client_budget?: number;
-    due_date?: string;
-    file?: File | null;
-  }) => void;
-  isCreating: boolean;
+  onProjectCreated?: () => void;
 }
 
 const CreateProjectModal = ({
   isOpen,
   onClose,
-  onCreateProject,
-  isCreating,
+  onProjectCreated,
 }: CreateProjectModalProps) => {
-const [title, setTitle] = useState("");
-const [description, setDescription] = useState("");
-const [projectDate, setProjectDate] = useState(
-  new Date().toISOString().split('T')[0]
-);
-const [clientBudget, setClientBudget] = useState<string>("");
-const [dueDate, setDueDate] = useState<string>("");
-const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [projectDate, setProjectDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [clientBudget, setClientBudget] = useState<string>("");
+  const [dueDate, setDueDate] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const { user } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-onCreateProject({
-  title: title.trim(),
-  description: description.trim() || undefined,
-  project_date: projectDate,
-  client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : undefined,
-  due_date: dueDate.trim() !== "" ? dueDate : undefined,
-  file,
-});
+    if (!user?.id) {
+      toast.error("Vous devez être connecté pour créer un projet");
+      return;
+    }
 
-// Reset form
-setTitle("");
-setDescription("");
-setProjectDate(new Date().toISOString().split('T')[0]);
-setClientBudget("");
-setDueDate("");
-setFile(null);
+    setIsCreating(true);
+    try {
+      const { data: project, error } = await supabase
+        .from("projects")
+        .insert({
+          title: title.trim(),
+          description: description.trim() || null,
+          project_date: projectDate,
+          client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : null,
+          due_date: dueDate.trim() !== "" ? dueDate : null,
+          owner_id: user.id,
+          status: 'draft'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Erreur création projet:", error);
+        toast.error("Erreur lors de la création du projet");
+        return;
+      }
+
+      // TODO: Handle file upload to storage if needed
+      if (file) {
+        console.log("File to upload:", file.name);
+      }
+
+      toast.success("Projet créé avec succès !");
+      
+      // Reset form
+      setTitle("");
+      setDescription("");
+      setProjectDate(new Date().toISOString().split('T')[0]);
+      setClientBudget("");
+      setDueDate("");
+      setFile(null);
+      
+      onClose();
+      onProjectCreated?.();
+
+    } catch (error) {
+      console.error("Erreur inattendue:", error);
+      toast.error("Une erreur inattendue est survenue");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
 const handleClose = () => {
