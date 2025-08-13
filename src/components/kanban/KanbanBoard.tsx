@@ -9,7 +9,8 @@ import {
   Filter, 
   Users, 
   Calendar,
-  Settings
+  Settings,
+  FolderKanban
 } from 'lucide-react';
 import { KanbanBoard as KanbanBoardType, KanbanCard, KanbanColumn as KanbanColumnType } from '@/types/kanban';
 import { KanbanColumn } from './KanbanColumn';
@@ -20,6 +21,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface KanbanBoardProps {
   board: KanbanBoardType;
@@ -32,6 +40,9 @@ interface KanbanBoardProps {
   onCardEdit?: (card: KanbanCard) => void;
   onCardDelete?: (cardId: string) => void;
   onBoardSettings?: () => void;
+  projectFilter?: string;
+  onProjectFilterChange?: (projectId: string) => void;
+  availableProjects?: Array<{ id: string; title: string }>;
 }
 
 export const KanbanBoard = ({
@@ -44,7 +55,10 @@ export const KanbanBoard = ({
   onCardClick,
   onCardEdit,
   onCardDelete,
-  onBoardSettings
+  onBoardSettings,
+  projectFilter,
+  onProjectFilterChange,
+  availableProjects = []
 }: KanbanBoardProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -117,6 +131,29 @@ export const KanbanBoard = ({
             <Filter className="w-4 h-4 mr-1" />
             Filtres
           </Button>
+
+          {/* Project Filter */}
+          {availableProjects.length > 0 && (
+            <Select
+              value={projectFilter || 'all'}
+              onValueChange={(value) => onProjectFilterChange?.(value === 'all' ? '' : value)}
+            >
+              <SelectTrigger className="w-48">
+                <div className="flex items-center gap-2">
+                  <FolderKanban className="w-4 h-4" />
+                  <SelectValue placeholder="Filtrer par projet" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectItem value="all">Tous les projets</SelectItem>
+                {availableProjects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <Button 
             variant="outline" 

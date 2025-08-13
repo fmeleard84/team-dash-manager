@@ -39,6 +39,7 @@ const KanbanPage = () => {
     isLoading,
     createBoard, 
     addColumn, 
+    updateColumn,
     addCard, 
     updateCard,
     deleteCard,
@@ -53,6 +54,7 @@ const KanbanPage = () => {
   const [showCardDialog, setShowCardDialog] = useState(false);
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null);
+  const [selectedColumn, setSelectedColumn] = useState<KanbanColumn | null>(null);
 
   // Form states
   const [columnForm, setColumnForm] = useState<CreateColumnInput>({
@@ -131,6 +133,7 @@ const KanbanPage = () => {
       priority: card.priority,
       status: card.status,
       assignedTo: card.assignedTo,
+      dueDate: card.dueDate,
       labels: card.labels
     });
     setCardProgress(card.progress);
@@ -140,8 +143,22 @@ const KanbanPage = () => {
   const submitColumn = () => {
     if (!columnForm.title.trim()) return;
     
-    addColumn(columnForm);
+    if (selectedColumn) {
+      // Update existing column
+      updateColumn({
+        id: selectedColumn.id,
+        title: columnForm.title,
+        position: columnForm.position,
+        color: columnForm.color,
+        limit: columnForm.limit
+      });
+    } else {
+      // Create new column
+      addColumn(columnForm);
+    }
+    
     setShowColumnDialog(false);
+    setSelectedColumn(null);
     setColumnForm({ title: '', position: 0 });
   };
 
@@ -157,6 +174,7 @@ const KanbanPage = () => {
         priority: cardForm.priority,
         status: cardForm.status,
         assignedTo: cardForm.assignedTo,
+        dueDate: cardForm.dueDate,
         progress: cardProgress
       });
     } else {
@@ -205,7 +223,7 @@ const KanbanPage = () => {
             Retour
           </Button>
           <div className="h-4 w-px bg-gray-300" />
-          <h1 className="text-lg font-semibold">Tableau Kanban</h1>
+          <h1 className="text-lg font-semibold">Mon suivi de projet</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -264,8 +282,19 @@ const KanbanPage = () => {
           onDragEnd={handleDragEnd}
           onAddColumn={handleAddColumn}
           onAddCard={handleAddCard}
+          onEditColumn={(column) => {
+            setSelectedColumn(column);
+            setColumnForm({ 
+              title: column.title, 
+              position: column.position,
+              color: column.color,
+              limit: column.limit 
+            });
+            setShowColumnDialog(true);
+          }}
           onDeleteColumn={deleteColumn}
           onCardClick={handleCardClick}
+          onCardEdit={handleCardClick}
           onCardDelete={deleteCard}
         />
       </div>
@@ -274,9 +303,14 @@ const KanbanPage = () => {
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajouter une colonne</DialogTitle>
+            <DialogTitle>
+              {selectedColumn ? 'Modifier la colonne' : 'Ajouter une colonne'}
+            </DialogTitle>
             <DialogDescription>
-              Créez une nouvelle colonne pour organiser vos tâches dans le tableau Kanban.
+              {selectedColumn 
+                ? 'Modifiez les paramètres de cette colonne.'
+                : 'Créez une nouvelle colonne pour organiser vos tâches dans le tableau Kanban.'
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -313,11 +347,14 @@ const KanbanPage = () => {
               />
             </div>
             <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowColumnDialog(false)}>
+              <Button variant="outline" onClick={() => {
+                setShowColumnDialog(false);
+                setSelectedColumn(null);
+              }}>
                 Annuler
               </Button>
               <Button onClick={submitColumn}>
-                Ajouter
+                {selectedColumn ? 'Modifier' : 'Ajouter'}
               </Button>
             </div>
           </div>
@@ -440,6 +477,16 @@ const KanbanPage = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="card-due-date">Date d'échéance</Label>
+              <Input
+                id="card-due-date"
+                type="datetime-local"
+                value={cardForm.dueDate || ''}
+                onChange={(e) => setCardForm(prev => ({ ...prev, dueDate: e.target.value }))}
+              />
             </div>
 
             <div>

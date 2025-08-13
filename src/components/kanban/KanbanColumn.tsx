@@ -46,7 +46,7 @@ export const KanbanColumn = ({
               style={{ backgroundColor: column.color }}
             />
           )}
-          <h3 className="font-semibold text-sm">{column.title}</h3>
+          <h3 className="font-semibold text-lg">{column.title}</h3>
           <Badge 
             variant={isOverLimit ? "destructive" : "secondary"} 
             className="text-xs"
@@ -72,13 +72,13 @@ export const KanbanColumn = ({
                 <MoreHorizontal className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEditColumn}>
+            <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
+              <DropdownMenuItem onClick={onEditColumn} className="cursor-pointer">
                 Modifier la colonne
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={onDeleteColumn}
-                className="text-red-600"
+                className="text-red-600 cursor-pointer"
               >
                 Supprimer la colonne
               </DropdownMenuItem>

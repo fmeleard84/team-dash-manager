@@ -250,6 +250,48 @@ export const useKanbanSupabase = (boardId?: string) => {
     }
   }, [board]);
 
+  // Update a column
+  const updateColumn = useCallback(async (input: UpdateColumnInput) => {
+    if (!board) return;
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from('kanban_columns')
+        .update({
+          title: input.title,
+          position: input.position,
+          color: input.color,
+          limit: input.limit
+        })
+        .eq('id', input.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setBoard(prev => {
+        if (!prev) return prev;
+        const updatedColumns = prev.columns.map(col => 
+          col.id === input.id 
+            ? { ...col, title: data.title, position: data.position, color: data.color, limit: data.limit }
+            : col
+        ).sort((a, b) => a.position - b.position);
+        
+        return {
+          ...prev,
+          columns: updatedColumns,
+          updatedAt: new Date().toISOString()
+        };
+      });
+
+      toast.success(`Colonne "${input.title}" modifiée`);
+
+    } catch (error) {
+      console.error('Error updating column:', error);
+      toast.error('Erreur lors de la modification de la colonne');
+    }
+  }, [board]);
+
   // Delete a column
   const deleteColumn = useCallback(async (columnId: string) => {
     if (!board) return;
@@ -731,7 +773,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     isLoading,
     createBoard,
     addColumn,
-    updateColumn: () => {}, // TODO: Implement if needed
+    updateColumn,
     deleteColumn,
     addCard,
     updateCard,

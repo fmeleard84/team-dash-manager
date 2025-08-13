@@ -99,11 +99,11 @@ export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCar
                       <MoreHorizontal className="w-3 h-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuContent align="end" className="w-32 bg-background border shadow-lg z-50">
                     <DropdownMenuItem onClick={(e) => {
                       e.stopPropagation();
                       onEdit?.();
-                    }}>
+                    }} className="cursor-pointer">
                       Modifier
                     </DropdownMenuItem>
                     <DropdownMenuItem 
@@ -111,7 +111,7 @@ export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCar
                         e.stopPropagation();
                         onDelete?.();
                       }}
-                      className="text-red-600"
+                      className="text-red-600 cursor-pointer"
                     >
                       Supprimer
                     </DropdownMenuItem>
@@ -170,10 +170,13 @@ export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCar
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
                   {/* Priority indicator */}
-                  {card.priority !== 'low' && (
+                  {card.priority && (
                     <div className={`flex items-center gap-1 ${getPriorityColor(card.priority)} text-white px-1.5 py-0.5 rounded text-xs`}>
                       {getPriorityIcon(card.priority)}
-                      <span className="capitalize">{card.priority}</span>
+                      <span className="capitalize">
+                        {card.priority === 'low' ? 'Faible' : 
+                         card.priority === 'medium' ? 'Moyenne' : 'Élevée'}
+                      </span>
                     </div>
                   )}
 
@@ -197,9 +200,10 @@ export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCar
                 <div className="flex items-center gap-2">
                   {/* Due date */}
                   {card.dueDate && (
-                    <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-500' : ''}`}>
+                    <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-blue-600'}`}>
                       <Calendar className="w-3 h-3" />
-                      <span>
+                      <span className="text-xs">
+                        {isOverdue ? '⚠️ ' : '📅 '}
                         {format(new Date(card.dueDate), 'dd MMM', { locale: fr })}
                       </span>
                     </div>
