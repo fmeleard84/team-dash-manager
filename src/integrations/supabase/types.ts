@@ -183,6 +183,7 @@ export type Database = {
           phone: string | null
           profile_id: string | null
           profile_type: Database["public"]["Enums"]["profile_type"] | null
+          qualification_status: string | null
           rating: number | null
           seniority: Database["public"]["Enums"]["hr_seniority"]
           status: string
@@ -203,6 +204,7 @@ export type Database = {
           phone?: string | null
           profile_id?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
+          qualification_status?: string | null
           rating?: number | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
@@ -223,6 +225,7 @@ export type Database = {
           phone?: string | null
           profile_id?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
+          qualification_status?: string | null
           rating?: number | null
           seniority?: Database["public"]["Enums"]["hr_seniority"]
           status?: string
@@ -278,6 +281,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      candidate_qualification_results: {
+        Row: {
+          answers: Json | null
+          candidate_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          max_score: number
+          score: number
+          started_at: string | null
+          status: string
+          test_id: string
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json | null
+          candidate_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          max_score?: number
+          score?: number
+          started_at?: string | null
+          status?: string
+          test_id: string
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json | null
+          candidate_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          max_score?: number
+          score?: number
+          started_at?: string | null
+          status?: string
+          test_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       candidate_reviews: {
         Row: {
@@ -525,6 +570,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hr_qualification_tests: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          max_score: number
+          name: string
+          passing_score: number
+          profile_id: string
+          questions: Json
+          time_limit_minutes: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_score?: number
+          name: string
+          passing_score?: number
+          profile_id: string
+          questions?: Json
+          time_limit_minutes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_score?: number
+          name?: string
+          passing_score?: number
+          profile_id?: string
+          questions?: Json
+          time_limit_minutes?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       hr_resource_assignments: {
         Row: {

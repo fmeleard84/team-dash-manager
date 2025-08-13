@@ -1,340 +1,369 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, DollarSign, Languages, Award, Edit } from 'lucide-react';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
-import type { Database } from '@/integrations/supabase/types';
-import { EditJobModal } from './EditJobModal';
-import { EditRateModal } from './EditRateModal';
-import { EditLanguagesModal } from './EditLanguagesModal';
-import { EditExpertisesModal } from './EditExpertisesModal';
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EditJobModal } from "./EditJobModal";
+import { EditRateModal } from "./EditRateModal";
+import { EditLanguagesModal } from "./EditLanguagesModal";
+import { EditExpertisesModal } from "./EditExpertisesModal";
+import { QualificationTest } from "./QualificationTest";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface CandidateSettingsProps {
   currentCandidateId: string;
 }
 
-export function CandidateSettings({ currentCandidateId }: CandidateSettingsProps) {
-  const [editJobModal, setEditJobModal] = useState(false);
-  const [editRateModal, setEditRateModal] = useState(false);
-  const [editLanguagesModal, setEditLanguagesModal] = useState(false);
-  const [editExpertisesModal, setEditExpertisesModal] = useState(false);
+export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps) => {
+  const [isEditJobModalOpen, setIsEditJobModalOpen] = useState(false);
+  const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
+  const [isEditLanguagesModalOpen, setIsEditLanguagesModalOpen] = useState(false);
+  const [isEditExpertisesModalOpen, setIsEditExpertisesModalOpen] = useState(false);
+  const [personalInfo, setPersonalInfo] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: ''
+  });
+  const { toast } = useToast();
 
-  // Fetch candidate profile with related data
-  const { data: candidateProfile, refetch } = useQuery({
-    queryKey: ['candidate-profile-full', currentCandidateId],
+  // Fetch comprehensive candidate profile data
+  const { data: candidateData, refetch: refetchCandidate } = useQuery({
+    queryKey: ['candidateProfile', currentCandidateId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('candidate_profiles')
-        .select(`
-          *,
-          candidate_languages (
-            hr_languages (id, name)
-          ),
-          candidate_expertises (
-            hr_expertises (id, name)
-          )
-        `)
+        .select('*')
         .eq('id', currentCandidateId)
         .single();
       
       if (error) throw error;
+      
+      // Initialize personal info state
+      setPersonalInfo({
+        first_name: data.first_name || '',
+        last_name: data.last_name || '',
+        email: data.email || '',
+        phone: data.phone || ''
+      });
+      
       return data;
-    },
-    enabled: !!currentCandidateId
+    }
   });
 
-  // Fetch profile and category data separately
+  // Fetch profile data separately
   const { data: profileData } = useQuery({
-    queryKey: ['profile-with-category', candidateProfile?.profile_id],
+    queryKey: ['profileData', candidateData?.profile_id],
     queryFn: async () => {
-      if (!candidateProfile?.profile_id) return null;
+      if (!candidateData?.profile_id) return null;
       
       const { data, error } = await supabase
         .from('hr_profiles')
         .select(`
+          id,
           name,
           hr_categories (
+            id,
             name
           )
         `)
-        .eq('id', candidateProfile.profile_id)
+        .eq('id', candidateData.profile_id)
         .single();
       
       if (error) throw error;
       return data;
     },
-    enabled: !!candidateProfile?.profile_id
+    enabled: !!candidateData?.profile_id
+  });
+
+  // Fetch candidate's languages
+  const { data: candidateLanguages } = useQuery({
+    queryKey: ['candidateLanguages', currentCandidateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('candidate_languages')
+        .select(`
+          id,
+          hr_languages (
+            id,
+            name
+          )
+        `)
+        .eq('candidate_id', currentCandidateId);
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch candidate's expertises
+  const { data: candidateExpertises } = useQuery({
+    queryKey: ['candidateExpertises', currentCandidateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('candidate_expertises')
+        .select(`
+          id,
+          hr_expertises (
+            id,
+            name
+          )
+        `)
+        .eq('candidate_id', currentCandidateId);
+      
+      if (error) throw error;
+      return data;
+    }
   });
 
   const handleUpdate = () => {
-    refetch();
-    toast.success('Profil mis à jour');
+    refetchCandidate();
+    toast({
+      title: "Succès",
+      description: "Profil mis à jour avec succès."
+    });
   };
 
-  const handleSeniorityChange = async (newSeniority: Database['public']['Enums']['hr_seniority']) => {
+  const handlePersonalInfoSave = async () => {
     try {
       const { error } = await supabase
         .from('candidate_profiles')
-        .update({ seniority: newSeniority })
+        .update({
+          first_name: personalInfo.first_name,
+          last_name: personalInfo.last_name,
+          email: personalInfo.email,
+          phone: personalInfo.phone
+        })
         .eq('id', currentCandidateId);
 
       if (error) throw error;
 
-      handleUpdate();
-    } catch (error: any) {
-      toast.error('Erreur lors de la modification: ' + error.message);
+      toast({
+        title: "Informations mises à jour",
+        description: "Vos informations personnelles ont été modifiées avec succès."
+      });
+      
+      refetchCandidate();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour les informations.",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('candidate_profiles')
-        .update({ status: newStatus })
-        .eq('id', currentCandidateId);
-
-      if (error) throw error;
-
-      handleUpdate();
-    } catch (error: any) {
-      toast.error('Erreur lors de la modification: ' + error.message);
-    }
-  };
-
-  if (!candidateProfile) {
+  if (!candidateData) {
     return (
       <div className="p-6">
-        <div className="text-center">
-          <p className="text-muted-foreground">Chargement du profil...</p>
-        </div>
+        <p className="text-center text-muted-foreground">Chargement...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Paramètres du profil</h1>
-      </div>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Paramètres du profil</h2>
+      
+      <Tabs defaultValue="personal" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="personal">Informations</TabsTrigger>
+          <TabsTrigger value="professional">Professionnel</TabsTrigger>
+          <TabsTrigger value="skills">Compétences</TabsTrigger>
+          <TabsTrigger value="qualification">Qualification</TabsTrigger>
+        </TabsList>
 
-      {/* Personal Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Informations personnelles
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Prénom</p>
-              <p className="text-lg">{candidateProfile.first_name}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Nom</p>
-              <p className="text-lg">{candidateProfile.last_name}</p>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Email</p>
-            <p className="text-lg">{candidateProfile.email}</p>
-          </div>
-          {candidateProfile.phone && (
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Téléphone</p>
-              <p className="text-lg">{candidateProfile.phone}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="personal" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Informations personnelles</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="first_name">Prénom</Label>
+                  <Input
+                    id="first_name"
+                    value={personalInfo.first_name}
+                    onChange={(e) => setPersonalInfo(prev => ({ ...prev, first_name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="last_name">Nom</Label>
+                  <Input
+                    id="last_name"
+                    value={personalInfo.last_name}
+                    onChange={(e) => setPersonalInfo(prev => ({ ...prev, last_name: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={personalInfo.email}
+                  onChange={(e) => setPersonalInfo(prev => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone">Téléphone</Label>
+                <Input
+                  id="phone"
+                  value={personalInfo.phone}
+                  onChange={(e) => setPersonalInfo(prev => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+              <Button onClick={handlePersonalInfoSave}>
+                Enregistrer les modifications
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Job Position */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5" />
-            Poste et séniorité
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Profil</p>
-              <p className="text-lg">
-                {profileData?.name || 'Aucun profil sélectionné'}
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setEditJobModal(true)}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
-            </Button>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Domaine d'expertise</p>
-            <p className="text-lg">
-              {profileData?.hr_categories?.name || 'Aucun domaine sélectionné'}
-            </p>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Niveau d'expérience</p>
-              <Badge variant="secondary" className="capitalize">
-                {candidateProfile.seniority}
-              </Badge>
-            </div>
-            <Select
-              value={candidateProfile.seniority}
-              onValueChange={handleSeniorityChange}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="junior">Junior</SelectItem>
-                <SelectItem value="intermediate">Intermédiaire</SelectItem>
-                <SelectItem value="senior">Senior</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="professional" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profil professionnel</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Poste / Fonction</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {profileData?.hr_categories?.name} - {profileData?.name}
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={() => setIsEditJobModalOpen(true)}>
+                      Modifier
+                    </Button>
+                  </div>
+                </div>
 
-      {/* Rate Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Tarification
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Tarif journalier</p>
-              <p className="text-2xl font-bold">{candidateProfile.daily_rate}€</p>
-              <p className="text-sm text-muted-foreground">
-                Soit {(candidateProfile.daily_rate / 8).toFixed(2)}€/heure | {(candidateProfile.daily_rate / (8 * 60)).toFixed(2)}€/minute
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setEditRateModal(true)}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Tarif journalier</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {candidateData.daily_rate}€ / jour
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={() => setIsEditRateModalOpen(true)}>
+                      Modifier
+                    </Button>
+                  </div>
+                </div>
 
-      {/* Languages */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Languages className="h-5 w-5" />
-            Langues parlées
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-start justify-between">
-            <div className="flex flex-wrap gap-2">
-              {candidateProfile.candidate_languages?.length > 0 ? (
-                candidateProfile.candidate_languages.map((cl, index) => (
-                  <Badge key={index} variant="secondary">
-                    {cl.hr_languages?.name}
-                  </Badge>
-                ))
-              ) : (
-                <p className="text-muted-foreground">Aucune langue renseignée</p>
-              )}
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setEditLanguagesModal(true)}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Séniorité</h4>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {candidateData.seniority}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Expertises */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5" />
-            Expertises
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-start justify-between">
-            <div className="flex flex-wrap gap-2">
-              {candidateProfile.candidate_expertises?.length > 0 ? (
-                candidateProfile.candidate_expertises.map((ce, index) => (
-                  <Badge key={index} variant="secondary">
-                    {ce.hr_expertises?.name}
-                  </Badge>
-                ))
-              ) : (
-                <p className="text-muted-foreground">Aucune expertise renseignée</p>
-              )}
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setEditExpertisesModal(true)}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="skills" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Compétences et langues</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium">Langues parlées</h4>
+                  <Button variant="outline" onClick={() => setIsEditLanguagesModalOpen(true)}>
+                    Modifier
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {candidateLanguages?.map((lang) => (
+                    <span
+                      key={lang.id}
+                      className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md text-sm"
+                    >
+                      {lang.hr_languages?.name}
+                    </span>
+                  ))}
+                  {(!candidateLanguages || candidateLanguages.length === 0) && (
+                    <span className="text-sm text-muted-foreground">Aucune langue renseignée</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium">Expertises</h4>
+                  <Button variant="outline" onClick={() => setIsEditExpertisesModalOpen(true)}>
+                    Modifier
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {candidateExpertises?.map((exp) => (
+                    <span
+                      key={exp.id}
+                      className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md text-sm"
+                    >
+                      {exp.hr_expertises?.name}
+                    </span>
+                  ))}
+                  {(!candidateExpertises || candidateExpertises.length === 0) && (
+                    <span className="text-sm text-muted-foreground">Aucune expertise renseignée</span>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="qualification">
+          <QualificationTest currentCandidateId={currentCandidateId} />
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
-      <EditJobModal
-        isOpen={editJobModal}
-        onClose={() => setEditJobModal(false)}
-        currentCandidateId={currentCandidateId}
-        currentProfileId={candidateProfile.profile_id}
-        onUpdate={handleUpdate}
-      />
-
-      <EditRateModal
-        isOpen={editRateModal}
-        onClose={() => setEditRateModal(false)}
-        currentCandidateId={currentCandidateId}
-        currentRate={candidateProfile.daily_rate}
-        onUpdate={handleUpdate}
-      />
-
-      <EditLanguagesModal
-        isOpen={editLanguagesModal}
-        onClose={() => setEditLanguagesModal(false)}
-        currentCandidateId={currentCandidateId}
-        onUpdate={handleUpdate}
-      />
-
-      <EditExpertisesModal
-        isOpen={editExpertisesModal}
-        onClose={() => setEditExpertisesModal(false)}
-        currentCandidateId={currentCandidateId}
-        currentProfileId={candidateProfile.profile_id}
-        onUpdate={handleUpdate}
-      />
+      {candidateData.profile_id && (
+        <>
+          <EditJobModal
+            isOpen={isEditJobModalOpen}
+            onClose={() => setIsEditJobModalOpen(false)}
+            currentCandidateId={currentCandidateId}
+            currentProfileId={candidateData.profile_id}
+            onUpdate={handleUpdate}
+          />
+          <EditRateModal
+            isOpen={isEditRateModalOpen}
+            onClose={() => setIsEditRateModalOpen(false)}
+            currentCandidateId={currentCandidateId}
+            currentRate={candidateData.daily_rate}
+            onUpdate={handleUpdate}
+          />
+          <EditLanguagesModal
+            isOpen={isEditLanguagesModalOpen}
+            onClose={() => setIsEditLanguagesModalOpen(false)}
+            currentCandidateId={currentCandidateId}
+            onUpdate={handleUpdate}
+          />
+          <EditExpertisesModal
+            isOpen={isEditExpertisesModalOpen}
+            onClose={() => setIsEditExpertisesModalOpen(false)}
+            currentCandidateId={currentCandidateId}
+            currentProfileId={candidateData.profile_id}
+            onUpdate={handleUpdate}
+          />
+        </>
+      )}
     </div>
   );
-}
+};
