@@ -909,12 +909,13 @@ export type Database = {
           due_date: string | null
           id: string
           keycloak_user_id: string | null
+          owner_id: string | null
           price_per_minute: number
           project_date: string
           status: string
           title: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           client_budget?: number | null
@@ -923,12 +924,13 @@ export type Database = {
           due_date?: string | null
           id?: string
           keycloak_user_id?: string | null
+          owner_id?: string | null
           price_per_minute?: number
           project_date?: string
           status?: string
           title: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           client_budget?: number | null
@@ -937,12 +939,13 @@ export type Database = {
           due_date?: string | null
           id?: string
           keycloak_user_id?: string | null
+          owner_id?: string | null
           price_per_minute?: number
           project_date?: string
           status?: string
           title?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }

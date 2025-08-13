@@ -299,11 +299,6 @@ const fetchAcceptedProjects = async () => {
     const projectIds = (data || [])
       .map((b: any) => b.project_id)
       .filter(Boolean);
-    if (projectIds.length > 0) {
-      await fetchProjectsDetails(projectIds);
-      // Les liens Nextcloud sont construits côté client via SSO Keycloak.
-
-    }
   } catch (error) {
     console.error('Error fetching accepted projects:', error);
   }

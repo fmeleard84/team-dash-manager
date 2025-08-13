@@ -119,8 +119,7 @@ const Project = () => {
         .from('projects')
         .select('*')
         .eq('id', id)
-        .eq('keycloak_user_id', user?.profile?.sub)
-        .single();
+        .maybeSingle();
 
       if (projectError) throw projectError;
       setProject(projectData as Project);
@@ -456,7 +455,8 @@ const Project = () => {
     if (!id) return;
     
     // Vérifier l'authentification de l'utilisateur
-    if (!user?.profile?.sub) {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
       console.error('User not authenticated');
       toast({
         title: "Erreur d'authentification",
@@ -466,7 +466,7 @@ const Project = () => {
       return;
     }
 
-    console.log('Saving with user:', user.profile.sub, 'project:', id);
+    console.log('Saving project:', id, 'by user:', auth.user.id);
     
     setIsSaving(true);
     try {

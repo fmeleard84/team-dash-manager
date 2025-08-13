@@ -31,7 +31,7 @@ import PlanningView from "@/components/client/PlanningView";
 import DriveView from "@/components/client/DriveView";
 import CreateProjectModal from "@/components/CreateProjectModal";
 import { ProjectCard } from "@/components/ProjectCard";
-import { supabase, setKeycloakIdentity } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MessageSystem } from "@/components/messages/MessageSystem";
@@ -53,9 +53,6 @@ const [selectedMessagesProjectId, setSelectedMessagesProjectId] = useState<strin
 useEffect(() => {
   const load = async () => {
     if (!user) return;
-    if (user.profile?.sub || user.email) {
-      setKeycloakIdentity({ sub: user.profile?.sub, email: user.email || undefined });
-    }
     const { data, error } = await supabase
       .from('projects')
       .select('id,title,description,project_date,due_date,client_budget,status')
@@ -69,15 +66,6 @@ useEffect(() => {
     }
   };
   load();
-}, [user]);
-
-useEffect(() => {
-  if (user?.profile?.sub || user?.email) {
-    setKeycloakIdentity({
-      sub: user.profile?.sub,
-      email: user.email || undefined,
-    });
-  }
 }, [user]);
 
 const refreshProjects = async () => {
@@ -114,7 +102,6 @@ const onDeleteProject = async (id: string) => {
 const handleCreateProject = async (data: { title: string; description?: string; project_date: string; client_budget?: number; due_date?: string; file?: File | null; }) => {
   setIsCreating(true);
   try {
-    const sub = user?.profile?.sub as string | undefined;
     const insert = {
       title: data.title,
       description: data.description || null,
@@ -122,8 +109,6 @@ const handleCreateProject = async (data: { title: string; description?: string; 
       due_date: data.due_date || null,
       client_budget: data.client_budget ?? null,
       status: 'pause',
-      keycloak_user_id: sub,
-      user_id: sub,
     } as any;
 
     const { data: inserted, error } = await supabase

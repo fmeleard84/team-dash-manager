@@ -15,8 +15,6 @@ export const buildFunctionHeaders = (opts?: FunctionAuthOptions) => {
     "Content-Type": "application/json",
   };
 
-  if (opts?.sub) headers["x-keycloak-sub"] = opts.sub;
-  if (opts?.email) headers["x-keycloak-email"] = opts.email;
-
+  // No external identity headers; internal Supabase auth only
   return headers;
 };
