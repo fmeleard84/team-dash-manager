@@ -39,7 +39,7 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
   useEffect(() => {
     if (!isOpen || !projectId) return;
     (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("project_members")
         .select("user_id, role, status, profiles:profiles(id, first_name, last_name, email)")
         .eq("project_id", projectId)
@@ -49,7 +49,7 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
         toast({ title: "Erreur", description: "Impossible de charger les membres du projet" });
         return;
       }
-      setMembers((data ?? []) as ProjectMemberRow[]);
+      setMembers(((data ?? []) as unknown) as ProjectMemberRow[]);
     })();
   }, [isOpen, projectId]);
 
@@ -57,7 +57,7 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
   useEffect(() => {
     if (!isOpen || !path) return;
     (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("project_file_acls")
         .select("*")
         .eq("path", path)
@@ -68,8 +68,9 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
         return;
       }
       if (data) {
-        setVisibility((data.visibility as Visibility) ?? "team");
-        setSelectedUserIds((data.allowed_user_ids ?? []) as string[]);
+        const row = data as any;
+        setVisibility((row.visibility as Visibility) ?? "team");
+        setSelectedUserIds(((row.allowed_user_ids ?? []) as string[]) ?? []);
       } else {
         // Par défaut, équipe
         setVisibility("team");
@@ -102,7 +103,7 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
       visibility,
       allowed_user_ids: visibility === "custom" ? selectedUserIds : [],
     };
-    const { error } = await supabase.from("project_file_acls").upsert(payload);
+    const { error } = await (supabase as any).from("project_file_acls").upsert(payload);
     setLoading(false);
     if (error) {
       console.error("save acl error", error);
@@ -182,3 +183,4 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
     </Dialog>
   );
 }
+

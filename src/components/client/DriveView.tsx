@@ -92,7 +92,7 @@ export default function DriveView() {
 
   const upsertDefaultAcl = async (fullPath: string) => {
     // Par défaut: visibilité équipe
-    const { error } = await supabase.from("project_file_acls").upsert({
+    const { error } = await (supabase as any).from("project_file_acls").upsert({
       path: fullPath,
       project_id: projectId,
       visibility: "team",
@@ -157,7 +157,7 @@ export default function DriveView() {
       toast({ title: "Erreur", description: "Suppression impossible" });
     } else {
       // Supprimer l'ACL associée si elle existe
-      const { error: aclErr } = await supabase.from("project_file_acls").delete().eq("path", filePath);
+      const { error: aclErr } = await (supabase as any).from("project_file_acls").delete().eq("path", filePath);
       if (aclErr) console.error("remove acl error", aclErr);
       list(prefix);
     }
@@ -177,14 +177,14 @@ export default function DriveView() {
     }
 
     // Met à jour l'ACL si existante (changer la clé 'path')
-    const { data: existingAcl } = await supabase
+    const { data: existingAcl } = await (supabase as any)
       .from("project_file_acls")
       .select("path")
       .eq("path", filePath)
       .maybeSingle();
 
-    if (existingAcl?.path) {
-      const { error: updErr } = await supabase
+    if ((existingAcl as any)?.path) {
+      const { error: updErr } = await (supabase as any)
         .from("project_file_acls")
         .update({ path: targetPath })
         .eq("path", filePath);
@@ -360,3 +360,4 @@ export default function DriveView() {
     </div>
   );
 }
+
