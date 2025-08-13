@@ -543,7 +543,7 @@ const KanbanPage = () => {
               <Label htmlFor="card-due-date">Date d'échéance</Label>
               <Input
                 id="card-due-date"
-                type="datetime-local"
+                type="date"
                 value={cardForm.dueDate || ''}
                 onChange={(e) => setCardForm(prev => ({ ...prev, dueDate: e.target.value }))}
               />

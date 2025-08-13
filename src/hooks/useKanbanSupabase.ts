@@ -365,7 +365,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           assigned_to_name: assignedMember?.name,
           assigned_to_email: assignedMember?.email,
           assigned_to_avatar: assignedMember?.avatar,
-          due_date: input.dueDate ? new Date(input.dueDate).toISOString().split('T')[0] + 'T' + new Date(input.dueDate).toISOString().split('T')[1] : null,
+          due_date: input.dueDate || null,
           priority: input.priority || 'medium',
           status: input.status || 'todo',
           labels: input.labels || [],
