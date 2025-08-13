@@ -5,18 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
-  Calendar, 
   MessageSquare, 
   Paperclip, 
   User, 
   AlertTriangle,
   Clock,
-  MoreHorizontal
+  MoreHorizontal,
+  CalendarDays
 } from 'lucide-react';
 import { KanbanCard as KanbanCardType } from '@/types/kanban';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CardFileAttachments } from './CardFileAttachments';
+import { useKanbanCardFiles } from '@/hooks/useKanbanCardFiles';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +72,7 @@ const getStatusLabel = (status: 'todo' | 'in_progress' | 'review' | 'done') => {
 
 export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCardProps) => {
   const isOverdue = card.dueDate && new Date(card.dueDate) < new Date();
+  const { fileCount } = useKanbanCardFiles(card.id);
 
   return (
     <Draggable draggableId={card.id} index={index}>
@@ -190,15 +191,20 @@ export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCar
                   )}
 
                   {/* Attachments count */}
-                  <CardFileAttachments fileCount={card.attachments?.length || 0} />
+                  {fileCount > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Paperclip className="w-3 h-3" />
+                      <span>{fileCount}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
                   {/* Due date */}
                   {card.dueDate && (
                     <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-blue-600'}`}>
+                      <CalendarDays className="w-3 h-3" />
                       <span className="text-xs">
-                        {isOverdue ? '⚠️ ' : '📅 '}
                         {format(new Date(card.dueDate), 'dd MMM', { locale: fr })}
                       </span>
                     </div>
