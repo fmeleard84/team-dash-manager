@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,24 +23,137 @@ import {
   LogOut,
   Kanban,
   CalendarClock,
-  Cloud
+  Cloud,
+  MessageSquare
 } from "lucide-react";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import PlanningView from "@/components/client/PlanningView";
 import DriveView from "@/components/client/DriveView";
+import CreateProjectModal from "@/components/CreateProjectModal";
+import { ProjectCard } from "@/components/ProjectCard";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MessageSystem } from "@/components/messages/MessageSystem";
 
 const ClientDashboard = () => {
-  const [activeSection, setActiveSection] = useState('projects');
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+const [activeSection, setActiveSection] = useState('projects');
+const { user, logout } = useAuth();
+const navigate = useNavigate();
+const { toast } = useToast();
 
-  const menuItems = [
-    { id: 'projects', label: 'Mes projets', icon: FolderOpen },
-    { id: 'planning', label: 'Planning', icon: CalendarClock },
-    { id: 'drive', label: 'Drive', icon: Cloud },
-    { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
-    { id: 'invoices', label: 'Mes factures', icon: Receipt },
-  ];
+// Projects state
+type DbProject = { id: string; title: string; description?: string | null; project_date: string; due_date?: string | null; client_budget?: number | null; status: string };
+const [projects, setProjects] = useState<DbProject[]>([]);
+const [isCreateOpen, setIsCreateOpen] = useState(false);
+const [isCreating, setIsCreating] = useState(false);
+const [selectedKanbanProjectId, setSelectedKanbanProjectId] = useState<string>("");
+const [selectedMessagesProjectId, setSelectedMessagesProjectId] = useState<string>("");
+
+useEffect(() => {
+  const load = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id,title,description,project_date,due_date,client_budget,status')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('load projects', error);
+    } else {
+      setProjects((data || []) as DbProject[]);
+      if (!selectedKanbanProjectId && data && data.length) setSelectedKanbanProjectId(data[0].id);
+      if (!selectedMessagesProjectId && data && data.length) setSelectedMessagesProjectId(data[0].id);
+    }
+  };
+  load();
+}, []);
+
+const refreshProjects = async () => {
+  const { data } = await supabase
+    .from('projects')
+    .select('id,title,description,project_date,due_date,client_budget,status')
+    .order('created_at', { ascending: false });
+  setProjects((data || []) as DbProject[]);
+};
+
+const onViewProject = (id: string) => navigate(`/project/${id}`);
+
+const onToggleStatus = async (id: string, status: string) => {
+  const { error } = await supabase.from('projects').update({ status }).eq('id', id);
+  if (error) {
+    console.error('toggle status error', error);
+    toast({ title: 'Erreur', description: 'Mise à jour du statut échouée' });
+  } else {
+    await refreshProjects();
+  }
+};
+
+const onDeleteProject = async (id: string) => {
+  const { error } = await supabase.from('projects').delete().eq('id', id);
+  if (error) {
+    console.error('delete project error', error);
+    toast({ title: 'Erreur', description: 'Suppression du projet échouée' });
+  } else {
+    toast({ title: 'Projet supprimé' });
+    await refreshProjects();
+  }
+};
+
+const handleCreateProject = async (data: { title: string; description?: string; project_date: string; client_budget?: number; due_date?: string; file?: File | null; }) => {
+  setIsCreating(true);
+  try {
+    const raw = localStorage.getItem('keycloak_identity');
+    const sub = raw ? (JSON.parse(raw)?.sub as string | undefined) : undefined;
+    const insert = {
+      title: data.title,
+      description: data.description || null,
+      project_date: data.project_date,
+      due_date: data.due_date || null,
+      client_budget: data.client_budget ?? null,
+      status: 'pause',
+      keycloak_user_id: sub,
+      user_id: sub,
+    } as any;
+
+    const { data: inserted, error } = await supabase
+      .from('projects')
+      .insert(insert)
+      .select('id')
+      .single();
+
+    if (error || !inserted) throw error;
+
+    const projectId = inserted.id as string;
+
+    if (data.file) {
+      const path = `project/${projectId}/${data.file.name}`;
+      const { error: upErr } = await supabase.storage
+        .from('project-files')
+        .upload(path, data.file, { upsert: true });
+      if (upErr) {
+        console.error('upload error', upErr);
+        toast({ title: 'Upload échoué', description: data.file.name });
+      }
+    }
+
+    toast({ title: 'Projet créé' });
+    setIsCreateOpen(false);
+    await refreshProjects();
+    navigate(`/project/${projectId}`);
+  } catch (e) {
+    console.error('create project error', e);
+    toast({ title: 'Erreur', description: 'Création du projet échouée' });
+  } finally {
+    setIsCreating(false);
+  }
+};
+const menuItems = [
+  { id: 'projects', label: 'Mes projets', icon: FolderOpen },
+  { id: 'planning', label: 'Planning', icon: CalendarClock },
+  { id: 'drive', label: 'Drive', icon: Cloud },
+  { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
+  { id: 'messages', label: 'Messages', icon: MessageSquare },
+  { id: 'invoices', label: 'Mes factures', icon: Receipt },
+];
 
   const renderContent = () => {
     switch (activeSection) {

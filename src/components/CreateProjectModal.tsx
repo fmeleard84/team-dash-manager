@@ -22,6 +22,7 @@ interface CreateProjectModalProps {
     project_date: string;
     client_budget?: number;
     due_date?: string;
+    file?: File | null;
   }) => void;
   isCreating: boolean;
 }
@@ -32,44 +33,48 @@ const CreateProjectModal = ({
   onCreateProject,
   isCreating,
 }: CreateProjectModalProps) => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [projectDate, setProjectDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
-  const [clientBudget, setClientBudget] = useState<string>("");
-  const [dueDate, setDueDate] = useState<string>("");
+const [title, setTitle] = useState("");
+const [description, setDescription] = useState("");
+const [projectDate, setProjectDate] = useState(
+  new Date().toISOString().split('T')[0]
+);
+const [clientBudget, setClientBudget] = useState<string>("");
+const [dueDate, setDueDate] = useState<string>("");
+const [file, setFile] = useState<File | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    onCreateProject({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      project_date: projectDate,
-      client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : undefined,
-      due_date: dueDate.trim() !== "" ? dueDate : undefined,
-    });
+onCreateProject({
+  title: title.trim(),
+  description: description.trim() || undefined,
+  project_date: projectDate,
+  client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : undefined,
+  due_date: dueDate.trim() !== "" ? dueDate : undefined,
+  file,
+});
 
-    // Reset form
+// Reset form
+setTitle("");
+setDescription("");
+setProjectDate(new Date().toISOString().split('T')[0]);
+setClientBudget("");
+setDueDate("");
+setFile(null);
+  };
+
+const handleClose = () => {
+  if (!isCreating) {
     setTitle("");
     setDescription("");
     setProjectDate(new Date().toISOString().split('T')[0]);
     setClientBudget("");
     setDueDate("");
-  };
-
-  const handleClose = () => {
-    if (!isCreating) {
-      setTitle("");
-      setDescription("");
-      setProjectDate(new Date().toISOString().split('T')[0]);
-      setClientBudget("");
-      setDueDate("");
-      onClose();
-    }
-  };
+    setFile(null);
+    onClose();
+  }
+};
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -131,20 +136,30 @@ const CreateProjectModal = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="client_budget">Budget prévu (optionnel)</Label>
-            <Input
-              id="client_budget"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0"
-              placeholder="Ex: 15000"
-              value={clientBudget}
-              onChange={(e) => setClientBudget(e.target.value)}
-              disabled={isCreating}
-            />
-          </div>
+<div className="space-y-2">
+  <Label htmlFor="client_budget">Budget prévu (optionnel)</Label>
+  <Input
+    id="client_budget"
+    type="number"
+    inputMode="decimal"
+    step="0.01"
+    min="0"
+    placeholder="Ex: 15000"
+    value={clientBudget}
+    onChange={(e) => setClientBudget(e.target.value)}
+    disabled={isCreating}
+  />
+</div>
+
+<div className="space-y-2">
+  <Label htmlFor="project_file">Document (optionnel)</Label>
+  <Input
+    id="project_file"
+    type="file"
+    onChange={(e) => setFile(e.target.files?.[0] || null)}
+    disabled={isCreating}
+  />
+</div>
           
           <DialogFooter>
             <Button
