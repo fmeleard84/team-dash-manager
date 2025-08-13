@@ -11,19 +11,21 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 // Optionally read a persisted identity (legacy Keycloak compat)
 const KEYCLOAK_STORAGE_KEY = 'keycloak_identity';
-let legacyHeaders: Record<string, string> = {};
-
-try {
-  const raw = localStorage.getItem(KEYCLOAK_STORAGE_KEY);
-  if (raw) {
-    const parsed = JSON.parse(raw);
-    if (parsed?.sub) legacyHeaders['x-keycloak-sub'] = String(parsed.sub);
-    if (parsed?.email) legacyHeaders['x-keycloak-email'] = String(parsed.email);
-    if (Array.isArray(parsed?.groups)) legacyHeaders['x-keycloak-groups'] = (parsed.groups as string[]).join(',');
+const getLegacyHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {};
+  try {
+    const raw = localStorage.getItem(KEYCLOAK_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.sub) headers['x-keycloak-sub'] = String(parsed.sub);
+      if (parsed?.email) headers['x-keycloak-email'] = String(parsed.email);
+      if (Array.isArray(parsed?.groups)) headers['x-keycloak-groups'] = (parsed.groups as string[]).join(',');
+    }
+  } catch {
+    // ignore
   }
-} catch {
-  // ignore
-}
+  return headers;
+};
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
@@ -33,8 +35,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     detectSessionInUrl: true,
   },
   global: {
-    headers: {
-      ...legacyHeaders,
+    headers: {},
+    fetch: (url, options) => {
+      const mergedHeaders = { ...(options?.headers || {}), ...getLegacyHeaders() } as Record<string, string>;
+      return fetch(url, { ...options, headers: mergedHeaders });
     },
   },
 });
