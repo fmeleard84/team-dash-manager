@@ -9,6 +9,7 @@ import { EditJobModal } from "./EditJobModal";
 import { EditRateModal } from "./EditRateModal";
 import { EditLanguagesModal } from "./EditLanguagesModal";
 import { EditExpertisesModal } from "./EditExpertisesModal";
+import { EditSeniorityModal } from "./EditSeniorityModal";
 import { QualificationTest } from "./QualificationTest";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
   const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
   const [isEditLanguagesModalOpen, setIsEditLanguagesModalOpen] = useState(false);
   const [isEditExpertisesModalOpen, setIsEditExpertisesModalOpen] = useState(false);
+  const [isEditSeniorityModalOpen, setIsEditSeniorityModalOpen] = useState(false);
   const [personalInfo, setPersonalInfo] = useState({
     first_name: '',
     last_name: '',
@@ -80,7 +82,7 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
   });
 
   // Fetch candidate's languages
-  const { data: candidateLanguages } = useQuery({
+  const { data: candidateLanguages, refetch: refetchLanguages } = useQuery({
     queryKey: ['candidateLanguages', currentCandidateId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -100,7 +102,7 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
   });
 
   // Fetch candidate's expertises
-  const { data: candidateExpertises } = useQuery({
+  const { data: candidateExpertises, refetch: refetchExpertises } = useQuery({
     queryKey: ['candidateExpertises', currentCandidateId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -121,6 +123,8 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
 
   const handleUpdate = () => {
     refetchCandidate();
+    refetchLanguages();
+    refetchExpertises();
     toast({
       title: "Succès",
       description: "Profil mis à jour avec succès."
@@ -267,6 +271,9 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
                         {candidateData.seniority}
                       </p>
                     </div>
+                    <Button variant="outline" onClick={() => setIsEditSeniorityModalOpen(true)}>
+                      Modifier
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -360,6 +367,13 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
             onClose={() => setIsEditExpertisesModalOpen(false)}
             currentCandidateId={currentCandidateId}
             currentProfileId={candidateData.profile_id}
+            onUpdate={handleUpdate}
+          />
+          <EditSeniorityModal
+            isOpen={isEditSeniorityModalOpen}
+            onClose={() => setIsEditSeniorityModalOpen(false)}
+            currentCandidateId={currentCandidateId}
+            currentSeniority={candidateData.seniority}
             onUpdate={handleUpdate}
           />
         </>
