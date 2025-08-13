@@ -86,7 +86,8 @@ export default function DriveView() {
       console.error("list error", error);
       toast({ title: "Erreur", description: "Chargement du drive échoué" });
     } else {
-      setEntries(data as Entry[]);
+      const filtered = (data as Entry[]).filter((e) => e.name !== ".keep");
+      setEntries(filtered);
     }
   };
 
@@ -96,7 +97,7 @@ export default function DriveView() {
     const key = `${prefix}${name}/.keep`;
     const { error } = await supabase.storage
       .from("project-files")
-      .upload(key, new Blob([new Uint8Array()]), { upsert: true });
+      .upload(key, new Blob([new Uint8Array()]), { upsert: true, contentType: "text/plain" });
     if (error) {
       console.error("create folder error", error);
       toast({ title: "Erreur", description: "Création du dossier échouée" });
@@ -105,21 +106,9 @@ export default function DriveView() {
     }
   };
 
-  const upsertDefaultAcl = async (fullPath: string) => {
-    // Par défaut: visibilité équipe
-    try {
-      const { error } = await (supabase as any).from("project_file_acls").upsert({
-        path: fullPath,
-        project_id: projectId,
-        visibility: "team",
-        allowed_user_ids: [],
-      });
-      if (error && (error as any).code !== "42P01") {
-        console.error("upsertDefaultAcl error", error);
-      }
-    } catch (e) {
-      // Ignore if ACL table doesn't exist
-    }
+  const upsertDefaultAcl = async (_fullPath: string) => {
+    // ACLs désactivés: la table project_file_acls peut ne pas exister
+    return;
   };
 
   const handleUpload = async (files: FileList | null) => {
@@ -130,8 +119,6 @@ export default function DriveView() {
       if (error) {
         console.error("upload error", error);
         toast({ title: "Erreur upload", description: file.name });
-      } else {
-        await upsertDefaultAcl(key);
       }
     }
     toast({ title: "Upload terminé" });
@@ -175,16 +162,6 @@ export default function DriveView() {
       console.error("remove error", error);
       toast({ title: "Erreur", description: "Suppression impossible" });
     } else {
-      // Supprimer l'ACL associée si elle existe (ignorer si la table n'existe pas)
-      try {
-        const { error: aclErr } = await (supabase as any)
-          .from("project_file_acls")
-          .delete()
-          .eq("path", filePath);
-        if (aclErr && (aclErr as any).code !== "42P01") console.error("remove acl error", aclErr);
-      } catch (e) {
-        // ignore missing table
-      }
       list(prefix);
     }
   };
@@ -225,15 +202,9 @@ export default function DriveView() {
         toast({ title: "Erreur", description: "Suppression du dossier impossible" });
         return;
       }
-      try {
-        await (supabase as any)
-          .from("project_file_acls")
-          .delete()
-          .like("path", `${folderPrefix}%`);
-      } catch (e: any) {
-        if (e?.code && e.code !== "42P01") console.error("deleteFolder acl error", e);
-      }
     }
+    // Remove the folder object itself (created via createFolder)
+    await supabase.storage.from("project-files").remove([folderPrefix]);
     toast({ title: "Dossier supprimé" });
     list(prefix);
   };
@@ -248,11 +219,6 @@ export default function DriveView() {
       console.error("rename file error", error);
       toast({ title: "Erreur", description: "Renommage du fichier impossible" });
       return;
-    }
-    try {
-      await (supabase as any).from("project_file_acls").update({ path: to }).eq("path", from);
-    } catch (e: any) {
-      if (e?.code && e.code !== "42P01") console.error("rename file acl error", e);
     }
     toast({ title: "Fichier renommé" });
     list(prefix);
@@ -269,8 +235,10 @@ export default function DriveView() {
       const target = `${newPrefix}${relative}`;
       const { error } = await supabase.storage.from("project-files").move(f, target);
       if (error) console.error("move in renameFolder", f, error);
-      await (supabase as any).from("project_file_acls").update({ path: target }).eq("path", f);
     }
+    // Remove the old empty folder object and create the new one to keep structure
+    await supabase.storage.from("project-files").remove([oldPrefix]);
+    await supabase.storage.from("project-files").createFolder(newPrefix);
     toast({ title: "Dossier renommé" });
     list(prefix);
   };
@@ -286,25 +254,6 @@ export default function DriveView() {
       console.error("move error", error);
       toast({ title: "Erreur", description: "Déplacement impossible" });
       return;
-    }
-
-    // Met à jour l'ACL si existante (changer la clé 'path')
-    try {
-      const { data: existingAcl } = await (supabase as any)
-        .from("project_file_acls")
-        .select("path")
-        .eq("path", filePath)
-        .maybeSingle();
-
-      if ((existingAcl as any)?.path) {
-        const { error: updErr } = await (supabase as any)
-          .from("project_file_acls")
-          .update({ path: targetPath })
-          .eq("path", filePath);
-        if (updErr && (updErr as any).code !== "42P01") console.error("update acl path error", updErr);
-      }
-    } catch (e) {
-      // Ignore if ACL table doesn't exist
     }
 
     toast({ title: "Fichier déplacé" });
@@ -431,12 +380,12 @@ export default function DriveView() {
                   const isFolder = e.metadata === null;
                   const isFile = !isFolder;
                   return (
-                    <div
-                      key={e.name}
-                      className="group relative rounded-md p-3 flex items-center justify-between bg-background hover:bg-accent/40 transition"
-                      draggable={isFile}
-                      onDragStart={(evt) => isFile && onDragStartFile(evt, e.name)}
-                    >
+                      <div
+                        key={e.name}
+                        className={`group relative rounded-md p-3 flex items-center justify-between transition ${isFolder ? "border bg-background hover:bg-accent/40" : "bg-background hover:bg-accent/30"}`}
+                        draggable={isFile}
+                        onDragStart={(evt) => isFile && onDragStartFile(evt, e.name)}
+                      >
                       {isFile ? (
                         <div className="flex items-center gap-3 min-w-0">
                           <FileIcon className="h-5 w-5" />
