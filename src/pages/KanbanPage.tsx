@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useKanbanSupabase } from '@/hooks/useKanbanSupabase';
+import { useKanbanFiles } from '@/hooks/useKanbanFiles';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
+import { FileUploadArea } from '@/components/kanban/FileUploadArea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,7 +29,7 @@ import { KanbanCard, KanbanColumn, CreateCardInput, CreateColumnInput, TeamMembe
 import { ArrowLeft, Plus, Download, Upload } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { FileUpload } from '@/components/kanban/FileUpload';
+
 
 const KanbanPage = () => {
   const navigate = useNavigate();
@@ -58,6 +60,16 @@ const KanbanPage = () => {
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null);
   const [selectedColumn, setSelectedColumn] = useState<KanbanColumn | null>(null);
 
+  // File management hook for the selected card
+  const { 
+    files, 
+    uploading, 
+    loadFiles, 
+    uploadFile, 
+    deleteFile, 
+    downloadFile 
+  } = useKanbanFiles(selectedCard?.id || '');
+
   // Form states
   const [columnForm, setColumnForm] = useState<CreateColumnInput>({
     title: '',
@@ -82,8 +94,8 @@ const KanbanPage = () => {
         const { data: projects, error } = await supabase
           .from('projects')
           .select('id, title')
-          .order('title');
-        
+          .order('created_at', { ascending: false });
+
         if (error) throw error;
         setAvailableProjects(projects || []);
       } catch (error) {
@@ -158,6 +170,11 @@ const KanbanPage = () => {
     });
     setCardProgress(card.progress);
     setShowCardDialog(true);
+    
+    // Load files for this card
+    setTimeout(() => {
+      if (card.id) loadFiles();
+    }, 100);
   };
 
   const submitColumn = () => {
@@ -216,6 +233,13 @@ const KanbanPage = () => {
       assignedTo: undefined
     });
     setCardProgress(0);
+  };
+
+  // Handle project filter change
+  const handleProjectFilterChange = (newProjectId: string) => {
+    if (newProjectId && newProjectId !== projectId) {
+      navigate(`/kanban?project_id=${newProjectId}`);
+    }
   };
 
   if (!board) {
@@ -317,11 +341,7 @@ const KanbanPage = () => {
           onCardEdit={handleCardClick}
           onCardDelete={deleteCard}
           projectFilter={projectId || ''}
-          onProjectFilterChange={(newProjectId) => {
-            if (newProjectId) {
-              navigate(`/kanban?project_id=${newProjectId}`);
-            }
-          }}
+          onProjectFilterChange={handleProjectFilterChange}
           availableProjects={availableProjects}
         />
       </div>
@@ -395,7 +415,7 @@ const KanbanPage = () => {
           setSelectedCard(null);
         }
       }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedCard ? 'Modifier la carte' : 'Ajouter une carte'}
@@ -516,16 +536,6 @@ const KanbanPage = () => {
               />
             </div>
 
-            {/* File Upload Section */}
-            <FileUpload
-              cardId={selectedCard?.id || 'temp'}
-              attachments={selectedCard?.attachments || []}
-              onAttachmentsUpdate={(attachments) => {
-                if (selectedCard) {
-                  setSelectedCard(prev => prev ? { ...prev, attachments } : null);
-                }
-              }}
-            />
 
             <div>
               <Label htmlFor="card-progress">Progression ({cardProgress}%)</Label>
@@ -542,6 +552,24 @@ const KanbanPage = () => {
                 />
               </div>
             </div>
+
+            {/* File Upload Section */}
+            {selectedCard && (
+              <div>
+                <Label>Fichiers joints</Label>
+                <FileUploadArea
+                  files={files}
+                  uploading={uploading}
+                  onFileUpload={async (uploadedFiles) => {
+                    for (const file of uploadedFiles) {
+                      await uploadFile(file);
+                    }
+                  }}
+                  onFileDelete={deleteFile}
+                  onFileDownload={downloadFile}
+                />
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setShowCardDialog(false)}>
