@@ -1,7 +1,4 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { MessageSystem } from "@/components/messages/MessageSystem";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -20,22 +17,33 @@ import {
   FolderOpen, 
   MessageSquare, 
   Calendar, 
-  FileText, 
+  Folder, 
   Receipt, 
   Settings, 
   LogOut,
-  Star
+  Star,
+  Trello
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import CandidateProjects from "@/components/candidate/CandidateProjects";
+import CandidatePlanningView from "@/components/candidate/CandidatePlanningView";
+import CandidateDriveView from "@/components/candidate/CandidateDriveView";
+import CandidateKanbanView from "@/components/candidate/CandidateKanbanView";
+import { CandidateNotes } from "@/components/candidate/CandidateNotes";
+import { useCandidateProjects } from "@/hooks/useCandidateProjects";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
   const { user, logout } = useAuth();
+  const { candidateId } = useCandidateProjects();
 
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: FolderOpen },
-    { id: 'messages', label: 'Mes messages', icon: MessageSquare },
-    { id: 'appointments', label: 'Mes rendez-vous', icon: Calendar },
-    { id: 'deliverables', label: 'Mes livrables', icon: FileText },
+    { id: 'planning', label: 'Planning', icon: Calendar },
+    { id: 'drive', label: 'Drive', icon: Folder },
+    { id: 'kanban', label: 'Kanban', icon: Trello },
+    { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'notes', label: 'Mes notes', icon: Star },
     { id: 'invoices', label: 'Mes factures', icon: Receipt },
   ];
@@ -43,106 +51,26 @@ const CandidateDashboard = () => {
   const renderContent = () => {
     switch (activeSection) {
       case 'projects':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes projets</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Site E-commerce</CardTitle>
-                  <Badge variant="default">En cours</Badge>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Développement d'une boutique en ligne avec React et Node.js
-                  </p>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Progress</span>
-                      <span>75%</span>
-                    </div>
-                    <div className="w-full bg-secondary rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full" style={{ width: '75%' }}></div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">App Mobile</CardTitle>
-                  <Badge variant="secondary">À commencer</Badge>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Application mobile React Native pour la gestion de tâches
-                  </p>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Progress</span>
-                      <span>10%</span>
-                    </div>
-                    <div className="w-full bg-secondary rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full" style={{ width: '10%' }}></div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        );
+        return <CandidateProjects />;
+        
+      case 'planning':
+        return <CandidatePlanningView />;
+        
+      case 'drive':
+        return <CandidateDriveView />;
+        
+      case 'kanban':
+        return <CandidateKanbanView />;
         
       case 'messages':
         return <MessageSystem />;
         
-      case 'appointments':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes rendez-vous</h2>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-center text-muted-foreground">
-                  Aucun rendez-vous planifié pour le moment.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-        
-      case 'deliverables':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes livrables</h2>
-            <div className="grid gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Maquettes UI/UX</CardTitle>
-                  <Badge variant="outline">En révision</Badge>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Maquettes complètes pour l'application mobile
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Télécharger
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        );
-        
       case 'notes':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes notes</h2>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-center text-muted-foreground">
-                  Aucune note pour le moment.
-                </p>
-              </CardContent>
-            </Card>
+        return candidateId ? <CandidateNotes currentCandidateId={candidateId} /> : (
+          <div className="p-6">
+            <p className="text-center text-muted-foreground">
+              Aucun profil candidat trouvé.
+            </p>
           </div>
         );
         
@@ -151,24 +79,10 @@ const CandidateDashboard = () => {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Mes factures</h2>
             <div className="grid gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Facture #2024-001</CardTitle>
-                  <Badge variant="default">Payée</Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Montant:</span>
-                      <span className="font-semibold">1 500€</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Date:</span>
-                      <span className="text-sm">15/01/2024</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Placeholder for invoices - to be implemented */}
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Fonctionnalité à venir</p>
+              </div>
             </div>
           </div>
         );
