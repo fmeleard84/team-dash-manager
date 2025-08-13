@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ProjectNotification {
   id: string;
@@ -21,11 +22,16 @@ interface ProjectNotification {
     title: string;
     description: string;
     project_date: string;
+    due_date?: string | null;
+    client_budget?: number | null;
   };
   hr_resource_assignments: {
     hr_profiles: {
       name: string;
     };
+    expertises?: string[];
+    languages?: string[];
+    seniority?: string;
   };
 }
 
@@ -146,7 +152,7 @@ const CandidateProjects = () => {
           const [projectData, resourceData] = await Promise.all([
             supabase
               .from('projects')
-              .select('title, description, project_date')
+              .select('title, description, project_date, due_date, client_budget')
               .eq('id', notification.project_id)
               .maybeSingle(),
             supabase
@@ -154,7 +160,10 @@ const CandidateProjects = () => {
               .select(`
                 hr_profiles (
                   name
-                )
+                ),
+                expertises,
+                languages,
+                seniority
               `)
               .eq('id', notification.resource_assignment_id)
               .maybeSingle()
@@ -162,8 +171,8 @@ const CandidateProjects = () => {
 
           return {
             ...notification,
-            projects: projectData.data || { title: '', description: '', project_date: '' },
-            hr_resource_assignments: resourceData.data || { hr_profiles: { name: '' } }
+            projects: projectData.data || { title: '', description: '', project_date: '', due_date: null, client_budget: null },
+            hr_resource_assignments: resourceData.data || { hr_profiles: { name: '' }, expertises: [], languages: [], seniority: null }
           };
         })
       );
@@ -183,6 +192,9 @@ const handleViewDetails = async (notification: ProjectNotification) => {
         action: 'get_candidate_project_details',
         projectId: notification.project_id,
         resourceAssignmentId: notification.resource_assignment_id,
+      },
+      headers: {
+        'x-keycloak-email': user?.profile?.email || '',
       },
     });
     if (error) throw error;
@@ -404,248 +416,339 @@ const formatCurrency = (n?: number | null) => {
     );
   }
 
-  if (selectedProject) {
-    const notification = notifications.find(n => n.project_id === selectedProject.id);
-    
-    return (
+  return (
+    <>
       <div className="p-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => setSelectedProject(null)}>
-            ← Retour
-          </Button>
-          <h2 className="text-2xl font-bold">Détail du projet</h2>
-        </div>
+        <h2 className="text-2xl font-bold">Mes projets</h2>
         
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">{selectedProject.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">Description du projet</h4>
-              <p className="text-muted-foreground">{selectedProject.description || '—'}</p>
-            </div>
+        <Tabs defaultValue="nouvelles" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="nouvelles">
+              Nouvelles demandes ({notifications.length})
+            </TabsTrigger>
+            <TabsTrigger value="acceptes">
+              Projets acceptés ({acceptedProjects.length})
+            </TabsTrigger>
+            <TabsTrigger value="termines">
+              Projets terminés ({completedProjects.length})
+            </TabsTrigger>
+          </TabsList>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-semibold mb-2">Date de début</h4>
-                <p className="text-muted-foreground">{formatDate(selectedProject.project_date)}</p>
+          <TabsContent value="nouvelles" className="space-y-4">
+            {notifications.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Aucune nouvelle demande</p>
               </div>
-              <div>
-                <h4 className="font-semibold mb-2">Délai demandé (date cible)</h4>
-                <p className="text-muted-foreground">{formatDate(selectedProject.due_date || '')}</p>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Budget global</h4>
-                <p className="text-muted-foreground">{formatCurrency(selectedProject.client_budget)}</p>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Poste</h4>
-                <Badge variant="secondary">{selectedProject.resourceProfile}</Badge>
-              </div>
-            </div>
+            ) : (
+              <div className="grid gap-4">
+                {notifications.map((notification) => (
+                  <Card key={notification.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{notification.title}</CardTitle>
+                        <Badge variant="default">Nouveau</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        {notification.description}
+                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Poste:</span>
+                          <Badge variant="secondary">
+                            {notification.hr_resource_assignments.hr_profiles.name}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Début:</span>
+                          <span className="text-sm">{formatDate(notification.projects.project_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Fin prévue:</span>
+                          <span className="text-sm">{formatDate(notification.projects.due_date || '')}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Budget:</span>
+                          <Badge variant="outline">
+                            {formatCurrency(notification.projects.client_budget)}
+                          </Badge>
+                        </div>
+                      </div>
 
-            {notification && (
-              <div className="flex gap-4 pt-4">
-                <Button 
-                  onClick={() => handleAcceptMission(notification)}
-                  className="flex-1"
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Accepter la mission
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleRefuseMission(notification)}
-                  className="flex-1"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Refuser
-                </Button>
+                      {(notification.hr_resource_assignments.expertises?.length || notification.hr_resource_assignments.languages?.length) && (
+                        <div className="space-y-2">
+                          {notification.hr_resource_assignments.expertises?.length > 0 && (
+                            <div>
+                              <span className="text-sm font-medium">Compétences requises:</span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {notification.hr_resource_assignments.expertises.map((expertise, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {expertise}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {notification.hr_resource_assignments.languages?.length > 0 && (
+                            <div>
+                              <span className="text-sm font-medium">Langues requises:</span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {notification.hr_resource_assignments.languages.map((language, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {language}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {notification.hr_resource_assignments.seniority && (
+                            <div>
+                              <span className="text-sm font-medium">Séniorité:</span>
+                              <Badge variant="outline" className="ml-2 text-xs">
+                                {notification.hr_resource_assignments.seniority}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(notification)}
+                          className="flex-1"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Voir le détail
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRefuseMission(notification)}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Refuser
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="acceptes" className="space-y-4">
+            {acceptedProjects.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Aucun projet accepté</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {acceptedProjects.map((booking) => (
+                  <Card key={booking.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                       <CardTitle className="text-lg">{projectsData[booking.project_id]?.title || 'Projet sans titre'}</CardTitle>
+                        <Badge variant="default">Accepté</Badge>
+                      </div>
+                    </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {projectsData[booking.project_id]?.description || 'Aucune description disponible'}
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Poste:</span>
+                <Badge variant="secondary">
+                  {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Date du projet:</span>
+                <span className="text-sm">{projectsData[booking.project_id]?.project_date ? formatDate(projectsData[booking.project_id].project_date) : 'Non spécifiée'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Fin prévue:</span>
+                <span className="text-sm">{projectsData[booking.project_id]?.due_date ? formatDate(projectsData[booking.project_id].due_date) : 'Non spécifiée'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Budget estimé:</span>
+                <Badge variant="outline">
+                  {formatCurrency(projectsData[booking.project_id]?.client_budget)}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                onClick={() => {
+                  const title = projectsData[booking.project_id]?.title || 'Projet';
+                  const { openNextcloud } = require('@/lib/auth');
+                  openNextcloud('project', title);
+                }}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Accéder à l'espace collaboratif
+              </Button>
+            </div>
+
           </CardContent>
-        </Card>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="termines" className="space-y-4">
+            {completedProjects.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Aucun projet terminé</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {completedProjects.map((booking) => (
+                  <Card key={booking.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
+                        <Badge variant="secondary">Terminé</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        {booking.projects?.description || 'Aucune description disponible'}
+                      </p>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Poste:</span>
+                        <Badge variant="secondary">
+                          {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Date du projet:</span>
+                        <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
-    );
-  }
 
-  return (
-    <div className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold">Mes projets</h2>
-      
-      <Tabs defaultValue="nouvelles" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="nouvelles">
-            Nouvelles demandes ({notifications.length})
-          </TabsTrigger>
-          <TabsTrigger value="acceptes">
-            Projets acceptés ({acceptedProjects.length})
-          </TabsTrigger>
-          <TabsTrigger value="termines">
-            Projets terminés ({completedProjects.length})
-          </TabsTrigger>
-        </TabsList>
+      {/* Project Details Dialog */}
+      <Dialog open={!!selectedProject} onOpenChange={() => setSelectedProject(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedProject?.title}</DialogTitle>
+            <DialogDescription>
+              Détails complets du projet et informations sur la mission
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedProject && (
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-semibold mb-2">Description du projet</h4>
+                <p className="text-muted-foreground">{selectedProject.description || '—'}</p>
+              </div>
 
-        <TabsContent value="nouvelles" className="space-y-4">
-          {notifications.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Aucune nouvelle demande</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {notifications.map((notification) => (
-                <Card key={notification.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{notification.title}</CardTitle>
-                      <Badge variant="default">Nouveau</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      {notification.description}
-                    </p>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Poste:</span>
-                      <Badge variant="secondary">
-                        {notification.hr_resource_assignments.hr_profiles.name}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDetails(notification)}
-                        className="flex-1"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Voir le détail
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRefuseMission(notification)}
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Refuser
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold mb-2">Date de début</h4>
+                  <p className="text-muted-foreground">{formatDate(selectedProject.project_date)}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Délai demandé (date cible)</h4>
+                  <p className="text-muted-foreground">{formatDate(selectedProject.due_date || '')}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Budget global</h4>
+                  <p className="text-muted-foreground">{formatCurrency(selectedProject.client_budget)}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Poste</h4>
+                  <Badge variant="secondary">{selectedProject.resourceProfile}</Badge>
+                </div>
+              </div>
 
-        <TabsContent value="acceptes" className="space-y-4">
-          {acceptedProjects.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Aucun projet accepté</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {acceptedProjects.map((booking) => (
-                <Card key={booking.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                     <CardTitle className="text-lg">{projectsData[booking.project_id]?.title || 'Projet sans titre'}</CardTitle>
-                      <Badge variant="default">Accepté</Badge>
-                    </div>
-                  </CardHeader>
-<CardContent className="space-y-4">
-  <p className="text-sm text-muted-foreground">
-    {projectsData[booking.project_id]?.description || 'Aucune description disponible'}
-  </p>
-  
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium">Poste:</span>
-      <Badge variant="secondary">
-        {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
-      </Badge>
-    </div>
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium">Date du projet:</span>
-      <span className="text-sm">{projectsData[booking.project_id]?.project_date ? formatDate(projectsData[booking.project_id].project_date) : 'Non spécifiée'}</span>
-    </div>
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium">Fin prévue:</span>
-      <span className="text-sm">{projectsData[booking.project_id]?.due_date ? formatDate(projectsData[booking.project_id].due_date) : 'Non spécifiée'}</span>
-    </div>
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium">Budget estimé:</span>
-      <Badge variant="outline">
-        {formatCurrency(projectsData[booking.project_id]?.client_budget)}
-      </Badge>
-    </div>
-  </div>
+              {/* Additional project details if available */}
+              {(() => {
+                const notification = notifications.find(n => n.project_id === selectedProject.id);
+                return notification && notification.hr_resource_assignments && (
+                  <div className="space-y-3">
+                    {notification.hr_resource_assignments.expertises?.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Compétences requises</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {notification.hr_resource_assignments.expertises.map((expertise, idx) => (
+                            <Badge key={idx} variant="outline">
+                              {expertise}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {notification.hr_resource_assignments.languages?.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Langues requises</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {notification.hr_resource_assignments.languages.map((language, idx) => (
+                            <Badge key={idx} variant="outline">
+                              {language}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {notification.hr_resource_assignments.seniority && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Niveau de séniorité</h4>
+                        <Badge variant="secondary">
+                          {notification.hr_resource_assignments.seniority}
+                        </Badge>
+                      </div>
+                    )}
 
-  <div className="pt-2">
-    <Button
-      variant="default"
-      size="sm"
-      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-      onClick={() => {
-        const title = projectsData[booking.project_id]?.title || 'Projet';
-        const { openNextcloud } = require('@/lib/auth');
-        openNextcloud('project', title);
-      }}
-    >
-      <ExternalLink className="w-4 h-4 mr-2" />
-      Accéder à l'espace collaboratif
-    </Button>
-  </div>
-
-</CardContent>
-                </Card>
-              ))}
+                    {notification && (
+                      <div className="flex gap-4 pt-4">
+                        <Button 
+                          onClick={() => handleAcceptMission(notification)}
+                          className="flex-1"
+                        >
+                          <Check className="w-4 h-4 mr-2" />
+                          Accepter la mission
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => handleRefuseMission(notification)}
+                          className="flex-1"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Refuser
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="termines" className="space-y-4">
-          {completedProjects.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Aucun projet terminé</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {completedProjects.map((booking) => (
-                <Card key={booking.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
-                      <Badge variant="secondary">Terminé</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      {booking.projects?.description || 'Aucune description disponible'}
-                    </p>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Poste:</span>
-                      <Badge variant="secondary">
-                        {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Date du projet:</span>
-                      <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
+
 };
 
 export default CandidateProjects;
