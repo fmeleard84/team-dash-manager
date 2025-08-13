@@ -93,7 +93,7 @@ export const KanbanColumn = ({
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-1 min-h-32 rounded transition-colors ${
+            className={`flex-1 min-h-32 max-h-[70vh] overflow-y-auto rounded transition-colors ${
               snapshot.isDraggingOver 
                 ? 'bg-blue-50 border-2 border-blue-200 border-dashed' 
                 : ''

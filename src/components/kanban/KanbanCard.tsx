@@ -197,7 +197,6 @@ export const KanbanCard = ({ card, index, onClick, onEdit, onDelete }: KanbanCar
                   {/* Due date */}
                   {card.dueDate && (
                     <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-blue-600'}`}>
-                      <Calendar className="w-3 h-3" />
                       <span className="text-xs">
                         {isOverdue ? '⚠️ ' : '📅 '}
                         {format(new Date(card.dueDate), 'dd MMM', { locale: fr })}

@@ -45,7 +45,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           assignedToName: card.assigned_to_name,
           assignedToEmail: card.assigned_to_email,
           assignedToAvatar: card.assigned_to_avatar,
-          dueDate: card.due_date,
+          dueDate: card.due_date ? new Date(card.due_date).toISOString() : null,
           priority: card.priority,
           status: card.status,
           labels: card.labels || [],
@@ -365,7 +365,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           assigned_to_name: assignedMember?.name,
           assigned_to_email: assignedMember?.email,
           assigned_to_avatar: assignedMember?.avatar,
-          due_date: input.dueDate,
+          due_date: input.dueDate ? new Date(input.dueDate).toISOString().split('T')[0] + 'T' + new Date(input.dueDate).toISOString().split('T')[1] : null,
           priority: input.priority || 'medium',
           status: input.status || 'todo',
           labels: input.labels || [],
@@ -386,7 +386,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         assignedToName: data.assigned_to_name,
         assignedToEmail: data.assigned_to_email,
         assignedToAvatar: data.assigned_to_avatar,
-        dueDate: data.due_date,
+        dueDate: data.due_date ? new Date(data.due_date).toISOString() : null,
         priority: data.priority,
         status: data.status,
         labels: data.labels || [],
@@ -447,7 +447,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         updateData.assigned_to_email = assignedMember?.email || null;
         updateData.assigned_to_avatar = assignedMember?.avatar || null;
       }
-      if (input.dueDate !== undefined) updateData.due_date = input.dueDate;
+      if (input.dueDate !== undefined) updateData.due_date = input.dueDate ? new Date(input.dueDate).toISOString().split('T')[0] + 'T' + new Date(input.dueDate).toISOString().split('T')[1] : null;
       if (input.priority !== undefined) updateData.priority = input.priority;
       if (input.status !== undefined) updateData.status = input.status;
       if (input.labels !== undefined) updateData.labels = input.labels;
@@ -479,7 +479,7 @@ export const useKanbanSupabase = (boardId?: string) => {
               assignedToName: data.assigned_to_name,
               assignedToEmail: data.assigned_to_email,
               assignedToAvatar: data.assigned_to_avatar,
-              dueDate: data.due_date,
+          dueDate: data.due_date ? new Date(data.due_date).toISOString() : null,
               priority: data.priority,
               status: data.status,
               labels: data.labels || [],

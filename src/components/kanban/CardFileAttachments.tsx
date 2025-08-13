@@ -11,9 +11,7 @@ export const CardFileAttachments = ({ fileCount }: CardFileAttachmentsProps) => 
   return (
     <div className="flex items-center gap-1">
       <Paperclip className="w-3 h-3" />
-      <Badge variant="secondary" className="text-xs px-1.5 py-0.5 h-auto">
-        {fileCount} fichier{fileCount > 1 ? 's' : ''}
-      </Badge>
+      <span className="text-xs">{fileCount}</span>
     </div>
   );
 };
