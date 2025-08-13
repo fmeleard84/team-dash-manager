@@ -2,15 +2,20 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  FolderPlus, Upload, Folder, File as FileIcon, ArrowLeft, Download, Trash, 
-  Share2, Eye 
+import {
+  FolderPlus, Upload, Folder, File as FileIcon, Download, Trash,
+  Share2, Eye, MoreVertical, Pencil, ChevronRight
 } from "lucide-react";
 import FileShareModal from "./FileShareModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Project { id: string; title: string }
 interface Entry { name: string; id?: string; created_at?: string; updated_at?: string; last_accessed_at?: string; metadata?: any; }
@@ -21,7 +26,7 @@ export default function DriveView() {
   const [projectId, setProjectId] = useState<string>("");
   const [prefix, setPrefix] = useState<string>("");
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [folderName, setFolderName] = useState("");
+  
   const [loading, setLoading] = useState(false);
 
   // DnD state
@@ -34,6 +39,17 @@ export default function DriveView() {
 
   const basePrefix = useMemo(() => (projectId ? `project/${projectId}/` : ""), [projectId]);
   const canGoUp = useMemo(() => prefix && prefix !== basePrefix, [prefix, basePrefix]);
+  const breadcrumbs = useMemo(() => {
+    const rel = prefix.replace(basePrefix, "");
+    const segs = rel.split("/").filter(Boolean);
+    const items: { label: string; path: string }[] = [{ label: "Dossier du projet", path: basePrefix }];
+    let acc = basePrefix;
+    for (const s of segs) {
+      acc += `${s}/`;
+      items.push({ label: s, path: acc });
+    }
+    return items;
+  }, [prefix, basePrefix]);
 
   useEffect(() => {
     (async () => {
@@ -74,8 +90,8 @@ export default function DriveView() {
     }
   };
 
-  const createFolder = async () => {
-    const name = folderName.trim();
+  const createFolder = async (nameArg?: string) => {
+    const name = (nameArg ?? prompt("Nom du nouveau dossier") ?? "").trim();
     if (!name) return;
     const key = `${prefix}${name}/.keep`;
     const { error } = await supabase.storage
@@ -85,7 +101,6 @@ export default function DriveView() {
       console.error("create folder error", error);
       toast({ title: "Erreur", description: "Création du dossier échouée" });
     } else {
-      setFolderName("");
       list(prefix);
     }
   };
@@ -161,6 +176,81 @@ export default function DriveView() {
       if (aclErr) console.error("remove acl error", aclErr);
       list(prefix);
     }
+  };
+
+  // Utils: lister récursivement tous les fichiers dans un préfixe
+  const listAllInPrefix = async (p: string): Promise<string[]> => {
+    const out: string[] = [];
+    const stack: string[] = [p];
+    while (stack.length) {
+      const current = stack.pop()!;
+      const { data, error } = await supabase.storage.from("project-files").list(current, {
+        limit: 1000,
+        sortBy: { column: "name", order: "asc" },
+      });
+      if (error) {
+        console.error("listAllInPrefix error", error);
+        continue;
+      }
+      for (const item of (data as Entry[])) {
+        const isFolder = !item.name.includes(".");
+        if (isFolder) {
+          stack.push(`${current}${item.name}/`);
+        } else {
+          out.push(`${current}${item.name}`);
+        }
+      }
+    }
+    return out;
+  };
+
+  const deleteFolder = async (folderName: string) => {
+    const folderPrefix = `${prefix}${folderName}/`;
+    const files = await listAllInPrefix(folderPrefix);
+    if (files.length) {
+      const { error } = await supabase.storage.from("project-files").remove(files);
+      if (error) {
+        console.error("deleteFolder error", error);
+        toast({ title: "Erreur", description: "Suppression du dossier impossible" });
+        return;
+      }
+      await (supabase as any).from("project_file_acls").delete().like("path", `${folderPrefix}%`);
+    }
+    toast({ title: "Dossier supprimé" });
+    list(prefix);
+  };
+
+  const renameFile = async (oldName: string) => {
+    const newName = (prompt("Nouveau nom du fichier", oldName) ?? "").trim();
+    if (!newName || newName === oldName) return;
+    const from = `${prefix}${oldName}`;
+    const to = `${prefix}${newName}`;
+    const { error } = await supabase.storage.from("project-files").move(from, to);
+    if (error) {
+      console.error("rename file error", error);
+      toast({ title: "Erreur", description: "Renommage du fichier impossible" });
+      return;
+    }
+    await (supabase as any).from("project_file_acls").update({ path: to }).eq("path", from);
+    toast({ title: "Fichier renommé" });
+    list(prefix);
+  };
+
+  const renameFolder = async (folderName: string) => {
+    const newName = (prompt("Nouveau nom du dossier", folderName) ?? "").trim();
+    if (!newName || newName === folderName) return;
+    const oldPrefix = `${prefix}${folderName}/`;
+    const newPrefix = `${prefix}${newName}/`;
+    const files = await listAllInPrefix(oldPrefix);
+    for (const f of files) {
+      const relative = f.replace(oldPrefix, "");
+      const target = `${newPrefix}${relative}`;
+      const { error } = await supabase.storage.from("project-files").move(f, target);
+      if (error) console.error("move in renameFolder", f, error);
+      await (supabase as any).from("project_file_acls").update({ path: target }).eq("path", f);
+    }
+    toast({ title: "Dossier renommé" });
+    list(prefix);
   };
 
   // DnD - Déplacement d'un fichier vers un dossier
@@ -262,32 +352,25 @@ export default function DriveView() {
               </Select>
             </div>
 
-            <div className="flex items-end gap-2 md:col-span-2">
-              <div className="flex-1 space-y-2">
-                <label className="text-sm font-medium">Nouveau dossier</label>
-                <Input value={folderName} onChange={(e) => setFolderName(e.target.value)} placeholder="Nom du dossier" />
-              </div>
-              <Button onClick={createFolder} className="shrink-0" aria-label="Créer un dossier">
-                <FolderPlus className="h-4 w-4 mr-2" /> Créer
-              </Button>
-            </div>
           </div>
 
           <div className="flex items-center justify-between border rounded-md p-3">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={goUp} disabled={!canGoUp}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Dossier parent
-              </Button>
-              <span className="text-sm text-muted-foreground">/{prefix}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-2 cursor-pointer">
-                <Upload className="h-4 w-4" />
-                <span className="text-sm">Uploader</span>
-                <input type="file" multiple className="hidden" onChange={(e) => handleUpload(e.target.files)} />
-              </label>
-            </div>
+            <nav className="flex items-center gap-1 text-sm">
+              {breadcrumbs.map((b, idx) => (
+                <div key={b.path} className="flex items-center">
+                  <button
+                    className={`hover:underline ${idx === breadcrumbs.length - 1 ? "font-medium" : "text-primary"}`}
+                    onClick={() => setPrefix(b.path)}
+                    disabled={idx === breadcrumbs.length - 1}
+                  >
+                    {b.label}
+                  </button>
+                  {idx < breadcrumbs.length - 1 && (
+                    <ChevronRight className="mx-1 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  )}
+                </div>
+              ))}
+            </nav>
           </div>
 
           {/* Conteneur avec dropzone pour l'upload */}
@@ -300,51 +383,94 @@ export default function DriveView() {
             {loading ? (
               <p className="text-sm text-muted-foreground">Chargement…</p>
             ) : (
-              <div className="grid md:grid-cols-2 gap-2">
-                {entries.map((e) => (
-                  e.name.endsWith("/") ? null : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {/* Tuiles d'action */}
+                <div className="border rounded-md p-4 flex flex-col items-center justify-center gap-2 hover-scale cursor-pointer">
+                  <label className="flex flex-col items-center gap-2 cursor-pointer">
+                    <Upload className="h-6 w-6" />
+                    <span className="text-sm font-medium">Uploader des fichiers</span>
+                    <input type="file" multiple className="hidden" onChange={(e) => handleUpload(e.target.files)} />
+                  </label>
+                </div>
+                <button
+                  className="border rounded-md p-4 flex flex-col items-center justify-center gap-2 hover-scale"
+                  onClick={() => createFolder()}
+                >
+                  <FolderPlus className="h-6 w-6" />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
+                </button>
+
+                {/* Liste dossiers/fichiers */}
+                {entries.map((e) => {
+                  const isFile = e.name.includes(".");
+                  if (e.name.endsWith("/")) return null;
+                  return (
                     <div
                       key={e.name}
-                      className="flex items-center justify-between border rounded-md p-2 bg-background"
-                      draggable={e.name.includes(".")}
-                      onDragStart={(evt) => e.name.includes(".") && onDragStartFile(evt, e.name)}
+                      className="group relative border rounded-md p-3 flex items-center justify-between bg-background hover:shadow-sm transition"
+                      draggable={isFile}
+                      onDragStart={(evt) => isFile && onDragStartFile(evt, e.name)}
                     >
-                      {e.name.includes(".") ? (
-                        <div className="flex items-center gap-2">
-                          <FileIcon className="h-4 w-4" />
-                          <span className="text-sm">{e.name}</span>
+                      {isFile ? (
+                        <div className="flex items-center gap-3 min-w-0">
+                          <FileIcon className="h-5 w-5" />
+                          <button className="truncate text-left" onClick={() => preview(e.name)}>
+                            <span className="text-sm font-medium truncate block">{e.name}</span>
+                          </button>
                         </div>
                       ) : (
                         <button
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-3 min-w-0"
                           onClick={() => goInto(e.name)}
                           onDragOver={(evt) => evt.preventDefault()}
                           onDrop={(evt) => onDropOnFolder(evt, e.name)}
                         >
-                          <Folder className="h-4 w-4" />
-                          <span className="text-sm font-medium">{e.name}</span>
+                          <Folder className="h-5 w-5" />
+                          <span className="text-sm font-medium truncate">{e.name}</span>
                         </button>
                       )}
 
-                      {e.name.includes(".") ? (
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => preview(e.name)} aria-label="Aperçu">
-                            <Eye className="h-4 w-4" />
+                      {/* Menu actions */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label="Actions">
+                            <MoreVertical className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => download(e.name)} aria-label="Télécharger">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openShare(e.name)} aria-label="Partager">
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => removeFile(e.name)} aria-label="Supprimer">
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : null}
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {isFile ? (
+                            <>
+                              <DropdownMenuItem onClick={() => preview(e.name)}>
+                                <Eye className="h-4 w-4 mr-2" /> Aperçu
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => download(e.name)}>
+                                <Download className="h-4 w-4 mr-2" /> Télécharger
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openShare(e.name)}>
+                                <Share2 className="h-4 w-4 mr-2" /> Partager
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => renameFile(e.name)}>
+                                <Pencil className="h-4 w-4 mr-2" /> Renommer
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => removeFile(e.name)} className="text-destructive">
+                                <Trash className="h-4 w-4 mr-2" /> Supprimer
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onClick={() => renameFolder(e.name)}>
+                                <Pencil className="h-4 w-4 mr-2" /> Renommer le dossier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => deleteFolder(e.name)} className="text-destructive">
+                                <Trash className="h-4 w-4 mr-2" /> Supprimer le dossier
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  )
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
