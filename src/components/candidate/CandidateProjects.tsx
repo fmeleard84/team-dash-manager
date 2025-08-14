@@ -880,10 +880,6 @@ const formatCurrency = (n?: number | null) => {
                   <p className="text-muted-foreground">{formatDate(selectedProject.due_date || '')}</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-2">Budget global</h4>
-                  <p className="text-muted-foreground">{formatCurrency(selectedProject.client_budget)}</p>
-                </div>
-                <div>
                   <h4 className="font-semibold mb-2">Poste</h4>
                   <Badge variant="secondary">{selectedProject.resourceProfile}</Badge>
                 </div>
