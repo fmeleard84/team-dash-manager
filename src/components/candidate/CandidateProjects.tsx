@@ -238,6 +238,58 @@ const handleViewDetails = async (notification: ProjectNotification) => {
   }
 };
 
+const handleViewAcceptedProject = async (booking: any, projectData: any) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('project-details', {
+      body: {
+        action: 'get_candidate_project_details',
+        projectId: booking.project_id,
+        resourceAssignmentId: booking.resource_assignment_id,
+      },
+      headers: {
+        'x-keycloak-email': user?.profile?.email || '',
+      },
+    });
+    
+    if (error) throw error;
+    
+    if (data?.success && data?.project) {
+      const p = data.project;
+      setSelectedProject({
+        id: p.id,
+        title: p.title,
+        description: p.description || '',
+        project_date: p.project_date,
+        due_date: p.due_date ?? null,
+        client_budget: p.client_budget ?? null,
+        resourceProfile: p.resourceProfile || booking.hr_resource_assignments?.hr_profiles?.name,
+        expertises: p.expertises || projectData.expertises || [],
+        languages: p.languages || projectData.languages || [],
+        seniority: p.seniority || projectData.seniority || null,
+        files: p.files || []
+      });
+    } else {
+      // fallback to enriched data
+      setSelectedProject({
+        id: booking.project_id,
+        title: booking.projects?.title || '',
+        description: booking.projects?.description || '',
+        project_date: booking.projects?.project_date || '',
+        due_date: booking.projects?.due_date || null,
+        client_budget: booking.projects?.client_budget || null,
+        resourceProfile: booking.hr_resource_assignments?.hr_profiles?.name || '',
+        expertises: projectData.expertises || [],
+        languages: projectData.languages || [],
+        seniority: projectData.seniority || null,
+        files: projectData.files || []
+      });
+    }
+  } catch (e) {
+    console.error('Erreur chargement détails projet:', e);
+    toast.error("Impossible de charger les détails du projet");
+  }
+};
+
   const handleAcceptMission = async (notification: ProjectNotification) => {
     try {
       const { data, error } = await supabase.functions.invoke('resource-booking', {
@@ -397,10 +449,16 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
       return;
     }
 
-    if (data?.projectsData) {
+    if (data?.success && data?.projectsData) {
       const projectsMap: { [key: string]: any } = {};
       data.projectsData.forEach((project: any) => {
-        projectsMap[project.id] = project;
+        projectsMap[project.id] = {
+          ...project,
+          expertises: project.expertises || [],
+          languages: project.languages || [],
+          seniority: project.seniority || '',
+          files: project.files || []
+        };
       });
       setProjectsData(projectsMap);
     }
@@ -638,10 +696,21 @@ const formatCurrency = (n?: number | null) => {
                           variant="default"
                           size="sm"
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                          onClick={() => {
+                          onClick={async () => {
                             const title = booking.projects?.title || 'Projet';
-                            const { openNextcloud } = require('@/lib/auth');
-                            openNextcloud('project', title);
+                            try {
+                              const { data } = await supabase.functions.invoke('project-details', {
+                                body: { 
+                                  action: 'get_candidate_nextcloud_links',
+                                  projectId: booking.project_id 
+                                }
+                              });
+                              if (data?.success && data?.url) {
+                                window.open(data.url, '_blank');
+                              }
+                            } catch (error) {
+                              console.error('Error opening Nextcloud:', error);
+                            }
                           }}
                         >
                           <ExternalLink className="w-4 h-4 mr-2" />
@@ -662,18 +731,41 @@ const formatCurrency = (n?: number | null) => {
               </div>
             ) : (
               <div className="grid gap-4">
-                {acceptedProjects.map((booking) => (
+                {acceptedProjects.map((booking) => {
+                  const projectData = projectsData[booking.project_id] || {};
+                  return (
                   <Card key={booking.id} className="hover:shadow-md transition-shadow">
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
-                        <Badge variant="secondary">En attente</Badge>
+                        <CardTitle className="text-xl font-bold">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
+                        <Badge variant="default" className="bg-orange-500 hover:bg-orange-600 text-white">
+                          {formatCurrency(booking.projects?.client_budget)}
+                        </Badge>
                       </div>
                     </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground line-clamp-3">
               {booking.projects?.description || 'Aucune description disponible'}
             </p>
+            
+            {/* Skills and seniority on same line */}
+            <div className="flex flex-wrap gap-2">
+              {projectData.expertises?.map((expertise: string, idx: number) => (
+                <Badge key={idx} variant="outline" className="text-xs">
+                  {expertise}
+                </Badge>
+              ))}
+              {projectData.languages?.map((language: string, idx: number) => (
+                <Badge key={idx} variant="outline" className="text-xs bg-blue-50">
+                  {language}
+                </Badge>
+              ))}
+              {projectData.seniority && (
+                <Badge variant="secondary" className="text-xs">
+                  {projectData.seniority}
+                </Badge>
+              )}
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="flex items-center gap-2">
@@ -699,14 +791,21 @@ const formatCurrency = (n?: number | null) => {
             </div>
 
             <div className="pt-2">
-              <p className="text-sm text-muted-foreground text-center">
-                En attente de démarrage par le client
-              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => handleViewAcceptedProject(booking, projectData)}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Voir le détail
+              </Button>
             </div>
 
           </CardContent>
-                  </Card>
-                ))}
+        </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -755,10 +854,17 @@ const formatCurrency = (n?: number | null) => {
       <Dialog open={!!selectedProject} onOpenChange={() => setSelectedProject(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedProject?.title}</DialogTitle>
-            <DialogDescription>
-              {selectedProject?.description || '—'}
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-2xl font-bold">{selectedProject?.title}</DialogTitle>
+              <Badge variant="default" className="bg-orange-500 hover:bg-orange-600 text-white">
+                {formatCurrency(selectedProject?.client_budget)}
+              </Badge>
+            </div>
+            {selectedProject?.description && (
+              <DialogDescription className="text-base">
+                {selectedProject.description}
+              </DialogDescription>
+            )}
           </DialogHeader>
           
           {selectedProject && (
@@ -783,41 +889,26 @@ const formatCurrency = (n?: number | null) => {
                 </div>
               </div>
 
-              {/* Skills, languages and seniority */}
+              {/* Skills, languages and seniority on same line */}
               {(selectedProject.expertises?.length || selectedProject.languages?.length || selectedProject.seniority) && (
-                <div className="space-y-3">
-                  {selectedProject.expertises?.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Compétences attendues</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedProject.expertises.map((expertise, idx) => (
-                          <Badge key={idx} variant="outline">
-                            {expertise}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {selectedProject.languages?.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Langues attendues</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedProject.languages.map((language, idx) => (
-                          <Badge key={idx} variant="outline">
-                            {language}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {selectedProject.seniority && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Niveau de séniorité</h4>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProject.expertises?.map((expertise, idx) => (
+                      <Badge key={idx} variant="outline">
+                        {expertise}
+                      </Badge>
+                    ))}
+                    {selectedProject.languages?.map((language, idx) => (
+                      <Badge key={idx} variant="outline" className="bg-blue-50">
+                        {language}
+                      </Badge>
+                    ))}
+                    {selectedProject.seniority && (
                       <Badge variant="secondary">
                         {selectedProject.seniority}
                       </Badge>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -839,13 +930,29 @@ const formatCurrency = (n?: number | null) => {
                             </p>
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(file.url, '_blank')}
-                        >
-                          Télécharger
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(file.url, '_blank')}
+                          >
+                            Voir
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = file.url;
+                              link.download = file.name;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                          >
+                            Télécharger
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

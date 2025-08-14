@@ -83,7 +83,7 @@ async function getProjectFiles(supabase: any, projectId: string) {
   const { data, error } = await supabase
     .storage
     .from('project-files')
-    .list(`${projectId}/`, {
+    .list(`project/${projectId}/`, {
       limit: 100
     });
   if (error) {
@@ -94,7 +94,7 @@ async function getProjectFiles(supabase: any, projectId: string) {
   return (data || []).filter(file => file.name !== '.emptyFolderPlaceholder').map(file => ({
     name: file.name,
     size: file.metadata?.size || 0,
-    url: supabase.storage.from('project-files').getPublicUrl(`${projectId}/${file.name}`).data.publicUrl
+    url: supabase.storage.from('project-files').getPublicUrl(`project/${projectId}/${file.name}`).data.publicUrl
   }));
 }
 
