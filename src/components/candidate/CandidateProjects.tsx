@@ -183,6 +183,14 @@ const CandidateProjects = () => {
       );
 
       setNotifications(enrichedNotifications);
+
+      // Fetch detailed project data for notifications
+      if (enrichedNotifications && enrichedNotifications.length > 0) {
+        const projectIds = enrichedNotifications.map(n => n.project_id).filter(Boolean);
+        if (projectIds.length > 0) {
+          await fetchProjectsDetails(projectIds);
+        }
+      }
     } catch (error) {
       console.error('Error:', error);
     } finally {
