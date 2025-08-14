@@ -449,7 +449,10 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
       body: { 
         action: 'get_candidate_projects_details',
         projectIds 
-      }
+      },
+      headers: {
+        'x-keycloak-email': user?.profile?.email || '',
+      },
     });
 
     if (error) {
