@@ -58,7 +58,7 @@ const CreateProjectModal = ({
           client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : null,
           due_date: dueDate.trim() !== "" ? dueDate : null,
           owner_id: user.id,
-          status: 'draft'
+          status: 'pause'
         })
         .select()
         .single();
