@@ -132,6 +132,7 @@ const CandidateProjects = () => {
   const fetchNotifications = async () => {
     try {
       // Fetch contextualized notifications with all necessary data
+      // Exclude projects that already have accepted bookings
       const { data, error } = await supabase
         .from('candidate_notifications')
         .select(`
@@ -157,6 +158,11 @@ const CandidateProjects = () => {
         `)
         .eq('candidate_id', currentCandidateId)
         .eq('status', 'unread')
+        .not('resource_assignment_id', 'in', `(
+          SELECT resource_assignment_id 
+          FROM project_bookings 
+          WHERE status = 'accepted'
+        )`)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -325,16 +331,16 @@ const handleViewAcceptedProject = async (booking: any, projectData: any) => {
 
   const handleRefuseMission = async (notification: ProjectNotification) => {
     try {
-      // Mark notification as read (refused)
+      // Mark notification as refused
       const { error } = await supabase
         .from('candidate_notifications')
-        .update({ status: 'read' })
+        .update({ status: 'refused' })
         .eq('id', notification.id);
 
       if (error) throw error;
 
       toast.success('Mission refusée');
-      // Refresh notifications
+      // Refresh notifications to remove the refused one
       await fetchNotifications();
       setSelectedProject(null);
     } catch (error) {
@@ -539,29 +545,29 @@ const formatCurrency = (n?: number | null) => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">
-                        {projectData?.title || notification.projects?.title || 'Projet sans titre'}
+                        {notification.projects?.title || notification.title || 'Projet sans titre'}
                       </CardTitle>
                       <Badge className="bg-blue-600 text-white">Nouveau</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground line-clamp-5">
-                      {(projectData?.description || notification.projects?.description || 'Aucune description disponible')?.split('\n').slice(0, 5).join('\n')}
+                      {(notification.projects?.description || notification.description || 'Aucune description disponible')?.split('\n').slice(0, 5).join('\n')}
                     </p>
                     
                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Début:</span>
-                        <span>{formatDate(projectData?.project_date || notification.projects?.project_date)}</span>
+                        <span>{formatDate(notification.projects?.project_date || '')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Fin:</span>
-                        <span>{formatDate(projectData?.due_date || notification.projects?.due_date || '')}</span>
+                        <span>{formatDate(notification.projects?.due_date || '')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Budget:</span>
                         <Badge variant="outline">
-                          {formatCurrency(projectData?.client_budget || notification.projects?.client_budget)}
+                          {formatCurrency(notification.projects?.client_budget)}
                         </Badge>
                       </div>
                     </div>
