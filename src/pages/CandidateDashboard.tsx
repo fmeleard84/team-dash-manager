@@ -36,6 +36,7 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { useCandidateProjects } from "@/hooks/useCandidateProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import CandidateMessages from "@/components/candidate/CandidateMessages";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
@@ -94,7 +95,21 @@ const CandidateDashboard = () => {
         return <CandidateKanbanView />;
         
       case 'messages':
-        return <MessageSystem />;
+        return candidateId ? (
+          <div className="space-y-6">
+            <MessageSystem />
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4">Notifications de missions</h3>
+              <CandidateMessages candidateId={candidateId} />
+            </div>
+          </div>
+        ) : (
+          <div className="p-6">
+            <p className="text-center text-muted-foreground">
+              Aucun profil candidat trouvé.
+            </p>
+          </div>
+        );
         
       case 'notes':
         return candidateId ? <CandidateNotes currentCandidateId={candidateId} /> : (
