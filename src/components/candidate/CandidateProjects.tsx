@@ -455,40 +455,34 @@ const formatCurrency = (n?: number | null) => {
             ) : (
               <div className="grid gap-4">
                 {notifications.map((notification) => (
-                  <Card key={notification.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{notification.title}</CardTitle>
-                        <Badge variant="default">Nouveau</Badge>
+                <Card key={notification.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{notification.projects.title}</CardTitle>
+                      <Badge className="bg-blue-600 text-white">Nouveau</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground line-clamp-5">
+                      {notification.projects.description?.split('\n').slice(0, 5).join('\n')}
+                    </p>
+                    
+                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Début:</span>
+                        <span>{formatDate(notification.projects.project_date)}</span>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        {notification.description}
-                      </p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Poste:</span>
-                          <Badge variant="secondary">
-                            {notification.hr_resource_assignments.hr_profiles.name}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Début:</span>
-                          <span className="text-sm">{formatDate(notification.projects.project_date)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Fin prévue:</span>
-                          <span className="text-sm">{formatDate(notification.projects.due_date || '')}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Budget:</span>
-                          <Badge variant="outline">
-                            {formatCurrency(notification.projects.client_budget)}
-                          </Badge>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Fin:</span>
+                        <span>{formatDate(notification.projects.due_date || '')}</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Budget:</span>
+                        <Badge variant="outline">
+                          {formatCurrency(notification.projects.client_budget)}
+                        </Badge>
+                      </div>
+                    </div>
 
                       {(notification.hr_resource_assignments.expertises?.length || notification.hr_resource_assignments.languages?.length) && (
                         <div className="space-y-2">
@@ -788,7 +782,7 @@ const formatCurrency = (n?: number | null) => {
                   <div className="space-y-3">
                     {notification.hr_resource_assignments.expertises?.length > 0 && (
                       <div>
-                        <h4 className="font-semibold mb-2">Compétences requises</h4>
+                        <h4 className="font-semibold mb-2">Compétences attendues</h4>
                         <div className="flex flex-wrap gap-2">
                           {notification.hr_resource_assignments.expertises.map((expertise, idx) => (
                             <Badge key={idx} variant="outline">
@@ -800,7 +794,7 @@ const formatCurrency = (n?: number | null) => {
                     )}
                     {notification.hr_resource_assignments.languages?.length > 0 && (
                       <div>
-                        <h4 className="font-semibold mb-2">Langues requises</h4>
+                        <h4 className="font-semibold mb-2">Langues attendues</h4>
                         <div className="flex flex-wrap gap-2">
                           {notification.hr_resource_assignments.languages.map((language, idx) => (
                             <Badge key={idx} variant="outline">
@@ -818,6 +812,14 @@ const formatCurrency = (n?: number | null) => {
                         </Badge>
                       </div>
                     )}
+
+                    {/* Add file uploads if any */}
+                    <div>
+                      <h4 className="font-semibold mb-2">Fichiers joints</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Aucun fichier joint pour le moment
+                      </p>
+                    </div>
 
                     {notification && (
                       <div className="flex gap-4 pt-4">
