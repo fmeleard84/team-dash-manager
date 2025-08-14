@@ -131,6 +131,7 @@ const CandidateProjects = () => {
 
   const fetchNotifications = async () => {
     try {
+      // Fetch contextualized notifications with all necessary data
       const { data, error } = await supabase
         .from('candidate_notifications')
         .select(`
@@ -140,7 +141,19 @@ const CandidateProjects = () => {
           title,
           description,
           status,
-          created_at
+          created_at,
+          profile_type,
+          required_seniority,
+          required_expertises,
+          required_languages,
+          calculated_price,
+          projects (
+            title,
+            description,
+            project_date,
+            due_date,
+            client_budget
+          )
         `)
         .eq('candidate_id', currentCandidateId)
         .eq('status', 'unread')
@@ -151,36 +164,20 @@ const CandidateProjects = () => {
         return;
       }
 
-      // Fetch additional project and resource data separately
-      const enrichedNotifications = await Promise.all(
-        (data || []).map(async (notification) => {
-          const [projectData, resourceData] = await Promise.all([
-            supabase
-              .from('projects')
-              .select('title, description, project_date, due_date, client_budget')
-              .eq('id', notification.project_id)
-              .maybeSingle(),
-            supabase
-              .from('hr_resource_assignments')
-              .select(`
-                hr_profiles (
-                  name
-                ),
-                expertises,
-                languages,
-                seniority
-              `)
-              .eq('id', notification.resource_assignment_id)
-              .maybeSingle()
-          ]);
-
-          return {
-            ...notification,
-            projects: projectData.data || { title: '', description: '', project_date: '', due_date: null, client_budget: null },
-            hr_resource_assignments: resourceData.data || { hr_profiles: { name: '' }, expertises: [], languages: [], seniority: null }
-          };
-        })
-      );
+      // Transform notifications to use contextualized data
+      const enrichedNotifications = (data || []).map((notification) => ({
+        ...notification,
+        // Use contextualized resource assignment data specific to this candidate
+        hr_resource_assignments: {
+          hr_profiles: {
+            name: notification.profile_type || ''
+          },
+          expertises: notification.required_expertises || [],
+          languages: notification.required_languages || [],
+          seniority: notification.required_seniority,
+          calculated_price: notification.calculated_price
+        }
+      }));
 
       setNotifications(enrichedNotifications);
 
