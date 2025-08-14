@@ -565,19 +565,19 @@ const formatCurrency = (n?: number | null) => {
                       {(notification.projects?.description || notification.description || 'Aucune description disponible')?.split('\n').slice(0, 5).join('\n')}
                     </p>
                     
-                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Début:</span>
-                        <span>{formatDate(notification.projects?.project_date || '')}</span>
+                        <span>{notification.projects?.project_date ? formatDate(notification.projects.project_date) : '—'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Fin:</span>
-                        <span>{formatDate(notification.projects?.due_date || '')}</span>
+                        <span>{notification.projects?.due_date ? formatDate(notification.projects.due_date) : '—'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Budget:</span>
                         <Badge variant="outline">
-                          {formatCurrency(notification.projects?.client_budget)}
+                          {notification.projects?.client_budget ? formatCurrency(notification.projects.client_budget) : '—'}
                         </Badge>
                       </div>
                     </div>
