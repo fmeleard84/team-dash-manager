@@ -161,7 +161,7 @@ const CandidateProjects = () => {
           required_expertises,
           required_languages,
           calculated_price,
-          projects (
+          projects!inner (
             title,
             description,
             project_date,
@@ -369,7 +369,7 @@ const fetchAcceptedProjects = async () => {
         created_at,
         project_id,
         resource_assignment_id,
-        projects (
+        projects!inner (
           id,
           title,
           description,
@@ -378,8 +378,8 @@ const fetchAcceptedProjects = async () => {
           client_budget,
           status
         ),
-        hr_resource_assignments (
-          hr_profiles (
+        hr_resource_assignments!inner (
+          hr_profiles!inner (
             name
           )
         )
@@ -606,14 +606,6 @@ const formatCurrency = (n?: number | null) => {
                                   </Badge>
                                 ))}
                               </div>
-                            </div>
-                          )}
-                          {notification.hr_resource_assignments.seniority && (
-                            <div>
-                              <span className="text-sm font-medium">Séniorité:</span>
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                {notification.hr_resource_assignments.seniority}
-                              </Badge>
                             </div>
                           )}
                         </div>
