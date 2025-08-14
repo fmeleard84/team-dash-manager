@@ -524,32 +524,36 @@ const formatCurrency = (n?: number | null) => {
               </div>
             ) : (
               <div className="grid gap-4">
-                {notifications.map((notification) => (
+                 {notifications.map((notification) => {
+                   const projectData = projectsData[notification.project_id];
+                   return (
                 <Card key={notification.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{notification.projects.title}</CardTitle>
+                      <CardTitle className="text-lg">
+                        {projectData?.title || notification.projects?.title || 'Projet sans titre'}
+                      </CardTitle>
                       <Badge className="bg-blue-600 text-white">Nouveau</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground line-clamp-5">
-                      {notification.projects.description?.split('\n').slice(0, 5).join('\n')}
+                      {(projectData?.description || notification.projects?.description || 'Aucune description disponible')?.split('\n').slice(0, 5).join('\n')}
                     </p>
                     
                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Début:</span>
-                        <span>{formatDate(notification.projects.project_date)}</span>
+                        <span>{formatDate(projectData?.project_date || notification.projects?.project_date)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Fin:</span>
-                        <span>{formatDate(notification.projects.due_date || '')}</span>
+                        <span>{formatDate(projectData?.due_date || notification.projects?.due_date || '')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Budget:</span>
                         <Badge variant="outline">
-                          {formatCurrency(notification.projects.client_budget)}
+                          {formatCurrency(projectData?.client_budget || notification.projects?.client_budget)}
                         </Badge>
                       </div>
                     </div>
@@ -612,8 +616,9 @@ const formatCurrency = (n?: number | null) => {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
+                   );
+                 })}
+               </div>
             )}
           </TabsContent>
 
