@@ -43,6 +43,10 @@ interface ProjectDetail {
   due_date?: string | null;
   client_budget?: number | null;
   resourceProfile: string;
+  expertises?: string[];
+  languages?: string[];
+  seniority?: string | null;
+  files?: { name: string; size: number; url: string }[];
 }
 
 const CandidateProjects = () => {
@@ -209,6 +213,10 @@ const handleViewDetails = async (notification: ProjectNotification) => {
         due_date: p.due_date ?? null,
         client_budget: p.client_budget ?? null,
         resourceProfile: p.resourceProfile || notification.hr_resource_assignments.hr_profiles.name,
+        expertises: p.expertises || notification.hr_resource_assignments.expertises || [],
+        languages: p.languages || notification.hr_resource_assignments.languages || [],
+        seniority: p.seniority || notification.hr_resource_assignments.seniority || null,
+        files: p.files || []
       });
     } else {
       // fallback to local enrichment
@@ -218,6 +226,10 @@ const handleViewDetails = async (notification: ProjectNotification) => {
         description: notification.projects.description,
         project_date: notification.projects.project_date,
         resourceProfile: notification.hr_resource_assignments.hr_profiles.name,
+        expertises: notification.hr_resource_assignments.expertises || [],
+        languages: notification.hr_resource_assignments.languages || [],
+        seniority: notification.hr_resource_assignments.seniority || null,
+        files: []
       });
     }
   } catch (e) {
@@ -745,16 +757,12 @@ const formatCurrency = (n?: number | null) => {
           <DialogHeader>
             <DialogTitle>{selectedProject?.title}</DialogTitle>
             <DialogDescription>
-              Détails complets du projet et informations sur la mission
+              {selectedProject?.description || '—'}
             </DialogDescription>
           </DialogHeader>
           
           {selectedProject && (
             <div className="space-y-6">
-              <div>
-                <h4 className="font-semibold mb-2">Description du projet</h4>
-                <p className="text-muted-foreground">{selectedProject.description || '—'}</p>
-              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -775,71 +783,98 @@ const formatCurrency = (n?: number | null) => {
                 </div>
               </div>
 
-              {/* Additional project details if available */}
+              {/* Skills, languages and seniority */}
+              {(selectedProject.expertises?.length || selectedProject.languages?.length || selectedProject.seniority) && (
+                <div className="space-y-3">
+                  {selectedProject.expertises?.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Compétences attendues</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedProject.expertises.map((expertise, idx) => (
+                          <Badge key={idx} variant="outline">
+                            {expertise}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedProject.languages?.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Langues attendues</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedProject.languages.map((language, idx) => (
+                          <Badge key={idx} variant="outline">
+                            {language}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedProject.seniority && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Niveau de séniorité</h4>
+                      <Badge variant="secondary">
+                        {selectedProject.seniority}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Project files */}
+              <div>
+                <h4 className="font-semibold mb-2">Fichiers joints</h4>
+                {selectedProject.files?.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedProject.files.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                            📄
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(file.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(file.url, '_blank')}
+                        >
+                          Télécharger
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Aucun fichier joint pour le moment
+                  </p>
+                )}
+              </div>
+
               {(() => {
                 const notification = notifications.find(n => n.project_id === selectedProject.id);
-                return notification && notification.hr_resource_assignments && (
-                  <div className="space-y-3">
-                    {notification.hr_resource_assignments.expertises?.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold mb-2">Compétences attendues</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {notification.hr_resource_assignments.expertises.map((expertise, idx) => (
-                            <Badge key={idx} variant="outline">
-                              {expertise}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {notification.hr_resource_assignments.languages?.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold mb-2">Langues attendues</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {notification.hr_resource_assignments.languages.map((language, idx) => (
-                            <Badge key={idx} variant="outline">
-                              {language}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {notification.hr_resource_assignments.seniority && (
-                      <div>
-                        <h4 className="font-semibold mb-2">Niveau de séniorité</h4>
-                        <Badge variant="secondary">
-                          {notification.hr_resource_assignments.seniority}
-                        </Badge>
-                      </div>
-                    )}
-
-                    {/* Add file uploads if any */}
-                    <div>
-                      <h4 className="font-semibold mb-2">Fichiers joints</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Aucun fichier joint pour le moment
-                      </p>
-                    </div>
-
-                    {notification && (
-                      <div className="flex gap-4 pt-4">
-                        <Button 
-                          onClick={() => handleAcceptMission(notification)}
-                          className="flex-1"
-                        >
-                          <Check className="w-4 h-4 mr-2" />
-                          Accepter la mission
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => handleRefuseMission(notification)}
-                          className="flex-1"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Refuser
-                        </Button>
-                      </div>
-                    )}
+                return notification && (
+                  <div className="flex gap-4 pt-4">
+                    <Button 
+                      onClick={() => handleAcceptMission(notification)}
+                      className="flex-1"
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Accepter la mission
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleRefuseMission(notification)}
+                      className="flex-1"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Refuser
+                    </Button>
                   </div>
                 );
               })()}

@@ -62,6 +62,42 @@ async function getProjectDetails(supabase: any, projectId: string) {
   return data;
 }
 
+async function getResourceAssignmentDetails(supabase: any, resourceAssignmentId: string) {
+  const { data, error } = await supabase
+    .from("hr_resource_assignments")
+    .select(`
+      hr_profiles (
+        name
+      ),
+      expertises,
+      languages,
+      seniority
+    `)
+    .eq("id", resourceAssignmentId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function getProjectFiles(supabase: any, projectId: string) {
+  const { data, error } = await supabase
+    .storage
+    .from('project-files')
+    .list(`${projectId}/`, {
+      limit: 100
+    });
+  if (error) {
+    console.error('Error fetching project files:', error);
+    return [];
+  }
+  
+  return (data || []).filter(file => file.name !== '.emptyFolderPlaceholder').map(file => ({
+    name: file.name,
+    size: file.metadata?.size || 0,
+    url: supabase.storage.from('project-files').getPublicUrl(`${projectId}/${file.name}`).data.publicUrl
+  }));
+}
+
 async function getResourceProfileName(supabase: any, resourceAssignmentId?: string) {
   if (!resourceAssignmentId) return null;
   const { data, error } = await supabase
@@ -164,10 +200,29 @@ Deno.serve(async (req) => {
         });
       }
 
-      const resourceProfile = await getResourceProfileName(supabase, resourceAssignmentId);
+      // Get resource assignment details
+      let resourceAssignmentDetails = null;
+      if (resourceAssignmentId) {
+        resourceAssignmentDetails = await getResourceAssignmentDetails(supabase, resourceAssignmentId);
+      }
+
+      // Get project files
+      const projectFiles = await getProjectFiles(supabase, projectId);
+
+      const resourceProfile = resourceAssignmentDetails?.hr_profiles?.name || await getResourceProfileName(supabase, resourceAssignmentId);
 
       return new Response(
-        JSON.stringify({ success: true, project: { ...project, resourceProfile } }),
+        JSON.stringify({ 
+          success: true, 
+          project: { 
+            ...project, 
+            resourceProfile,
+            expertises: resourceAssignmentDetails?.expertises || [],
+            languages: resourceAssignmentDetails?.languages || [],
+            seniority: resourceAssignmentDetails?.seniority || null,
+            files: projectFiles
+          } 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
