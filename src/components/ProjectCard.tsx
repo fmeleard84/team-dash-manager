@@ -1,13 +1,20 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2 } from "lucide-react";
+import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, Edit } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { buildFunctionHeaders } from "@/lib/functionAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import EditProjectModal from "@/components/EditProjectModal";
 
 interface Project {
   id: string;
@@ -35,13 +42,14 @@ interface ProjectCardProps {
   onDelete: (id: string) => void;
   onView: (id: string) => void;
   onStart?: (project: { id: string; title: string }) => void;
+  onEdit?: () => void;
 }
 
 interface PlankaProject {
   planka_url: string;
 }
 
-export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart }: ProjectCardProps) {
+export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart, onEdit }: ProjectCardProps) {
   const { user } = useAuth();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -49,6 +57,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
   const [isBookingTeam, setIsBookingTeam] = useState(false);
   const [showKickoff, setShowKickoff] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR');
@@ -182,9 +191,31 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-foreground">{project.title}</h3>
-            <Badge variant={project.status === 'play' ? 'default' : 'secondary'}>
-              {project.status === 'play' ? 'En cours' : 'En pause'}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant={project.status === 'play' ? 'default' : 'secondary'}>
+                {project.status === 'play' ? 'En cours' : 'En pause'}
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowEditModal(true)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Éditer
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => onDelete(project.id)}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           {project.description && (
             <p className="text-sm text-muted-foreground mt-2">{project.description}</p>
@@ -251,37 +282,33 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               Éditer l'équipe
             </Button>
 
-            {/* Play/Pause */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleStatusToggle}
-              className="flex-1"
-              disabled={(project.status === 'pause' && !allResourcesBooked) || isSyncing}
-            >
-              {isSyncing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Mise en place...
-                </>
-              ) : project.status === 'play' ? (
-                <>
-                  <Pause className="w-4 h-4 mr-2" />
-                  Pause
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 mr-2" />
-                  Démarrer
-                </>
-              )}
-            </Button>
-
-
-            {/* Supprimer */}
-            <Button variant="destructive" size="sm" onClick={() => onDelete(project.id)}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {/* Play/Pause - Only show if there's at least one team member (beyond client) */}
+            {resourceAssignments.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStatusToggle}
+                className="flex-1"
+                disabled={(project.status === 'pause' && !allResourcesBooked) || isSyncing}
+              >
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Mise en place...
+                  </>
+                ) : project.status === 'play' ? (
+                  <>
+                    <Pause className="w-4 h-4 mr-2" />
+                    Pause
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Démarrer
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           {/* Booking Team button - only show when resources exist but not all are booked */}
@@ -322,6 +349,20 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         projectTitle={project.title}
         onClose={() => setShowKickoff(false)}
         onConfirm={(iso) => startProject(iso)}
+      />
+
+      <EditProjectModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onProjectUpdated={onEdit}
+        project={{
+          id: project.id,
+          title: project.title,
+          description: project.description,
+          project_date: project.date,
+          due_date: project.dueDate,
+          client_budget: project.clientBudget,
+        }}
       />
     </>
   );

@@ -205,6 +205,7 @@ const menuItems = [
                   onDelete={onDeleteProject}
                   onView={onViewProject}
                   onStart={onStartProject}
+                  onEdit={refreshProjects}
                 />
               ))}
             </div>
