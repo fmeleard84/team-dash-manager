@@ -112,33 +112,48 @@ export type Database = {
       }
       candidate_notifications: {
         Row: {
+          calculated_price: number | null
           candidate_id: string
           created_at: string
           description: string
           id: string
+          profile_type: string | null
           project_id: string
+          required_expertises: string[] | null
+          required_languages: string[] | null
+          required_seniority: string | null
           resource_assignment_id: string
           status: string
           title: string
           updated_at: string
         }
         Insert: {
+          calculated_price?: number | null
           candidate_id: string
           created_at?: string
           description: string
           id?: string
+          profile_type?: string | null
           project_id: string
+          required_expertises?: string[] | null
+          required_languages?: string[] | null
+          required_seniority?: string | null
           resource_assignment_id: string
           status?: string
           title: string
           updated_at?: string
         }
         Update: {
+          calculated_price?: number | null
           candidate_id?: string
           created_at?: string
           description?: string
           id?: string
+          profile_type?: string | null
           project_id?: string
+          required_expertises?: string[] | null
+          required_languages?: string[] | null
+          required_seniority?: string | null
           resource_assignment_id?: string
           status?: string
           title?: string
@@ -1285,6 +1300,13 @@ export type Database = {
       debug_jwt_claims: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      find_matching_candidates: {
+        Args: { assignment_id: string }
+        Returns: {
+          candidate_id: string
+          email: string
+        }[]
       }
     }
     Enums: {
