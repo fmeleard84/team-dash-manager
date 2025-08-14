@@ -46,7 +46,7 @@ interface ProjectDetail {
   expertises?: string[];
   languages?: string[];
   seniority?: string | null;
-  files?: { name: string; size: number; url: string }[];
+  files?: { name: string; size: number; url: string; downloadUrl?: string }[];
 }
 
 const CandidateProjects = () => {
@@ -939,8 +939,9 @@ const formatCurrency = (n?: number | null) => {
                             size="sm"
                             onClick={() => {
                               const link = document.createElement('a');
-                              link.href = file.url;
+                              link.href = file.downloadUrl || file.url;
                               link.download = file.name;
+                              link.target = '_blank';
                               document.body.appendChild(link);
                               link.click();
                               document.body.removeChild(link);

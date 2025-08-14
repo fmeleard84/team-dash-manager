@@ -94,7 +94,8 @@ async function getProjectFiles(supabase: any, projectId: string) {
   return (data || []).filter(file => file.name !== '.emptyFolderPlaceholder').map(file => ({
     name: file.name,
     size: file.metadata?.size || 0,
-    url: supabase.storage.from('project-files').getPublicUrl(`project/${projectId}/${file.name}`).data.publicUrl
+    url: supabase.storage.from('project-files').getPublicUrl(`project/${projectId}/${file.name}`).data.publicUrl,
+    downloadUrl: supabase.storage.from('project-files').getPublicUrl(`project/${projectId}/${file.name}`).data.publicUrl
   }));
 }
 
@@ -152,14 +153,37 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const projectsData: any[] = [];
-        
-        for (const projectId of projectIds) {
-          const projectDetails = await getProjectDetails(supabase, projectId);
-          if (projectDetails) {
-            projectsData.push(projectDetails);
-          }
-        }
+        const projectsData = await Promise.all(
+          projectIds.map(async (projectId: string) => {
+            const projectDetails = await getProjectDetails(supabase, projectId);
+            
+            // Get resource assignment details for this project
+            const { data: resourceAssignments } = await supabase
+              .from("hr_resource_assignments")
+              .select(`
+                id,
+                expertises,
+                languages,
+                seniority,
+                hr_profiles(name)
+              `)
+              .eq("project_id", projectId)
+              .limit(1);
+
+            const resourceAssignment = resourceAssignments?.[0];
+            const files = await getProjectFiles(supabase, projectId);
+            
+            return {
+              id: projectId,
+              ...projectDetails,
+              expertises: resourceAssignment?.expertises || [],
+              languages: resourceAssignment?.languages || [],
+              seniority: resourceAssignment?.seniority || '',
+              resourceProfile: resourceAssignment?.hr_profiles?.name || '',
+              files
+            };
+          })
+        );
 
         return new Response(
           JSON.stringify({ projectsData }),
