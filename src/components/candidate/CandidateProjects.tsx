@@ -131,6 +131,19 @@ const CandidateProjects = () => {
 
   const fetchNotifications = async () => {
     try {
+      // First, get the list of already booked resource assignments
+      const { data: bookedAssignments, error: bookedError } = await supabase
+        .from('project_bookings')
+        .select('resource_assignment_id')
+        .eq('status', 'accepted');
+
+      if (bookedError) {
+        console.error('Error fetching booked assignments:', bookedError);
+        return;
+      }
+
+      const bookedAssignmentIds = (bookedAssignments || []).map(b => b.resource_assignment_id);
+
       // Fetch contextualized notifications with all necessary data
       // Exclude projects that already have accepted bookings
       const { data, error } = await supabase
@@ -158,11 +171,6 @@ const CandidateProjects = () => {
         `)
         .eq('candidate_id', currentCandidateId)
         .eq('status', 'unread')
-        .not('resource_assignment_id', 'in', `(
-          SELECT resource_assignment_id 
-          FROM project_bookings 
-          WHERE status = 'accepted'
-        )`)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -170,8 +178,10 @@ const CandidateProjects = () => {
         return;
       }
 
-      // Transform notifications to use contextualized data
-      const enrichedNotifications = (data || []).map((notification) => ({
+      // Transform notifications to use contextualized data and filter out booked assignments
+      const enrichedNotifications = (data || [])
+        .filter(notification => !bookedAssignmentIds.includes(notification.resource_assignment_id))
+        .map((notification) => ({
         ...notification,
         // Use contextualized resource assignment data specific to this candidate
         hr_resource_assignments: {
