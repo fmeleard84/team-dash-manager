@@ -465,7 +465,6 @@ const formatDate = (dateString: string) => {
 
 const fetchProjectsDetails = async (projectIds: string[]) => {
   try {
-    console.log('Calling fetchProjectsDetails with:', projectIds);
     const { data, error } = await supabase.functions.invoke('project-details', {
       body: { 
         action: 'get_candidate_projects_details',
@@ -476,14 +475,12 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
       },
     });
 
-    console.log('fetchProjectsDetails response:', { data, error });
-
     if (error) {
       console.error('Error fetching projects details:', error);
       return;
     }
 
-    if (data?.success && data?.projectsData) {
+    if (data?.projectsData && Array.isArray(data.projectsData)) {
       const projectsMap: { [key: string]: any } = {};
       data.projectsData.forEach((project: any) => {
         projectsMap[project.id] = {
@@ -494,10 +491,7 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
           files: project.files || []
         };
       });
-      console.log('Setting projectsData:', projectsMap);
       setProjectsData(projectsMap);
-    } else {
-      console.log('No project data returned or success=false. Full response:', data);
     }
   } catch (error) {
     console.error('Error calling projects details function:', error);
@@ -563,11 +557,6 @@ const formatCurrency = (n?: number | null) => {
               <div className="grid gap-4">
                  {notifications.map((notification) => {
                    const projectData = projectsData[notification.project_id];
-                   console.log('Notification data for card:', {
-                     notification_projects: notification.projects,
-                     project_data: projectData,
-                     project_id: notification.project_id
-                   });
                    return (
                 <Card key={notification.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
