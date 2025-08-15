@@ -1473,6 +1473,14 @@ export type Database = {
           email: string
         }[]
       }
+      get_current_user_email: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      is_admin_user: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_event_attendee: {
         Args: { event_id_param: string; user_email: string }
         Returns: boolean
