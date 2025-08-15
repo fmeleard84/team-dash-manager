@@ -1297,6 +1297,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_user_delete_event: {
+        Args: {
+          event_created_by: string
+          event_id: string
+          event_project_id: string
+        }
+        Returns: boolean
+      }
       candidate_can_view_booking: {
         Args: { booking_candidate_id: string; candidate_email: string }
         Returns: boolean
