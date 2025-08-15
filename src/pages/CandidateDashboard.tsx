@@ -37,6 +37,7 @@ import { useCandidateProjects } from "@/hooks/useCandidateProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import CandidateMessages from "@/components/candidate/CandidateMessages";
+import CandidateEventNotifications from "@/components/candidate/CandidateEventNotifications";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
@@ -98,9 +99,14 @@ const CandidateDashboard = () => {
         return candidateId ? (
           <div className="space-y-6">
             <MessageSystem />
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-semibold mb-4">Notifications de missions</h3>
-              <CandidateMessages candidateId={candidateId} />
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Notifications de missions</h3>
+                <CandidateMessages candidateId={candidateId} />
+              </div>
+              <div>
+                <CandidateEventNotifications candidateId={candidateId} />
+              </div>
             </div>
           </div>
         ) : (
