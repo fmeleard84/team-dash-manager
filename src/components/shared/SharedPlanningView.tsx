@@ -103,9 +103,37 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     }
   };
 
+  // Load event attendees for editing
+  const loadEventAttendees = async (eventId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("project_event_attendees")
+        .select("email")
+        .eq("event_id", eventId);
+      
+      if (error) {
+        console.error("load event attendees error", error);
+        return "";
+      }
+      
+      const emails = (data || []).map(attendee => attendee.email).filter(Boolean);
+      return emails.join(", ");
+    } catch (err) {
+      console.error("Error loading event attendees:", err);
+      return "";
+    }
+  };
+
   useEffect(() => {
     loadTeamMembersForProject(projectId);
   }, [projectId]);
+
+  // Load team members when project changes in edit mode
+  useEffect(() => {
+    if (isEditDialogOpen && projectId) {
+      loadTeamMembersForProject(projectId);
+    }
+  }, [projectId, isEditDialogOpen]);
 
   const loadAllEvents = async () => {
     if (!projects.length) {
@@ -244,7 +272,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     setAttendeesEmails("");
   };
 
-  const handleEdit = (event: EventRow) => {
+  const handleEdit = async (event: EventRow) => {
     setEditingEvent(event);
     const eventDate = new Date(event.start_at);
     const eventEndDate = event.end_at ? new Date(event.end_at) : null;
@@ -260,7 +288,11 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     setDriveUrl(event.drive_url || "");
     
     // Load team members for the event's project immediately
-    loadTeamMembersForProject(event.project_id);
+    await loadTeamMembersForProject(event.project_id);
+    
+    // Load existing attendees
+    const existingAttendees = await loadEventAttendees(event.id);
+    setAttendeesEmails(existingAttendees);
     
     setIsEditDialogOpen(true);
   };
@@ -277,6 +309,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
       const endISO = endTime ? new Date(`${date}T${endTime}:00`).toISOString() : null;
       const finalVideoUrl = videoUrl || suggestedVideoUrl || null;
 
+      // Update the event
       const { error } = await supabase
         .from("project_events")
         .update({
@@ -295,6 +328,56 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
         console.error("update event error", error);
         toast({ title: "Erreur", description: "Modification de l'événement échouée" });
         return;
+      }
+
+      // Update attendees
+      if (attendeesEmails.trim()) {
+        // Delete existing attendees
+        await supabase
+          .from("project_event_attendees")
+          .delete()
+          .eq("event_id", editingEvent.id);
+
+        // Add new attendees
+        const emails = attendeesEmails
+          .split(/[,\n]/)
+          .map((e) => e.trim())
+          .filter(Boolean);
+        
+        if (emails.length) {
+          const rows = emails.map((email) => ({ event_id: editingEvent.id, email }));
+          const { error: attErr } = await supabase
+            .from("project_event_attendees")
+            .insert(rows);
+          if (attErr) console.error("attendees update error", attErr);
+          
+          // Send updated event invitations
+          try {
+            const projectTitle = projects.find(p => p.id === projectId)?.title || "Projet";
+            await supabase.functions.invoke('send-event-invitations', {
+              body: {
+                eventId: editingEvent.id,
+                eventTitle: title,
+                eventDate: `${date}T${startTime}:00`,
+                projectTitle,
+                attendeesEmails: emails,
+                organizerName: mode === 'client' ? 'Client' : 'Équipe',
+                videoUrl: finalVideoUrl,
+                location: location || undefined,
+                isUpdate: true
+              }
+            });
+            console.log('Event update invitations sent successfully');
+          } catch (emailError) {
+            console.error('Failed to send event update invitations:', emailError);
+          }
+        }
+      } else {
+        // If no attendees, delete all existing ones
+        await supabase
+          .from("project_event_attendees")
+          .delete()
+          .eq("event_id", editingEvent.id);
       }
 
       toast({ title: "Événement modifié" });
@@ -584,6 +667,32 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
             <div className="space-y-2">
               <label className="text-sm font-medium">Description (optionnel)</label>
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Détails supplémentaires" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Invités</label>
+              <Select
+                value={selectedTeamEmail}
+                onValueChange={(v) => {
+                  setSelectedTeamEmail(v);
+                  setAttendeesEmails((prev) => {
+                    const set = new Set(prev.split(/[\s,\n]+/).filter(Boolean));
+                    set.add(v);
+                    return Array.from(set).join(", ");
+                  });
+                }}
+                disabled={teamMembers.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={teamMembers.length ? "Ajouter depuis l'équipe" : "Aucune équipe"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMembers.map((m) => (
+                    <SelectItem key={m.email} value={m.email}>{m.name || m.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Textarea value={attendeesEmails} onChange={(e) => setAttendeesEmails(e.target.value)} placeholder="email1@ex.com, email2@ex.com" />
             </div>
 
             <Button onClick={handleUpdate} disabled={!projectId || loading} className="w-full">

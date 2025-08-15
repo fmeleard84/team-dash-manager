@@ -19,6 +19,7 @@ interface EventInvitationRequest {
   organizerName?: string;
   videoUrl?: string;
   location?: string;
+  isUpdate?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -37,10 +38,11 @@ const handler = async (req: Request): Promise<Response> => {
       attendeesEmails,
       organizerName = "L'équipe projet",
       videoUrl,
-      location
+      location,
+      isUpdate = false
     }: EventInvitationRequest = await req.json();
 
-    console.log(`Sending event invitations for event: ${eventId} to ${attendeesEmails.length} attendees`);
+    console.log(`Sending event ${isUpdate ? 'update' : 'invitations'} for event: ${eventId} to ${attendeesEmails.length} attendees`);
 
     // Format the event date and time
     const eventDateTime = new Date(eventDate);
@@ -60,7 +62,7 @@ const handler = async (req: Request): Promise<Response> => {
       const emailHtml = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h1 style="margin: 0; font-size: 24px; font-weight: 600;">📅 Invitation à un événement</h1>
+            <h1 style="margin: 0; font-size: 24px; font-weight: 600;">${isUpdate ? '📝 Événement modifié' : '📅 Invitation à un événement'}</h1>
           </div>
           
           <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
@@ -83,8 +85,10 @@ const handler = async (req: Request): Promise<Response> => {
             ` : ''}
 
             <p style="color: #6b7280; margin: 20px 0; line-height: 1.6;">
-              Vous êtes invité(e) à participer à cet événement dans le cadre du projet <strong>${projectTitle}</strong>. 
-              Votre participation est importante pour le succès du projet.
+              ${isUpdate 
+                ? `Les détails de cet événement ont été modifiés. Merci de mettre à jour votre calendrier pour le projet <strong>${projectTitle}</strong>.`
+                : `Vous êtes invité(e) à participer à cet événement dans le cadre du projet <strong>${projectTitle}</strong>. Votre participation est importante pour le succès du projet.`
+              }
             </p>
 
             <div style="background: #fef3c7; padding: 15px; border-radius: 6px; margin: 20px 0;">
@@ -105,7 +109,7 @@ const handler = async (req: Request): Promise<Response> => {
       return resend.emails.send({
         from: "Équipe Projet <noreply@resend.dev>",
         to: [email],
-        subject: `📅 Invitation: ${eventTitle} - ${projectTitle}`,
+        subject: `${isUpdate ? '📝 Modifié' : '📅 Invitation'}: ${eventTitle} - ${projectTitle}`,
         html: emailHtml,
       });
     });
@@ -129,7 +133,7 @@ const handler = async (req: Request): Promise<Response> => {
       success: true,
       emailsSent: successful,
       emailsFailed: failed,
-      message: `Invitations envoyées avec succès à ${successful} participants`
+      message: `${isUpdate ? 'Notifications de modification' : 'Invitations'} envoyées avec succès à ${successful} participants`
     }), {
       status: 200,
       headers: {
