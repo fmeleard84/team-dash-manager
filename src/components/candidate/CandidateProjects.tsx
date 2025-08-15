@@ -570,11 +570,11 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
             <TabsTrigger value="nouvelles">
               Nouvelles demandes ({notifications.length})
             </TabsTrigger>
-            <TabsTrigger value="actifs">
-              Projets en cours ({activeProjects.length})
-            </TabsTrigger>
             <TabsTrigger value="acceptes">
               Projets acceptés ({acceptedProjects.length})
+            </TabsTrigger>
+            <TabsTrigger value="actifs">
+              Projets en cours ({activeProjects.length})
             </TabsTrigger>
             <TabsTrigger value="termines">
               Projets terminés ({completedProjects.length})
