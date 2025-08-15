@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Notification, NotificationType } from "@/types/notifications";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useKanbanNotifications } from "@/hooks/useKanbanNotifications";
 import { generateGoogleCalendarUrl } from "@/utils/googleCalendar";
 
 
@@ -82,11 +83,22 @@ const formatTimeAgo = (dateString: string) => {
 export const NotificationCenter = () => {
   const navigate = useNavigate();
   const { notifications, loading, markAsRead, markAllAsRead, archiveNotification, acceptEvent, declineEvent } = useNotifications();
+  const {
+    notifications: kanbanNotifications,
+    loading: kanbanLoading,
+    markAsRead: markKanbanAsRead,
+    markAllAsRead: markAllKanbanAsRead,
+    archiveNotification: archiveKanbanNotification
+  } = useKanbanNotifications();
   const [activeTab, setActiveTab] = useState('all');
   
-  const unreadCount = notifications.filter(n => n.status === 'unread').length;
+  // Combine all notifications
+  const allNotifications = [...notifications, ...kanbanNotifications]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
-  const filteredNotifications = notifications.filter(notification => {
+  const unreadCount = allNotifications.filter(n => n.status === 'unread').length;
+  
+  const filteredNotifications = allNotifications.filter(notification => {
     switch (activeTab) {
       case 'unread':
         return notification.status === 'unread';
@@ -96,6 +108,8 @@ export const NotificationCenter = () => {
         return notification.type === 'message_received';
       case 'events':
         return notification.type === 'event_invitation';
+      case 'kanban':
+        return notification.type?.startsWith('kanban_');
       default:
         return true;
     }
@@ -132,7 +146,10 @@ export const NotificationCenter = () => {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={markAllAsRead}
+                    onClick={() => {
+                      markAllAsRead();
+                      markAllKanbanAsRead();
+                    }}
                     className="text-xs"
                   >
                     Tout marquer lu
@@ -149,15 +166,18 @@ export const NotificationCenter = () => {
           
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 rounded-none border-b">
+              <TabsList className="grid w-full grid-cols-5 rounded-none border-b">
                 <TabsTrigger value="all" className="text-xs">
-                  Toutes ({notifications.length})
+                  Toutes ({allNotifications.length})
                 </TabsTrigger>
                 <TabsTrigger value="unread" className="text-xs">
                   Non lues ({unreadCount})
                 </TabsTrigger>
                 <TabsTrigger value="events" className="text-xs">
                   Événements
+                </TabsTrigger>
+                <TabsTrigger value="kanban" className="text-xs">
+                  Kanban
                 </TabsTrigger>
                 <TabsTrigger value="messages" className="text-xs">
                   Messages
@@ -180,7 +200,15 @@ export const NotificationCenter = () => {
                               ? 'bg-accent/20 border-l-primary' 
                               : 'border-l-transparent'
                           }`}
-                          onClick={() => notification.status === 'unread' && markAsRead(notification.id)}
+                          onClick={() => {
+                            if (notification.status === 'unread') {
+                              if (notification.type?.startsWith('kanban_')) {
+                                markKanbanAsRead(notification.id);
+                              } else {
+                                markAsRead(notification.id);
+                              }
+                            }
+                          }}
                         >
                           <div className="flex items-start gap-3">
                             <div className={`w-2 h-2 rounded-full mt-2 ${getPriorityColor(notification.priority)}`} />
@@ -261,59 +289,85 @@ export const NotificationCenter = () => {
                                     </>
                                   ) : (
                                     <>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          markAsRead(notification.id);
-                                        }}
-                                        className="h-6 px-2 text-xs"
-                                      >
-                                        <Check className="w-3 h-3 mr-1" />
-                                        Marquer lu
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          archiveNotification(notification.id);
-                                        }}
-                                        className="h-6 px-2 text-xs"
-                                      >
-                                        <Archive className="w-3 h-3 mr-1" />
-                                        Archiver
-                                      </Button>
+                                       <Button 
+                                         variant="ghost" 
+                                         size="sm"
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           if (notification.type?.startsWith('kanban_')) {
+                                             markKanbanAsRead(notification.id);
+                                           } else {
+                                             markAsRead(notification.id);
+                                           }
+                                         }}
+                                         className="h-6 px-2 text-xs"
+                                       >
+                                         <Check className="w-3 h-3 mr-1" />
+                                         Marquer lu
+                                       </Button>
+                                       <Button 
+                                         variant="ghost" 
+                                         size="sm"
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           if (notification.type?.startsWith('kanban_')) {
+                                             archiveKanbanNotification(notification.id);
+                                           } else {
+                                             archiveNotification(notification.id);
+                                           }
+                                         }}
+                                         className="h-6 px-2 text-xs"
+                                       >
+                                         <Archive className="w-3 h-3 mr-1" />
+                                         Archiver
+                                       </Button>
                                     </>
                                   )}
                                 </div>
                               )}
                               
-                              {notification.type === 'event_invitation' && notification.metadata?.eventDate && (
-                                <div className="flex items-center gap-1 mt-2">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const eventData = {
-                                        title: notification.title,
-                                        description: notification.message,
-                                        start_at: notification.metadata.eventDate,
-                                        end_at: null,
-                                        location: notification.metadata.location,
-                                        video_url: notification.metadata.videoUrl
-                                      };
-                                      window.open(generateGoogleCalendarUrl(eventData), '_blank');
-                                    }}
-                                    className="h-6 px-2 text-xs"
-                                  >
-                                    <ExternalLink className="w-3 h-3 mr-1" />
-                                    Google Calendar
-                                  </Button>
-                                </div>
-                              )}
+                               {notification.type === 'event_invitation' && notification.metadata?.eventDate && (
+                                 <div className="flex items-center gap-1 mt-2">
+                                   <Button 
+                                     variant="ghost" 
+                                     size="sm"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       const eventData = {
+                                         title: notification.title,
+                                         description: notification.message,
+                                         start_at: notification.metadata.eventDate,
+                                         end_at: null,
+                                         location: notification.metadata.location,
+                                         video_url: notification.metadata.videoUrl
+                                       };
+                                       window.open(generateGoogleCalendarUrl(eventData), '_blank');
+                                     }}
+                                     className="h-6 px-2 text-xs"
+                                   >
+                                     <ExternalLink className="w-3 h-3 mr-1" />
+                                     Google Calendar
+                                   </Button>
+                                 </div>
+                               )}
+
+                               {/* Kanban specific actions */}
+                               {notification.type?.startsWith('kanban_') && notification.metadata?.projectId && (
+                                 <div className="flex items-center gap-1 mt-2">
+                                   <Button 
+                                     variant="ghost" 
+                                     size="sm"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       window.open(`/kanban?project_id=${notification.metadata.projectId}`, '_blank');
+                                     }}
+                                     className="h-6 px-2 text-xs"
+                                   >
+                                     <ExternalLink className="w-3 h-3 mr-1" />
+                                     Voir Kanban
+                                   </Button>
+                                 </div>
+                               )}
                             </div>
                           </div>
                         </div>

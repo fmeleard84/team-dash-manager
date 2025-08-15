@@ -893,6 +893,51 @@ export type Database = {
           },
         ]
       }
+      kanban_notifications: {
+        Row: {
+          candidate_id: string
+          card_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          kanban_board_id: string | null
+          metadata: Json | null
+          notification_type: string
+          project_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          candidate_id: string
+          card_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          kanban_board_id?: string | null
+          metadata?: Json | null
+          notification_type: string
+          project_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string
+          card_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          kanban_board_id?: string | null
+          metadata?: Json | null
+          notification_type?: string
+          project_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nextcloud_projects: {
         Row: {
           created_at: string
@@ -1357,6 +1402,18 @@ export type Database = {
       candidate_has_project_access: {
         Args: { candidate_email: string; project_id_param: string }
         Returns: boolean
+      }
+      create_kanban_notifications_for_team: {
+        Args: {
+          p_card_id?: string
+          p_description?: string
+          p_kanban_board_id: string
+          p_metadata?: Json
+          p_notification_type: string
+          p_project_id: string
+          p_title: string
+        }
+        Returns: undefined
       }
       debug_jwt_claims: {
         Args: Record<PropertyKey, never>

@@ -213,6 +213,78 @@ const handleKickoffConfirm = async (kickoffISO: string) => {
         } catch (emailError) {
           console.error('Failed to send kickoff invitations:', emailError);
         }
+
+        // 4. Create Kanban board for the project
+        try {
+          const { data: existingBoard } = await supabase
+            .from('kanban_boards')
+            .select('id')
+            .eq('project_id', kickoffProject.id)
+            .maybeSingle();
+
+          if (!existingBoard) {
+            // Create board
+            const { data: boardData, error: boardError } = await supabase
+              .from('kanban_boards')
+              .insert({
+                title: `Kanban - ${kickoffProject.title}`,
+                description: `Tableau Kanban pour le projet ${kickoffProject.title}`,
+                project_id: kickoffProject.id,
+                created_by: userId,
+                members: teamMembers.map(m => m.email),
+                team_members: teamMembers.map(member => ({
+                  id: member.email,
+                  name: `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email,
+                  email: member.email,
+                  role: 'Membre'
+                }))
+              })
+              .select('id')
+              .single();
+
+            if (boardError) {
+              console.error('Error creating Kanban board:', boardError);
+            } else {
+              // Create default columns
+              const defaultColumns = [
+                { title: 'Set-up', position: 0, color: '#ef4444' },
+                { title: 'À faire', position: 1, color: '#f59e0b' },
+                { title: 'En cours', position: 2, color: '#3b82f6' },
+                { title: 'À vérifier', position: 3, color: '#8b5cf6' },
+                { title: 'Finalisé', position: 4, color: '#10b981' }
+              ];
+
+              const columnsData = defaultColumns.map(col => ({
+                board_id: boardData.id,
+                title: col.title,
+                position: col.position,
+                color: col.color
+              }));
+
+              await supabase
+                .from('kanban_columns')
+                .insert(columnsData);
+
+              // Create Kanban notifications for team members
+              await supabase.rpc('create_kanban_notifications_for_team', {
+                p_project_id: kickoffProject.id,
+                p_kanban_board_id: boardData.id,
+                p_notification_type: 'kanban_new_project',
+                p_title: `Nouveau projet Kanban: ${kickoffProject.title}`,
+                p_description: `Le tableau Kanban pour le projet "${kickoffProject.title}" est maintenant disponible. Vous pouvez commencer à collaborer sur les tâches.`,
+                p_metadata: { 
+                  projectId: kickoffProject.id,
+                  boardId: boardData.id,
+                  boardTitle: `Kanban - ${kickoffProject.title}`
+                }
+              });
+
+              console.log('Kanban board created successfully');
+            }
+          }
+        } catch (kanbanError) {
+          console.error('Error setting up Kanban:', kanbanError);
+        }
       }
     }
 

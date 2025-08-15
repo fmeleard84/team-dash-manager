@@ -7,7 +7,13 @@ export type NotificationType =
   | 'payment_received'
   | 'profile_updated'
   | 'system_alert'
-  | 'event_invitation';
+  | 'event_invitation'
+  | 'kanban_new_project'
+  | 'kanban_card_created'
+  | 'kanban_card_updated'
+  | 'kanban_card_deleted'
+  | 'kanban_column_created'
+  | 'kanban_column_deleted';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 

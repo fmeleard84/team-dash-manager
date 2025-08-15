@@ -137,7 +137,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     }
   }, [boardId, loadBoard]);
 
-  // Create a new board
+  // Create a new board with default columns and team notifications
   const createBoard = useCallback(async (title: string, description?: string, projectId?: string) => {
     try {
       if (!projectId) {
@@ -145,38 +145,22 @@ export const useKanbanSupabase = (boardId?: string) => {
         return null;
       }
 
-      const teamMembers = [
-        {
-          id: '1',
-          name: 'François Meleard',
-          email: 'fmeleard+client@gmail.com',
-          role: 'Chef de projet'
-        },
-        {
-          id: '2',
-          name: 'Marie Dupont',
-          email: 'marie.dupont@example.com',
-          role: 'Développeuse Frontend'
-        },
-        {
-          id: '3',
-          name: 'Jean Martin',
-          email: 'jean.martin@example.com',
-          role: 'Développeur Backend'
-        },
-        {
-          id: '4',
-          name: 'Sophie Chen',
-          email: 'sophie.chen@example.com',
-          role: 'Designer UX/UI'
-        },
-        {
-          id: '5',
-          name: 'Alex Rodriguez',
-          email: 'alex.rodriguez@example.com',
-          role: 'QA Tester'
-        }
-      ];
+      // Get real team members from project_teams
+      const { data: projectTeams, error: teamError } = await (supabase as any)
+        .from('project_teams')
+        .select('member_id, email, first_name, last_name, role')
+        .eq('project_id', projectId);
+
+      if (teamError) {
+        console.error('Error fetching team members:', teamError);
+      }
+
+      const teamMembers = (projectTeams || []).map((member: any) => ({
+        id: member.member_id,
+        name: `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email,
+        email: member.email,
+        role: member.role || 'Membre'
+      }));
 
       const { data, error } = await (supabase as any)
         .from('kanban_boards')
@@ -185,7 +169,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           description,
           project_id: projectId, // required by RLS
           created_by: '1', // TODO: replace with real user id if needed
-          members: ['1'],
+          members: teamMembers.map(m => m.id),
           team_members: teamMembers
         } as any)
         .select()
@@ -193,9 +177,54 @@ export const useKanbanSupabase = (boardId?: string) => {
 
       if (error) throw error;
 
-      const newBoard = transformDbToBoard(data, [], []);
+      // Create default columns
+      const defaultColumns = [
+        { title: 'Set-up', position: 0, color: '#ef4444' },
+        { title: 'À faire', position: 1, color: '#f59e0b' },
+        { title: 'En cours', position: 2, color: '#3b82f6' },
+        { title: 'À vérifier', position: 3, color: '#8b5cf6' },
+        { title: 'Finalisé', position: 4, color: '#10b981' }
+      ];
+
+      const columnsData = defaultColumns.map(col => ({
+        board_id: data.id,
+        title: col.title,
+        position: col.position,
+        color: col.color
+      }));
+
+      const { data: createdColumns, error: columnsError } = await (supabase as any)
+        .from('kanban_columns')
+        .insert(columnsData)
+        .select();
+
+      if (columnsError) {
+        console.error('Error creating default columns:', columnsError);
+      }
+
+      // Create notifications for team members
+      if (projectId) {
+        try {
+          await (supabase as any).rpc('create_kanban_notifications_for_team', {
+            p_project_id: projectId,
+            p_kanban_board_id: data.id,
+            p_notification_type: 'kanban_new_project',
+            p_title: `Nouveau tableau Kanban: ${title}`,
+            p_description: `Un nouveau tableau Kanban a été créé pour le projet. Vous pouvez maintenant commencer à collaborer sur les tâches.`,
+            p_metadata: { 
+              projectId: projectId,
+              boardId: data.id,
+              boardTitle: title
+            }
+          });
+        } catch (notifError) {
+          console.error('Error creating team notifications:', notifError);
+        }
+      }
+
+      const newBoard = transformDbToBoard(data, createdColumns || [], []);
       setBoard(newBoard);
-      toast.success('Tableau créé');
+      toast.success('Tableau créé avec colonnes par défaut');
       return newBoard;
 
     } catch (error) {
@@ -341,7 +370,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     }
   }, [board]);
 
-  // Add a new card
+  // Add a new card with team notifications
   const addCard = useCallback(async (input: CreateCardInput) => {
     if (!board) return null;
 
@@ -377,6 +406,30 @@ export const useKanbanSupabase = (boardId?: string) => {
         .single();
 
       if (error) throw error;
+
+      // Create notifications for team members
+      if (board.projectId) {
+        const columnTitle = column?.title || 'Colonne inconnue';
+        try {
+          await (supabase as any).rpc('create_kanban_notifications_for_team', {
+            p_project_id: board.projectId,
+            p_kanban_board_id: board.id,
+            p_notification_type: 'kanban_card_created',
+            p_title: `Nouvelle carte: ${input.title}`,
+            p_description: `Une nouvelle carte "${input.title}" a été ajoutée dans la colonne "${columnTitle}".`,
+            p_card_id: data.id,
+            p_metadata: { 
+              cardId: data.id,
+              cardTitle: input.title,
+              columnId: input.columnId,
+              columnTitle: columnTitle,
+              assignedTo: assignedMember?.name
+            }
+          });
+        } catch (notifError) {
+          console.error('Error creating card notifications:', notifError);
+        }
+      }
 
       const newCard: KanbanCard = {
         id: data.id,
@@ -425,7 +478,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     }
   }, [board]);
 
-  // Update a card
+  // Update a card with team notifications
   const updateCard = useCallback(async (input: UpdateCardInput) => {
     if (!board) return;
 
@@ -461,6 +514,30 @@ export const useKanbanSupabase = (boardId?: string) => {
         .single();
 
       if (error) throw error;
+
+      // Create notifications for team members if it's a significant update
+      if (board.projectId && (input.title || input.assignedTo !== undefined || input.status)) {
+        const existingCard = board.cards[input.id];
+        const cardTitle = input.title || existingCard?.title || 'Carte';
+        try {
+          await (supabase as any).rpc('create_kanban_notifications_for_team', {
+            p_project_id: board.projectId,
+            p_kanban_board_id: board.id,
+            p_notification_type: 'kanban_card_updated',
+            p_title: `Carte mise à jour: ${cardTitle}`,
+            p_description: `La carte "${cardTitle}" a été modifiée.`,
+            p_card_id: input.id,
+            p_metadata: { 
+              cardId: input.id,
+              cardTitle: cardTitle,
+              updatedFields: Object.keys(updateData),
+              assignedTo: assignedMember?.name
+            }
+          });
+        } catch (notifError) {
+          console.error('Error creating update notifications:', notifError);
+        }
+      }
 
       setBoard(prev => {
         if (!prev) return prev;
