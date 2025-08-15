@@ -218,6 +218,8 @@ const Project = () => {
         .eq('project_id', id)
         .maybeSingle();
 
+      console.log('Flow data fetch result:', { flowData, flowError });
+
       if (!flowError && flowData?.flow_data) {
         const flowDataParsed = flowData.flow_data as { nodes?: Node[], edges?: Edge[] };
         if (flowDataParsed.edges && flowDataParsed.edges.length > 0) {
