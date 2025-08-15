@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSystem } from "@/components/messages/MessageSystem";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   Sidebar, 
@@ -36,7 +36,7 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { useCandidateProjects } from "@/hooks/useCandidateProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import CandidateMessages from "@/components/candidate/CandidateMessages";
+import DynamicCandidateMessages from "@/components/candidate/DynamicCandidateMessages";
 import CandidateEventNotifications from "@/components/candidate/CandidateEventNotifications";
 
 const CandidateDashboard = () => {
@@ -98,10 +98,10 @@ const CandidateDashboard = () => {
       case 'messages':
         return candidateId ? (
           <div className="space-y-6">
-            <MessageSystem />
+            <DynamicCandidateMessages candidateId={candidateId} />
             <div>
-              <h3 className="text-lg font-semibold mb-4">Notifications de missions</h3>
-              <CandidateMessages candidateId={candidateId} />
+              <h3 className="text-lg font-semibold mb-4">Notifications d'événements</h3>
+              <CandidateEventNotifications candidateId={candidateId} />
             </div>
           </div>
         ) : (

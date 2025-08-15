@@ -35,7 +35,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSystem } from "@/components/messages/MessageSystem";
+import DynamicMessageSystem from "@/components/messages/DynamicMessageSystem";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 
@@ -600,7 +600,7 @@ const menuItems = [
                 <p>Démarrez un projet pour communiquer avec votre équipe</p>
               </div>
             ) : selectedMessagesProjectId && (
-              <MessageSystem />
+              <DynamicMessageSystem projectId={selectedMessagesProjectId} />
             )}
           </div>
         );
