@@ -375,10 +375,7 @@ export default function PlanningView() {
 
       {/* Events section - full width */}
       <Card>
-        <CardHeader>
-          <CardTitle>Événements à venir</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {loading ? (
             <p className="text-sm text-muted-foreground">Chargement…</p>
           ) : viewMode === "calendar" ? (
@@ -389,12 +386,26 @@ export default function PlanningView() {
                 mode="single" 
                 className="rounded-md border"
                 modifiers={{
-                  eventDay: (date) => isEventDate(date)
+                  eventDay: (date) => isEventDate(date),
+                  today: (date) => {
+                    const today = new Date();
+                    return date.toDateString() === today.toDateString();
+                  }
                 }}
                 modifiersStyles={{
                   eventDay: {
                     backgroundColor: 'hsl(var(--primary))',
                     color: 'hsl(var(--primary-foreground))',
+                    fontWeight: 'bold'
+                  },
+                  today: {
+                    backgroundColor: 'hsl(var(--accent))',
+                    color: 'hsl(var(--accent-foreground))',
+                    fontWeight: 'bold'
+                  },
+                  selected: {
+                    backgroundColor: 'hsl(var(--secondary))',
+                    color: 'hsl(var(--secondary-foreground))',
                     fontWeight: 'bold'
                   }
                 }}
