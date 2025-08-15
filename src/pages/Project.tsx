@@ -214,16 +214,18 @@ const Project = () => {
       // Fetch flow data for edges  
       const { data: flowData, error: flowError } = await supabase
         .from('project_flows')
-        .select('flow_data')
+        .select('nodes, edges')
         .eq('project_id', id)
         .maybeSingle();
 
       console.log('Flow data fetch result:', { flowData, flowError });
 
-      if (!flowError && flowData?.flow_data) {
-        const flowDataParsed = flowData.flow_data as { nodes?: Node[], edges?: Edge[] };
-        if (flowDataParsed.edges && flowDataParsed.edges.length > 0) {
-          setEdges(flowDataParsed.edges);
+      if (!flowError && flowData) {
+        if (flowData.edges && Array.isArray(flowData.edges) && flowData.edges.length > 0) {
+          setEdges(flowData.edges as unknown as Edge[]);
+        }
+        if (flowData.nodes && Array.isArray(flowData.nodes) && flowData.nodes.length > 0) {
+          setNodes(flowData.nodes as unknown as Node[]);
         }
       }
     } catch (error) {
@@ -538,7 +540,8 @@ const Project = () => {
         .from('project_flows')
         .upsert({
           project_id: id,
-          flow_data: { nodes, edges } as any
+          nodes: nodes as any,
+          edges: edges as any
         }, {
           onConflict: 'project_id'
         });

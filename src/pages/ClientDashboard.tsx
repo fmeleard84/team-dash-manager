@@ -36,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DynamicMessageSystem from "@/components/messages/DynamicMessageSystem";
+import ClientKanbanView from "@/components/client/ClientKanbanView";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 
@@ -686,18 +687,7 @@ const menuItems = [
                 <p>Démarrez un projet pour accéder au tableau de gestion des tâches</p>
               </div>
             ) : selectedKanbanProjectId && (
-              <div style={{ height: '70vh' }}>
-                <iframe
-                  src={`/kanban/${selectedKanbanProjectId}`}
-                  title="Kanban Board"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                    borderRadius: '8px'
-                  }}
-                />
-              </div>
+              <ClientKanbanView />
             )}
           </div>
         );

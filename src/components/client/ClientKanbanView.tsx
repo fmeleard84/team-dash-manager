@@ -4,15 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { useKanbanSupabase } from "@/hooks/useKanbanSupabase";
-import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
-export default function CandidateKanbanView() {
-  const { projects, loading, candidateId } = useCandidateProjectsOptimized();
+interface Project {
+  id: string;
+  title: string;
+  status: string;
+}
+
+export default function ClientKanbanView() {
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const { 
@@ -20,9 +28,41 @@ export default function CandidateKanbanView() {
     isLoading: boardLoading,
     handleDragEnd,
     addCard,
+    addColumn,
     updateCard,
-    deleteCard
+    updateColumn,
+    deleteCard,
+    deleteColumn
   } = useKanbanSupabase(boardId || undefined);
+
+  // Load client projects
+  useEffect(() => {
+    const loadProjects = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('id, title, status')
+          .eq('status', 'play') // Only active projects have Kanban
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setProjects(data || []);
+        
+        // Set default project if only one
+        if (data && data.length === 1) {
+          setSelectedProjectId(data[0].id);
+        }
+      } catch (error) {
+        console.error('Erreur chargement projets:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProjects();
+  }, [user]);
 
   // Load board when project is selected
   useEffect(() => {
@@ -52,24 +92,6 @@ export default function CandidateKanbanView() {
     loadBoard();
   }, [selectedProjectId]);
 
-  // Set default project if only one available
-  useEffect(() => {
-    if (projects.length === 1 && !selectedProjectId) {
-      setSelectedProjectId(projects[0].id);
-    }
-  }, [projects, selectedProjectId]);
-
-  if (!candidateId) {
-    return (
-      <Card className="p-8 text-center">
-        <h3 className="text-lg font-semibold mb-2">Profil non trouvé</h3>
-        <p className="text-muted-foreground">
-          Impossible de charger votre profil candidat.
-        </p>
-      </Card>
-    );
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -81,10 +103,16 @@ export default function CandidateKanbanView() {
   if (projects.length === 0) {
     return (
       <Card className="p-8 text-center">
-        <h3 className="text-lg font-semibold mb-2">Aucun projet assigné</h3>
+        <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
         <p className="text-muted-foreground">
-          Vous n'avez aucun projet assigné pour le moment.
+          Vous n'avez aucun projet en cours avec un tableau Kanban.
         </p>
+        <Button 
+          className="mt-4" 
+          onClick={() => navigate('/client-dashboard')}
+        >
+          Retour aux projets
+        </Button>
       </Card>
     );
   }
@@ -156,25 +184,32 @@ export default function CandidateKanbanView() {
             Retour
           </Button>
           <div>
-            <h2 className="text-2xl font-bold">Kanban</h2>
+            <h2 className="text-2xl font-bold">Gestion Kanban</h2>
             <p className="text-muted-foreground">{selectedProject?.title}</p>
           </div>
         </div>
 
-        {projects.length > 1 && (
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="w-64">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex items-center gap-2">
+          {projects.length > 1 && (
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger className="w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
+          <Button onClick={() => addColumn({ title: 'Nouvelle colonne', position: board?.columns.length || 0 })}>
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter colonne
+          </Button>
+        </div>
       </div>
 
       {/* Kanban Board */}
@@ -183,9 +218,8 @@ export default function CandidateKanbanView() {
           <KanbanBoard
             board={board}
             onDragEnd={handleDragEnd}
-            onAddColumn={() => {}} // Disable column creation for candidates
+            onAddColumn={() => addColumn({ title: 'Nouvelle colonne', position: board.columns.length })}
             onAddCard={(columnId) => {
-              // Simplified card creation for candidates
               const newCard = {
                 title: 'Nouvelle tâche',
                 description: '',
@@ -195,8 +229,8 @@ export default function CandidateKanbanView() {
               };
               addCard(newCard);
             }}
-            onEditColumn={() => {}} // Disable column editing for candidates
-            onDeleteColumn={() => {}} // Disable column deletion for candidates
+            onEditColumn={updateColumn}
+            onDeleteColumn={deleteColumn}
             onCardClick={() => {}} // Handle card click
             onCardEdit={updateCard}
             onCardDelete={deleteCard}

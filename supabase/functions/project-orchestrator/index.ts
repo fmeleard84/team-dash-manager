@@ -244,22 +244,13 @@ serve(async (req) => {
         const resourceCategories = [...new Set(resources.map((r: any) => r.candidate_profiles.profile_type))];
         const columns = [];
         
-        // Colonnes standards pour chaque catégorie
-        let position = 0;
-        for (const category of resourceCategories) {
-          const categoryColor = getCategoryColor(category);
-          columns.push({
-            board_id: kanbanBoard.id,
-            title: category || 'Général',
-            position: position++,
-            color: categoryColor
-          });
-        }
-        
-        // Colonnes de workflow général
+        // Colonnes standards de workflow demandées
         columns.push(
-          { board_id: kanbanBoard.id, title: 'En révision', position: position++, color: '#orange' },
-          { board_id: kanbanBoard.id, title: 'Terminé', position: position++, color: '#green' }
+          { board_id: kanbanBoard.id, title: 'Setup', position: 0, color: '#blue' },
+          { board_id: kanbanBoard.id, title: 'A faire', position: 1, color: '#gray' },
+          { board_id: kanbanBoard.id, title: 'En cours', position: 2, color: '#yellow' },
+          { board_id: kanbanBoard.id, title: 'A contrôler', position: 3, color: '#orange' },
+          { board_id: kanbanBoard.id, title: 'Terminé', position: 4, color: '#green' }
         );
 
         // Insérer toutes les colonnes

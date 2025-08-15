@@ -1446,22 +1446,25 @@ export type Database = {
       project_flows: {
         Row: {
           created_at: string
-          flow_data: Json
+          edges: Json | null
           id: string
+          nodes: Json | null
           project_id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
-          flow_data?: Json
+          edges?: Json | null
           id?: string
+          nodes?: Json | null
           project_id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
-          flow_data?: Json
+          edges?: Json | null
           id?: string
+          nodes?: Json | null
           project_id?: string
           updated_at?: string
         }
@@ -1469,7 +1472,7 @@ export type Database = {
           {
             foreignKeyName: "project_flows_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
