@@ -146,7 +146,7 @@ const CandidateProjects = () => {
 
       // Fetch contextualized notifications with all necessary data
       // Only exclude notifications for specific resource assignments that are already booked
-      const { data, error } = await supabase
+      let query = supabase
         .from('candidate_notifications')
         .select(`
           id,
@@ -171,8 +171,14 @@ const CandidateProjects = () => {
         `)
         .eq('candidate_id', currentCandidateId)
         .eq('status', 'unread')
-        .not('resource_assignment_id', 'in', `(${bookedAssignmentIds.join(',')})`)
         .order('created_at', { ascending: false });
+
+      // Filter out notifications for already booked assignments
+      if (bookedAssignmentIds.length > 0) {
+        query = query.not('resource_assignment_id', 'in', `(${bookedAssignmentIds.join(',')})`);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching notifications:', error);
