@@ -183,7 +183,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         { title: 'À faire', position: 1, color: '#f59e0b' },
         { title: 'En cours', position: 2, color: '#3b82f6' },
         { title: 'À vérifier', position: 3, color: '#8b5cf6' },
-        { title: 'Finalisé', position: 4, color: '#10b981' }
+        { title: 'Terminé', position: 4, color: '#10b981' }
       ];
 
       const columnsData = defaultColumns.map(col => ({
@@ -200,6 +200,75 @@ export const useKanbanSupabase = (boardId?: string) => {
 
       if (columnsError) {
         console.error('Error creating default columns:', columnsError);
+        throw columnsError;
+      }
+
+      // Get project details to create the initial project card
+      const { data: projectData, error: projectError } = await (supabase as any)
+        .from('projects')
+        .select('title, description, deadline, budget, created_at')
+        .eq('id', projectId)
+        .single();
+
+      if (projectError) {
+        console.error('Error fetching project details:', projectError);
+      }
+
+      // Get project files to include in the project card description
+      const { data: projectFiles, error: filesError } = await (supabase as any)
+        .from('project_files')
+        .select('file_name, file_path')
+        .eq('project_id', projectId);
+
+      if (filesError) {
+        console.error('Error fetching project files:', filesError);
+      }
+
+      // Create initial "Projet" card in Set-up column if we have project data
+      if (projectData && createdColumns && createdColumns.length > 0) {
+        const setupColumn = createdColumns.find(col => col.title === 'Set-up');
+        if (setupColumn) {
+          let projectCardDescription = `**Détails du projet:**\n\n`;
+          projectCardDescription += `${projectData.description || 'Aucune description disponible'}\n\n`;
+          
+          if (projectData.deadline) {
+            const deadline = new Date(projectData.deadline);
+            projectCardDescription += `**Date limite:** ${deadline.toLocaleDateString('fr-FR')}\n`;
+          }
+          
+          if (projectData.budget) {
+            projectCardDescription += `**Budget:** ${projectData.budget}€\n`;
+          }
+          
+          projectCardDescription += `**Date de création:** ${new Date(projectData.created_at).toLocaleDateString('fr-FR')}\n`;
+          
+          if (projectFiles && projectFiles.length > 0) {
+            projectCardDescription += `\n**Fichiers joints:**\n`;
+            projectFiles.forEach(file => {
+              projectCardDescription += `- ${file.file_name}\n`;
+            });
+          }
+
+          const { data: projectCard, error: cardError } = await (supabase as any)
+            .from('kanban_cards')
+            .insert({
+              board_id: data.id,
+              column_id: setupColumn.id,
+              title: 'Projet',
+              description: projectCardDescription,
+              position: 0,
+              priority: 'high',
+              status: 'todo',
+              created_by: '1', // TODO: replace with real user id if needed
+              due_date: projectData.deadline || null
+            })
+            .select()
+            .single();
+
+          if (cardError) {
+            console.error('Error creating project card:', cardError);
+          }
+        }
       }
 
       // Create notifications for team members
