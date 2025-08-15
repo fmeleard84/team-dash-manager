@@ -5,9 +5,10 @@ import { toast } from 'sonner';
 export const useProjectOrchestrator = () => {
   const [isLoading, setIsLoading] = useState(false);
 
-  const setupProject = async (projectId: string) => {
+  const setupProject = async (projectId: string, kickoffDate?: string) => {
     setIsLoading(true);
     try {
+      // First call the project-orchestrator for general setup
       const { data, error } = await supabase.functions.invoke('project-orchestrator', {
         body: {
           action: 'setup-project',
@@ -21,8 +22,22 @@ export const useProjectOrchestrator = () => {
         return false;
       }
 
-      if (data?.success) {
-        toast.success('Projet configuré avec succès !');
+      // Then call the project-kickoff for planning synchronization
+      const { data: kickoffData, error: kickoffError } = await supabase.functions.invoke('project-kickoff', {
+        body: {
+          projectId,
+          kickoffDate
+        }
+      });
+
+      if (kickoffError) {
+        console.error('Erreur création kickoff:', kickoffError);
+        toast.error('Erreur lors de la création du planning de lancement');
+        return false;
+      }
+
+      if (data?.success && kickoffData?.success) {
+        toast.success('Projet configuré avec succès ! Planning synchronisé pour toute l\'équipe.');
         return true;
       }
 
