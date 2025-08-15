@@ -1324,6 +1324,14 @@ export type Database = {
           email: string
         }[]
       }
+      is_event_attendee: {
+        Args: { event_id_param: string; user_email: string }
+        Returns: boolean
+      }
+      is_project_team_member: {
+        Args: { project_id_param: string; user_id_param: string }
+        Returns: boolean
+      }
       owner_can_view_booking: {
         Args: { booking_project_id: string; owner_user_id: string }
         Returns: boolean
