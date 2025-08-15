@@ -131,14 +131,103 @@ const onStartProject = (project: { id: string; title: string }) => {
 const handleKickoffConfirm = async (kickoffISO: string) => {
   if (!kickoffProject) return;
   
-  const success = await setupProject(kickoffProject.id);
-  if (success) {
+  try {
+    // 1. Setup the project
+    const success = await setupProject(kickoffProject.id);
+    if (!success) {
+      toast({ 
+        title: "Erreur", 
+        description: "Échec de la configuration du projet." 
+      });
+      return;
+    }
+
+    // 2. Create kickoff event
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id;
+    
+    if (!userId) {
+      toast({ title: "Erreur", description: "Utilisateur non connecté" });
+      return;
+    }
+
+    const kickoffDate = new Date(kickoffISO);
+    const endDate = new Date(kickoffDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+    
+    const { data: eventData, error: eventError } = await supabase
+      .from('project_events')
+      .insert({
+        project_id: kickoffProject.id,
+        title: `Réunion de lancement - ${kickoffProject.title}`,
+        description: `Réunion de lancement officielle du projet "${kickoffProject.title}". Présentation de l'équipe, des objectifs et du planning.`,
+        start_at: kickoffISO,
+        end_at: endDate.toISOString(),
+        location: null,
+        video_url: `https://meet.jit.si/${kickoffProject.id}-kickoff`,
+        drive_url: null,
+        created_by: userId
+      })
+      .select('id')
+      .single();
+
+    if (eventError) {
+      console.error('Error creating kickoff event:', eventError);
+      toast({ 
+        title: "Événement créé avec avertissement", 
+        description: "Projet configuré mais l'événement de kickoff n'a pas pu être créé automatiquement." 
+      });
+    } else {
+      // 3. Get team members and send notifications
+      const { data: teamMembers, error: teamError } = await supabase
+        .from('project_teams')
+        .select('email, first_name, last_name')
+        .eq('project_id', kickoffProject.id)
+        .eq('member_type', 'resource'); // Only notify resources
+
+      if (!teamError && teamMembers && teamMembers.length > 0) {
+        // Add team members as event attendees and send notifications
+        const attendeesData = teamMembers.map(member => ({
+          event_id: eventData.id,
+          email: member.email
+        }));
+
+        await supabase
+          .from('project_event_attendees')
+          .insert(attendeesData);
+
+        // Send email invitations
+        try {
+          await supabase.functions.invoke('send-event-invitations', {
+            body: {
+              eventId: eventData.id,
+              eventTitle: `Réunion de lancement - ${kickoffProject.title}`,
+              eventDate: kickoffISO,
+              projectTitle: kickoffProject.title,
+              attendeesEmails: teamMembers.map(m => m.email),
+              organizerName: 'Client',
+              videoUrl: `https://meet.jit.si/${kickoffProject.id}-kickoff`,
+              location: undefined
+            }
+          });
+          console.log('Kickoff invitations sent successfully');
+        } catch (emailError) {
+          console.error('Failed to send kickoff invitations:', emailError);
+        }
+      }
+    }
+
     setKickoffDialogOpen(false);
     setKickoffProject(null);
     await refreshProjects();
     toast({ 
       title: "Projet configuré avec succès!", 
-      description: "Planning, Kanban, Drive et notifications créés." 
+      description: "Planning, Kanban, Drive, notifications créés et équipe invitée au kickoff." 
+    });
+  } catch (error) {
+    console.error('Error in handleKickoffConfirm:', error);
+    toast({ 
+      title: "Erreur", 
+      description: "Une erreur s'est produite lors de la configuration." 
     });
   }
 };
