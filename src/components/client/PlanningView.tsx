@@ -7,8 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Trash2 } from "lucide-react";
+import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Project { id: string; title: string }
 interface EventRow {
@@ -48,6 +49,7 @@ export default function PlanningView() {
   );
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Nouveau: membres d'équipe validés pour le projet (invités rapides)
   const [teamMembers, setTeamMembers] = useState<{ email: string; name: string }[]>([]);
@@ -194,6 +196,7 @@ export default function PlanningView() {
       setVideoUrl(""); 
       setDriveUrl(""); 
       setAttendeesEmails("");
+      setIsDialogOpen(false);
       await loadAllEvents();
     } catch (error) {
       console.error("Unexpected error:", error);
@@ -214,199 +217,256 @@ export default function PlanningView() {
     }
   };
 
+  // Get event dates for calendar highlighting
+  const eventDates = useMemo(() => {
+    const dates = new Set<string>();
+    eventsToShow.forEach(event => {
+      const eventDate = new Date(event.start_at);
+      dates.add(eventDate.toDateString());
+    });
+    return dates;
+  }, [eventsToShow]);
+
+  const isEventDate = (date: Date) => {
+    return eventDates.has(date.toDateString());
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <CalendarDays className="h-5 w-5" />
-        <h2 className="text-2xl font-bold">Planning</h2>
-      </div>
+      {/* Header with project select, view toggle, and new event CTA */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <CalendarDays className="h-5 w-5" />
+            <h2 className="text-2xl font-bold">Planning</h2>
+          </div>
+          
+          <Select value={filterProjectId} onValueChange={(value) => {
+            setFilterProjectId(value);
+            setProjectId(value === "all" ? (projects[0]?.id || "") : value);
+          }}>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Sélectionner un projet" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les projets</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Nouvel événement</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Projet</label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un projet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="flex items-center gap-2">
+          <div className="flex border rounded-md">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="rounded-r-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "calendar" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("calendar")}
+              className="rounded-l-none"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Titre</label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Kickoff" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date</label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Début</label>
-                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Fin (optionnel)</label>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lieu (optionnel)</label>
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Adresse / Salle" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lien visio (optionnel)</label>
-              <Input value={videoUrl || suggestedVideoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="URL Jitsi / Teams" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lien Google Drive (optionnel)</label>
-              <Input value={driveUrl} onChange={(e) => setDriveUrl(e.target.value)} placeholder="URL Google Drive / Docs" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Invités</label>
-              <Select
-                value={selectedTeamEmail}
-                onValueChange={(v) => {
-                  setSelectedTeamEmail(v);
-                  setAttendeesEmails((prev) => {
-                    const set = new Set(prev.split(/[\s,\n]+/).filter(Boolean));
-                    set.add(v);
-                    return Array.from(set).join(", ");
-                  });
-                }}
-                disabled={teamMembers.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={teamMembers.length ? "Ajouter depuis l'équipe" : "Aucune équipe"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {teamMembers.map((m) => (
-                    <SelectItem key={m.email} value={m.email}>{m.name || m.email}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Textarea value={attendeesEmails} onChange={(e) => setAttendeesEmails(e.target.value)} placeholder="email1@ex.com, email2@ex.com" />
-            </div>
-
-            <Button onClick={handleCreate} disabled={!projectId || loading}>Créer</Button>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <CardTitle>Événements à venir</CardTitle>
-            <div className="flex items-center gap-2">
-              <Select value={filterProjectId} onValueChange={setFilterProjectId}>
-                <SelectTrigger className="w-56">
-                  <SelectValue placeholder="Filtrer par projet" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les projets</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder="Vue" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="list">Liste</SelectItem>
-                  <SelectItem value="calendar">Calendrier</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-sm text-muted-foreground">Chargement…</p>
-            ) : viewMode === "calendar" ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <Calendar selected={selectedDate} onSelect={setSelectedDate} mode="single" className="rounded-md border" />
-                <div className="space-y-3">
-                  <div className="text-sm font-medium">Événements du {selectedDate ? selectedDate.toLocaleDateString() : "jour sélectionné"}</div>
-                  {eventsToShow.filter((ev) => {
-                    if (!selectedDate) return true;
-                    const d = new Date(ev.start_at);
-                    return d.toDateString() === selectedDate.toDateString();
-                  }).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun événement.</p>
-                  ) : (
-                    eventsToShow
-                      .filter((ev) => {
-                        if (!selectedDate) return true;
-                        const d = new Date(ev.start_at);
-                        return d.toDateString() === selectedDate.toDateString();
-                      })
-                      .map((ev) => (
-                        <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
-                          <div>
-                            <div className="font-medium">{ev.title}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
-                            </div>
-                            <div className="flex gap-3">
-                              {ev.video_url && (
-                                <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
-                              )}
-                              {ev.drive_url && (
-                                <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
-                              )}
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-            ) : eventsToShow.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun événement.</p>
-            ) : (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle événement
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nouvel événement</DialogTitle>
+              </DialogHeader>
               <div className="space-y-3">
-                {eventsToShow.map((ev) => (
-                  <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
-                    <div>
-                      <div className="font-medium">{ev.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
-                      </div>
-                      <div className="flex gap-3">
-                        {ev.video_url && (
-                          <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
-                        )}
-                        {ev.drive_url && (
-                          <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
-                        )}
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Projet</label>
+                  <Select value={projectId} onValueChange={setProjectId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un projet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Titre</label>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Kickoff" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Date</label>
+                    <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                   </div>
-                ))}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Début</label>
+                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Fin (optionnel)</label>
+                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Lieu (optionnel)</label>
+                  <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Adresse / Salle" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Lien visio (optionnel)</label>
+                  <Input value={videoUrl || suggestedVideoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="URL Jitsi / Teams" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Lien Google Drive (optionnel)</label>
+                  <Input value={driveUrl} onChange={(e) => setDriveUrl(e.target.value)} placeholder="URL Google Drive / Docs" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Invités</label>
+                  <Select
+                    value={selectedTeamEmail}
+                    onValueChange={(v) => {
+                      setSelectedTeamEmail(v);
+                      setAttendeesEmails((prev) => {
+                        const set = new Set(prev.split(/[\s,\n]+/).filter(Boolean));
+                        set.add(v);
+                        return Array.from(set).join(", ");
+                      });
+                    }}
+                    disabled={teamMembers.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={teamMembers.length ? "Ajouter depuis l'équipe" : "Aucune équipe"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teamMembers.map((m) => (
+                        <SelectItem key={m.email} value={m.email}>{m.name || m.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Textarea value={attendeesEmails} onChange={(e) => setAttendeesEmails(e.target.value)} placeholder="email1@ex.com, email2@ex.com" />
+                </div>
+
+                <Button onClick={handleCreate} disabled={!projectId || loading} className="w-full">
+                  Créer
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {/* Events section - full width */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Événements à venir</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Chargement…</p>
+          ) : viewMode === "calendar" ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Calendar 
+                selected={selectedDate} 
+                onSelect={setSelectedDate} 
+                mode="single" 
+                className="rounded-md border"
+                modifiers={{
+                  eventDay: (date) => isEventDate(date)
+                }}
+                modifiersStyles={{
+                  eventDay: {
+                    backgroundColor: 'hsl(var(--primary))',
+                    color: 'hsl(var(--primary-foreground))',
+                    fontWeight: 'bold'
+                  }
+                }}
+              />
+              <div className="space-y-3">
+                <div className="text-sm font-medium">Événements du {selectedDate ? selectedDate.toLocaleDateString() : "jour sélectionné"}</div>
+                {eventsToShow.filter((ev) => {
+                  if (!selectedDate) return true;
+                  const d = new Date(ev.start_at);
+                  return d.toDateString() === selectedDate.toDateString();
+                }).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aucun événement.</p>
+                ) : (
+                  eventsToShow
+                    .filter((ev) => {
+                      if (!selectedDate) return true;
+                      const d = new Date(ev.start_at);
+                      return d.toDateString() === selectedDate.toDateString();
+                    })
+                    .map((ev) => (
+                      <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
+                        <div>
+                          <div className="font-medium">{ev.title}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
+                          </div>
+                          <div className="flex gap-3">
+                            {ev.video_url && (
+                              <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
+                            )}
+                            {ev.drive_url && (
+                              <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
+                            )}
+                          </div>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          ) : eventsToShow.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aucun événement.</p>
+          ) : (
+            <div className="space-y-3">
+              {eventsToShow.map((ev) => (
+                <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
+                  <div>
+                    <div className="font-medium">{ev.title}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
+                    </div>
+                    <div className="flex gap-3">
+                      {ev.video_url && (
+                        <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
+                      )}
+                      {ev.drive_url && (
+                        <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
+                      )}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
