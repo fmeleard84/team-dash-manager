@@ -52,6 +52,9 @@ export const useCandidateProjects = () => {
     const fetchProjects = async () => {
       if (!candidateId) return;
 
+      console.log('DEBUG: Fetching projects for candidate ID:', candidateId);
+      console.log('DEBUG: User email from context:', user?.profile?.email);
+
       setLoading(true);
       try {
         // Get accepted projects via project_bookings
@@ -72,6 +75,9 @@ export const useCandidateProjects = () => {
           .eq('candidate_id', candidateId)
           .eq('status', 'accepted');
 
+        console.log('DEBUG: Raw bookings data:', bookings);
+        console.log('DEBUG: Query error:', error);
+
         if (error) {
           console.error('Error fetching projects:', error);
           toast.error('Erreur lors du chargement des projets');
@@ -84,6 +90,7 @@ export const useCandidateProjects = () => {
           .map(booking => booking.projects)
           .filter(Boolean) as CandidateProject[];
 
+        console.log('DEBUG: Processed candidate projects:', candidateProjects);
         setProjects(candidateProjects);
       } catch (error) {
         console.error('Error:', error);
