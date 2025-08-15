@@ -117,7 +117,7 @@ const CandidateProjects = () => {
 
       if (candidate) {
         setCurrentCandidateId(candidate.id);
-        toast.success(`Connecté en tant que ${candidate.first_name} ${candidate.last_name}`);
+        // Removed annoying success toast that appears every time
       } else {
         toast.info("Aucun profil candidat trouvé pour votre compte. Veuillez vérifier votre email ou contacter un administrateur.");
       }
@@ -185,6 +185,10 @@ const CandidateProjects = () => {
         return;
       }
 
+      console.log('Raw notifications data:', data);
+      console.log('Booked assignment IDs:', bookedAssignmentIds);
+      console.log('Current candidate ID:', currentCandidateId);
+
       // Transform notifications to use contextualized data
       const enrichedNotifications = (data || [])
         .map((notification) => ({
@@ -199,8 +203,9 @@ const CandidateProjects = () => {
           seniority: notification.required_seniority,
           calculated_price: notification.calculated_price
         }
-      }));
+       }));
 
+      console.log('Enriched notifications:', enrichedNotifications);
       setNotifications(enrichedNotifications);
 
       // Fetch detailed project data for notifications
