@@ -1681,7 +1681,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_current_user_email_safe: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       is_admin_user: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_admin_user_safe: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
