@@ -279,11 +279,13 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   };
 
   const handleDelete = async (id: string) => {
+    console.log(`Attempting to delete event with ID: ${id}`);
     const { error } = await supabase.from("project_events").delete().eq("id", id);
     if (error) {
       console.error("delete event error", error);
-      toast({ title: "Erreur", description: "Suppression échouée" });
+      toast({ title: "Erreur", description: `Suppression échouée: ${error.message}` });
     } else {
+      console.log(`Successfully deleted event with ID: ${id}`);
       toast({ title: "Événement supprimé" });
       setAllEvents((prev) => prev.filter((e) => e.id !== id));
     }
