@@ -196,6 +196,27 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
             .from("project_event_attendees")
             .insert(rows);
           if (attErr) console.error("attendees insert error", attErr);
+          
+          // Send email invitations to attendees
+          try {
+            const projectTitle = projects.find(p => p.id === projectId)?.title || "Projet";
+            await supabase.functions.invoke('send-event-invitations', {
+              body: {
+                eventId,
+                eventTitle: title,
+                eventDate: `${date}T${startTime}:00`,
+                projectTitle,
+                attendeesEmails: emails,
+                organizerName: mode === 'client' ? 'Client' : 'Équipe',
+                videoUrl: finalVideoUrl,
+                location: location || undefined
+              }
+            });
+            console.log('Event invitations sent successfully');
+          } catch (emailError) {
+            console.error('Failed to send event invitations:', emailError);
+            // Don't fail the event creation if email sending fails
+          }
         }
       }
 

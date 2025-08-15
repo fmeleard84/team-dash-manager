@@ -121,3 +121,6 @@ verify_jwt = false
 
 [functions.project-orchestrator]
 verify_jwt = false
+
+[functions.send-event-invitations]
+verify_jwt = false
