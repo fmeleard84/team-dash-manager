@@ -1297,6 +1297,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      candidate_has_project_access: {
+        Args: { candidate_email: string; project_id_param: string }
+        Returns: boolean
+      }
       debug_jwt_claims: {
         Args: Record<PropertyKey, never>
         Returns: Json
