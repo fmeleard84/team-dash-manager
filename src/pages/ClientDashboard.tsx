@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   Sidebar, 
@@ -47,6 +48,7 @@ const { toast } = useToast();
 // Projects state
 type DbProject = { id: string; title: string; description?: string | null; project_date: string; due_date?: string | null; client_budget?: number | null; status: string };
 const [projects, setProjects] = useState<DbProject[]>([]);
+const [resourceAssignments, setResourceAssignments] = useState<any[]>([]);
 const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [isCreating, setIsCreating] = useState(false);
 const [selectedKanbanProjectId, setSelectedKanbanProjectId] = useState<string>("");
@@ -70,9 +72,35 @@ useEffect(() => {
       if (!selectedKanbanProjectId && data && data.length) setSelectedKanbanProjectId(data[0].id);
       if (!selectedMessagesProjectId && data && data.length) setSelectedMessagesProjectId(data[0].id);
     }
+    
+    // Load resource assignments for all projects
+    await loadResourceAssignments();
   };
   load();
 }, [user]);
+
+const loadResourceAssignments = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('hr_resource_assignments')
+      .select(`
+        id,
+        project_id,
+        booking_status,
+        hr_profiles (
+          name
+        )
+      `);
+    
+    if (error) {
+      console.error('Error loading resource assignments:', error);
+    } else {
+      setResourceAssignments(data || []);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
 
 const refreshProjects = async () => {
   const { data } = await supabase
@@ -80,6 +108,7 @@ const refreshProjects = async () => {
     .select('id,title,description,project_date,due_date,client_budget,status')
     .order('created_at', { ascending: false });
   setProjects((data || []) as DbProject[]);
+  await loadResourceAssignments();
 };
 
 const onViewProject = (id: string) => navigate(`/project/${id}`);
@@ -169,6 +198,44 @@ const handleCreateProject = async (data: { title: string; description?: string; 
     setIsCreating(false);
   }
 };
+// Project classification logic
+const getProjectResourceAssignments = (projectId: string) => {
+  return resourceAssignments.filter(assignment => assignment.project_id === projectId);
+};
+
+const getProjectsWithClassification = () => {
+  return projects.map(project => {
+    const assignments = getProjectResourceAssignments(project.id);
+    const allResourcesBooked = assignments.length > 0 && assignments.every(assignment => assignment.booking_status === 'booké');
+    
+    let category = 'nouveaux'; // default
+    
+    if (project.status === 'completed') {
+      category = 'termines';
+    } else if (project.status === 'play') {
+      category = 'en-cours';
+    } else if (project.status === 'pause') {
+      if (assignments.length === 0) {
+        category = 'nouveaux';
+      } else if (allResourcesBooked) {
+        category = 'en-pause';
+      } else {
+        category = 'attente-team';
+      }
+    }
+    
+    return { ...project, category, assignments };
+  });
+};
+
+const classifiedProjects = getProjectsWithClassification();
+
+const nouveauxProjets = classifiedProjects.filter(p => p.category === 'nouveaux');
+const projetsAttenteTeam = classifiedProjects.filter(p => p.category === 'attente-team');
+const projetsEnPause = classifiedProjects.filter(p => p.category === 'en-pause');
+const projetsEnCours = classifiedProjects.filter(p => p.category === 'en-cours');
+const projetsTermines = classifiedProjects.filter(p => p.category === 'termines');
+
 const menuItems = [
   { id: 'projects', label: 'Mes projets', icon: FolderOpen },
   { id: 'planning', label: 'Planning', icon: CalendarClock },
@@ -187,28 +254,201 @@ const menuItems = [
               <h2 className="text-2xl font-bold">Mes projets</h2>
               <Button onClick={() => setIsCreateOpen(true)}>Créer un nouveau projet</Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projects.map((p) => (
-                <ProjectCard
-                  key={p.id}
-                  project={{
-                    id: p.id,
-                    title: p.title,
-                    description: p.description || undefined,
-                    price: undefined,
-                    date: p.project_date,
-                    status: p.status,
-                    clientBudget: p.client_budget ?? undefined,
-                    dueDate: p.due_date ?? undefined,
-                  }}
-                  onStatusToggle={onToggleStatus}
-                  onDelete={onDeleteProject}
-                  onView={onViewProject}
-                  onStart={onStartProject}
-                  onEdit={refreshProjects}
-                />
-              ))}
-            </div>
+
+            <Tabs defaultValue="nouveaux" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="nouveaux" className="text-xs">
+                  Nouveaux projets
+                  {nouveauxProjets.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                      {nouveauxProjets.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="attente-team" className="text-xs">
+                  Attente team
+                  {projetsAttenteTeam.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                      {projetsAttenteTeam.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="en-pause" className="text-xs">
+                  En pause
+                  {projetsEnPause.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                      {projetsEnPause.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="en-cours" className="text-xs">
+                  En cours
+                  {projetsEnCours.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                      {projetsEnCours.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="termines" className="text-xs">
+                  Terminés
+                  {projetsTermines.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                      {projetsTermines.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="nouveaux" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {nouveauxProjets.map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={{
+                        id: p.id,
+                        title: p.title,
+                        description: p.description || undefined,
+                        price: undefined,
+                        date: p.project_date,
+                        status: p.status,
+                        clientBudget: p.client_budget ?? undefined,
+                        dueDate: p.due_date ?? undefined,
+                      }}
+                      onStatusToggle={onToggleStatus}
+                      onDelete={onDeleteProject}
+                      onView={onViewProject}
+                      onStart={onStartProject}
+                      onEdit={refreshProjects}
+                    />
+                  ))}
+                  {nouveauxProjets.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      Aucun nouveau projet
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="attente-team" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projetsAttenteTeam.map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={{
+                        id: p.id,
+                        title: p.title,
+                        description: p.description || undefined,
+                        price: undefined,
+                        date: p.project_date,
+                        status: p.status,
+                        clientBudget: p.client_budget ?? undefined,
+                        dueDate: p.due_date ?? undefined,
+                      }}
+                      onStatusToggle={onToggleStatus}
+                      onDelete={onDeleteProject}
+                      onView={onViewProject}
+                      onStart={onStartProject}
+                      onEdit={refreshProjects}
+                    />
+                  ))}
+                  {projetsAttenteTeam.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      Aucun projet en attente de team
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="en-pause" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projetsEnPause.map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={{
+                        id: p.id,
+                        title: p.title,
+                        description: p.description || undefined,
+                        price: undefined,
+                        date: p.project_date,
+                        status: p.status,
+                        clientBudget: p.client_budget ?? undefined,
+                        dueDate: p.due_date ?? undefined,
+                      }}
+                      onStatusToggle={onToggleStatus}
+                      onDelete={onDeleteProject}
+                      onView={onViewProject}
+                      onStart={onStartProject}
+                      onEdit={refreshProjects}
+                    />
+                  ))}
+                  {projetsEnPause.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      Aucun projet en pause
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="en-cours" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projetsEnCours.map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={{
+                        id: p.id,
+                        title: p.title,
+                        description: p.description || undefined,
+                        price: undefined,
+                        date: p.project_date,
+                        status: p.status,
+                        clientBudget: p.client_budget ?? undefined,
+                        dueDate: p.due_date ?? undefined,
+                      }}
+                      onStatusToggle={onToggleStatus}
+                      onDelete={onDeleteProject}
+                      onView={onViewProject}
+                      onStart={onStartProject}
+                      onEdit={refreshProjects}
+                    />
+                  ))}
+                  {projetsEnCours.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      Aucun projet en cours
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="termines" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projetsTermines.map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={{
+                        id: p.id,
+                        title: p.title,
+                        description: p.description || undefined,
+                        price: undefined,
+                        date: p.project_date,
+                        status: p.status,
+                        clientBudget: p.client_budget ?? undefined,
+                        dueDate: p.due_date ?? undefined,
+                      }}
+                      onStatusToggle={onToggleStatus}
+                      onDelete={onDeleteProject}
+                      onView={onViewProject}
+                      onStart={onStartProject}
+                      onEdit={refreshProjects}
+                    />
+                  ))}
+                  {projetsTermines.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      Aucun projet terminé
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <CreateProjectModal
               isOpen={isCreateOpen}

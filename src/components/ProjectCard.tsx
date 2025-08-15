@@ -325,21 +325,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             </Button>
           )}
 
-          {/* My Workspace button - show when project is active (play) */}
-          {project.status === 'play' && (
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-              onClick={() => {
-                const { openNextcloud } = require('@/lib/auth');
-                openNextcloud('project', project.title);
-              }}
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Accéder à l'espace collaboratif
-            </Button>
-          )}
+          {/* Removed: My Workspace button (no longer needed for active projects) */}
 
         </CardContent>
       </Card>
