@@ -41,7 +41,7 @@ interface ProjectCardProps {
   onStatusToggle: (id: string, status: string) => void;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
-  onStart?: (project: { id: string; title: string }) => void;
+  onStart?: (project: { id: string; title: string; kickoffISO?: string }) => void;
   onEdit?: () => void;
 }
 
@@ -97,25 +97,17 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   // Nextcloud: workspace existence check handled by backend; no client-side check needed.
 
   const handleStatusToggle = async () => {
-    // Check if all resources are booked before allowing play
-    const allResourcesBooked = resourceAssignments.every(assignment => assignment.booking_status === 'booké');
-    
     if (project.status === 'pause' && !allResourcesBooked) {
       toast.error('Toutes les ressources doivent être bookées avant de démarrer le projet');
       return;
     }
-
-    const newStatus = project.status === 'play' ? 'pause' : 'play';
     
-    if (newStatus === 'play') {
-      if (onStart) {
-        onStart({ id: project.id, title: project.title });
-      } else {
-        setShowKickoff(true);
-      }
+    if (project.status === 'pause') {
+      // If starting, show kickoff dialog first
+      setShowKickoff(true);
     } else {
-      // Simple pause
-      await onStatusToggle(project.id, newStatus);
+      // If pausing, directly update status
+      await onStatusToggle(project.id, 'pause');
     }
   };
 
@@ -145,8 +137,11 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   const startProject = async (kickoffISO: string) => {
     try {
       setIsSyncing(true);
-      await onStatusToggle(project.id, 'play');
-      toast.success('Projet démarré.');
+      // Trigger the project setup with kickoff
+      if (onStart) {
+        onStart({ id: project.id, title: project.title, kickoffISO });
+      }
+      setShowKickoff(false);
     } catch (error) {
       console.error('Error starting project:', error);
       toast.error('Erreur lors du démarrage du projet');

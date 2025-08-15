@@ -69,8 +69,11 @@ useEffect(() => {
       console.error('load projects', error);
     } else {
       setProjects((data || []) as DbProject[]);
-      if (!selectedKanbanProjectId && data && data.length) setSelectedKanbanProjectId(data[0].id);
-      if (!selectedMessagesProjectId && data && data.length) setSelectedMessagesProjectId(data[0].id);
+      
+      // Only set default project if we have active projects (status = 'play')
+      const activeProjects = (data || []).filter(p => p.status === 'play');
+      if (!selectedKanbanProjectId && activeProjects.length > 0) setSelectedKanbanProjectId(activeProjects[0].id);
+      if (!selectedMessagesProjectId && activeProjects.length > 0) setSelectedMessagesProjectId(activeProjects[0].id);
     }
     
     // Load resource assignments for all projects
@@ -123,9 +126,36 @@ const onToggleStatus = async (id: string, status: string) => {
   }
 };
 
-const onStartProject = (project: { id: string; title: string }) => {
-  setKickoffProject(project);
-  setKickoffDialogOpen(true);
+const onStartProject = async (project: { id: string; title: string; kickoffISO?: string }) => {
+  if (project.kickoffISO) {
+    // Direct start with kickoff - setup the project
+    try {
+      const success = await setupProject(project.id, project.kickoffISO);
+      if (!success) {
+        toast({ 
+          title: "Erreur", 
+          description: "Échec de la configuration du projet." 
+        });
+        return;
+      }
+
+      await refreshProjects();
+      toast({ 
+        title: "Projet configuré avec succès!", 
+        description: "Planning, Kanban, Drive, notifications créés et équipe invitée au kickoff." 
+      });
+    } catch (error) {
+      console.error('Error starting project:', error);
+      toast({ 
+        title: "Erreur", 
+        description: "Une erreur s'est produite lors de la configuration." 
+      });
+    }
+  } else {
+    // Legacy flow - open dialog
+    setKickoffProject(project);
+    setKickoffDialogOpen(true);
+  }
 };
 
 const handleKickoffConfirm = async (kickoffISO: string) => {
@@ -141,8 +171,6 @@ const handleKickoffConfirm = async (kickoffISO: string) => {
       });
       return;
     }
-
-    // The project orchestrator now handles everything including kickoff event
 
     setKickoffDialogOpen(false);
     setKickoffProject(null);
@@ -278,12 +306,16 @@ const projetsEnPause = classifiedProjects.filter(p => p.category === 'en-pause')
 const projetsEnCours = classifiedProjects.filter(p => p.category === 'en-cours');
 const projetsTermines = classifiedProjects.filter(p => p.category === 'termines');
 
+const hasActiveProjects = projetsEnCours.length > 0;
+
 const menuItems = [
   { id: 'projects', label: 'Mes projets', icon: FolderOpen },
-  { id: 'planning', label: 'Planning', icon: CalendarClock },
-  { id: 'drive', label: 'Drive', icon: Cloud },
-  { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
-  { id: 'messages', label: 'Messages', icon: MessageSquare },
+  ...(hasActiveProjects ? [
+    { id: 'planning', label: 'Planning', icon: CalendarClock },
+    { id: 'drive', label: 'Drive', icon: Cloud },
+    { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
+    { id: 'messages', label: 'Messages', icon: MessageSquare },
+  ] : []),
   { id: 'invoices', label: 'Mes factures', icon: Receipt },
 ];
 
@@ -513,7 +545,15 @@ const menuItems = [
       case 'planning':
         return (
           <div className="space-y-4">
-            <SharedPlanningView mode="client" projects={projects} />
+            {projetsEnCours.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CalendarClock className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">Planning non disponible</h3>
+                <p>Démarrez un projet pour accéder au planning partagé</p>
+              </div>
+            ) : (
+              <SharedPlanningView mode="client" projects={projetsEnCours} />
+            )}
           </div>
         );
 
@@ -521,30 +561,47 @@ const menuItems = [
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Drive</h2>
-            <DriveView />
+            {projetsEnCours.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Cloud className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">Espace de stockage non disponible</h3>
+                <p>Démarrez un projet pour accéder aux fichiers partagés</p>
+              </div>
+            ) : (
+              <DriveView />
+            )}
           </div>
         );
 
       case 'messages':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Messages</h2>
-            <div className="space-y-4">
-              <div className="w-full md:w-80">
-                <label className="text-sm font-medium">Projet</label>
-                <Select value={selectedMessagesProjectId} onValueChange={setSelectedMessagesProjectId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un projet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <MessageSystem />
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Messages</h2>
+              {projetsEnCours.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Select value={selectedMessagesProjectId} onValueChange={setSelectedMessagesProjectId}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Sélectionner un projet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                           {projetsEnCours.map((p) => (
+                             <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                           ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
+            {projetsEnCours.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">Messagerie non disponible</h3>
+                <p>Démarrez un projet pour communiquer avec votre équipe</p>
+              </div>
+            ) : selectedMessagesProjectId && (
+              <MessageSystem />
+            )}
           </div>
         );
 
@@ -605,61 +662,43 @@ const menuItems = [
       case 'kanban':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Tableau Kanban</h2>
-            <div className="grid gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Gestion de projet Kanban</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Projet</label>
-                      <Select value={selectedKanbanProjectId} onValueChange={setSelectedKanbanProjectId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un projet" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {projects.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <p className="text-muted-foreground">
-                      Organisez vos tâches et suivez l'avancement de vos projets avec notre tableau Kanban interactif.
-                    </p>
-
-                    <Button 
-                      onClick={() => selectedKanbanProjectId && navigate(`/kanban?project_id=${selectedKanbanProjectId}`)} 
-                      className="w-full"
-                      disabled={!selectedKanbanProjectId}
-                    >
-                      Ouvrir le tableau Kanban
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Boards récents</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-sm">Projet de développement web</span>
-                      <Badge variant="secondary">3 colonnes • 8 cartes</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-sm">Sprint Planning Q1</span>
-                      <Badge variant="secondary">4 colonnes • 12 cartes</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Tableau Kanban</h2>
+              {projetsEnCours.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Select value={selectedKanbanProjectId} onValueChange={setSelectedKanbanProjectId}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Sélectionner un projet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                     {projetsEnCours.map((p) => (
+                       <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                     ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
+            {projetsEnCours.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Kanban className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">Tableau Kanban non disponible</h3>
+                <p>Démarrez un projet pour accéder au tableau de gestion des tâches</p>
+              </div>
+            ) : selectedKanbanProjectId && (
+              <div style={{ height: '70vh' }}>
+                <iframe
+                  src={`/kanban/${selectedKanbanProjectId}`}
+                  title="Kanban Board"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    borderRadius: '8px'
+                  }}
+                />
+              </div>
+            )}
           </div>
         );
         
