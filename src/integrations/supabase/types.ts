@@ -38,6 +38,51 @@ export type Database = {
         }
         Relationships: []
       }
+      candidate_event_notifications: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          description: string | null
+          event_date: string
+          event_id: string
+          id: string
+          location: string | null
+          project_id: string
+          status: string
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          description?: string | null
+          event_date: string
+          event_id: string
+          id?: string
+          location?: string | null
+          project_id: string
+          status?: string
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          description?: string | null
+          event_date?: string
+          event_id?: string
+          id?: string
+          location?: string | null
+          project_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       candidate_expertises: {
         Row: {
           candidate_id: string
