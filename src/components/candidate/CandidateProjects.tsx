@@ -399,8 +399,12 @@ const fetchAcceptedProjects = async () => {
     
     // Séparer les projets en pause (acceptés) et actifs (en cours)
     const allProjects = data || [];
+    console.log('All accepted projects from DB:', allProjects);
     const acceptedOnly = allProjects.filter((p: any) => p.projects?.status === 'pause');
     const activeOnly = allProjects.filter((p: any) => p.projects?.status === 'play');
+    
+    console.log('Filtered accepted projects (pause):', acceptedOnly);
+    console.log('Filtered active projects (play):', activeOnly);
     
     setAcceptedProjects(acceptedOnly);
     setActiveProjects(activeOnly);
