@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DynamicMessageSystem from "@/components/messages/DynamicMessageSystem";
 import ClientKanbanView from "@/components/client/ClientKanbanView";
+import ClientMessagesView from "@/components/client/ClientMessagesView";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 

@@ -34,7 +34,7 @@ export default function CandidateKanbanView() {
           .from('kanban_boards')
           .select('id')
           .eq('project_id', selectedProjectId)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Erreur chargement board:', error);
