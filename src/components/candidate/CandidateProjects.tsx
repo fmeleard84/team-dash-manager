@@ -557,13 +557,16 @@ const formatCurrency = (n?: number | null) => {
               <div className="grid gap-4">
                  {notifications.map((notification) => {
                    const projectData = projectsData[notification.project_id];
+                   console.log('Notification data for card:', {
+                     notification_projects: notification.projects,
+                     project_data: projectData,
+                     project_id: notification.project_id
+                   });
                    return (
                 <Card key={notification.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">
-                        {notification.projects?.title || notification.title || 'Projet sans titre'}
-                      </CardTitle>
+                      <CardTitle className="text-lg">{notification.projects?.title || notification.title || 'Projet sans titre'}</CardTitle>
                       <Badge className="bg-blue-600 text-white">Nouveau</Badge>
                     </div>
                   </CardHeader>
