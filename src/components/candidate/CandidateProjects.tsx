@@ -368,6 +368,8 @@ const handleViewAcceptedProject = async (booking: any, projectData: any) => {
 
 const fetchAcceptedProjects = async () => {
   try {
+    console.log('DEBUG: Fetching accepted projects for candidate ID:', currentCandidateId);
+    
     const { data, error } = await supabase
       .from('project_bookings')
       .select(`
@@ -376,7 +378,7 @@ const fetchAcceptedProjects = async () => {
         created_at,
         project_id,
         resource_assignment_id,
-        projects!inner (
+        projects (
           id,
           title,
           description,
@@ -385,8 +387,8 @@ const fetchAcceptedProjects = async () => {
           client_budget,
           status
         ),
-        hr_resource_assignments!inner (
-          hr_profiles!inner (
+        hr_resource_assignments (
+          hr_profiles (
             name
           )
         )
@@ -394,6 +396,8 @@ const fetchAcceptedProjects = async () => {
       .eq('candidate_id', currentCandidateId)
       .eq('status', 'accepted')
       .order('created_at', { ascending: false });
+
+    console.log('DEBUG: fetchAcceptedProjects query result:', { data, error });
 
     if (error) throw error;
     
