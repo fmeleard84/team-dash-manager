@@ -28,7 +28,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
-import PlanningView from "@/components/client/PlanningView";
+import SharedPlanningView from "@/components/shared/SharedPlanningView";
 import DriveView from "@/components/client/DriveView";
 import CreateProjectModal from "@/components/CreateProjectModal";
 import { ProjectCard } from "@/components/ProjectCard";
@@ -657,8 +657,7 @@ const menuItems = [
       case 'planning':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Planning</h2>
-            <PlanningView />
+            <SharedPlanningView mode="client" projects={projects} />
           </div>
         );
 

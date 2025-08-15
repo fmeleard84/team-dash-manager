@@ -36,7 +36,8 @@ interface SharedPlanningViewProps {
 
 export default function SharedPlanningView({ mode, projects, candidateId }: SharedPlanningViewProps) {
   const { toast } = useToast();
-  const { acceptEvent, declineEvent } = useNotifications();
+  // Only use notifications hook in candidate mode to avoid loading candidate profiles in client mode
+  const { acceptEvent, declineEvent } = mode === 'candidate' ? useNotifications() : { acceptEvent: async () => {}, declineEvent: async () => {} };
   const [projectId, setProjectId] = useState<string>("");
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
