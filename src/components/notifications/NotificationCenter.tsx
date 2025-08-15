@@ -22,10 +22,12 @@ import {
   User,
   Calendar,
   Video,
-  MapPin
+  MapPin,
+  ExternalLink
 } from "lucide-react";
 import { Notification, NotificationType } from "@/types/notifications";
 import { useNotifications } from "@/hooks/useNotifications";
+import { generateGoogleCalendarUrl } from "@/utils/googleCalendar";
 
 
 const NotificationIcon = ({ type }: { type: NotificationType }) => {
@@ -79,7 +81,7 @@ const formatTimeAgo = (dateString: string) => {
 
 export const NotificationCenter = () => {
   const navigate = useNavigate();
-  const { notifications, loading, markAsRead, markAllAsRead, archiveNotification } = useNotifications();
+  const { notifications, loading, markAsRead, markAllAsRead, archiveNotification, acceptEvent, declineEvent } = useNotifications();
   const [activeTab, setActiveTab] = useState('all');
   
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
@@ -228,7 +230,7 @@ export const NotificationCenter = () => {
                                 </div>
                               )}
                               
-                              {notification.status === 'unread' && (
+                              {notification.status === 'unread' && notification.metadata?.eventStatus === 'pending' && (
                                 <div className="flex items-center gap-1 mt-2">
                                   {notification.type === 'event_invitation' ? (
                                     <>
@@ -237,7 +239,7 @@ export const NotificationCenter = () => {
                                         size="sm"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          markAsRead(notification.id);
+                                          acceptEvent(notification.id);
                                         }}
                                         className="h-6 px-2 text-xs text-green-600 hover:text-green-700"
                                       >
@@ -249,7 +251,7 @@ export const NotificationCenter = () => {
                                         size="sm"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          archiveNotification(notification.id);
+                                          declineEvent(notification.id);
                                         }}
                                         className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
                                       >
@@ -285,6 +287,31 @@ export const NotificationCenter = () => {
                                       </Button>
                                     </>
                                   )}
+                                </div>
+                              )}
+                              
+                              {notification.type === 'event_invitation' && notification.metadata?.eventDate && (
+                                <div className="flex items-center gap-1 mt-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const eventData = {
+                                        title: notification.title,
+                                        description: notification.message,
+                                        start_at: notification.metadata.eventDate,
+                                        end_at: null,
+                                        location: notification.metadata.location,
+                                        video_url: notification.metadata.videoUrl
+                                      };
+                                      window.open(generateGoogleCalendarUrl(eventData), '_blank');
+                                    }}
+                                    className="h-6 px-2 text-xs"
+                                  >
+                                    <ExternalLink className="w-3 h-3 mr-1" />
+                                    Google Calendar
+                                  </Button>
                                 </div>
                               )}
                             </div>

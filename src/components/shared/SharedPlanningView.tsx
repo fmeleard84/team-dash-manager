@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { generateGoogleCalendarUrl } from "@/utils/googleCalendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2 } from "lucide-react";
+import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
@@ -21,6 +22,7 @@ interface EventRow {
   video_url?: string | null;
   drive_url?: string | null;
   project_id: string;
+  _candidate_event?: boolean;
 }
 
 interface SharedPlanningViewProps {
@@ -169,6 +171,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
 
       // If in candidate mode, also load accepted event invitations
       if (mode === 'candidate' && candidateId) {
+        console.log('Loading candidate events for candidateId:', candidateId);
         const { data: candidateEvents, error: candidateError } = await supabase
           .from("candidate_event_notifications")
           .select(`
@@ -182,15 +185,16 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
             project_id
           `)
           .eq('candidate_id', candidateId)
-          .eq('status', 'read') // Only show accepted events
+          .eq('status', 'accepted') // Only show accepted events
           .order('event_date', { ascending: true });
 
         if (candidateError) {
           console.error("Error loading candidate events:", candidateError);
         } else if (candidateEvents) {
+          console.log('Loaded candidate events:', candidateEvents);
           // Convert candidate event notifications to EventRow format
           const convertedEvents: EventRow[] = candidateEvents.map(event => ({
-            id: event.event_id || event.id,
+            id: event.event_id || `candidate_${event.id}`,
             title: event.title,
             description: event.description,
             start_at: event.event_date,
@@ -199,7 +203,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
             video_url: event.video_url,
             drive_url: null,
             project_id: event.project_id,
-            created_by: 'system' // Mark as system/invitation event
+            _candidate_event: true // Mark as candidate event
           }));
 
           allEvents = [...allEvents, ...convertedEvents];
@@ -821,12 +825,24 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
-                            <Edit2 className="h-4 w-4" />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => window.open(generateGoogleCalendarUrl(ev), '_blank')}
+                            aria-label="Ajouter à Google Calendar"
+                          >
+                            <ExternalLink className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!ev._candidate_event && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))
@@ -854,12 +870,24 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
-                      <Edit2 className="h-4 w-4" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => window.open(generateGoogleCalendarUrl(ev), '_blank')}
+                      aria-label="Ajouter à Google Calendar"
+                    >
+                      <ExternalLink className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {!ev._candidate_event && (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

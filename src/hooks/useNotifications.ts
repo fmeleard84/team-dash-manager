@@ -55,7 +55,7 @@ export const useNotifications = () => {
         id: event.id,
         type: 'event_invitation' as const,
         priority: new Date(event.event_date) < new Date(Date.now() + 24 * 60 * 60 * 1000) ? 'high' : 'medium',
-        status: event.status === 'read' ? 'read' : 'unread',
+        status: event.status === 'pending' ? 'unread' : 'read',
         title: event.title,
         message: event.description || 'Nouvel événement',
         metadata: {
@@ -64,9 +64,10 @@ export const useNotifications = () => {
           eventDate: event.event_date,
           location: event.location,
           videoUrl: event.video_url,
+          eventStatus: event.status,
         },
         createdAt: event.created_at,
-        readAt: event.status === 'read' ? event.updated_at : undefined,
+        readAt: event.status !== 'pending' ? event.updated_at : undefined,
       }));
 
       setNotifications(formattedNotifications);
@@ -96,6 +97,50 @@ export const useNotifications = () => {
       ));
     } catch (error) {
       console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const acceptEvent = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('candidate_event_notifications')
+        .update({ status: 'accepted', updated_at: new Date().toISOString() })
+        .eq('id', notificationId);
+
+      if (error) {
+        console.error('Error accepting event:', error);
+        return;
+      }
+
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId 
+          ? { ...n, status: 'read' as const, readAt: new Date().toISOString() } 
+          : n
+      ));
+    } catch (error) {
+      console.error('Error accepting event:', error);
+    }
+  };
+
+  const declineEvent = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('candidate_event_notifications')
+        .update({ status: 'declined', updated_at: new Date().toISOString() })
+        .eq('id', notificationId);
+
+      if (error) {
+        console.error('Error declining event:', error);
+        return;
+      }
+
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId 
+          ? { ...n, status: 'read' as const, readAt: new Date().toISOString() } 
+          : n
+      ));
+    } catch (error) {
+      console.error('Error declining event:', error);
     }
   };
 
@@ -184,6 +229,8 @@ export const useNotifications = () => {
     markAsRead,
     markAllAsRead,
     archiveNotification,
+    acceptEvent,
+    declineEvent,
     refetch: loadNotifications
   };
 };
