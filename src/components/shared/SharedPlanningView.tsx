@@ -77,13 +77,13 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   }, [projects, projectId]);
 
   // Load team members when project changes
-  useEffect(() => {
-    if (projectId) {
-      (async () => {
+  const loadTeamMembersForProject = async (currentProjectId: string) => {
+    if (currentProjectId) {
+      try {
         const { data, error } = await supabase
           .from("project_teams")
           .select("email, first_name, last_name")
-          .eq("project_id", projectId);
+          .eq("project_id", currentProjectId);
         if (error) {
           console.error("load team members error", error);
           setTeamMembers([]);
@@ -94,10 +94,17 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
           })).filter((m) => m.email);
           setTeamMembers(members);
         }
-      })();
+      } catch (err) {
+        console.error("Error loading team members:", err);
+        setTeamMembers([]);
+      }
     } else {
       setTeamMembers([]);
     }
+  };
+
+  useEffect(() => {
+    loadTeamMembersForProject(projectId);
   }, [projectId]);
 
   const loadAllEvents = async () => {
@@ -230,6 +237,10 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     setLocation(event.location || "");
     setVideoUrl(event.video_url || "");
     setDriveUrl(event.drive_url || "");
+    
+    // Load team members for the event's project immediately
+    loadTeamMembersForProject(event.project_id);
+    
     setIsEditDialogOpen(true);
   };
 
