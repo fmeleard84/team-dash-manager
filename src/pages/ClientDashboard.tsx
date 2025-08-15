@@ -337,14 +337,39 @@ const handleCreateProject = async (data: { title: string; description?: string; 
 
     const projectId = inserted.id as string;
 
+    // Upload file and save metadata to database
     if (data.file) {
-      const path = `project/${projectId}/${data.file.name}`;
-      const { error: upErr } = await supabase.storage
-        .from('project-files')
-        .upload(path, data.file, { upsert: true });
-      if (upErr) {
-        console.error('upload error', upErr);
-        toast({ title: 'Upload échoué', description: data.file.name });
+      try {
+        const path = `project/${projectId}/${data.file.name}`;
+        const { error: upErr } = await supabase.storage
+          .from('project-files')
+          .upload(path, data.file, { upsert: true });
+        
+        if (upErr) {
+          console.error('upload error', upErr);
+          toast({ title: 'Upload échoué', description: data.file.name });
+        } else {
+          // Save file metadata to database
+          const { data: authData } = await supabase.auth.getUser();
+          const { error: fileErr } = await supabase
+            .from('project_files')
+            .insert({
+              project_id: projectId,
+              file_name: data.file.name,
+              file_path: path,
+              file_size: data.file.size,
+              file_type: data.file.type,
+              uploaded_by: authData.user?.id
+            });
+          
+          if (fileErr) {
+            console.error('Error saving file metadata:', fileErr);
+          } else {
+            console.log('File uploaded and metadata saved successfully');
+          }
+        }
+      } catch (error) {
+        console.error('Error uploading file:', error);
       }
     }
 

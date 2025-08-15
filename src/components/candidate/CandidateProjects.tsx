@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useProjectFiles } from "@/hooks/useProjectFiles";
 
 interface ProjectNotification {
   id: string;
@@ -46,7 +47,14 @@ interface ProjectDetail {
   expertises?: string[];
   languages?: string[];
   seniority?: string | null;
-  files?: { name: string; size: number; url: string; downloadUrl?: string }[];
+  files?: Array<{
+    id: string;
+    file_name: string;
+    file_path: string;
+    file_size?: number;
+    file_type?: string;
+    uploaded_at?: string;
+  }>;
 }
 
 const CandidateProjects = () => {
@@ -60,6 +68,9 @@ const CandidateProjects = () => {
   const [nextcloudLinks, setNextcloudLinks] = useState<Record<string, string>>({});
   const [projectsData, setProjectsData] = useState<{ [key: string]: any }>({});
   const { user } = useAuth();
+  
+  // Project files hook
+  const { files: projectFiles, loading: filesLoading, downloadFile } = useProjectFiles(selectedProject?.id || null);
   useEffect(() => {
     fetchCurrentCandidate();
   }, []);
@@ -243,7 +254,7 @@ const handleViewDetails = async (notification: ProjectNotification) => {
         expertises: p.expertises || notification.hr_resource_assignments.expertises || [],
         languages: p.languages || notification.hr_resource_assignments.languages || [],
         seniority: p.seniority || notification.hr_resource_assignments.seniority || null,
-        files: p.files || []
+        files: [] // Files will be loaded by useProjectFiles hook
       });
     } else {
       // fallback to local enrichment
@@ -976,52 +987,42 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
               {/* Project files */}
               <div>
                 <h4 className="font-semibold mb-2">Fichiers joints</h4>
-                {selectedProject.files?.length > 0 ? (
+                {filesLoading ? (
+                  <p className="text-sm text-gray-500">Chargement des fichiers...</p>
+                ) : projectFiles?.length > 0 ? (
                   <div className="space-y-2">
-                    {selectedProject.files.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
+                    {projectFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
                             📄
                           </div>
                           <div>
-                            <p className="text-sm font-medium">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {(file.size / 1024).toFixed(1)} KB
+                            <p className="font-medium text-sm">{file.file_name}</p>
+                            <p className="text-xs text-gray-500">
+                              {file.file_size ? `${(file.file_size / 1024 / 1024).toFixed(2)} MB` : 'Taille inconnue'} • 
+                              {new Date(file.uploaded_at).toLocaleDateString('fr-FR')}
                             </p>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(file.url, '_blank')}
-                          >
-                            Voir
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = file.downloadUrl || file.url;
-                              link.download = file.name;
-                              link.target = '_blank';
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
-                          >
-                            Télécharger
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              await downloadFile(file);
+                            } catch (error) {
+                              toast.error('Erreur lors du téléchargement');
+                            }
+                          }}
+                        >
+                          Télécharger
+                        </Button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Aucun fichier joint pour le moment
-                  </p>
+                  <p className="text-sm text-gray-500">Aucun fichier joint à ce projet</p>
                 )}
               </div>
 
@@ -1053,7 +1054,6 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
       </Dialog>
     </>
   );
-
 };
 
 export default CandidateProjects;
