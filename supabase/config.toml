@@ -115,3 +115,9 @@ verify_jwt = false
 
 [functions.auth-check]
 verify_jwt = false
+
+[functions.project-kickoff]
+verify_jwt = false
+
+[functions.project-orchestrator]
+verify_jwt = false

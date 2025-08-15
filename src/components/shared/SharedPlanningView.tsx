@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
 interface Project { id: string; title: string }
 interface EventRow {
@@ -396,9 +396,12 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                 Nouvel événement
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md" aria-describedby="new-event-desc">
               <DialogHeader>
                 <DialogTitle>Nouvel événement</DialogTitle>
+                <DialogDescription id="new-event-desc">
+                  Créez un nouvel événement pour votre projet. Vous pouvez inviter les membres de l'équipe.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -487,9 +490,12 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
 
       {/* Edit Event Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="edit-event-desc">
           <DialogHeader>
             <DialogTitle>Modifier l'événement</DialogTitle>
+            <DialogDescription id="edit-event-desc">
+              Modifiez les détails de cet événement. Les participants seront automatiquement notifiés des changements.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
