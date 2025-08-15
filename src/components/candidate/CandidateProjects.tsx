@@ -465,6 +465,7 @@ const formatDate = (dateString: string) => {
 
 const fetchProjectsDetails = async (projectIds: string[]) => {
   try {
+    console.log('Calling fetchProjectsDetails with:', projectIds);
     const { data, error } = await supabase.functions.invoke('project-details', {
       body: { 
         action: 'get_candidate_projects_details',
@@ -474,6 +475,8 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
         'x-keycloak-email': user?.profile?.email || '',
       },
     });
+
+    console.log('fetchProjectsDetails response:', { data, error });
 
     if (error) {
       console.error('Error fetching projects details:', error);
@@ -491,7 +494,10 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
           files: project.files || []
         };
       });
+      console.log('Setting projectsData:', projectsMap);
       setProjectsData(projectsMap);
+    } else {
+      console.log('No project data returned or success=false');
     }
   } catch (error) {
     console.error('Error calling projects details function:', error);
