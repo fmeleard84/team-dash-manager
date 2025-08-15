@@ -144,6 +144,16 @@ const CandidateProjects = () => {
 
       const bookedAssignmentIds = (bookedAssignments || []).map(b => b.resource_assignment_id);
 
+      // DEBUG: First check basic notifications without joins
+      const { data: basicCheck, error: basicError } = await supabase
+        .from('candidate_notifications')
+        .select('*')
+        .eq('candidate_id', currentCandidateId)
+        .eq('status', 'unread');
+        
+      console.log('Basic notifications check:', basicCheck);
+      console.log('Basic check error:', basicError);
+
       // Fetch contextualized notifications with all necessary data
       // Only exclude notifications for specific resource assignments that are already booked
       let query = supabase
@@ -161,7 +171,7 @@ const CandidateProjects = () => {
           required_expertises,
           required_languages,
           calculated_price,
-          projects!inner (
+          projects (
             title,
             description,
             project_date,
