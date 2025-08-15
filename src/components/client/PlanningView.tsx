@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus } from "lucide-react";
+import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -39,6 +39,10 @@ export default function PlanningView() {
   const [videoUrl, setVideoUrl] = useState("");
   const [driveUrl, setDriveUrl] = useState(""); // NEW
   const [attendeesEmails, setAttendeesEmails] = useState("");
+
+  // Edition d'événement
+  const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Nouveau: filtre et vues
   const [filterProjectId, setFilterProjectId] = useState<string>("all");
@@ -197,6 +201,75 @@ export default function PlanningView() {
       setDriveUrl(""); 
       setAttendeesEmails("");
       setIsDialogOpen(false);
+      await loadAllEvents();
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({ title: "Erreur", description: "Une erreur inattendue est survenue" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (event: EventRow) => {
+    setEditingEvent(event);
+    const eventDate = new Date(event.start_at);
+    const eventEndDate = event.end_at ? new Date(event.end_at) : null;
+    
+    setProjectId(event.project_id);
+    setTitle(event.title);
+    setDescription(event.description || "");
+    setDate(eventDate.toISOString().split('T')[0]);
+    setStartTime(eventDate.toTimeString().slice(0, 5));
+    setEndTime(eventEndDate ? eventEndDate.toTimeString().slice(0, 5) : "");
+    setLocation(event.location || "");
+    setVideoUrl(event.video_url || "");
+    setDriveUrl(event.drive_url || "");
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingEvent || !projectId || !title || !date || !startTime) {
+      toast({ title: "Champs manquants", description: "Titre, date et heure de début requis" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const startISO = new Date(`${date}T${startTime}:00`).toISOString();
+      const endISO = endTime ? new Date(`${date}T${endTime}:00`).toISOString() : null;
+      const finalVideoUrl = videoUrl || suggestedVideoUrl || null;
+
+      const { error } = await supabase
+        .from("project_events")
+        .update({
+          project_id: projectId,
+          title,
+          description: description || null,
+          start_at: startISO,
+          end_at: endISO,
+          location: location || null,
+          video_url: finalVideoUrl,
+          drive_url: driveUrl || null,
+        })
+        .eq("id", editingEvent.id);
+
+      if (error) {
+        console.error("update event error", error);
+        toast({ title: "Erreur", description: "Modification de l'événement échouée" });
+        return;
+      }
+
+      toast({ title: "Événement modifié" });
+      setTitle(""); 
+      setDescription(""); 
+      setDate(""); 
+      setStartTime(""); 
+      setEndTime(""); 
+      setLocation(""); 
+      setVideoUrl(""); 
+      setDriveUrl(""); 
+      setEditingEvent(null);
+      setIsEditDialogOpen(false);
       await loadAllEvents();
     } catch (error) {
       console.error("Unexpected error:", error);
@@ -440,10 +513,15 @@ export default function PlanningView() {
                               <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
                             )}
                           </div>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                         </div>
+                         <div className="flex gap-2">
+                           <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
+                             <Edit2 className="h-4 w-4" />
+                           </Button>
+                           <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                         </div>
                       </div>
                     ))
                 )}
@@ -468,16 +546,105 @@ export default function PlanningView() {
                         <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
                       )}
                     </div>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                   </div>
+                   <div className="flex gap-2">
+                     <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
+                       <Edit2 className="h-4 w-4" />
+                     </Button>
+                     <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   </div>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Event Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier l'événement</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Projet</label>
+              <Select value={projectId} onValueChange={setProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un projet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Titre</label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Kickoff" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Date</label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Début</label>
+                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Fin (optionnel)</label>
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description (optionnel)</label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description de l'événement" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Lieu (optionnel)</label>
+              <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Adresse / Salle" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Lien visio (optionnel)</label>
+              <Input value={videoUrl || suggestedVideoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="URL Jitsi / Teams" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Lien Google Drive (optionnel)</label>
+              <Input value={driveUrl} onChange={(e) => setDriveUrl(e.target.value)} placeholder="URL Google Drive / Docs" />
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={handleUpdate} disabled={!projectId || loading} className="flex-1">
+                Modifier
+              </Button>
+              <Button variant="outline" onClick={() => {
+                setIsEditDialogOpen(false);
+                setEditingEvent(null);
+                setTitle("");
+                setDescription("");
+                setDate("");
+                setStartTime("");
+                setEndTime("");
+                setLocation("");
+                setVideoUrl("");
+                setDriveUrl("");
+              }}>
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
