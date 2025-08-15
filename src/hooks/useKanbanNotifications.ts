@@ -20,16 +20,18 @@ export const useKanbanNotifications = () => {
         return;
       }
 
-      // First get the candidate profile
+      // Try to get candidate profile first 
       const { data: candidateProfile, error: profileError } = await supabase
         .from('candidate_profiles')
         .select('id')
         .eq('email', userEmail)
-        .single();
+        .maybeSingle();
 
+      // If no candidate profile found, this user is probably a client, not a candidate
       if (profileError || !candidateProfile) {
         console.log('No candidate profile found for email:', userEmail);
         setNotifications([]);
+        setLoading(false);
         return;
       }
 
@@ -140,9 +142,12 @@ export const useKanbanNotifications = () => {
         .from('candidate_profiles')
         .select('id')
         .eq('email', userEmail)
-        .single();
+        .maybeSingle();
 
-      if (!candidateProfile) return;
+      if (!candidateProfile) {
+        // This is likely a client, not a candidate
+        return;
+      }
 
       const { error } = await supabase
         .from('kanban_notifications')

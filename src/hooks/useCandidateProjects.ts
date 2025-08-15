@@ -33,6 +33,15 @@ export const useCandidateProjects = () => {
 
         if (error) {
           console.error('Error fetching candidate:', error);
+          setProjects([]);
+          setLoading(false);
+          return;
+        }
+
+        if (!candidate) {
+          console.log('No candidate profile found for email:', user.profile.email);
+          setProjects([]);
+          setLoading(false);
           return;
         }
 

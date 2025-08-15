@@ -14,15 +14,17 @@ export const useNotifications = () => {
     try {
       setLoading(true);
       
-      // Get candidate profile first
+      // Get candidate profile first - only for candidates, not clients
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
         .select('id')
         .eq('email', user.email)
-        .single();
+        .maybeSingle();
 
       if (!candidateProfile) {
+        // This is likely a client, not a candidate
         setNotifications([]);
+        setLoading(false);
         return;
       }
 
@@ -148,13 +150,17 @@ export const useNotifications = () => {
     if (!user?.email) return;
 
     try {
+      // Get candidate profile
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
         .select('id')
         .eq('email', user.email)
-        .single();
+        .maybeSingle();
 
-      if (!candidateProfile) return;
+      if (!candidateProfile) {
+        // This is likely a client, not a candidate
+        return;
+      }
 
       const { error } = await supabase
         .from('candidate_event_notifications')
