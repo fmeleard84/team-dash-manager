@@ -87,7 +87,20 @@ const CandidateDashboard = () => {
         return <CandidateProjects />;
         
       case 'planning':
-        return <CandidatePlanningView />;
+        return candidateId ? (
+          <div className="space-y-6">
+            <CandidatePlanningView />
+            <div>
+              <CandidateEventNotifications candidateId={candidateId} />
+            </div>
+          </div>
+        ) : (
+          <div className="p-6">
+            <p className="text-center text-muted-foreground">
+              Aucun profil candidat trouvé.
+            </p>
+          </div>
+        );
         
       case 'drive':
         return <CandidateDriveView />;
@@ -99,14 +112,9 @@ const CandidateDashboard = () => {
         return candidateId ? (
           <div className="space-y-6">
             <MessageSystem />
-            <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Notifications de missions</h3>
-                <CandidateMessages candidateId={candidateId} />
-              </div>
-              <div>
-                <CandidateEventNotifications candidateId={candidateId} />
-              </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Notifications de missions</h3>
+              <CandidateMessages candidateId={candidateId} />
             </div>
           </div>
         ) : (

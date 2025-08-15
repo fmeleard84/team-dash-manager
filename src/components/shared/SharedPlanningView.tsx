@@ -80,6 +80,10 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   const loadTeamMembersForProject = async (currentProjectId: string) => {
     if (currentProjectId) {
       try {
+        // Get current user email
+        const { data: userData } = await supabase.auth.getUser();
+        const userEmail = userData.user?.email;
+
         const { data, error } = await supabase
           .from("project_teams")
           .select("email, first_name, last_name")
@@ -91,7 +95,9 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
           const members = (data as any[]).map((r) => ({
             email: r.email,
             name: [r.first_name, r.last_name].filter(Boolean).join(" "),
-          })).filter((m) => m.email);
+          }))
+          .filter((m) => m.email)
+          .filter((m) => m.email !== userEmail); // Exclude current user
           setTeamMembers(members);
         }
       } catch (err) {
