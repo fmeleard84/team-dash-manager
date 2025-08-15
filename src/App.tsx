@@ -18,6 +18,7 @@ import NotificationsPage from "./pages/NotificationsPage";
 import KanbanPage from "./pages/KanbanPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import AuthCallback from "./pages/AuthCallback";
 
@@ -29,7 +30,7 @@ const AppContent = () => {
   const showHeader = !dashboardPaths.includes(location.pathname);
 
   return (
-    <>
+    <ErrorBoundary>
       {showHeader && <Header />}
       <Routes>
         <Route path="/" element={<Index />} />
@@ -43,10 +44,11 @@ const AppContent = () => {
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
         <Route path="/kanban" element={<ProtectedRoute><KanbanPage /></ProtectedRoute>} />
+        <Route path="/kanban/:projectId" element={<ProtectedRoute><KanbanPage /></ProtectedRoute>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </ErrorBoundary>
   );
 };
 

@@ -2,18 +2,18 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useCandidateProjects } from "@/hooks/useCandidateProjects";
+import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
 import { useNavigate } from "react-router-dom";
 import { Trello } from "lucide-react";
 
 export default function CandidateKanbanView() {
-  const { projects, candidateId } = useCandidateProjects();
+  const { projects, candidateId } = useCandidateProjectsOptimized();
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const navigate = useNavigate();
 
   const handleOpenKanban = () => {
     if (selectedProjectId) {
-      navigate(`/kanban?projectId=${selectedProjectId}`);
+      navigate(`/kanban/${selectedProjectId}`);
     }
   };
 

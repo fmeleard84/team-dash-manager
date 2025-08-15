@@ -27,14 +27,15 @@ import {
 } from '@/components/ui/select';
 import { KanbanCard, KanbanColumn, CreateCardInput, CreateColumnInput, TeamMember } from '@/types/kanban';
 import { ArrowLeft, Plus, Download, Upload } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 
 const KanbanPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const { projectId: paramProjectId } = useParams<{ projectId: string }>();
+  const [projectId, setProjectId] = useState<string | null>(paramProjectId || null);
   const [boardId, setBoardId] = useState<string | null>(null);
   const [availableProjects, setAvailableProjects] = useState<Array<{ id: string; title: string }>>([]);
 
@@ -148,9 +149,9 @@ const KanbanPage = () => {
 
   // Bootstrap board based on project_id
   useEffect(() => {
-    const pid = searchParams.get('project_id');
-    if (pid) setProjectId(pid);
-  }, [searchParams]);
+    const pid = paramProjectId || searchParams.get('project_id');
+    if (pid && pid !== projectId) setProjectId(pid);
+  }, [searchParams, paramProjectId, projectId]);
 
   useEffect(() => {
     const bootstrap = async () => {
