@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateGoogleCalendarUrl } from "@/utils/googleCalendar";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink } from "lucide-react";
+import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink, Check, X, Video, FolderOpen } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
@@ -23,6 +24,8 @@ interface EventRow {
   drive_url?: string | null;
   project_id: string;
   _candidate_event?: boolean;
+  _notification_id?: string;
+  _notification_status?: string;
 }
 
 interface SharedPlanningViewProps {
@@ -33,6 +36,7 @@ interface SharedPlanningViewProps {
 
 export default function SharedPlanningView({ mode, projects, candidateId }: SharedPlanningViewProps) {
   const { toast } = useToast();
+  const { acceptEvent, declineEvent } = useNotifications();
   const [projectId, setProjectId] = useState<string>("");
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -169,7 +173,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
 
       let allEvents = (projectEvents as EventRow[]) || [];
 
-      // If in candidate mode, also load accepted event invitations
+      // If in candidate mode, also load all event notifications (not just accepted)
       if (mode === 'candidate' && candidateId) {
         console.log('Loading candidate events for candidateId:', candidateId);
         const { data: candidateEvents, error: candidateError } = await supabase
@@ -182,10 +186,11 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
             event_date,
             location,
             video_url,
-            project_id
+            project_id,
+            status
           `)
           .eq('candidate_id', candidateId)
-          .eq('status', 'accepted') // Only show accepted events
+          .neq('status', 'archived') // Show all except archived
           .order('event_date', { ascending: true });
 
         if (candidateError) {
@@ -203,7 +208,9 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
             video_url: event.video_url,
             drive_url: null,
             project_id: event.project_id,
-            _candidate_event: true // Mark as candidate event
+            _candidate_event: true, // Mark as candidate event
+            _notification_id: event.id, // Store notification ID for actions
+            _notification_status: event.status // Store status
           }));
 
           allEvents = [...allEvents, ...convertedEvents];
@@ -465,6 +472,22 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
       toast({ title: "Événement supprimé" });
       setAllEvents((prev) => prev.filter((e) => e.id !== id));
     }
+  };
+
+  const handleAcceptNotification = async (notificationId: string, eventId: string) => {
+    await acceptEvent(notificationId);
+    setAllEvents((prev) => prev.map((e) =>
+      e.id === eventId ? { ...e, _notification_status: 'accepted' } : e
+    ));
+    toast({ title: "Événement accepté", description: "Vous avez accepté l'invitation à cet événement." });
+  };
+
+  const handleDeclineNotification = async (notificationId: string, eventId: string) => {
+    await declineEvent(notificationId);
+    setAllEvents((prev) => prev.map((e) =>
+      e.id === eventId ? { ...e, _notification_status: 'declined' } : e
+    ));
+    toast({ title: "Événement refusé", description: "Vous avez refusé l'invitation à cet événement." });
   };
 
   // Get event dates for calendar highlighting
@@ -808,89 +831,231 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                       const d = new Date(ev.start_at);
                       return d.toDateString() === selectedDate.toDateString();
                     })
-                    .map((ev) => (
-                      <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
-                        <div>
-                          <div className="font-medium">{ev.title}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
-                          </div>
-                          <div className="flex gap-3">
-                            {ev.video_url && (
-                              <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
-                            )}
-                            {ev.drive_url && (
-                              <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => window.open(generateGoogleCalendarUrl(ev), '_blank')}
-                            aria-label="Ajouter à Google Calendar"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                          {!ev._candidate_event && (
-                            <>
-                              <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))
+                     .map((ev) => (
+                       <div key={ev.id} className="border rounded-md p-3 space-y-3">
+                         <div className="flex items-start justify-between">
+                           <div className="flex-1">
+                             <div className="font-medium">{ev.title}</div>
+                             <div className="text-sm text-muted-foreground">
+                               {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
+                             </div>
+                             {ev.description && (
+                               <div className="text-sm text-muted-foreground mt-1">{ev.description}</div>
+                             )}
+                             {ev.location && (
+                               <div className="text-sm text-muted-foreground">📍 {ev.location}</div>
+                             )}
+                             {ev._candidate_event && ev._notification_status && (
+                               <div className="mt-2">
+                                 <span className={`px-2 py-1 rounded text-xs ${
+                                   ev._notification_status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                   ev._notification_status === 'declined' ? 'bg-red-100 text-red-800' :
+                                   'bg-yellow-100 text-yellow-800'
+                                 }`}>
+                                   {ev._notification_status === 'accepted' ? 'Accepté' :
+                                    ev._notification_status === 'declined' ? 'Refusé' : 'En attente'}
+                                 </span>
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                         
+                         <div className="flex gap-2 flex-wrap">
+                           {ev.video_url && (
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => window.open(ev.video_url, '_blank')}
+                             >
+                               <Video className="w-4 h-4 mr-2" />
+                               Visio
+                             </Button>
+                           )}
+                           
+                           {ev.drive_url && (
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => window.open(ev.drive_url, '_blank')}
+                             >
+                               <FolderOpen className="w-4 h-4 mr-2" />
+                               Drive
+                             </Button>
+                           )}
+                           
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => {
+                               const googleUrl = generateGoogleCalendarUrl({
+                                 title: ev.title,
+                                 description: ev.description,
+                                 start_at: ev.start_at,
+                                 end_at: ev.end_at,
+                                 location: ev.location,
+                                 video_url: ev.video_url
+                               });
+                               window.open(googleUrl, '_blank');
+                             }}
+                           >
+                             <CalendarIcon className="w-4 h-4 mr-2" />
+                             Google Agenda
+                           </Button>
+                           
+                           {!ev._candidate_event && (
+                             <>
+                               <Button variant="outline" size="sm" onClick={() => handleEdit(ev)}>
+                                 <Edit2 className="h-4 w-4 mr-2" />
+                                 Modifier
+                               </Button>
+                               <Button variant="outline" size="sm" onClick={() => handleDelete(ev.id)}>
+                                 <Trash2 className="h-4 w-4 mr-2" />
+                                 Supprimer
+                               </Button>
+                             </>
+                           )}
+                         </div>
+                         
+                         {ev._candidate_event && ev._notification_status === 'pending' && ev._notification_id && (
+                           <div className="flex gap-2">
+                             <Button
+                               variant="default"
+                               size="sm"
+                               onClick={() => handleAcceptNotification(ev._notification_id!, ev.id)}
+                               className="flex-1"
+                             >
+                               <Check className="w-4 h-4 mr-2" />
+                               Accepter
+                             </Button>
+                             <Button
+                               variant="destructive"
+                               size="sm"
+                               onClick={() => handleDeclineNotification(ev._notification_id!, ev.id)}
+                               className="flex-1"
+                             >
+                               <X className="w-4 h-4 mr-2" />
+                               Refuser
+                             </Button>
+                           </div>
+                         )}
+                       </div>
+                     ))
                 )}
               </div>
             </div>
           ) : eventsToShow.length === 0 ? (
             <p className="text-sm text-muted-foreground">Aucun événement.</p>
           ) : (
-            <div className="space-y-3">
-              {eventsToShow.map((ev) => (
-                <div key={ev.id} className="flex items-center justify-between border rounded-md p-3">
-                  <div>
-                    <div className="font-medium">{ev.title}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
-                    </div>
-                    <div className="flex gap-3">
-                      {ev.video_url && (
-                        <a href={ev.video_url} target="_blank" rel="noreferrer" className="text-sm underline">Lien visio</a>
-                      )}
-                      {ev.drive_url && (
-                        <a href={ev.drive_url} target="_blank" rel="noreferrer" className="text-sm underline">Drive</a>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => window.open(generateGoogleCalendarUrl(ev), '_blank')}
-                      aria-label="Ajouter à Google Calendar"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                    {!ev._candidate_event && (
-                      <>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(ev)} aria-label="Modifier">
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(ev.id)} aria-label="Supprimer">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+             <div className="space-y-3">
+               {eventsToShow.map((ev) => (
+                 <div key={ev.id} className="border rounded-md p-3 space-y-3">
+                   <div className="flex items-start justify-between">
+                     <div className="flex-1">
+                       <div className="font-medium">{ev.title}</div>
+                       <div className="text-sm text-muted-foreground">
+                         {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
+                       </div>
+                       {ev.description && (
+                         <div className="text-sm text-muted-foreground mt-1">{ev.description}</div>
+                       )}
+                       {ev.location && (
+                         <div className="text-sm text-muted-foreground">📍 {ev.location}</div>
+                       )}
+                       {ev._candidate_event && ev._notification_status && (
+                         <div className="mt-2">
+                           <span className={`px-2 py-1 rounded text-xs ${
+                             ev._notification_status === 'accepted' ? 'bg-green-100 text-green-800' :
+                             ev._notification_status === 'declined' ? 'bg-red-100 text-red-800' :
+                             'bg-yellow-100 text-yellow-800'
+                           }`}>
+                             {ev._notification_status === 'accepted' ? 'Accepté' :
+                              ev._notification_status === 'declined' ? 'Refusé' : 'En attente'}
+                           </span>
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                   
+                   <div className="flex gap-2 flex-wrap">
+                     {ev.video_url && (
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => window.open(ev.video_url, '_blank')}
+                       >
+                         <Video className="w-4 h-4 mr-2" />
+                         Visio
+                       </Button>
+                     )}
+                     
+                     {ev.drive_url && (
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => window.open(ev.drive_url, '_blank')}
+                       >
+                         <FolderOpen className="w-4 h-4 mr-2" />
+                         Drive
+                       </Button>
+                     )}
+                     
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => {
+                         const googleUrl = generateGoogleCalendarUrl({
+                           title: ev.title,
+                           description: ev.description,
+                           start_at: ev.start_at,
+                           end_at: ev.end_at,
+                           location: ev.location,
+                           video_url: ev.video_url
+                         });
+                         window.open(googleUrl, '_blank');
+                       }}
+                     >
+                       <CalendarIcon className="w-4 h-4 mr-2" />
+                       Google Agenda
+                     </Button>
+                     
+                     {!ev._candidate_event && (
+                       <>
+                         <Button variant="outline" size="sm" onClick={() => handleEdit(ev)}>
+                           <Edit2 className="h-4 w-4 mr-2" />
+                           Modifier
+                         </Button>
+                         <Button variant="outline" size="sm" onClick={() => handleDelete(ev.id)}>
+                           <Trash2 className="h-4 w-4 mr-2" />
+                           Supprimer
+                         </Button>
+                       </>
+                     )}
+                   </div>
+                   
+                   {ev._candidate_event && ev._notification_status === 'pending' && ev._notification_id && (
+                     <div className="flex gap-2">
+                       <Button
+                         variant="default"
+                         size="sm"
+                         onClick={() => handleAcceptNotification(ev._notification_id!, ev.id)}
+                         className="flex-1"
+                       >
+                         <Check className="w-4 h-4 mr-2" />
+                         Accepter
+                       </Button>
+                       <Button
+                         variant="destructive"
+                         size="sm"
+                         onClick={() => handleDeclineNotification(ev._notification_id!, ev.id)}
+                         className="flex-1"
+                       >
+                         <X className="w-4 h-4 mr-2" />
+                         Refuser
+                       </Button>
+                     </div>
+                   )}
+                 </div>
+               ))}
             </div>
           )}
         </CardContent>
