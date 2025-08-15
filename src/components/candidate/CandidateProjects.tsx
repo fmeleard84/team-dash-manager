@@ -497,7 +497,7 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
       console.log('Setting projectsData:', projectsMap);
       setProjectsData(projectsMap);
     } else {
-      console.log('No project data returned or success=false');
+      console.log('No project data returned or success=false. Full response:', data);
     }
   } catch (error) {
     console.error('Error calling projects details function:', error);
