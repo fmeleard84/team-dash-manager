@@ -87,20 +87,7 @@ const CandidateDashboard = () => {
         return <CandidateProjects />;
         
       case 'planning':
-        return candidateId ? (
-          <div className="space-y-6">
-            <CandidatePlanningView />
-            <div>
-              <CandidateEventNotifications candidateId={candidateId} />
-            </div>
-          </div>
-        ) : (
-          <div className="p-6">
-            <p className="text-center text-muted-foreground">
-              Aucun profil candidat trouvé.
-            </p>
-          </div>
-        );
+        return <CandidatePlanningView />;
         
       case 'drive':
         return <CandidateDriveView />;

@@ -6,7 +6,8 @@ export type NotificationType =
   | 'project_deadline'
   | 'payment_received'
   | 'profile_updated'
-  | 'system_alert';
+  | 'system_alert'
+  | 'event_invitation';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -23,6 +24,10 @@ export interface Notification {
     projectId?: string;
     userId?: string;
     actionUrl?: string;
+    eventId?: string;
+    eventDate?: string;
+    location?: string;
+    videoUrl?: string;
     [key: string]: any;
   };
   createdAt: string;

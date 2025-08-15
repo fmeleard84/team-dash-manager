@@ -148,19 +148,70 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     }
 
     setLoading(true);
-    const ids = projects.map((p) => p.id);
-    const { data, error } = await supabase
-      .from("project_events")
-      .select("id,title,description,start_at,end_at,location,video_url,drive_url,project_id")
-      .in("project_id", ids)
-      .order("start_at", { ascending: true });
-    setLoading(false);
+    try {
+      const projectIds = projects.map(p => p.id);
+      
+      // Load regular project events
+      const { data: projectEvents, error: projectError } = await supabase
+        .from("project_events")
+        .select("id,title,description,start_at,end_at,location,video_url,drive_url,project_id")
+        .in("project_id", projectIds)
+        .order("start_at", { ascending: true });
 
-    if (error) {
-      console.error("load all events error", error);
+      if (projectError) {
+        console.error("Error loading project events:", projectError);
+        toast({ title: "Erreur", description: "Impossible de charger les événements" });
+        setLoading(false);
+        return;
+      }
+
+      let allEvents = (projectEvents as EventRow[]) || [];
+
+      // If in candidate mode, also load accepted event invitations
+      if (mode === 'candidate' && candidateId) {
+        const { data: candidateEvents, error: candidateError } = await supabase
+          .from("candidate_event_notifications")
+          .select(`
+            id,
+            event_id,
+            title,
+            description,
+            event_date,
+            location,
+            video_url,
+            project_id
+          `)
+          .eq('candidate_id', candidateId)
+          .eq('status', 'read') // Only show accepted events
+          .order('event_date', { ascending: true });
+
+        if (candidateError) {
+          console.error("Error loading candidate events:", candidateError);
+        } else if (candidateEvents) {
+          // Convert candidate event notifications to EventRow format
+          const convertedEvents: EventRow[] = candidateEvents.map(event => ({
+            id: event.event_id || event.id,
+            title: event.title,
+            description: event.description,
+            start_at: event.event_date,
+            end_at: null,
+            location: event.location,
+            video_url: event.video_url,
+            drive_url: null,
+            project_id: event.project_id,
+            created_by: 'system' // Mark as system/invitation event
+          }));
+
+          allEvents = [...allEvents, ...convertedEvents];
+        }
+      }
+
+      setAllEvents(allEvents);
+    } catch (error) {
+      console.error("Error loading events:", error);
       toast({ title: "Erreur", description: "Impossible de charger les événements" });
-    } else {
-      setAllEvents((data || []) as EventRow[]);
+    } finally {
+      setLoading(false);
     }
   };
 

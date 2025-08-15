@@ -19,65 +19,14 @@ import {
   AlertTriangle,
   Clock,
   DollarSign,
-  User
+  User,
+  Calendar,
+  Video,
+  MapPin
 } from "lucide-react";
 import { Notification, NotificationType } from "@/types/notifications";
+import { useNotifications } from "@/hooks/useNotifications";
 
-// Mock data pour la démo
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "new_project",
-    priority: "high",
-    status: "unread",
-    title: "Nouveau projet assigné",
-    message: "Vous avez été assigné au projet 'Refonte site e-commerce'",
-    metadata: { projectId: "proj-123", actionUrl: "/project/proj-123" },
-    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "2",
-    type: "message_received",
-    priority: "medium",
-    status: "unread",
-    title: "Nouveau message",
-    message: "Marie Dupont: 'Pouvez-vous me confirmer les délais ?'",
-    metadata: { userId: "user-456", actionUrl: "/messages/thread-789" },
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "3",
-    type: "project_deadline",
-    priority: "urgent",
-    status: "unread",
-    title: "Échéance proche",
-    message: "Le projet 'App mobile' doit être livré dans 2 jours",
-    metadata: { projectId: "proj-789", actionUrl: "/project/proj-789" },
-    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "4",
-    type: "payment_received",
-    priority: "low",
-    status: "read",
-    title: "Paiement reçu",
-    message: "Vous avez reçu un paiement de 1500€ pour le projet 'Site vitrine'",
-    metadata: { projectId: "proj-456" },
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    readAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "5",
-    type: "project_status_change",
-    priority: "medium",
-    status: "read",
-    title: "Statut projet modifié",
-    message: "Le projet 'Dashboard Analytics' est maintenant en cours",
-    metadata: { projectId: "proj-101" },
-    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-    readAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  }
-];
 
 const NotificationIcon = ({ type }: { type: NotificationType }) => {
   const iconProps = { className: "w-4 h-4" };
@@ -95,6 +44,8 @@ const NotificationIcon = ({ type }: { type: NotificationType }) => {
       return <DollarSign {...iconProps} />;
     case 'profile_updated':
       return <User {...iconProps} />;
+    case 'event_invitation':
+      return <Calendar {...iconProps} />;
     default:
       return <Bell {...iconProps} />;
   }
@@ -128,7 +79,7 @@ const formatTimeAgo = (dateString: string) => {
 
 export const NotificationCenter = () => {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const { notifications, loading, markAsRead, markAllAsRead, archiveNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState('all');
   
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
@@ -141,30 +92,13 @@ export const NotificationCenter = () => {
         return ['new_project', 'project_assigned', 'project_status_change', 'project_deadline'].includes(notification.type);
       case 'messages':
         return notification.type === 'message_received';
+      case 'events':
+        return notification.type === 'event_invitation';
       default:
         return true;
     }
   });
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => 
-      n.id === id ? { ...n, status: 'read' as const, readAt: new Date().toISOString() } : n
-    ));
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ 
-      ...n, 
-      status: 'read' as const, 
-      readAt: new Date().toISOString() 
-    })));
-  };
-
-  const archiveNotification = (id: string) => {
-    setNotifications(prev => prev.map(n => 
-      n.id === id ? { ...n, status: 'archived' as const } : n
-    ));
-  };
 
   return (
     <Popover>
@@ -220,8 +154,8 @@ export const NotificationCenter = () => {
                 <TabsTrigger value="unread" className="text-xs">
                   Non lues ({unreadCount})
                 </TabsTrigger>
-                <TabsTrigger value="projects" className="text-xs">
-                  Projets
+                <TabsTrigger value="events" className="text-xs">
+                  Événements
                 </TabsTrigger>
                 <TabsTrigger value="messages" className="text-xs">
                   Messages
@@ -264,32 +198,93 @@ export const NotificationCenter = () => {
                                 {notification.message}
                               </p>
                               
+                              {/* Event specific metadata */}
+                              {notification.type === 'event_invitation' && notification.metadata && (
+                                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                                  {notification.metadata.eventDate && (
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {new Date(notification.metadata.eventDate).toLocaleDateString('fr-FR', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </div>
+                                  )}
+                                  {notification.metadata.location && (
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" />
+                                      {notification.metadata.location}
+                                    </div>
+                                  )}
+                                  {notification.metadata.videoUrl && (
+                                    <div className="flex items-center gap-1">
+                                      <Video className="w-3 h-3" />
+                                      Visio
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
                               {notification.status === 'unread' && (
                                 <div className="flex items-center gap-1 mt-2">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      markAsRead(notification.id);
-                                    }}
-                                    className="h-6 px-2 text-xs"
-                                  >
-                                    <Check className="w-3 h-3 mr-1" />
-                                    Marquer lu
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      archiveNotification(notification.id);
-                                    }}
-                                    className="h-6 px-2 text-xs"
-                                  >
-                                    <Archive className="w-3 h-3 mr-1" />
-                                    Archiver
-                                  </Button>
+                                  {notification.type === 'event_invitation' ? (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          markAsRead(notification.id);
+                                        }}
+                                        className="h-6 px-2 text-xs text-green-600 hover:text-green-700"
+                                      >
+                                        <Check className="w-3 h-3 mr-1" />
+                                        Accepter
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          archiveNotification(notification.id);
+                                        }}
+                                        className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                      >
+                                        <X className="w-3 h-3 mr-1" />
+                                        Refuser
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          markAsRead(notification.id);
+                                        }}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        <Check className="w-3 h-3 mr-1" />
+                                        Marquer lu
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          archiveNotification(notification.id);
+                                        }}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        <Archive className="w-3 h-3 mr-1" />
+                                        Archiver
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </div>
