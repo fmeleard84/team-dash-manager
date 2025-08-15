@@ -1297,6 +1297,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      candidate_can_view_booking: {
+        Args: { booking_candidate_id: string; candidate_email: string }
+        Returns: boolean
+      }
       candidate_has_project_access: {
         Args: { candidate_email: string; project_id_param: string }
         Returns: boolean
@@ -1311,6 +1315,10 @@ export type Database = {
           candidate_id: string
           email: string
         }[]
+      }
+      owner_can_view_booking: {
+        Args: { booking_project_id: string; owner_user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
