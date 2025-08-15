@@ -463,6 +463,39 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('fr-FR');
 };
 
+const formatCurrency = (amount: number) => {
+  if (!amount && amount !== 0) return '—';
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR'
+  }).format(amount);
+};
+
+const calculateDuration = (startDate: string, endDate: string) => {
+  if (!startDate || !endDate) return '';
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffInDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffInDays < 7) {
+    return `${diffInDays} jour${diffInDays > 1 ? 's' : ''}`;
+  } else if (diffInDays < 30) {
+    const weeks = Math.floor(diffInDays / 7);
+    const remainingDays = diffInDays % 7;
+    if (remainingDays === 0) {
+      return `${weeks} semaine${weeks > 1 ? 's' : ''}`;
+    }
+    return `${weeks} semaine${weeks > 1 ? 's' : ''} ${remainingDays} jour${remainingDays > 1 ? 's' : ''}`;
+  } else {
+    const months = diffInDays / 30;
+    if (months < 2) {
+      return `${Math.round(months * 10) / 10} mois`;
+    }
+    return `${Math.round(months * 10) / 10} mois`;
+  }
+};
+
 const fetchProjectsDetails = async (projectIds: string[]) => {
   try {
     const { data, error } = await supabase.functions.invoke('project-details', {
@@ -498,14 +531,6 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
   }
 };
 
-const formatCurrency = (n?: number | null) => {
-  if (typeof n !== 'number') return '—';
-  try {
-    return n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-  } catch {
-    return `${n}€`;
-  }
-};
 
   if (isLoading) {
     return <div className="p-6">Chargement...</div>;
@@ -559,84 +584,88 @@ const formatCurrency = (n?: number | null) => {
                    const projectData = projectsData[notification.project_id];
                    return (
                 <Card key={notification.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Première ligne: Dates à gauche, Budget à droite */}
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{notification.projects?.title || notification.title || 'Projet sans titre'}</CardTitle>
-                      <Badge className="bg-blue-600 text-white">Nouveau</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground line-clamp-5">
-                      {(notification.projects?.description || notification.description || 'Aucune description disponible')?.split('\n').slice(0, 5).join('\n')}
-                    </p>
-                    
-                     <div className="flex flex-wrap items-center gap-4 text-sm">
-                       <div className="flex items-center gap-2">
-                         <span className="font-medium">Début:</span>
-                         <span>{notification.projects?.project_date ? formatDate(notification.projects.project_date) : (projectData?.project_date ? formatDate(projectData.project_date) : '—')}</span>
-                       </div>
-                       <div className="flex items-center gap-2">
-                         <span className="font-medium">Fin:</span>
-                         <span>{notification.projects?.due_date ? formatDate(notification.projects.due_date) : (projectData?.due_date ? formatDate(projectData.due_date) : '—')}</span>
-                       </div>
-                       <div className="flex items-center gap-2">
-                         <span className="font-medium">Budget:</span>
-                         <Badge variant="outline">
-                           {notification.projects?.client_budget ? formatCurrency(notification.projects.client_budget) : (projectData?.client_budget ? formatCurrency(projectData.client_budget) : '—')}
-                         </Badge>
-                       </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{notification.projects?.project_date ? formatDate(notification.projects.project_date) : (projectData?.project_date ? formatDate(projectData.project_date) : '—')}</span>
+                        <span>→</span>
+                        <span>{notification.projects?.due_date ? formatDate(notification.projects.due_date) : (projectData?.due_date ? formatDate(projectData.due_date) : '—')}</span>
+                        {notification.projects?.project_date && notification.projects?.due_date && (
+                          <span className="text-blue-600 font-medium">
+                            ({calculateDuration(notification.projects.project_date, notification.projects.due_date)})
+                          </span>
+                        )}
+                        {!notification.projects?.project_date && projectData?.project_date && projectData?.due_date && (
+                          <span className="text-blue-600 font-medium">
+                            ({calculateDuration(projectData.project_date, projectData.due_date)})
+                          </span>
+                        )}
+                      </div>
+                      <Badge variant="default" className="bg-orange-500 hover:bg-orange-600 text-white">
+                        {notification.projects?.client_budget ? formatCurrency(notification.projects.client_budget) : (projectData?.client_budget ? formatCurrency(projectData.client_budget) : '—')}
+                      </Badge>
                     </div>
 
-                      {(notification.hr_resource_assignments.expertises?.length || notification.hr_resource_assignments.languages?.length) && (
-                        <div className="space-y-2">
-                          {notification.hr_resource_assignments.expertises?.length > 0 && (
-                            <div>
-                              <span className="text-sm font-medium">Compétences requises:</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {notification.hr_resource_assignments.expertises.map((expertise, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-xs">
-                                    {expertise}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {notification.hr_resource_assignments.languages?.length > 0 && (
-                            <div>
-                              <span className="text-sm font-medium">Langues requises:</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {notification.hr_resource_assignments.languages.map((language, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-xs">
-                                    {language}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(notification)}
-                          className="flex-1"
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Voir le détail
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRefuseMission(notification)}
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Refuser
-                        </Button>
+                    {/* Titre */}
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold line-clamp-1">
+                        {notification.projects?.title || notification.title || projectData?.title || 'Projet sans titre'}
+                      </h3>
+                      <Badge className="bg-blue-600 text-white ml-2 shrink-0">Nouveau</Badge>
+                    </div>
+
+                    {/* Description (4 premières lignes) */}
+                    <p className="text-sm text-muted-foreground line-clamp-4">
+                      {(notification.projects?.description || notification.description || projectData?.description || 'Aucune description disponible')?.split('\n').slice(0, 4).join('\n')}
+                    </p>
+                    
+                    {/* Compétences sur une ligne */}
+                    {(notification.hr_resource_assignments?.expertises || projectData?.expertises) && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-sm font-medium text-muted-foreground">Compétences:</span>
+                        {(notification.hr_resource_assignments?.expertises || projectData?.expertises || []).map((expertise: string) => (
+                          <Badge key={expertise} variant="secondary" className="text-xs">
+                            {expertise}
+                          </Badge>
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+
+                    {/* Langues sur une ligne */}
+                    {(notification.hr_resource_assignments?.languages || projectData?.languages) && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-sm font-medium text-muted-foreground">Langues:</span>
+                        {(notification.hr_resource_assignments?.languages || projectData?.languages || []).map((language: string) => (
+                          <Badge key={language} variant="outline" className="text-xs">
+                            {language}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Boutons d'action */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDetails(notification)}
+                        className="flex-1"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Voir le détail
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRefuseMission(notification)}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Refuser
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
                    );
                  })}
                </div>
