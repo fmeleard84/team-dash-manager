@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Check, X, ExternalLink } from "lucide-react";
+import { Eye, Check, X, ExternalLink, Calendar, Trello, Folder, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -687,102 +687,104 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
               </div>
             ) : (
               <div className="grid gap-4">
-                {activeProjects.map((booking) => (
-                  <Card key={booking.id} className="hover:shadow-md transition-shadow border-green-200">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
-                        <Badge variant="default" className="bg-green-600">En cours</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        {booking.projects?.description || 'Aucune description disponible'}
-                      </p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Poste:</span>
-                          <Badge variant="secondary">
-                            {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
-                          </Badge>
+                {activeProjects.map((booking) => {
+                  const projectData = projectsData[booking.project_id] || {};
+                  return (
+                  <Card key={booking.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="space-y-4 p-6">
+                      {/* Dates/Durée à gauche, Budget à droite */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span>{booking.projects?.project_date ? formatDate(booking.projects.project_date) : '—'}</span>
+                          <span>→</span>
+                          <span>{booking.projects?.due_date ? formatDate(booking.projects.due_date) : '—'}</span>
+                          {booking.projects?.project_date && booking.projects?.due_date && (
+                            <span className="text-blue-600 font-medium">
+                              ({calculateDuration(booking.projects.project_date, booking.projects.due_date)})
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Date de début:</span>
-                          <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Fin prévue:</span>
-                          <span className="text-sm">{booking.projects?.due_date ? formatDate(booking.projects.due_date) : 'Non spécifiée'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Budget:</span>
-                          <Badge variant="outline">
-                            {formatCurrency(booking.projects?.client_budget)}
-                          </Badge>
-                        </div>
+                        <Badge variant="default" className="bg-orange-500 hover:bg-orange-600 text-white">
+                          {formatCurrency(booking.projects?.client_budget)}
+                        </Badge>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      {/* Titre */}
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold line-clamp-1">
+                          {booking.projects?.title || 'Projet sans titre'}
+                        </h3>
+                        <Badge className="bg-green-600 text-white ml-2 shrink-0">En cours</Badge>
+                      </div>
+
+                      {/* Description (4 premières lignes) */}
+                      <p className="text-sm text-muted-foreground line-clamp-4">
+                        {(booking.projects?.description || 'Aucune description disponible')?.split('\n').slice(0, 4).join('\n')}
+                      </p>
+                      
+                      {/* Compétences sur une ligne */}
+                      {projectData.expertises && (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="text-sm font-medium text-muted-foreground">Compétences:</span>
+                          {projectData.expertises.map((expertise: string) => (
+                            <Badge key={expertise} variant="secondary" className="text-xs">
+                              {expertise}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Langues sur une ligne */}
+                      {projectData.languages && (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="text-sm font-medium text-muted-foreground">Langues:</span>
+                          {projectData.languages.map((language: string) => (
+                            <Badge key={language} variant="outline" className="text-xs">
+                              {language}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Boutons d'action alignés */}
+                      <div className="grid grid-cols-2 gap-2 pt-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => window.open(`/planning?project=${booking.project_id}`, '_blank')}
                         >
-                          📅 Planning
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Planning
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => window.open(`/kanban?project_id=${booking.project_id}`, '_blank')}
                         >
-                          📋 Kanban
+                          <Trello className="w-4 h-4 mr-2" />
+                          Kanban
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => window.open(`/drive?project=${booking.project_id}`, '_blank')}
                         >
-                          📁 Drive
+                          <Folder className="w-4 h-4 mr-2" />
+                          Drive
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => window.open(`/messages?project=${booking.project_id}`, '_blank')}
                         >
-                          💬 Messages
-                        </Button>
-                      </div>
-
-                      <div className="pt-2">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                          onClick={async () => {
-                            const title = booking.projects?.title || 'Projet';
-                            try {
-                              const { data } = await supabase.functions.invoke('project-details', {
-                                body: { 
-                                  action: 'get_candidate_nextcloud_links',
-                                  projectId: booking.project_id 
-                                }
-                              });
-                              if (data?.success && data?.url) {
-                                window.open(data.url, '_blank');
-                              }
-                            } catch (error) {
-                              console.error('Error opening Nextcloud:', error);
-                            }
-                          }}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Accéder à l'espace collaboratif
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Messages
                         </Button>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -798,75 +800,75 @@ const fetchProjectsDetails = async (projectIds: string[]) => {
                   const projectData = projectsData[booking.project_id] || {};
                   return (
                   <Card key={booking.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-xl font-bold">{booking.projects?.title || 'Projet sans titre'}</CardTitle>
+                    <CardContent className="space-y-4 p-6">
+                      {/* Dates/Durée à gauche, Budget à droite */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span>{booking.projects?.project_date ? formatDate(booking.projects.project_date) : '—'}</span>
+                          <span>→</span>
+                          <span>{booking.projects?.due_date ? formatDate(booking.projects.due_date) : '—'}</span>
+                          {booking.projects?.project_date && booking.projects?.due_date && (
+                            <span className="text-blue-600 font-medium">
+                              ({calculateDuration(booking.projects.project_date, booking.projects.due_date)})
+                            </span>
+                          )}
+                        </div>
                         <Badge variant="default" className="bg-orange-500 hover:bg-orange-600 text-white">
                           {formatCurrency(booking.projects?.client_budget)}
                         </Badge>
                       </div>
-                    </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground line-clamp-3">
-              {booking.projects?.description || 'Aucune description disponible'}
-            </p>
-            
-            {/* Skills and seniority on same line */}
-            <div className="flex flex-wrap gap-2">
-              {projectData.expertises?.map((expertise: string, idx: number) => (
-                <Badge key={idx} variant="outline" className="text-xs">
-                  {expertise}
-                </Badge>
-              ))}
-              {projectData.languages?.map((language: string, idx: number) => (
-                <Badge key={idx} variant="outline" className="text-xs bg-blue-50">
-                  {language}
-                </Badge>
-              ))}
-              {projectData.seniority && (
-                <Badge variant="secondary" className="text-xs">
-                  {projectData.seniority}
-                </Badge>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Poste:</span>
-                <Badge variant="secondary">
-                  {booking.hr_resource_assignments?.hr_profiles?.name || 'Non spécifié'}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Date du projet:</span>
-                <span className="text-sm">{booking.projects?.project_date ? formatDate(booking.projects.project_date) : 'Non spécifiée'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Fin prévue:</span>
-                <span className="text-sm">{booking.projects?.due_date ? formatDate(booking.projects.due_date) : 'Non spécifiée'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Budget estimé:</span>
-                <Badge variant="outline">
-                  {formatCurrency(booking.projects?.client_budget)}
-                </Badge>
-              </div>
-            </div>
 
-            <div className="pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => handleViewAcceptedProject(booking, projectData)}
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                Voir le détail
-              </Button>
-            </div>
+                      {/* Titre */}
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold line-clamp-1">
+                          {booking.projects?.title || 'Projet sans titre'}
+                        </h3>
+                        <Badge className="bg-green-600 text-white ml-2 shrink-0">Accepté</Badge>
+                      </div>
 
-          </CardContent>
-        </Card>
+                      {/* Description (4 premières lignes) */}
+                      <p className="text-sm text-muted-foreground line-clamp-4">
+                        {(booking.projects?.description || 'Aucune description disponible')?.split('\n').slice(0, 4).join('\n')}
+                      </p>
+                      
+                      {/* Compétences sur une ligne */}
+                      {projectData.expertises && (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="text-sm font-medium text-muted-foreground">Compétences:</span>
+                          {projectData.expertises.map((expertise: string) => (
+                            <Badge key={expertise} variant="secondary" className="text-xs">
+                              {expertise}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Langues sur une ligne */}
+                      {projectData.languages && (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="text-sm font-medium text-muted-foreground">Langues:</span>
+                          {projectData.languages.map((language: string) => (
+                            <Badge key={language} variant="outline" className="text-xs">
+                              {language}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Boutons d'action */}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewAcceptedProject(booking, projectData)}
+                          className="flex-1"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Voir le détail
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                   );
                 })}
               </div>
