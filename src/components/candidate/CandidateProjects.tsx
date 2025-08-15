@@ -144,16 +144,6 @@ const CandidateProjects = () => {
 
       const bookedAssignmentIds = (bookedAssignments || []).map(b => b.resource_assignment_id);
 
-      // DEBUG: First check basic notifications without joins
-      const { data: basicCheck, error: basicError } = await supabase
-        .from('candidate_notifications')
-        .select('*')
-        .eq('candidate_id', currentCandidateId)
-        .eq('status', 'unread');
-        
-      console.log('Basic notifications check:', basicCheck);
-      console.log('Basic check error:', basicError);
-
       // Fetch contextualized notifications with all necessary data
       // Only exclude notifications for specific resource assignments that are already booked
       let query = supabase
@@ -195,10 +185,6 @@ const CandidateProjects = () => {
         return;
       }
 
-      console.log('Raw notifications data:', data);
-      console.log('Booked assignment IDs:', bookedAssignmentIds);
-      console.log('Current candidate ID:', currentCandidateId);
-
       // Transform notifications to use contextualized data
       const enrichedNotifications = (data || [])
         .map((notification) => ({
@@ -215,7 +201,6 @@ const CandidateProjects = () => {
         }
        }));
 
-      console.log('Enriched notifications:', enrichedNotifications);
       setNotifications(enrichedNotifications);
 
       // Fetch detailed project data for notifications
@@ -588,20 +573,20 @@ const formatCurrency = (n?: number | null) => {
                     </p>
                     
                      <div className="flex flex-wrap items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Début:</span>
-                        <span>{notification.projects?.project_date ? formatDate(notification.projects.project_date) : '—'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Fin:</span>
-                        <span>{notification.projects?.due_date ? formatDate(notification.projects.due_date) : '—'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Budget:</span>
-                        <Badge variant="outline">
-                          {notification.projects?.client_budget ? formatCurrency(notification.projects.client_budget) : '—'}
-                        </Badge>
-                      </div>
+                       <div className="flex items-center gap-2">
+                         <span className="font-medium">Début:</span>
+                         <span>{notification.projects?.project_date ? formatDate(notification.projects.project_date) : (projectData?.project_date ? formatDate(projectData.project_date) : '—')}</span>
+                       </div>
+                       <div className="flex items-center gap-2">
+                         <span className="font-medium">Fin:</span>
+                         <span>{notification.projects?.due_date ? formatDate(notification.projects.due_date) : (projectData?.due_date ? formatDate(projectData.due_date) : '—')}</span>
+                       </div>
+                       <div className="flex items-center gap-2">
+                         <span className="font-medium">Budget:</span>
+                         <Badge variant="outline">
+                           {notification.projects?.client_budget ? formatCurrency(notification.projects.client_budget) : (projectData?.client_budget ? formatCurrency(projectData.client_budget) : '—')}
+                         </Badge>
+                       </div>
                     </div>
 
                       {(notification.hr_resource_assignments.expertises?.length || notification.hr_resource_assignments.languages?.length) && (
