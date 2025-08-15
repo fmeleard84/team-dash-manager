@@ -122,6 +122,7 @@ export const useKanbanSupabase = (boardId?: string) => {
 
     } catch (error) {
       console.error('Error loading board:', error);
+      setBoard(null);
       toast.error('Erreur lors du chargement du tableau');
     } finally {
       setIsLoading(false);
