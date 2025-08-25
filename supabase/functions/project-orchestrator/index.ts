@@ -94,22 +94,11 @@ serve(async (req) => {
     console.log(`[project-orchestrator] Action: ${action}, Project: ${projectId}`);
 
     if (action === 'setup-project') {
-      // 1. Récupérer les détails du projet et les ressources acceptées
+      // 1. Récupérer les détails du projet
       const { data: project, error: projectError } = await supabaseClient
         .from('projects')
-        .select(`
-          *,
-          project_bookings!inner(
-            id,
-            candidate_id,
-            status,
-            candidate_profiles!inner(
-              id, first_name, last_name, email, profile_type, seniority
-            )
-          )
-        `)
+        .select('*')
         .eq('id', projectId)
-        .eq('project_bookings.status', 'accepted')
         .single();
 
       if (projectError || !project) {
@@ -118,102 +107,63 @@ serve(async (req) => {
 
       console.log(`[project-orchestrator] Found project: ${project.title}`);
 
-      const resources = project.project_bookings || [];
-      const allMembers = [project.owner_id, ...resources.map((r: any) => r.candidate_profiles.id)];
+      // 2. Récupérer les ressources acceptées via hr_resource_assignments
+      const { data: acceptedAssignments, error: assignmentsError } = await supabaseClient
+        .from('hr_resource_assignments')
+        .select(`
+          id,
+          profile_id,
+          seniority,
+          booking_status,
+          hr_profiles!inner(
+            id,
+            name,
+            category_id,
+            hr_categories(name)
+          )
+        `)
+        .eq('project_id', projectId)
+        .eq('booking_status', 'accepted');
 
-      // 2. Créer le planning avec événements enrichis par catégorie
+      if (assignmentsError) {
+        throw new Error(`Erreur récupération ressources: ${assignmentsError.message}`);
+      }
+
+      // 3. Récupérer les profils candidats correspondants
+      const candidateProfiles = [];
+      for (const assignment of acceptedAssignments || []) {
+        const { data: candidateProfile, error: candidateError } = await supabaseClient
+          .from('candidate_profiles')
+          .select('id, first_name, last_name, email, profile_id, seniority')
+          .eq('profile_id', assignment.profile_id)
+          .eq('seniority', assignment.seniority)
+          .eq('status', 'disponible')
+          .single();
+        
+        if (candidateProfile && !candidateError) {
+          candidateProfiles.push({
+            ...candidateProfile,
+            profile_type: assignment.hr_profiles.hr_categories?.name || assignment.hr_profiles.name
+          });
+        }
+      }
+
+      const resources = candidateProfiles;
+      const allMembers = [project.owner_id, ...resources.map((r: any) => r.id)];
+
+      // 2. Le kickoff sera créé par project-kickoff, pas ici
+      // Mais on a besoin de la date pour les autres événements
       const kickoffDate = new Date(project.project_date);
       kickoffDate.setHours(9, 0, 0, 0); // 9h00 par défaut
-      const kickoffEnd = new Date(kickoffDate);
-      kickoffEnd.setHours(10, 0, 0, 0); // 1h de durée
 
-      const { data: kickoffEvent, error: eventError } = await supabaseClient
-        .from('project_events')
-        .insert({
-          project_id: projectId,
-          title: `Kickoff - ${project.title}`,
-          description: `Réunion de lancement du projet "${project.title}". Présentation de l'équipe et des objectifs.`,
-          start_at: kickoffDate.toISOString(),
-          end_at: kickoffEnd.toISOString(),
-          video_url: `https://meet.jit.si/kickoff-${projectId}`,
-          created_by: project.owner_id
-        })
-        .select()
-        .single();
-
-      // Créer des événements contextualisés par catégorie de ressources
-      const resourceCategories = [...new Set(resources.map((r: any) => r.candidate_profiles.profile_type))];
-      const categoryEvents = [];
+      // Les événements par catégorie sont désactivés - seul le kickoff sera créé
+      // Les événements supplémentaires pourront être ajoutés manuellement plus tard
+      // Récupérer les catégories des ressources acceptées
+      const resourceCategories = [...new Set(acceptedAssignments.map((a: any) => 
+        a.hr_profiles?.hr_categories?.name || a.hr_profiles?.name || 'Général'
+      ).filter(Boolean))];
       
-      for (const category of resourceCategories) {
-        const categoryDate = new Date(kickoffDate);
-        categoryDate.setDate(categoryDate.getDate() + 3); // 3 jours après le kickoff
-        categoryDate.setHours(14, 0, 0, 0); // 14h00
-        const categoryEnd = new Date(categoryDate);
-        categoryEnd.setHours(15, 30, 0, 0); // 1h30 de durée
-
-        let eventTitle = '';
-        let eventDescription = '';
-        
-        switch (category?.toLowerCase()) {
-          case 'marketing':
-            eventTitle = 'Workshop Stratégie Marketing';
-            eventDescription = 'Définition de la stratégie marketing et validation des concepts créatifs.';
-            break;
-          case 'développement':
-            eventTitle = 'Architecture Review';
-            eventDescription = 'Revue de l\'architecture technique et définition des spécifications.';
-            break;
-          case 'gestion de projet':
-            eventTitle = 'Point de Pilotage';
-            eventDescription = 'Première réunion de suivi et définition des jalons projet.';
-            break;
-          case 'finance':
-            eventTitle = 'Validation Budget';
-            eventDescription = 'Revue du budget et validation des allocations financières.';
-            break;
-          default:
-            eventTitle = `Workshop ${category}`;
-            eventDescription = `Réunion de travail dédiée aux aspects ${category} du projet.`;
-        }
-
-        categoryEvents.push({
-          project_id: projectId,
-          title: eventTitle,
-          description: eventDescription,
-          start_at: categoryDate.toISOString(),
-          end_at: categoryEnd.toISOString(),
-          video_url: `https://meet.jit.si/${category?.toLowerCase()}-${projectId}`,
-          created_by: project.owner_id
-        });
-      }
-
-      if (categoryEvents.length > 0) {
-        await supabaseClient.from('project_events').insert(categoryEvents);
-      }
-
-      if (eventError) {
-        console.error('Erreur création événement kickoff:', eventError);
-      } else {
-        console.log(`[project-orchestrator] Created kickoff event: ${kickoffEvent.id}`);
-
-        // Ajouter les participants au kickoff - utiliser candidate_profiles.id
-        const attendees = resources.map((r: any) => ({
-          event_id: kickoffEvent.id,
-          email: r.candidate_profiles.email,
-          profile_id: r.candidate_profiles.id  // Utiliser l'ID du profil candidat
-        }));
-
-        if (attendees.length > 0) {
-          const { error: attendeesError } = await supabaseClient
-            .from('project_event_attendees')
-            .insert(attendees);
-          
-          if (attendeesError) {
-            console.error('Erreur ajout attendees:', attendeesError);
-          }
-        }
-      }
+      console.log('[project-orchestrator] Resource categories found:', resourceCategories);
 
       // 3. Créer le tableau Kanban
       const { data: kanbanBoard, error: kanbanError } = await supabaseClient
@@ -225,23 +175,38 @@ serve(async (req) => {
           created_by: project.owner_id,
           members: allMembers,
           team_members: resources.map((r: any) => ({
-            id: r.candidate_profiles.id,
-            name: `${r.candidate_profiles.first_name} ${r.candidate_profiles.last_name}`,
-            email: r.candidate_profiles.email,
-            role: r.candidate_profiles.profile_type || 'Ressource',
-            seniority: r.candidate_profiles.seniority
+            id: r.id,
+            name: `${r.first_name} ${r.last_name}`,
+            email: r.email,
+            role: r.profile_type || 'Ressource',
+            seniority: r.seniority
           }))
         })
         .select()
         .single();
 
       if (kanbanError) {
-        console.error('Erreur création kanban:', kanbanError);
+        console.error('[project-orchestrator] ERREUR création kanban:', kanbanError);
+        console.error('[project-orchestrator] Message:', kanbanError.message);
+        console.error('[project-orchestrator] Code:', kanbanError.code);
+        console.error('[project-orchestrator] Details:', kanbanError.details);
+        // Ne pas continuer si le kanban échoue
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Échec création Kanban: ${kanbanError.message}`,
+            details: kanbanError
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       } else {
         console.log(`[project-orchestrator] Created kanban board: ${kanbanBoard.id}`);
 
         // Créer les colonnes par catégorie de ressources
-        const resourceCategories = [...new Set(resources.map((r: any) => r.candidate_profiles.profile_type))];
+        const resourceCategories = [...new Set(resources.map((r: any) => r.profile_type))];
         const columns = [];
         
         // Colonnes standards de workflow demandées
@@ -249,8 +214,8 @@ serve(async (req) => {
           { board_id: kanbanBoard.id, title: 'Setup', position: 0, color: '#blue' },
           { board_id: kanbanBoard.id, title: 'A faire', position: 1, color: '#gray' },
           { board_id: kanbanBoard.id, title: 'En cours', position: 2, color: '#yellow' },
-          { board_id: kanbanBoard.id, title: 'A contrôler', position: 3, color: '#orange' },
-          { board_id: kanbanBoard.id, title: 'Terminé', position: 4, color: '#green' }
+          { board_id: kanbanBoard.id, title: 'A vérifier', position: 3, color: '#orange' },
+          { board_id: kanbanBoard.id, title: 'Finalisé', position: 4, color: '#green' }
         );
 
         // Insérer toutes les colonnes
@@ -264,10 +229,82 @@ serve(async (req) => {
           const cards = [];
           
           for (const column of createdColumns) {
-            if (column.title === 'En révision' || column.title === 'Terminé') continue;
+            if (column.title === 'A vérifier' || column.title === 'Finalisé') continue;
             
-            const categoryCards = getCategoryCards(column.title, column.id, kanbanBoard.id, project.owner_id);
-            cards.push(...categoryCards);
+            // Cartes spéciales pour la colonne Setup
+            if (column.title === 'Setup') {
+              // Formater les dates
+              const projectDate = new Date(project.project_date).toLocaleDateString('fr-FR');
+              const dueDate = project.due_date ? new Date(project.due_date).toLocaleDateString('fr-FR') : 'Non définie';
+              
+              // Formater le budget
+              const budgetFormatted = project.client_budget 
+                ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(project.client_budget)
+                : 'Non défini';
+              
+              // Créer la liste des membres de l'équipe
+              const teamMembersList = resources.map((r: any) => 
+                `• ${r.first_name} ${r.last_name} - ${r.profile_type || 'Ressource'} (${r.seniority})`
+              ).join('\n');
+              
+              // Cartes de rappel du projet
+              cards.push(
+                {
+                  board_id: kanbanBoard.id,
+                  column_id: column.id,
+                  title: '📋 Rappel - Description du projet',
+                  description: `${project.description || 'Aucune description fournie'}\n\n🎯 Objectif principal du projet`,
+                  position: 0,
+                  created_by: project.owner_id,
+                  status: 'todo',
+                  priority: 'high'
+                },
+                {
+                  board_id: kanbanBoard.id,
+                  column_id: column.id,
+                  title: '📅 Rappel - Dates clés',
+                  description: `📍 Date de début: ${projectDate}\n📍 Date de fin prévue: ${dueDate}\n\n⏱️ Durée estimée du projet`,
+                  position: 1,
+                  created_by: project.owner_id,
+                  status: 'todo',
+                  priority: 'high'
+                },
+                {
+                  board_id: kanbanBoard.id,
+                  column_id: column.id,
+                  title: '💰 Rappel - Budget global',
+                  description: `Budget total alloué: ${budgetFormatted}\n\n💡 À répartir entre les différentes phases du projet`,
+                  position: 2,
+                  created_by: project.owner_id,
+                  status: 'todo',
+                  priority: 'high'
+                },
+                {
+                  board_id: kanbanBoard.id,
+                  column_id: column.id,
+                  title: '👥 Rappel - Constitution de l\'équipe',
+                  description: `Membres de l'équipe:\n${teamMembersList}\n\n🔄 Coordination nécessaire entre tous les membres`,
+                  position: 3,
+                  created_by: project.owner_id,
+                  status: 'todo',
+                  priority: 'high'
+                },
+                {
+                  board_id: kanbanBoard.id,
+                  column_id: column.id,
+                  title: '📦 Livrables à fournir',
+                  description: `📎 Le client doit transmettre les livrables au chef de projet\n📎 Le chef de projet transmet aux membres concernés\n📎 Validation finale par le client\n\n✨ Enjoy la Team !!`,
+                  position: 4,
+                  created_by: project.owner_id,
+                  status: 'todo',
+                  priority: 'high'
+                }
+              );
+            } else {
+              // Cartes normales pour les autres colonnes
+              const categoryCards = getCategoryCards(column.title, column.id, kanbanBoard.id, project.owner_id);
+              cards.push(...categoryCards);
+            }
           }
           
           if (cards.length > 0) {
@@ -276,7 +313,26 @@ serve(async (req) => {
         }
       }
 
-      // 4. Appeler nc-orchestrator pour la structure Nextcloud
+      // 4. Initialiser la structure de stockage du projet
+      try {
+        const { data: storageData, error: storageError } = await supabaseClient.functions.invoke('init-project-storage', {
+          body: {
+            projectId: projectId,
+            projectTitle: project.title,
+            resourceCategories: resourceCategories
+          }
+        });
+
+        if (storageError) {
+          console.error('Erreur init-project-storage:', storageError);
+        } else {
+          console.log('[project-orchestrator] Project storage initialized successfully:', storageData);
+        }
+      } catch (storageErr) {
+        console.error('[project-orchestrator] Storage initialization failed:', storageErr);
+      }
+
+      // 5. Appeler nc-orchestrator pour la structure Nextcloud (si configuré)
       try {
         const { data: ncData, error: ncError } = await supabaseClient.functions.invoke('nc-orchestrator', {
           body: {
@@ -297,9 +353,9 @@ serve(async (req) => {
 
       // 5. Créer notifications pour tous les participants
       const notifications = resources.map((r: any) => ({
-        candidate_id: r.candidate_profiles.id,
+        candidate_id: r.id,
         project_id: projectId,
-        resource_assignment_id: r.id,  // Utiliser l'ID du booking, pas du resource assignment
+        resource_assignment_id: r.id,  // Utiliser l'ID du candidat
         title: `Bienvenue dans le projet ${project.title} !`,
         description: `Le projet "${project.title}" a été configuré. Vous pouvez maintenant accéder au planning, au kanban et à la messagerie.`,
         status: 'unread'
@@ -329,7 +385,6 @@ serve(async (req) => {
           message: 'Projet configuré avec succès',
           data: {
             kanbanBoardId: kanbanBoard?.id,
-            kickoffEventId: kickoffEvent?.id,
             participantsCount: resources.length,
             categoriesSetup: resourceCategories
           }

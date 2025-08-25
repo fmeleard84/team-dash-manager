@@ -27,8 +27,8 @@ export interface Message {
   updated_at: string;
   parent_message_id?: string;
   is_edited: boolean;
-  attachments?: MessageAttachment[];
-  read_by?: MessageReadStatus[];
+  message_attachments?: MessageAttachment[];
+  message_read_status?: MessageReadStatus[];
 }
 
 export interface MessageParticipant {
@@ -94,17 +94,22 @@ export const useMessages = (projectId?: string) => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user?.email) return { ...thread, unread_count: 0, participants: thread.message_participants || [] };
 
-            // Count unread messages
-            const { count: unreadCount } = await supabase
+            // Get messages in this thread that are not from current user
+            const { data: allMessages } = await supabase
               .from('messages')
-              .select('*', { count: 'exact', head: true })
+              .select('id')
               .eq('thread_id', thread.id)
-              .not('sender_email', 'eq', user.email)
-              .not('id', 'in', `(
-                SELECT message_id 
-                FROM message_read_status 
-                WHERE user_email = '${user.email}'
-              )`);
+              .not('sender_email', 'eq', user.email);
+
+            // Get read status for current user
+            const { data: readStatuses } = await supabase
+              .from('message_read_status')
+              .select('message_id')
+              .eq('user_email', user.email);
+
+            // Calculate unread count
+            const readMessageIds = new Set(readStatuses?.map(rs => rs.message_id) || []);
+            const unreadCount = allMessages?.filter(msg => !readMessageIds.has(msg.id)).length || 0;
 
             return {
               ...thread,
@@ -214,9 +219,9 @@ export const useMessages = (projectId?: string) => {
         }
       }
 
-      // Refresh messages
-      await fetchMessages(selectedThread);
-      await fetchThreads();
+      // Don't manually refresh - realtime will handle it
+      // await fetchMessages(selectedThread);
+      // await fetchThreads();
 
       toast({
         title: "Message envoyé",
@@ -274,13 +279,17 @@ export const useMessages = (projectId?: string) => {
     }
   };
 
-  // Set up real-time subscriptions
+  // DISABLED: Set up real-time subscriptions (using useRealtimeMessages instead)
   useEffect(() => {
+    return; // Temporarily disabled to avoid conflicts
+    
     if (!projectId) return;
 
-    // Subscribe to new messages
+    console.log('🔄 Setting up realtime subscriptions for project:', projectId);
+
+    // Subscribe to new messages with improved filtering
     const messagesChannel = supabase
-      .channel('messages-changes')
+      .channel(`messages-${projectId}`)
       .on(
         'postgres_changes',
         {
@@ -288,18 +297,90 @@ export const useMessages = (projectId?: string) => {
           schema: 'public',
           table: 'messages'
         },
-        (payload) => {
+        async (payload) => {
+          console.log('📨 New message received via realtime:', payload.new);
+          
+          // If this message belongs to the currently selected thread, add it immediately
           if (payload.new.thread_id === selectedThread) {
-            fetchMessages(selectedThread);
+            // Fetch the complete message with attachments
+            const { data: fullMessage, error } = await supabase
+              .from('messages')
+              .select(`
+                *,
+                message_attachments (*),
+                message_read_status (*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (!error && fullMessage) {
+              console.log('✅ Adding new message to current thread:', fullMessage);
+              setMessages(prev => {
+                // Avoid duplicates
+                const exists = prev.some(msg => msg.id === fullMessage.id);
+                if (exists) return prev;
+                return [...prev, fullMessage];
+              });
+            }
           }
+          
+          // Always refresh threads to update unread counts
           fetchThreads();
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          console.log('📝 Message updated via realtime:', payload.new);
+          
+          if (payload.new.thread_id === selectedThread) {
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
+              )
+            );
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Messages channel status:', status);
+      });
+
+    // Subscribe to message attachments
+    const attachmentsChannel = supabase
+      .channel(`attachments-${projectId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_attachments'
+        },
+        async (payload) => {
+          console.log('📎 New attachment via realtime:', payload.new);
+          
+          // Find the message this attachment belongs to and refresh it
+          const messageId = payload.new.message_id;
+          const message = messages.find(m => m.id === messageId);
+          
+          if (message && message.thread_id === selectedThread) {
+            // Refresh the specific message to get the new attachment
+            fetchMessages(selectedThread);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📎 Attachments channel status:', status);
+      });
 
     // Subscribe to thread changes
     const threadsChannel = supabase
-      .channel('threads-changes')
+      .channel(`threads-${projectId}`)
       .on(
         'postgres_changes',
         {
@@ -308,33 +389,49 @@ export const useMessages = (projectId?: string) => {
           table: 'message_threads',
           filter: `project_id=eq.${projectId}`
         },
-        () => {
+        (payload) => {
+          console.log('💬 Thread changed via realtime:', payload);
           fetchThreads();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('💬 Threads channel status:', status);
+      });
 
     return () => {
+      console.log('🛑 Cleaning up realtime subscriptions');
       supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(attachmentsChannel);
       supabase.removeChannel(threadsChannel);
     };
-  }, [projectId, selectedThread]);
+  }, [projectId, selectedThread, messages]);
 
-  // Initial load
+  // Initial load and reset when project changes
   useEffect(() => {
+    // Reset all state when project changes
+    setThreads([]);
+    setSelectedThread(null);
+    setMessages([]);
     setLoading(true);
-    fetchThreads().finally(() => setLoading(false));
+    
+    if (projectId) {
+      fetchThreads().finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
   }, [projectId]);
 
   // Load messages when thread changes
   useEffect(() => {
-    if (selectedThread) {
+    if (selectedThread && projectId) {
+      // Clear messages first to avoid showing old ones
+      setMessages([]);
       fetchMessages(selectedThread);
       markAsRead(selectedThread);
     } else {
       setMessages([]);
     }
-  }, [selectedThread]);
+  }, [selectedThread, projectId]);
 
   return {
     threads,
@@ -346,6 +443,9 @@ export const useMessages = (projectId?: string) => {
     sendMessage,
     markAsRead,
     refreshThreads: fetchThreads,
-    refreshMessages: () => selectedThread && fetchMessages(selectedThread)
+    refreshMessages: () => selectedThread && fetchMessages(selectedThread),
+    // Expose setters for realtime updates
+    setMessages,
+    setThreads
   };
 };

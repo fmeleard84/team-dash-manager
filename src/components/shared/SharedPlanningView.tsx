@@ -2,15 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateGoogleCalendarUrl } from "@/utils/googleCalendar";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useProjectUsers } from "@/hooks/useProjectUsers";
+import { useEffect as useEffectForLog } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink, Check, X, Video, FolderOpen } from "lucide-react";
+import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink, Check, X, Video, FolderOpen, CalendarPlus, Briefcase, Clock, MapPin, Users } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Project { id: string; title: string }
 interface EventRow {
@@ -50,6 +54,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   const [videoUrl, setVideoUrl] = useState("");
   const [driveUrl, setDriveUrl] = useState("");
   const [attendeesEmails, setAttendeesEmails] = useState("");
+  const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
 
   // Edition d'événement
   const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
@@ -62,12 +67,19 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     () => (filterProjectId === "all" ? allEvents : allEvents.filter((e) => e.project_id === filterProjectId)),
     [allEvents, filterProjectId]
   );
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Membres d'équipe
-  const [teamMembers, setTeamMembers] = useState<{ email: string; name: string }[]>([]);
+  // Membres d'équipe - utilisation du hook unifié
+  const { users: projectMembers, loading: membersLoading } = useProjectUsers(projectId);
+  
+  // Log pour debug
+  useEffect(() => {
+    if (projectMembers.length > 0) {
+      console.log('👥 Membres du projet chargés:', projectMembers);
+    }
+  }, [projectMembers]);
   const [selectedTeamEmail, setSelectedTeamEmail] = useState<string>("");
 
   const suggestedVideoUrl = useMemo(() => {
@@ -84,37 +96,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   }, [projects, projectId]);
 
   // Load team members when project changes
-  const loadTeamMembersForProject = async (currentProjectId: string) => {
-    if (currentProjectId) {
-      try {
-        // Get current user email
-        const { data: userData } = await supabase.auth.getUser();
-        const userEmail = userData.user?.email;
-
-        const { data, error } = await supabase
-          .from("project_teams")
-          .select("email, first_name, last_name")
-          .eq("project_id", currentProjectId);
-        if (error) {
-          console.error("load team members error", error);
-          setTeamMembers([]);
-        } else {
-          const members = (data as any[]).map((r) => ({
-            email: r.email,
-            name: [r.first_name, r.last_name].filter(Boolean).join(" "),
-          }))
-          .filter((m) => m.email)
-          .filter((m) => m.email !== userEmail); // Exclude current user
-          setTeamMembers(members);
-        }
-      } catch (err) {
-        console.error("Error loading team members:", err);
-        setTeamMembers([]);
-      }
-    } else {
-      setTeamMembers([]);
-    }
-  };
+  // Cette fonction n'est plus nécessaire car nous utilisons useProjectMembers hook
 
   // Load event attendees for editing
   const loadEventAttendees = async (eventId: string) => {
@@ -137,17 +119,6 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     }
   };
 
-  useEffect(() => {
-    loadTeamMembersForProject(projectId);
-  }, [projectId]);
-
-  // Load team members when project changes in edit mode
-  useEffect(() => {
-    if (isEditDialogOpen && projectId) {
-      loadTeamMembersForProject(projectId);
-    }
-  }, [projectId, isEditDialogOpen]);
-
   const loadAllEvents = async () => {
     if (!projects.length) {
       setAllEvents([]);
@@ -157,8 +128,9 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     setLoading(true);
     try {
       const projectIds = projects.map(p => p.id);
+      console.log('📅 Loading events for projects:', projectIds);
       
-      // Load regular project events
+      // Load from project_events table only
       const { data: projectEvents, error: projectError } = await supabase
         .from("project_events")
         .select("id,title,description,start_at,end_at,location,video_url,drive_url,project_id")
@@ -173,6 +145,7 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
       }
 
       let allEvents = (projectEvents as EventRow[]) || [];
+      console.log('Found', allEvents.length, 'events in project_events');
 
       // If in candidate mode, also load all event notifications (not just accepted)
       if (mode === 'candidate' && candidateId) {
@@ -356,9 +329,6 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     setVideoUrl(event.video_url || "");
     setDriveUrl(event.drive_url || "");
     
-    // Load team members for the event's project immediately
-    await loadTeamMembersForProject(event.project_id);
-    
     // Load existing attendees
     const existingAttendees = await loadEventAttendees(event.id);
     setAttendeesEmails(existingAttendees);
@@ -509,15 +479,14 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   if (mode === 'candidate' && !candidateId) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <CalendarDays className="h-5 w-5" />
-          <h2 className="text-2xl font-bold">Planning</h2>
-        </div>
-        <Card>
+        <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200/50">
           <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">
-              Aucun profil candidat trouvé. Veuillez contacter un administrateur.
-            </p>
+            <div className="flex items-center justify-center gap-3">
+              <CalendarDays className="h-8 w-8 text-orange-500" />
+              <p className="text-center text-orange-700 font-medium">
+                Aucun profil candidat trouvé. Veuillez contacter un administrateur.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -527,18 +496,17 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   if (projects.length === 0) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <CalendarDays className="h-5 w-5" />
-          <h2 className="text-2xl font-bold">Planning</h2>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">
-              {mode === 'candidate' 
-                ? "Aucun projet assigné. Votre planning apparaîtra ici une fois que vous serez assigné à des projets."
-                : "Aucun projet trouvé. Créez un projet pour commencer à planifier des événements."
-              }
-            </p>
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50">
+          <CardContent className="pt-8 pb-8">
+            <div className="text-center space-y-3">
+              <CalendarDays className="h-12 w-12 text-blue-500 mx-auto" />
+              <p className="text-blue-700 font-medium">
+                {mode === 'candidate' 
+                  ? "Aucun projet assigné. Votre planning apparaîtra ici une fois que vous serez assigné à des projets."
+                  : "Aucun projet trouvé. Créez un projet pour commencer à planifier des événements."
+                }
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -547,69 +515,33 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
 
   return (
     <div className="space-y-6">
-      {/* Header with project select, view toggle, and new event CTA */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <CalendarDays className="h-5 w-5" />
-            <h2 className="text-2xl font-bold">Planning</h2>
-          </div>
-          
-          <Select value={filterProjectId} onValueChange={(value) => {
-            setFilterProjectId(value);
-            setProjectId(value === "all" ? (projects[0]?.id || "") : value);
-          }}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Sélectionner un projet" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les projets</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex border rounded-md">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="rounded-r-none"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "calendar" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("calendar")}
-              className="rounded-l-none"
-            >
-              <CalendarIcon className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nouvel événement
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md" aria-describedby="new-event-desc">
-              <DialogHeader>
-                <DialogTitle>Nouvel événement</DialogTitle>
-                <DialogDescription id="new-event-desc">
-                  Créez un nouvel événement pour votre projet. Vous pouvez inviter les membres de l'équipe.
+      {/* Main Dialog for creating events */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg">
+            <Plus className="h-4 w-4 mr-2" />
+            Nouvel événement
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-purple-200" aria-describedby="new-event-desc">
+              <DialogHeader className="bg-gradient-to-r from-blue-500 to-purple-500 -m-6 mb-4 p-4 rounded-t-lg">
+                <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
+                  <CalendarPlus className="w-6 h-6" />
+                  Nouvel événement
+                </DialogTitle>
+                <DialogDescription id="new-event-desc" className="text-blue-100 mt-1 text-sm">
+                  Planifiez un événement pour votre équipe projet
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Projet</label>
+                {/* Projet avec icône et style amélioré */}
+                <div className="bg-white/60 p-3 rounded-lg border border-purple-100">
+                  <label className="text-sm font-semibold text-purple-700 flex items-center gap-2 mb-2">
+                    <Briefcase className="w-4 h-4" />
+                    Projet
+                  </label>
                   <Select value={projectId} onValueChange={setProjectId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="border-purple-200 focus:border-purple-400 bg-white">
                       <SelectValue placeholder="Sélectionner un projet" />
                     </SelectTrigger>
                     <SelectContent>
@@ -620,75 +552,172 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Titre</label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Kickoff" />
+                {/* Titre de l'événement */}
+                <div className="bg-white/60 p-3 rounded-lg border border-purple-100">
+                  <label className="text-sm font-semibold text-purple-700 mb-2 block">
+                    Titre de l'événement
+                  </label>
+                  <Input 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)} 
+                    placeholder="Ex: Réunion kickoff, Point hebdo..." 
+                    className="border-purple-200 focus:border-purple-400 bg-white"
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date</label>
-                    <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                {/* Date et heures regroupées */}
+                <div className="bg-white/60 p-3 rounded-lg border border-purple-100">
+                  <label className="text-sm font-semibold text-purple-700 flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4" />
+                    Date et horaires
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Input 
+                        type="date" 
+                        value={date} 
+                        onChange={(e) => setDate(e.target.value)}
+                        className="border-purple-200 focus:border-purple-400 bg-white text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Input 
+                        type="time" 
+                        value={startTime} 
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="border-purple-200 focus:border-purple-400 bg-white text-sm"
+                        placeholder="Début"
+                      />
+                    </div>
+                    <div>
+                      <Input 
+                        type="time" 
+                        value={endTime} 
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="border-purple-200 focus:border-purple-400 bg-white text-sm"
+                        placeholder="Fin"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Début</label>
-                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                </div>
+
+                {/* Lieu et liens en ligne */}
+                <div className="bg-white/60 p-3 rounded-lg border border-purple-100">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-semibold text-purple-700 flex items-center gap-1 mb-2">
+                        <MapPin className="w-3 h-3" />
+                        Lieu
+                      </label>
+                      <Input 
+                        value={location} 
+                        onChange={(e) => setLocation(e.target.value)} 
+                        placeholder="Salle / Adresse" 
+                        className="border-purple-200 focus:border-purple-400 bg-white text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-purple-700 flex items-center gap-1 mb-2">
+                        <Video className="w-3 h-3" />
+                        Visio
+                      </label>
+                      <Input 
+                        value={videoUrl || suggestedVideoUrl} 
+                        onChange={(e) => setVideoUrl(e.target.value)} 
+                        placeholder="Lien Jitsi/Teams" 
+                        className="border-purple-200 focus:border-purple-400 bg-white text-sm"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2">
+                    <label className="text-sm font-semibold text-purple-700 flex items-center gap-1 mb-2">
+                      <FolderOpen className="w-3 h-3" />
+                      Documents
+                    </label>
+                    <Input 
+                      value={driveUrl} 
+                      onChange={(e) => setDriveUrl(e.target.value)} 
+                      placeholder="Lien vers les documents (Drive, etc.)" 
+                      className="border-purple-200 focus:border-purple-400 bg-white text-sm"
+                    />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Fin (optionnel)</label>
-                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Lieu (optionnel)</label>
-                  <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Adresse / Salle" />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Lien visio (optionnel)</label>
-                  <Input value={videoUrl || suggestedVideoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="URL Jitsi / Teams" />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Lien Google Drive (optionnel)</label>
-                  <Input value={driveUrl} onChange={(e) => setDriveUrl(e.target.value)} placeholder="URL Google Drive / Docs" />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Invités</label>
-                  <Select
-                    value={selectedTeamEmail}
-                    onValueChange={(v) => {
-                      setSelectedTeamEmail(v);
-                      setAttendeesEmails((prev) => {
-                        const set = new Set(prev.split(/[\s,\n]+/).filter(Boolean));
-                        set.add(v);
-                        return Array.from(set).join(", ");
-                      });
-                    }}
-                    disabled={teamMembers.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={teamMembers.length ? "Ajouter depuis l'équipe" : "Aucune équipe"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teamMembers.map((m) => (
-                        <SelectItem key={m.email} value={m.email}>{m.name || m.email}</SelectItem>
+                {/* Participants avec style compact */}
+                <div className="bg-white/60 p-3 rounded-lg border border-purple-100">
+                  <label className="text-sm font-semibold text-purple-700 flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4" />
+                    Participants
+                  </label>
+                  {!membersLoading && projectMembers.length > 0 && (
+                    <div className="space-y-2 mb-3 max-h-32 overflow-y-auto bg-white/50 p-2 rounded border border-purple-100">
+                      {projectMembers.map((member) => (
+                        <div key={member.user_id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`member-${member.user_id}`}
+                            checked={selectedAttendees.includes(member.email)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedAttendees([...selectedAttendees, member.email]);
+                                setAttendeesEmails((prev) => {
+                                  const emails = prev.split(/[\s,\n]+/).filter(Boolean);
+                                  if (!emails.includes(member.email)) {
+                                    emails.push(member.email);
+                                  }
+                                  return emails.join(", ");
+                                });
+                              } else {
+                                setSelectedAttendees(selectedAttendees.filter(e => e !== member.email));
+                                setAttendeesEmails((prev) => {
+                                  const emails = prev.split(/[\s,\n]+/).filter(e => e && e !== member.email);
+                                  return emails.join(", ");
+                                });
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`member-${member.user_id}`}
+                            className="text-sm flex items-center gap-2 cursor-pointer"
+                          >
+                            {member.display_name}
+                            <Badge variant="outline" className="text-xs">
+                              {member.role === 'client' ? 'Client' : member.job_title || 'Consultant'}
+                            </Badge>
+                          </label>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <Textarea value={attendeesEmails} onChange={(e) => setAttendeesEmails(e.target.value)} placeholder="email1@ex.com, email2@ex.com" />
+                    </div>
+                  )}
+                  <Textarea 
+                    value={attendeesEmails} 
+                    onChange={(e) => setAttendeesEmails(e.target.value)} 
+                    placeholder="Entrez les emails des participants (séparés par des virgules)" 
+                    className="border-purple-200 focus:border-purple-400 bg-white min-h-[60px] text-sm"
+                  />
                 </div>
 
-                <Button onClick={handleCreate} disabled={!projectId || loading} className="w-full">
-                  Créer
+                {/* Bouton de création avec gradient */}
+                <Button 
+                  onClick={handleCreate} 
+                  disabled={!projectId || !title || !date || !startTime || loading} 
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-2 shadow-lg"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Création...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <CalendarPlus className="w-4 h-4" />
+                      Créer l'événement
+                    </span>
+                  )}
                 </Button>
               </div>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+      </Dialog>
 
       {/* Edit Event Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -766,14 +795,14 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                     return Array.from(set).join(", ");
                   });
                 }}
-                disabled={teamMembers.length === 0}
+                disabled={projectMembers.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={teamMembers.length ? "Ajouter depuis l'équipe" : "Aucune équipe"} />
+                  <SelectValue placeholder={projectMembers.length ? "Ajouter depuis l'équipe" : "Aucune équipe"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {teamMembers.map((m) => (
-                    <SelectItem key={m.email} value={m.email}>{m.name || m.email}</SelectItem>
+                  {projectMembers.map((m) => (
+                    <SelectItem key={m.email} value={m.email}>{m.display_name || m.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -810,9 +839,9 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                   }
                 }}
                 modifiersClassNames={{
-                  eventDay: "bg-primary/20 text-primary border-primary/40 border-2",
-                  today: "bg-accent text-accent-foreground font-bold ring-2 ring-accent",
-                  selected: "bg-secondary text-secondary-foreground ring-2 ring-secondary"
+                  eventDay: "bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-2 border-blue-300 font-semibold",
+                  today: "bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold ring-2 ring-orange-400 shadow-lg",
+                  selected: "bg-gradient-to-r from-blue-500 to-purple-500 text-white ring-2 ring-blue-400 shadow-md"
                 }}
               />
               <div className="space-y-3">
@@ -833,31 +862,48 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                       return d.toDateString() === selectedDate.toDateString();
                     })
                      .map((ev) => (
-                       <div key={ev.id} className="border rounded-md p-3 space-y-3">
+                       <div key={ev.id} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200/50 rounded-xl p-4 space-y-3 hover:shadow-md transition-shadow">
                          <div className="flex items-start justify-between">
                            <div className="flex-1">
-                             <div className="font-medium">{ev.title}</div>
-                             <div className="text-sm text-muted-foreground">
-                               {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
-                             </div>
-                             {ev.description && (
-                               <div className="text-sm text-muted-foreground mt-1">{ev.description}</div>
-                             )}
-                             {ev.location && (
-                               <div className="text-sm text-muted-foreground">📍 {ev.location}</div>
-                             )}
-                             {ev._candidate_event && ev._notification_status && (
-                               <div className="mt-2">
-                                 <span className={`px-2 py-1 rounded text-xs ${
-                                   ev._notification_status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                   ev._notification_status === 'declined' ? 'bg-red-100 text-red-800' :
-                                   'bg-yellow-100 text-yellow-800'
-                                 }`}>
-                                   {ev._notification_status === 'accepted' ? 'Accepté' :
-                                    ev._notification_status === 'declined' ? 'Refusé' : 'En attente'}
+                             <div className="flex items-start gap-3">
+                               <div className="flex flex-col gap-1">
+                                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold shadow-sm">
+                                   {new Date(ev.start_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                 </span>
+                                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold shadow-sm">
+                                   {new Date(ev.start_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                                  </span>
                                </div>
-                             )}
+                               <div className="flex-1">
+                                 <div className="font-semibold text-gray-900 text-lg">{ev.title}</div>
+                                 {ev.end_at && (
+                                   <div className="text-sm text-gray-600 mt-1">
+                                     Jusqu'à {new Date(ev.end_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                   </div>
+                                 )}
+                                 {ev.description && (
+                                   <div className="text-sm text-gray-600 mt-2">{ev.description}</div>
+                                 )}
+                                 {ev.location && (
+                                   <div className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-orange-100 text-orange-700 rounded-md text-sm">
+                                     <span>📍</span>
+                                     <span>{ev.location}</span>
+                                   </div>
+                                 )}
+                                 {ev._candidate_event && ev._notification_status && (
+                                   <div className="mt-2">
+                                     <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                                       ev._notification_status === 'accepted' ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-300' :
+                                       ev._notification_status === 'declined' ? 'bg-gradient-to-r from-red-100 to-rose-100 text-red-800 border border-red-300' :
+                                       'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-800 border border-yellow-300'
+                                     }`}>
+                                       {ev._notification_status === 'accepted' ? '✓ Accepté' :
+                                        ev._notification_status === 'declined' ? '✗ Refusé' : '⏳ En attente'}
+                                     </span>
+                                   </div>
+                                 )}
+                               </div>
+                             </div>
                            </div>
                          </div>
                          
@@ -949,31 +995,48 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
           ) : (
              <div className="space-y-3">
                {eventsToShow.map((ev) => (
-                 <div key={ev.id} className="border rounded-md p-3 space-y-3">
+                 <div key={ev.id} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200/50 rounded-xl p-4 space-y-3 hover:shadow-md transition-shadow">
                    <div className="flex items-start justify-between">
                      <div className="flex-1">
-                       <div className="font-medium">{ev.title}</div>
-                       <div className="text-sm text-muted-foreground">
-                         {new Date(ev.start_at).toLocaleString()} {ev.end_at ? `→ ${new Date(ev.end_at).toLocaleTimeString()}` : ""}
-                       </div>
-                       {ev.description && (
-                         <div className="text-sm text-muted-foreground mt-1">{ev.description}</div>
-                       )}
-                       {ev.location && (
-                         <div className="text-sm text-muted-foreground">📍 {ev.location}</div>
-                       )}
-                       {ev._candidate_event && ev._notification_status && (
-                         <div className="mt-2">
-                           <span className={`px-2 py-1 rounded text-xs ${
-                             ev._notification_status === 'accepted' ? 'bg-green-100 text-green-800' :
-                             ev._notification_status === 'declined' ? 'bg-red-100 text-red-800' :
-                             'bg-yellow-100 text-yellow-800'
-                           }`}>
-                             {ev._notification_status === 'accepted' ? 'Accepté' :
-                              ev._notification_status === 'declined' ? 'Refusé' : 'En attente'}
+                       <div className="flex items-start gap-3">
+                         <div className="flex flex-col gap-1">
+                           <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold shadow-sm">
+                             {new Date(ev.start_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                           </span>
+                           <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold shadow-sm">
+                             {new Date(ev.start_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                            </span>
                          </div>
-                       )}
+                         <div className="flex-1">
+                           <div className="font-semibold text-gray-900 text-lg">{ev.title}</div>
+                           {ev.end_at && (
+                             <div className="text-sm text-gray-600 mt-1">
+                               Jusqu'à {new Date(ev.end_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                             </div>
+                           )}
+                           {ev.description && (
+                             <div className="text-sm text-gray-600 mt-2">{ev.description}</div>
+                           )}
+                           {ev.location && (
+                             <div className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-orange-100 text-orange-700 rounded-md text-sm">
+                               <span>📍</span>
+                               <span>{ev.location}</span>
+                             </div>
+                           )}
+                           {ev._candidate_event && ev._notification_status && (
+                             <div className="mt-2">
+                               <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                                 ev._notification_status === 'accepted' ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-300' :
+                                 ev._notification_status === 'declined' ? 'bg-gradient-to-r from-red-100 to-rose-100 text-red-800 border border-red-300' :
+                                 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-800 border border-yellow-300'
+                               }`}>
+                                 {ev._notification_status === 'accepted' ? '✓ Accepté' :
+                                  ev._notification_status === 'declined' ? '✗ Refusé' : '⏳ En attente'}
+                               </span>
+                             </div>
+                           )}
+                         </div>
+                       </div>
                      </div>
                    </div>
                    

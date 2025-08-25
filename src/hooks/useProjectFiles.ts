@@ -22,6 +22,33 @@ export const useProjectFiles = (projectId: string | null) => {
 
     try {
       setLoading(true);
+      
+      // First try to get files from storage bucket (where they actually are)
+      const projectPath = `project/${projectId}`;
+      const { data: storageFiles, error: storageError } = await supabase.storage
+        .from('project-files')
+        .list(projectPath, {
+          limit: 100,
+          offset: 0
+        });
+      
+      if (!storageError && storageFiles && storageFiles.length > 0) {
+        // Convert storage files to ProjectFile format
+        const projectFiles: ProjectFile[] = storageFiles.map(file => ({
+          id: file.id || `${projectId}-${file.name}`,
+          file_name: file.name,
+          file_path: `${projectPath}/${file.name}`,
+          file_size: file.metadata?.size || 0,
+          file_type: file.metadata?.mimetype || 'application/octet-stream',
+          uploaded_at: file.created_at || new Date().toISOString()
+        }));
+        
+        setFiles(projectFiles);
+        console.log('Loaded files from storage:', projectFiles);
+        return;
+      }
+      
+      // Fallback to database table (legacy support)
       const { data, error } = await supabase
         .from('project_files')
         .select('*')
@@ -29,7 +56,7 @@ export const useProjectFiles = (projectId: string | null) => {
         .order('uploaded_at', { ascending: false });
 
       if (error) {
-        console.error('Error loading project files:', error);
+        console.error('Error loading project files from database:', error);
         return;
       }
 
@@ -43,17 +70,35 @@ export const useProjectFiles = (projectId: string | null) => {
 
   const downloadFile = async (file: ProjectFile) => {
     try {
+      // Use download method directly for better compatibility
       const { data, error } = await supabase.storage
         .from('project-files')
-        .createSignedUrl(file.file_path, 60 * 60); // 1 hour expiry
+        .download(file.file_path);
       
       if (error) {
-        console.error('Error creating signed URL:', error);
-        throw new Error('Impossible de générer le lien de téléchargement');
-      }
-      
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank');
+        // Fallback to signed URL if download fails
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from('project-files')
+          .createSignedUrl(file.file_path, 60 * 60); // 1 hour expiry
+        
+        if (signedError) {
+          console.error('Error creating signed URL:', signedError);
+          throw new Error('Impossible de générer le lien de téléchargement');
+        }
+        
+        if (signedData?.signedUrl) {
+          window.open(signedData.signedUrl, '_blank');
+        }
+      } else if (data) {
+        // Create download link from blob
+        const url = URL.createObjectURL(data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.file_name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }
     } catch (error) {
       console.error('Download error:', error);

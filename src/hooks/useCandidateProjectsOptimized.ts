@@ -29,11 +29,11 @@ export const useCandidateProjectsOptimized = () => {
 
       setLoading(true);
       try {
-        // Get accepted projects via project_bookings
-        const { data: bookings, error } = await supabase
-          .from('project_bookings')
+        // Get accepted projects via hr_resource_assignments
+        const { data: assignments, error } = await supabase
+          .from('hr_resource_assignments')
           .select(`
-            project_id,
+            *,
             projects (
               id,
               title,
@@ -45,7 +45,7 @@ export const useCandidateProjectsOptimized = () => {
             )
           `)
           .eq('candidate_id', candidateProfile.id)
-          .eq('status', 'accepted');
+          .eq('booking_status', 'accepted');
 
         if (error) {
           console.error('Error fetching projects:', error);
@@ -53,10 +53,10 @@ export const useCandidateProjectsOptimized = () => {
           return;
         }
 
-        // Extract projects from bookings
-        const candidateProjects = (bookings || [])
-          .filter(booking => booking.projects)
-          .map(booking => booking.projects)
+        // Extract projects from assignments - include all statuses for planning
+        const candidateProjects = (assignments || [])
+          .filter(assignment => assignment.projects)
+          .map(assignment => assignment.projects)
           .filter(Boolean) as CandidateProject[];
 
         setProjects(candidateProjects);

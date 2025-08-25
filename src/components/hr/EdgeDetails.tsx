@@ -40,7 +40,7 @@ export function EdgeDetails({ sourceProfile, targetProfile, onClose }: EdgeDetai
     <Card className="w-80 bg-background border shadow-lg" aria-describedby="edge-details-description">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center justify-between">
-          <span>Connexion des livrables</span>
+          <span>Les attendus</span>
           <button 
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground text-xl leading-none"
@@ -54,67 +54,30 @@ export function EdgeDetails({ sourceProfile, targetProfile, onClose }: EdgeDetai
         <div id="edge-details-description" className="sr-only">
           Détails de la connexion entre {sourceProfile.name} et {targetProfile.name}, montrant les inputs et outputs de chaque ressource.
         </div>
-        {/* Source Profile */}
-        <div>
-          <h4 className="font-medium text-sm text-muted-foreground mb-2">
-            📤 {sourceProfile.name} produit :
-          </h4>
-          <div className="flex flex-wrap gap-1">
-            {sourceProfile.outputs?.map((output, index) => (
-              <Badge key={index} variant="secondary" className="text-xs">
-                {output}
-              </Badge>
-            ))}
+        
+        {/* Relation principale */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+          <p className="text-sm text-gray-700">
+            <span className="font-semibold text-blue-600">{sourceProfile.name}</span>
+            {' '}doit donner ses livrables à{' '}
+            <span className="font-semibold text-purple-600">{targetProfile.name}</span>
+          </p>
+        </div>
+        
+        {/* Message principal sur les livrables */}
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg p-4 border border-amber-200">
+          <div className="flex items-start gap-2">
+            <div className="text-amber-600 mt-0.5">💡</div>
+            <div className="flex-1">
+              <p className="text-sm text-amber-800">
+                Les livrables attendus seront à définir par vous et les experts qui composent votre équipe. 
+              </p>
+              <p className="text-sm text-amber-700 mt-2 font-medium">
+                Nous recommandons fortement de les définir dès le lancement du projet.
+              </p>
+            </div>
           </div>
         </div>
-
-        <Separator />
-
-        {/* Target Profile */}
-        <div>
-          <h4 className="font-medium text-sm text-muted-foreground mb-2">
-            📥 {targetProfile.name} a besoin de :
-          </h4>
-          <div className="flex flex-wrap gap-1">
-            {targetProfile.inputs?.map((input, index) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {input}
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        {/* Matching connections */}
-        {connections.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <h4 className="font-medium text-sm text-primary mb-2">
-                🔗 Connexions identifiées :
-              </h4>
-              <div className="space-y-2">
-                {connections.map((connection, index) => (
-                  <div key={index} className="text-xs bg-muted/50 p-2 rounded">
-                    <span className="font-medium">{connection.output}</span>
-                    <span className="text-muted-foreground"> → </span>
-                    <span>{connection.input}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {connections.length === 0 && (
-          <>
-            <Separator />
-            <div className="text-sm text-muted-foreground text-center py-2">
-              Aucune connexion directe identifiée automatiquement.
-              <br />
-              Cette collaboration peut nécessiter une coordination spécifique.
-            </div>
-          </>
-        )}
       </CardContent>
     </Card>
   );

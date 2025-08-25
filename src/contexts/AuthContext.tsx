@@ -29,6 +29,13 @@ export interface ContextUser {
   isActive: boolean;
   emailVerified: boolean;
   createdAt: string;
+  // Add user_metadata for components that expect it
+  user_metadata?: {
+    role: AppRole;
+    firstName: string;
+    lastName: string;
+    companyName?: string;
+  };
   // Compatibility layer for code expecting user.profile.*
   profile: {
     id: string;
@@ -82,11 +89,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const isAuthenticated = !!user;
 
   // Maps DB profile + session to our ContextUser with compatibility user.profile
-  const mapToContextUser = (profile: ProfileRow, sessionUserId: string): ContextUser => {
+  const mapToContextUser = (profile: ProfileRow, sessionUserId: string, sessionUser?: any): ContextUser => {
     const email = profile.email ?? '';
     const firstName = profile.first_name ?? '';
     const lastName = profile.last_name ?? '';
     const createdAt = profile.created_at ?? new Date().toISOString();
+    const role = profile.role ?? 'candidate';
 
     const base = {
       id: sessionUserId,
@@ -95,10 +103,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       lastName,
       phone: profile.phone ?? undefined,
       companyName: profile.company_name ?? undefined,
-      role: profile.role ?? 'candidate',
+      role,
       isActive: true,
       emailVerified: true,
       createdAt,
+      // Add user_metadata for compatibility with components expecting it
+      user_metadata: {
+        role,
+        firstName,
+        lastName,
+        companyName: profile.company_name ?? undefined,
+      }
     };
 
     return {
@@ -144,7 +159,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setTimeout(async () => {
         const profile = await fetchProfile(session.user.id);
         if (profile) {
-          setUser(mapToContextUser(profile, session.user.id));
+          setUser(mapToContextUser(profile, session.user.id, session.user));
         } else {
           // If profile missing (rare), create minimal row
           const { error: upsertErr } = await supabase.from('profiles').upsert({
@@ -158,7 +173,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             console.error('profiles upsert failed:', upsertErr);
           }
           const profile2 = await fetchProfile(session.user.id);
-          if (profile2) setUser(mapToContextUser(profile2, session.user.id));
+          if (profile2) setUser(mapToContextUser(profile2, session.user.id, session.user));
         }
         setIsLoading(false);
       }, 0);
@@ -170,7 +185,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
         if (profile) {
-          setUser(mapToContextUser(profile, session.user.id));
+          setUser(mapToContextUser(profile, session.user.id, session.user));
         }
       }
       setIsLoading(false);
@@ -210,6 +225,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return false;
     }
 
+    // Fetch profile to get user role
+    if (data.session?.user) {
+      const profile = await fetchProfile(data.session.user.id);
+      if (profile) {
+        // Redirect based on role
+        if (profile.role === 'client') {
+          window.location.href = '/client-dashboard';
+        } else if (profile.role === 'candidate') {
+          window.location.href = '/candidate-dashboard';
+        } else if (profile.role === 'admin') {
+          window.location.href = '/dashboard';
+        } else if (profile.role === 'hr_manager') {
+          window.location.href = '/dashboard';
+        }
+      }
+    }
+
     // Profile and user state will be set by onAuthStateChange
     toast.success('Connexion réussie');
     setIsLoading(false);
@@ -231,7 +263,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try { await supabase.auth.signOut({ scope: 'global' } as any); } catch {}
 
     const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
+    
+    // EXACTEMENT comme firstName et lastName sont traités
+    const signUpData = {
       email: userData.email.toLowerCase(),
       password: userData.password,
       options: {
@@ -239,12 +273,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         data: {
           first_name: userData.firstName,
           last_name: userData.lastName,
+          phone: userData.phone,  // EXACTEMENT comme first_name et last_name
+          company_name: userData.companyName,
           role: userData.role,
-          phone: userData.phone ?? undefined,
-          company_name: userData.companyName ?? undefined,
         },
       },
-    });
+    };
+    
+    console.log('📱 SIGNUP DATA TO SUPABASE:', signUpData);
+    console.log('📱 PHONE VALUE:', userData.phone);
+    console.log('📱 METADATA:', signUpData.options.data);
+    
+    const { error } = await supabase.auth.signUp(signUpData);
 
     if (error) {
       console.error('Registration failed:', error);
@@ -292,7 +332,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Refresh local user
     const fresh = await fetchProfile(user.id);
     if (fresh) {
-      setUser(mapToContextUser(fresh, user.id));
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(mapToContextUser(fresh, user.id, session?.user));
     }
     toast.success('Profil mis à jour');
     return true;

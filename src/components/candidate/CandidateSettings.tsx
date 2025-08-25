@@ -10,15 +10,26 @@ import { EditRateModal } from "./EditRateModal";
 import { EditLanguagesModal } from "./EditLanguagesModal";
 import { EditExpertisesModal } from "./EditExpertisesModal";
 import { EditSeniorityModal } from "./EditSeniorityModal";
-import { QualificationTest } from "./QualificationTest";
+import { QualificationResults } from "./QualificationResults";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CandidateSettingsProps {
-  currentCandidateId: string;
+  candidateId: string;
+  onProfileUpdate?: () => void;
 }
 
-export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps) => {
+export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSettingsProps) => {
+  // Early return if candidateId is not provided
+  if (!candidateId) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-gray-500">Chargement du profil...</p>
+        </CardContent>
+      </Card>
+    );
+  }
   const [isEditJobModalOpen, setIsEditJobModalOpen] = useState(false);
   const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
   const [isEditLanguagesModalOpen, setIsEditLanguagesModalOpen] = useState(false);
@@ -34,12 +45,12 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
 
   // Fetch comprehensive candidate profile data
   const { data: candidateData, refetch: refetchCandidate } = useQuery({
-    queryKey: ['candidateProfile', currentCandidateId],
+    queryKey: ['candidateProfile', candidateId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('candidate_profiles')
         .select('*')
-        .eq('id', currentCandidateId)
+        .eq('id', candidateId)
         .single();
       
       if (error) throw error;
@@ -83,7 +94,7 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
 
   // Fetch candidate's languages
   const { data: candidateLanguages, refetch: refetchLanguages } = useQuery({
-    queryKey: ['candidateLanguages', currentCandidateId],
+    queryKey: ['candidateLanguages', candidateId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('candidate_languages')
@@ -94,7 +105,7 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
             name
           )
         `)
-        .eq('candidate_id', currentCandidateId);
+        .eq('candidate_id', candidateId);
       
       if (error) throw error;
       return data;
@@ -103,7 +114,7 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
 
   // Fetch candidate's expertises
   const { data: candidateExpertises, refetch: refetchExpertises } = useQuery({
-    queryKey: ['candidateExpertises', currentCandidateId],
+    queryKey: ['candidateExpertises', candidateId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('candidate_expertises')
@@ -114,7 +125,7 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
             name
           )
         `)
-        .eq('candidate_id', currentCandidateId);
+        .eq('candidate_id', candidateId);
       
       if (error) throw error;
       return data;
@@ -133,7 +144,8 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
 
   const handlePersonalInfoSave = async () => {
     try {
-      const { error } = await supabase
+      // Mettre à jour candidate_profiles
+      const { error: candidateError } = await supabase
         .from('candidate_profiles')
         .update({
           first_name: personalInfo.first_name,
@@ -141,9 +153,25 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
           email: personalInfo.email,
           phone: personalInfo.phone
         })
-        .eq('id', currentCandidateId);
+        .eq('id', candidateId);
 
-      if (error) throw error;
+      if (candidateError) throw candidateError;
+
+      // Mettre à jour aussi profiles pour le téléphone (pour l'affichage dans AuthContext)
+      if (candidateData?.user_id) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            first_name: personalInfo.first_name,
+            last_name: personalInfo.last_name,
+            phone: personalInfo.phone
+          })
+          .eq('id', candidateData.user_id);
+
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        }
+      }
 
       toast({
         title: "Informations mises à jour",
@@ -151,6 +179,11 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
       });
       
       refetchCandidate();
+      
+      // Refresh auth context if callback available
+      if (onProfileUpdate) {
+        onProfileUpdate();
+      }
     } catch (error) {
       toast({
         title: "Erreur",
@@ -335,7 +368,15 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
         </TabsContent>
 
         <TabsContent value="qualification">
-          <QualificationTest currentCandidateId={currentCandidateId} />
+          {candidateId ? (
+            <QualificationResults candidateId={candidateId} />
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-gray-500">Chargement du profil...</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -345,34 +386,34 @@ export const CandidateSettings = ({ currentCandidateId }: CandidateSettingsProps
           <EditJobModal
             isOpen={isEditJobModalOpen}
             onClose={() => setIsEditJobModalOpen(false)}
-            currentCandidateId={currentCandidateId}
+            currentCandidateId={candidateId}
             currentProfileId={candidateData.profile_id}
             onUpdate={handleUpdate}
           />
           <EditRateModal
             isOpen={isEditRateModalOpen}
             onClose={() => setIsEditRateModalOpen(false)}
-            currentCandidateId={currentCandidateId}
+            currentCandidateId={candidateId}
             currentRate={candidateData.daily_rate}
             onUpdate={handleUpdate}
           />
           <EditLanguagesModal
             isOpen={isEditLanguagesModalOpen}
             onClose={() => setIsEditLanguagesModalOpen(false)}
-            currentCandidateId={currentCandidateId}
+            currentCandidateId={candidateId}
             onUpdate={handleUpdate}
           />
           <EditExpertisesModal
             isOpen={isEditExpertisesModalOpen}
             onClose={() => setIsEditExpertisesModalOpen(false)}
-            currentCandidateId={currentCandidateId}
+            currentCandidateId={candidateId}
             currentProfileId={candidateData.profile_id}
             onUpdate={handleUpdate}
           />
           <EditSeniorityModal
             isOpen={isEditSeniorityModalOpen}
             onClose={() => setIsEditSeniorityModalOpen(false)}
-            currentCandidateId={currentCandidateId}
+            currentCandidateId={candidateId}
             currentSeniority={candidateData.seniority}
             onUpdate={handleUpdate}
           />

@@ -47,6 +47,17 @@ export const QualificationTest = ({ currentCandidateId }: QualificationTestProps
   const [isStarted, setIsStarted] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Early return if no candidateId
+  if (!currentCandidateId) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-gray-500">Chargement du profil candidat...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Fetch candidate profile to get profile_id
   const { data: candidateProfile } = useQuery({
@@ -60,7 +71,8 @@ export const QualificationTest = ({ currentCandidateId }: QualificationTestProps
       
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!currentCandidateId
   });
 
   // Fetch available tests based on candidate's profile
@@ -95,7 +107,8 @@ export const QualificationTest = ({ currentCandidateId }: QualificationTestProps
       
       if (error) throw error;
       return data as TestResult[];
-    }
+    },
+    enabled: !!currentCandidateId
   });
 
   // Submit test mutation

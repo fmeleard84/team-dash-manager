@@ -30,6 +30,10 @@ interface HRResource {
   calculated_price: number;
   languageNames?: string[];
   expertiseNames?: string[];
+  is_ai?: boolean;
+  is_team_member?: boolean;
+  description?: string;
+  profileName?: string;
 }
 
 interface HRResourcePanelProps {
@@ -54,14 +58,56 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     fetchExpertises();
   }, [selectedResource?.profile_id]); // Re-fetch when profile changes
 
+  // État pour tracker l'ID de la ressource précédente
+  const [previousResourceId, setPreviousResourceId] = useState<string | null>(null);
+
   useEffect(() => {
     if (selectedResource) {
-      setSelectedLanguages(selectedResource.languages || []);
-      setSelectedExpertises(selectedResource.expertises || []);
-      setSeniority(selectedResource.seniority);
-      setCalculatedPrice(selectedResource.calculated_price || 0);
+      // Si on change de ressource (différent ID)
+      if (previousResourceId !== selectedResource.id) {
+        setPreviousResourceId(selectedResource.id);
+        
+        // Pour les ressources IA, toujours garder toutes les langues
+        if (selectedResource.is_ai) {
+          // Charger toutes les langues pour les IA
+          supabase
+            .from('hr_languages')
+            .select('id')
+            .then(({ data: allLanguages }) => {
+              if (allLanguages) {
+                const allLanguageIds = allLanguages.map(lang => lang.id);
+                setSelectedLanguages(allLanguageIds);
+                // Mettre à jour la ressource avec toutes les langues
+                if (selectedResource.languages.length === 0) {
+                  const updatedResource = {
+                    ...selectedResource,
+                    languages: allLanguageIds
+                  };
+                  onResourceUpdate(updatedResource);
+                }
+              }
+            });
+          setSelectedExpertises([]);
+        } else {
+          // Pour les ressources humaines, comportement normal
+          const hasLanguages = selectedResource.languages && selectedResource.languages.length > 0;
+          const hasExpertises = selectedResource.expertises && selectedResource.expertises.length > 0;
+          
+          if (!hasLanguages && !hasExpertises) {
+            setSelectedLanguages([]);
+            setSelectedExpertises([]);
+          } else {
+            setSelectedLanguages(selectedResource.languages || []);
+            setSelectedExpertises(selectedResource.expertises || []);
+          }
+        }
+        
+        // La séniorité reste toujours sur la valeur actuelle (junior par défaut pour nouvelles cartes)
+        setSeniority(selectedResource.seniority);
+        setCalculatedPrice(selectedResource.calculated_price || 0);
+      }
     }
-  }, [selectedResource]);
+  }, [selectedResource, previousResourceId, onResourceUpdate]);
 
   const fetchLanguages = async () => {
     const { data, error } = await supabase
@@ -81,6 +127,12 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
   };
 
   const fetchExpertises = async () => {
+    // Skip for team members
+    if (selectedResource?.is_team_member) {
+      setExpertises([]);
+      return;
+    }
+    
     if (!selectedResource?.profile_id) {
       // Fallback: show all expertises if no profile selected
       const { data, error } = await supabase
@@ -100,6 +152,12 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
       return;
     }
 
+    // Skip API call for team members (they use team-XXX format)
+    if (selectedResource.profile_id.startsWith('team-')) {
+      setExpertises([]);
+      return;
+    }
+    
     // Fetch only expertises linked to this profile
     const { data, error } = await supabase
       .from('hr_profile_expertises')
@@ -128,6 +186,12 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
 
   const calculatePrice = useCallback(async () => {
     if (!selectedResource) return;
+    
+    // For team members, use the calculated price directly
+    if (selectedResource.is_team_member || selectedResource.profile_id.startsWith('team-')) {
+      setCalculatedPrice(selectedResource.calculated_price || 0);
+      return;
+    }
     
     // Get base price from the profile
     const { data: profile } = await supabase
@@ -188,6 +252,11 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     seniorityLevel: 'junior' | 'intermediate' | 'senior'
   ) => {
     if (!selectedResource) return 0;
+    
+    // For team members, return the calculated price directly
+    if (selectedResource.is_team_member || selectedResource.profile_id.startsWith('team-')) {
+      return selectedResource.calculated_price || 0;
+    }
     
     // Get base price from the profile
     const { data: profile } = await supabase
@@ -314,7 +383,19 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
 
   const handleSeniorityChange = async (newSeniority: 'junior' | 'intermediate' | 'senior') => {
     setSeniority(newSeniority);
-    await updateResource({ seniority: newSeniority }, selectedLanguages, selectedExpertises, newSeniority);
+    // Pour les ressources IA, s'assurer qu'elles gardent toutes les langues
+    if (selectedResource?.is_ai) {
+      const { data: allLanguages } = await supabase
+        .from('hr_languages')
+        .select('id');
+      
+      if (allLanguages) {
+        const allLanguageIds = allLanguages.map(lang => lang.id);
+        await updateResource({ seniority: newSeniority }, allLanguageIds, selectedExpertises, newSeniority);
+      }
+    } else {
+      await updateResource({ seniority: newSeniority }, selectedLanguages, selectedExpertises, newSeniority);
+    }
   };
 
   if (!selectedResource) {
@@ -327,35 +408,74 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
     );
   }
 
+  // Special display for team members
+  if (selectedResource?.is_team_member) {
+    return (
+      <div className="w-80 bg-card border-l p-6 space-y-6">
+        {/* Team member header */}
+        <div className="text-center p-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg">
+          <Badge className="mb-2 bg-white text-blue-600">Membre d'équipe</Badge>
+          <div className="text-xl font-bold text-white">
+            {selectedResource.profileName || 'Membre'}
+          </div>
+          <div className="text-2xl font-bold text-white mt-2">
+            {calculatedPrice.toFixed(2)} €/mn
+          </div>
+        </div>
+
+        {/* Description */}
+        {selectedResource.description && (
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <div className="p-3 bg-muted rounded-md text-sm">
+              {selectedResource.description}
+            </div>
+          </div>
+        )}
+
+        {/* Note */}
+        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md">
+          <p className="text-xs text-muted-foreground">
+            Ce membre fait partie de votre équipe interne. 
+            Les options de configuration ne sont pas disponibles.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-80 bg-card border-l p-6 space-y-6">
       {/* Prix calculé */}
-      <div className="text-center p-4 bg-primary/10 rounded-lg">
-        <div className="text-2xl font-bold text-primary">
+      <div className="text-center p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg">
+        <div className="text-2xl font-bold text-white">
           {calculatedPrice.toFixed(2)} €/mn
         </div>
-        <div className="text-sm text-muted-foreground">Prix calculé</div>
+        <div className="text-sm text-white/80">Prix calculé</div>
       </div>
 
-      {/* Séniorité */}
-      <div className="space-y-2">
-        <Label>Séniorité</Label>
-        <Select value={seniority} onValueChange={handleSeniorityChange}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="junior">Junior</SelectItem>
-            <SelectItem value="intermediate">Intermédiaire</SelectItem>
-            <SelectItem value="senior">Senior</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Options pour les ressources humaines seulement */}
+      {!selectedResource?.is_ai && (
+        <>
+          {/* Séniorité */}
+          <div className="space-y-2">
+            <Label>Séniorité</Label>
+            <Select value={seniority} onValueChange={handleSeniorityChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="junior">Junior</SelectItem>
+                <SelectItem value="intermediate">Intermédiaire</SelectItem>
+                <SelectItem value="senior">Senior</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Langues */}
-      <div className="space-y-2">
-        <Label>Langues</Label>
-        <Select onValueChange={addLanguage}>
+          {/* Langues */}
+          <div className="space-y-2">
+            <Label>Langues</Label>
+        <Select key={`lang-${selectedResource?.id}`} value="" onValueChange={addLanguage}>
           <SelectTrigger>
             <SelectValue placeholder="Ajouter une langue" />
           </SelectTrigger>
@@ -392,7 +512,7 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
       {/* Expertises */}
       <div className="space-y-2">
         <Label>Expertises</Label>
-        <Select onValueChange={addExpertise}>
+        <Select key={`exp-${selectedResource?.id}`} value="" onValueChange={addExpertise}>
           <SelectTrigger>
             <SelectValue placeholder="Ajouter une expertise" />
           </SelectTrigger>
@@ -425,6 +545,49 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
           })}
         </div>
       </div>
+
+          {/* Bloc d'information sur la séniorité */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200">
+            <div className="flex items-start gap-2">
+              <div className="text-blue-600 mt-0.5">ℹ️</div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-800 mb-1">Information Séniorité</p>
+                {seniority === 'junior' && (
+                  <p className="text-xs text-gray-600">
+                    Un profil <span className="font-semibold">junior</span> a entre 1 et 3 ans d'expérience en moyenne.
+                  </p>
+                )}
+                {seniority === 'intermediate' && (
+                  <p className="text-xs text-gray-600">
+                    Un profil <span className="font-semibold">intermédiaire</span> est autonome, mais peut avoir besoin de points de contrôle réguliers. 
+                    Il a entre 3 et 5 ans d'expérience, et quelques notions d'encadrement de petites équipes.
+                  </p>
+                )}
+                {seniority === 'senior' && (
+                  <p className="text-xs text-gray-600">
+                    Un profil <span className="font-semibold">sénior</span> est parfaitement autonome. 
+                    Il a plus de 5 ans d'expérience, et peut encadrer des équipes moyennes à grandes.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Message pour les ressources IA */}
+      {selectedResource?.is_ai && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start gap-2">
+            <div className="text-amber-600 mt-0.5">⚠️</div>
+            <div className="flex-1">
+              <p className="text-sm text-amber-800">
+                Une ressource IA doit toujours être connectée à une ressource humaine qui la supervise et lui fournit les instructions.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,291 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import { FileText, Flag, Users, X, CalendarDays, Paperclip, Trash2, Plus } from "lucide-react";
+import { toast } from "sonner";
+
+interface CardCreateDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  cardData: any;
+  onCardDataChange: (data: any) => void;
+  projectMembers: string[];
+  uploadedFiles: File[];
+  onUploadedFilesChange: (files: File[]) => void;
+  onSave: () => void;
+  isSaving: boolean;
+  uploadProgress: { uploaded: number; total: number };
+}
+
+export function CardCreateDialog({
+  open,
+  onOpenChange,
+  cardData,
+  onCardDataChange,
+  projectMembers,
+  uploadedFiles,
+  onUploadedFilesChange,
+  onSave,
+  isSaving,
+  uploadProgress
+}: CardCreateDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl shadow-xl max-h-[85vh] overflow-y-auto bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-purple-200">
+        <DialogHeader className="bg-gradient-to-r from-blue-500 to-purple-500 -m-6 mb-4 p-4 rounded-t-lg">
+          <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Nouvelle tâche
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 pt-3">
+          {/* Titre sur toute la largeur */}
+          <div className="relative">
+            <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              value={cardData.title}
+              onChange={(e) => onCardDataChange({ ...cardData, title: e.target.value })}
+              placeholder="Titre de la tâche..."
+              className="h-9 pl-10 text-sm font-medium"
+              required
+            />
+          </div>
+
+          {/* Priorité */}
+          <Select
+            value={cardData.priority}
+            onValueChange={(value) => onCardDataChange({ ...cardData, priority: value })}
+          >
+            <SelectTrigger className="h-9">
+              <div className="flex items-center gap-2">
+                <Flag className="w-4 h-4 text-gray-400" />
+                <SelectValue placeholder="Priorité" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">
+                <span className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  Faible
+                </span>
+              </SelectItem>
+              <SelectItem value="medium">
+                <span className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                  Moyenne
+                </span>
+              </SelectItem>
+              <SelectItem value="high">
+                <span className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                  Élevée
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Description à gauche, Date et Membres à droite */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Description */}
+            <div>
+              <Textarea
+                value={cardData.description}
+                onChange={(e) => onCardDataChange({ ...cardData, description: e.target.value })}
+                placeholder="Description détaillée de la tâche..."
+                className="min-h-[100px] resize-none text-sm"
+                rows={4}
+              />
+            </div>
+
+            {/* Date et Membres */}
+            <div className="space-y-2">
+              {/* Date d'échéance */}
+              <div className="relative">
+                <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                <Input
+                  type="date"
+                  value={cardData.dueDate}
+                  onChange={(e) => onCardDataChange({ ...cardData, dueDate: e.target.value })}
+                  className="h-9 pl-10 text-sm"
+                  title="Date d'échéance"
+                />
+              </div>
+
+              {/* Membres assignés */}
+              <div className="space-y-2">
+                {/* Membres sélectionnés */}
+                {cardData.assignedTo.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-lg min-h-[32px] border border-gray-100">
+                    {cardData.assignedTo.map((user: string, index: number) => {
+                      const firstName = user.split(' ')[0] || user.split('(')[0] || user;
+                      const initials = firstName.substring(0, 2).toUpperCase();
+                      return (
+                        <div key={index} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-full border border-gray-200 shadow-sm">
+                          <Avatar className="w-5 h-5">
+                            <AvatarFallback className="text-[9px] bg-gradient-to-br from-blue-600 to-purple-600 text-white font-medium">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-gray-700">{user}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-0.5 h-3.5 w-3.5 p-0 hover:bg-gray-100 rounded-full"
+                            onClick={() => {
+                              const newAssignees = cardData.assignedTo.filter((_: any, i: number) => i !== index);
+                              onCardDataChange({ ...cardData, assignedTo: newAssignees });
+                            }}
+                          >
+                            <X className="w-2.5 h-2.5 text-gray-400 hover:text-gray-600" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Sélecteur de membres */}
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    if (value && !cardData.assignedTo.includes(value)) {
+                      onCardDataChange({
+                        ...cardData,
+                        assignedTo: [...cardData.assignedTo, value]
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-gray-400" />
+                      <SelectValue placeholder="Ajouter un membre" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectMembers.filter(m => !cardData.assignedTo.includes(m)).map((member) => {
+                      const parts = member.split(' - ');
+                      const name = parts[0];
+                      const role = parts[1] || '';
+                      const firstName = name.split(' ')[0] || name.split('(')[0] || name;
+                      const initials = firstName.substring(0, 2).toUpperCase();
+                      return (
+                        <SelectItem key={member} value={member}>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-6 h-6">
+                              <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">{name}</span>
+                              {role && <span className="text-xs text-gray-500">{role}</span>}
+                            </div>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Section Fichiers */}
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-gray-600">Fichiers joints</div>
+            <div className="space-y-2">
+              {/* Display selected files if any */}
+              {uploadedFiles.length > 0 && (
+                <div className="p-2 border rounded-md">
+                  <div className="text-sm font-medium mb-2">Fichiers sélectionnés:</div>
+                  {uploadedFiles.map((file: File, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-2 flex-1">
+                        <Paperclip className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm font-medium">{file.name}</span>
+                        <span className="text-xs text-gray-500">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                          onClick={() => {
+                            const newFiles = uploadedFiles.filter((_, i: number) => i !== index);
+                            onUploadedFilesChange(newFiles);
+                            toast.success('Fichier retiré de la sélection');
+                          }}
+                          title="Retirer le fichier"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Upload new files */}
+              <div className="p-4 border-2 border-dashed border-gray-200 rounded-lg text-center">
+                <Input
+                  id="new-card-files"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      const newFiles = Array.from(e.target.files);
+                      onUploadedFilesChange(newFiles);
+                      console.log('New card files selected:', newFiles);
+                    }
+                  }}
+                />
+                <Label htmlFor="new-card-files" className="cursor-pointer">
+                  <div className="text-sm text-gray-600">
+                    Cliquez pour ajouter des fichiers ou glissez-déposez
+                  </div>
+                  {uploadedFiles.length > 0 && (
+                    <div className="mt-2 text-xs text-green-600">
+                      {uploadedFiles.length} fichier(s) sélectionné(s)
+                    </div>
+                  )}
+                </Label>
+              </div>
+            </div>
+          </div>
+
+          {/* Boutons d'action */}
+          <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 sticky bottom-0 bg-white pb-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                onOpenChange(false);
+                onUploadedFilesChange([]);
+              }}
+              className="min-w-[100px] border-gray-200 hover:bg-gray-50"
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={onSave} 
+              disabled={!cardData.title.trim() || isSaving}
+              className="min-w-[120px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all"
+            >
+              {isSaving ? (
+                uploadProgress.total > 0 ? 
+                  `Upload ${uploadProgress.uploaded}/${uploadProgress.total}...` : 
+                  'Création...'
+              ) : 'Créer la tâche'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

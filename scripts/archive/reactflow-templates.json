@@ -1,0 +1,410 @@
+{
+  "communication_social_media": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "custom",
+        "position": { "x": 100, "y": 100 },
+        "data": {
+          "label": "Community Manager",
+          "role": "Community Manager",
+          "skills": ["Social Media", "Content Creation", "Analytics"],
+          "description": "Gestion quotidienne des réseaux sociaux"
+        }
+      },
+      {
+        "id": "2", 
+        "type": "custom",
+        "position": { "x": 350, "y": 50 },
+        "data": {
+          "label": "Graphiste",
+          "role": "Graphic Designer", 
+          "skills": ["Design", "Photoshop", "Illustrator"],
+          "description": "Création de visuels et contenus graphiques"
+        }
+      },
+      {
+        "id": "3",
+        "type": "custom", 
+        "position": { "x": 350, "y": 200 },
+        "data": {
+          "label": "Rédacteur",
+          "role": "Content Writer",
+          "skills": ["Writing", "SEO", "Storytelling"],
+          "description": "Rédaction de contenus engageants"
+        }
+      },
+      {
+        "id": "4",
+        "type": "custom",
+        "position": { "x": 600, "y": 125 },
+        "data": {
+          "label": "Social Media Analyst",
+          "role": "Data Analyst",
+          "skills": ["Analytics", "Reporting", "KPIs"],
+          "description": "Analyse des performances et ROI"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "1",
+        "target": "2", 
+        "label": "Collaboration créative",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e1-3",
+        "source": "1",
+        "target": "3",
+        "label": "Coordination éditoriale", 
+        "type": "smoothstep"
+      },
+      {
+        "id": "e1-4",
+        "source": "1",
+        "target": "4",
+        "label": "Suivi performances",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e2-4", 
+        "source": "2",
+        "target": "4",
+        "label": "Analytics visuels",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e3-4",
+        "source": "3", 
+        "target": "4",
+        "label": "Analytics contenus",
+        "type": "smoothstep"
+      }
+    ]
+  },
+
+  "web_development": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "custom",
+        "position": { "x": 100, "y": 150 },
+        "data": {
+          "label": "Chef de projet",
+          "role": "Project Manager",
+          "skills": ["Management", "Planning", "Communication"],
+          "description": "Coordination générale et suivi du projet"
+        }
+      },
+      {
+        "id": "2",
+        "type": "custom", 
+        "position": { "x": 350, "y": 50 },
+        "data": {
+          "label": "UX/UI Designer",
+          "role": "UX/UI Designer",
+          "skills": ["Figma", "User Research", "Prototyping"],
+          "description": "Conception de l'expérience utilisateur"
+        }
+      },
+      {
+        "id": "3",
+        "type": "custom",
+        "position": { "x": 350, "y": 200 },
+        "data": {
+          "label": "Développeur Frontend", 
+          "role": "Frontend Developer",
+          "skills": ["React", "TypeScript", "CSS"],
+          "description": "Développement de l'interface utilisateur"
+        }
+      },
+      {
+        "id": "4",
+        "type": "custom",
+        "position": { "x": 600, "y": 125 },
+        "data": {
+          "label": "Développeur Backend",
+          "role": "Backend Developer", 
+          "skills": ["Node.js", "PostgreSQL", "API"],
+          "description": "Développement serveur et base de données"
+        }
+      },
+      {
+        "id": "5",
+        "type": "custom",
+        "position": { "x": 850, "y": 150 },
+        "data": {
+          "label": "DevOps Engineer",
+          "role": "DevOps Engineer",
+          "skills": ["Docker", "AWS", "CI/CD"],
+          "description": "Déploiement et infrastructure"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "1",
+        "target": "2",
+        "label": "Brief & validation",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e1-3", 
+        "source": "1",
+        "target": "3",
+        "label": "Coordination dev",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e1-4",
+        "source": "1",
+        "target": "4", 
+        "label": "Management technique",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e2-3",
+        "source": "2",
+        "target": "3",
+        "label": "Design System",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e3-4",
+        "source": "3",
+        "target": "4",
+        "label": "Intégration API", 
+        "type": "smoothstep"
+      },
+      {
+        "id": "e4-5",
+        "source": "4",
+        "target": "5",
+        "label": "Déploiement",
+        "type": "smoothstep"
+      }
+    ]
+  },
+
+  "mobile_app": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "custom",
+        "position": { "x": 100, "y": 150 },
+        "data": {
+          "label": "Product Owner",
+          "role": "Product Owner",
+          "skills": ["Product Strategy", "User Stories", "Roadmap"],
+          "description": "Définition des besoins et priorités"
+        }
+      },
+      {
+        "id": "2",
+        "type": "custom",
+        "position": { "x": 350, "y": 100 },
+        "data": {
+          "label": "Mobile Designer",
+          "role": "Mobile UI/UX Designer", 
+          "skills": ["Mobile Design", "Prototyping", "User Testing"],
+          "description": "Design spécialisé mobile"
+        }
+      },
+      {
+        "id": "3",
+        "type": "custom",
+        "position": { "x": 350, "y": 200 },
+        "data": {
+          "label": "Développeur React Native",
+          "role": "Mobile Developer",
+          "skills": ["React Native", "JavaScript", "Mobile APIs"],
+          "description": "Développement cross-platform"
+        }
+      },
+      {
+        "id": "4",
+        "type": "custom", 
+        "position": { "x": 600, "y": 150 },
+        "data": {
+          "label": "Backend Developer",
+          "role": "Backend Developer",
+          "skills": ["Node.js", "API REST", "Database"],
+          "description": "API et services backend"
+        }
+      },
+      {
+        "id": "5",
+        "type": "custom",
+        "position": { "x": 350, "y": 300 },
+        "data": {
+          "label": "QA Tester",
+          "role": "QA Engineer", 
+          "skills": ["Testing", "Bug Tracking", "Test Automation"],
+          "description": "Tests et assurance qualité"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "1",
+        "target": "2",
+        "label": "Specs fonctionnelles",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e1-3",
+        "source": "1", 
+        "target": "3",
+        "label": "User Stories",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e2-3",
+        "source": "2",
+        "target": "3",
+        "label": "Maquettes & Assets",
+        "type": "smoothstep" 
+      },
+      {
+        "id": "e3-4",
+        "source": "3",
+        "target": "4",
+        "label": "Intégrations API",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e3-5",
+        "source": "3",
+        "target": "5", 
+        "label": "Builds de test",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e5-1",
+        "source": "5",
+        "target": "1",
+        "label": "Feedback qualité",
+        "type": "smoothstep"
+      }
+    ]
+  },
+
+  "ecommerce_platform": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "custom",
+        "position": { "x": 100, "y": 200 },
+        "data": {
+          "label": "E-commerce Manager",
+          "role": "E-commerce Project Manager",
+          "skills": ["E-commerce Strategy", "Project Management", "Analytics"],
+          "description": "Pilotage stratégique du projet e-commerce"
+        }
+      },
+      {
+        "id": "2",
+        "type": "custom",
+        "position": { "x": 350, "y": 100 },
+        "data": {
+          "label": "UX/UI E-commerce",
+          "role": "E-commerce Designer",
+          "skills": ["E-commerce UX", "Conversion Optimization", "A/B Testing"],
+          "description": "Optimisation de l'expérience d'achat"
+        }
+      },
+      {
+        "id": "3",
+        "type": "custom",
+        "position": { "x": 600, "y": 50 },
+        "data": {
+          "label": "Frontend Developer",
+          "role": "Frontend Developer",
+          "skills": ["React", "E-commerce APIs", "Payment Integration"],
+          "description": "Interface utilisateur e-commerce"
+        }
+      },
+      {
+        "id": "4",
+        "type": "custom",
+        "position": { "x": 600, "y": 150 },
+        "data": {
+          "label": "Backend Developer",
+          "role": "Backend Developer", 
+          "skills": ["Node.js", "Database", "Payment Systems"],
+          "description": "Logique métier et paiements"
+        }
+      },
+      {
+        "id": "5",
+        "type": "custom",
+        "position": { "x": 350, "y": 300 },
+        "data": {
+          "label": "SEO Specialist",
+          "role": "SEO Expert",
+          "skills": ["SEO E-commerce", "Content Strategy", "Analytics"],
+          "description": "Optimisation pour les moteurs de recherche"
+        }
+      },
+      {
+        "id": "6",
+        "type": "custom",
+        "position": { "x": 850, "y": 100 },
+        "data": {
+          "label": "Security Expert",
+          "role": "Security Specialist",
+          "skills": ["Web Security", "PCI Compliance", "Penetration Testing"],
+          "description": "Sécurisation des transactions"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "1",
+        "target": "2",
+        "label": "Strategy & Brief",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e1-5",
+        "source": "1", 
+        "target": "5",
+        "label": "SEO Strategy",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e2-3",
+        "source": "2",
+        "target": "3",
+        "label": "Design System",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e3-4",
+        "source": "3",
+        "target": "4", 
+        "label": "API Integration",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e4-6",
+        "source": "4",
+        "target": "6",
+        "label": "Security Review",
+        "type": "smoothstep"
+      },
+      {
+        "id": "e5-3",
+        "source": "5",
+        "target": "3",
+        "label": "SEO Requirements",
+        "type": "smoothstep"
+      }
+    ]
+  }
+}

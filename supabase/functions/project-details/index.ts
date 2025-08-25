@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
           projectIds.map(async (projectId: string) => {
             const projectDetails = await getProjectDetails(supabase, projectId);
             
-            // Get resource assignment details for this project
+            // Get resource assignment details for this project (prioritize 'recherche' status)
             const { data: resourceAssignments } = await supabase
               .from("hr_resource_assignments")
               .select(`
@@ -165,10 +165,11 @@ Deno.serve(async (req) => {
                 expertises,
                 languages,
                 seniority,
+                booking_status,
                 hr_profiles(name)
               `)
               .eq("project_id", projectId)
-              .limit(1);
+              .order("booking_status", { ascending: false }); // 'recherche' comes before 'draft'
 
             const resourceAssignment = resourceAssignments?.[0];
             const files = await getProjectFiles(supabase, projectId);

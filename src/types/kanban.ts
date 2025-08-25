@@ -24,6 +24,7 @@ export interface KanbanCard {
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID
+  files?: any[]; // Support pour les fichiers uploadés
 }
 
 export interface KanbanColumn {
@@ -113,11 +114,13 @@ export interface CreateCardInput {
   priority?: 'low' | 'medium' | 'high';
   status?: 'todo' | 'in_progress' | 'review' | 'done';
   labels?: string[];
+  files?: any[];
 }
 
 export interface UpdateCardInput extends Partial<CreateCardInput> {
   id: string;
   progress?: number;
+  files?: any[];
 }
 
 export interface CreateColumnInput {

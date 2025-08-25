@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,9 +25,18 @@ import {
   Kanban,
   CalendarClock,
   Cloud,
-  MessageSquare
+  MessageSquare,
+  Rocket,
+  Plus,
+  Eye,
+  Network,
+  Users,
+  Activity
 } from "lucide-react";
-import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { IallaLogo } from "@/components/IallaLogo";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { ClientActiveTracking } from '@/components/time-tracking/ClientActiveTracking';
+import { useTemplates } from "@/hooks/useTemplates";
 import SharedPlanningView from "@/components/shared/SharedPlanningView";
 import DriveView from "@/components/client/DriveView";
 import CreateProjectModal from "@/components/CreateProjectModal";
@@ -35,14 +44,18 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import DynamicMessageSystem from "@/components/messages/DynamicMessageSystem";
 import ClientKanbanView from "@/components/client/ClientKanbanView";
-import ClientMessagesView from "@/components/client/ClientMessagesView";
+import { EnhancedMessageSystem } from "@/components/shared/EnhancedMessageSystem";
+import { InvoiceList } from "@/components/invoicing/InvoiceList";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
+import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
+import ClientMetricsDashboard from "./ClientMetricsDashboard";
 
 const ClientDashboard = () => {
-const [activeSection, setActiveSection] = useState('projects');
+const [searchParams, setSearchParams] = useSearchParams();
+const [activeSection, setActiveSection] = useState('start');
+const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 const { user, logout } = useAuth();
 const navigate = useNavigate();
 const { toast } = useToast();
@@ -52,13 +65,36 @@ type DbProject = { id: string; title: string; description?: string | null; proje
 const [projects, setProjects] = useState<DbProject[]>([]);
 const [resourceAssignments, setResourceAssignments] = useState<any[]>([]);
 const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+// Debug useEffect
+useEffect(() => {
+  console.log('isCreateOpen changed to:', isCreateOpen);
+}, [isCreateOpen]);
 const [isCreating, setIsCreating] = useState(false);
 const [selectedKanbanProjectId, setSelectedKanbanProjectId] = useState<string>("");
 const [selectedMessagesProjectId, setSelectedMessagesProjectId] = useState<string>("");
 const [kickoffDialogOpen, setKickoffDialogOpen] = useState(false);
 const [kickoffProject, setKickoffProject] = useState<{ id: string; title: string } | null>(null);
+const [refreshTrigger, setRefreshTrigger] = useState(0);
 
 const { setupProject, isLoading: isOrchestrating } = useProjectOrchestrator();
+const { categories, templates, getTemplatesByCategory } = useTemplates();
+
+// Set up real-time project updates with FIXED version
+useRealtimeProjectsFixed({
+  setProjects,
+  setResourceAssignments,
+  userId: user?.profile?.id || user?.id,
+  userType: 'client'
+});
+
+// Handle URL parameters for section navigation
+useEffect(() => {
+  const section = searchParams.get('section');
+  if (section && ['start', 'dashboard', 'templates', 'projects', 'planning', 'drive', 'kanban', 'messages', 'invoices', 'settings'].includes(section)) {
+    setActiveSection(section);
+  }
+}, [searchParams]);
 
 useEffect(() => {
   const load = async () => {
@@ -66,6 +102,7 @@ useEffect(() => {
     const { data, error } = await supabase
       .from('projects')
       .select('id,title,description,project_date,due_date,client_budget,status')
+      .eq('owner_id', user.id) // CRITICAL: Filter by owner to prevent data leak
       .order('created_at', { ascending: false });
     if (error) {
       console.error('load projects', error);
@@ -94,6 +131,11 @@ const loadResourceAssignments = async () => {
         booking_status,
         hr_profiles (
           name
+        ),
+        candidate_profiles (
+          first_name,
+          last_name,
+          profile_title
         )
       `);
     
@@ -108,15 +150,34 @@ const loadResourceAssignments = async () => {
 };
 
 const refreshProjects = async () => {
+  if (!user) return;
   const { data } = await supabase
     .from('projects')
     .select('id,title,description,project_date,due_date,client_budget,status')
+    .eq('owner_id', user.id) // CRITICAL: Filter by owner to prevent data leak
     .order('created_at', { ascending: false });
   setProjects((data || []) as DbProject[]);
   await loadResourceAssignments();
 };
 
-const onViewProject = (id: string) => navigate(`/project/${id}`);
+const onViewProject = (id: string) => {
+  navigate(`/project/${id}`);
+};
+
+// Function to refresh resource assignments after returning from ReactFlow
+const triggerResourceRefresh = () => {
+  setRefreshTrigger(prev => prev + 1);
+};
+
+// Listen for navigation back to trigger refresh
+useEffect(() => {
+  const handleFocus = () => {
+    triggerResourceRefresh();
+  };
+  
+  window.addEventListener('focus', handleFocus);
+  return () => window.removeEventListener('focus', handleFocus);
+}, []);
 
 const onToggleStatus = async (id: string, status: string) => {
   const { error } = await supabase.from('projects').update({ status }).eq('id', id);
@@ -259,10 +320,12 @@ const handleCreateProject = async (data: { title: string; description?: string; 
       }
     }
 
-    toast({ title: 'Projet créé' });
+    toast({ title: 'Projet créé', description: 'Redirection vers ReactFlow pour construire votre équipe...' });
     setIsCreateOpen(false);
-    await refreshProjects();
+    // Navigate immediately to ReactFlow for team building
     navigate(`/project/${projectId}`);
+    // Refresh projects in background
+    await refreshProjects();
   } catch (e) {
     console.error('create project error', e);
     toast({ title: 'Erreur', description: 'Création du projet échouée' });
@@ -278,29 +341,63 @@ const getProjectResourceAssignments = (projectId: string) => {
 const getProjectsWithClassification = () => {
   return projects.map(project => {
     const assignments = getProjectResourceAssignments(project.id);
-    const allResourcesBooked = assignments.length > 0 && assignments.every(assignment => assignment.booking_status === 'booké');
+    // Support both old 'booké' status and new 'accepted' status
+    const allResourcesBooked = assignments.length > 0 && assignments.every(assignment => 
+      assignment.booking_status === 'booké' || assignment.booking_status === 'accepted'
+    );
+    const hasBookingRequested = assignments.some(assignment => assignment.booking_status === 'recherche');
+    const hasResourcesInDraft = assignments.some(assignment => assignment.booking_status === 'draft');
     
     let category = 'nouveaux'; // default
     
-    if (project.status === 'completed') {
-      category = 'termines';
-    } else if (project.status === 'play') {
-      category = 'en-cours';
-    } else if (project.status === 'pause') {
-      if (assignments.length === 0) {
-        category = 'nouveaux';
-      } else if (allResourcesBooked) {
-        category = 'en-pause';
-      } else {
-        category = 'attente-team';
-      }
+    // UNIFIED STATUS LOGIC - based on project status and resource booking
+    switch (project.status) {
+      case 'completed':
+        category = 'termines';
+        break;
+        
+      case 'play':
+        // Projet en cours
+        category = 'en-cours';
+        break;
+        
+      case 'attente-team':
+        // Projet qui attend l'équipe - mais si tous booké, devrait être en cours
+        if (allResourcesBooked) {
+          // Force immediate UI update - backend should update to 'play' soon
+          category = 'en-cours';
+          console.log(`🔄 PROJECT ${project.title}: Force move to 'en-cours' (all resources booked)`);
+        } else {
+          category = 'attente-team';
+        }
+        break;
+        
+      case 'pause':
+      case 'nouveaux':
+      default:
+        // Projet pas encore démarré - classification selon les ressources
+        if (assignments.length === 0) {
+          category = 'nouveaux';
+        } else if (allResourcesBooked) {
+          // Toutes ressources bookées mais projet en pause
+          category = 'en-pause';
+        } else if (hasBookingRequested) {
+          // Booking en cours
+          category = 'attente-team';
+        } else if (hasResourcesInDraft) {
+          // Ressources définies mais pas encore bookées
+          category = 'nouveaux';
+        } else {
+          category = 'nouveaux';
+        }
+        break;
     }
     
-    return { ...project, category, assignments };
+    return { ...project, category, assignments, allResourcesBooked, hasBookingRequested };
   });
 };
 
-const classifiedProjects = getProjectsWithClassification();
+const classifiedProjects = useMemo(() => getProjectsWithClassification(), [projects, resourceAssignments]);
 
 const nouveauxProjets = classifiedProjects.filter(p => p.category === 'nouveaux');
 const projetsAttenteTeam = classifiedProjects.filter(p => p.category === 'attente-team');
@@ -311,6 +408,8 @@ const projetsTermines = classifiedProjects.filter(p => p.category === 'termines'
 const hasActiveProjects = projetsEnCours.length > 0;
 
 const menuItems = [
+  { id: 'start', label: 'Commencer', icon: Rocket },
+  { id: 'dashboard', label: 'Tableau de bord', icon: Activity },
   { id: 'projects', label: 'Mes projets', icon: FolderOpen },
   ...(hasActiveProjects ? [
     { id: 'planning', label: 'Planning', icon: CalendarClock },
@@ -323,60 +422,371 @@ const menuItems = [
 
   const renderContent = () => {
     switch (activeSection) {
+      case 'start':
+        return (
+          <div className="min-h-[calc(100vh-12rem)] bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
+            <div className="w-full max-w-4xl mx-auto text-center space-y-8">
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  <IallaLogo size="lg" />
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold leading-tight">
+                  Créez votre 
+                  <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    {" "}équipe externe
+                  </span>
+                </h1>
+                <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                  Choisissez comment vous souhaitez démarrer votre nouveau projet
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-8 mt-12">
+                <Card className="group hover:shadow-2xl transition-all duration-300 border-0 shadow-lg">
+                  <CardHeader className="space-y-4 pb-8">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <Plus className="w-8 h-8 text-white" />
+                    </div>
+                    <CardTitle className="text-2xl font-bold">Projet sur-mesure</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 mb-6">
+                      Créez un projet personnalisé en définissant vos propres besoins et contraintes.
+                    </p>
+                    <Button 
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Button clicked, opening modal...');
+                        console.log('isCreateOpen before:', isCreateOpen);
+                        setIsCreateOpen(true);
+                        console.log('setIsCreateOpen(true) called');
+                      }}
+                    >
+                      Créer un projet
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="group hover:shadow-2xl transition-all duration-300 border-0 shadow-lg cursor-pointer" 
+                      onClick={() => setActiveSection('templates')}>
+                  <CardHeader className="space-y-4 pb-8">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <Rocket className="w-8 h-8 text-white" />
+                    </div>
+                    <CardTitle className="text-2xl font-bold">Templates prêts à l'emploi</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 mb-6">
+                      Utilisez nos modèles pré-configurés pour démarrer rapidement avec une équipe optimisée.
+                    </p>
+                    <Button variant="outline" className="w-full border-2">
+                      Explorer les templates
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="mt-16 text-center">
+                <p className="text-gray-500 text-sm">
+                  Besoin d'aide ? Notre équipe est là pour vous accompagner
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'dashboard':
+        return <ClientMetricsDashboard />;
+
+      case 'templates':
+        if (selectedCategory) {
+          // Show templates for selected category
+          const category = categories.find(c => c.id === selectedCategory);
+          const categoryTemplates = getTemplatesByCategory(selectedCategory);
+          
+          const IconComponent = category?.icon === 'MessageSquare' ? MessageSquare :
+                               category?.icon === 'Cloud' ? Cloud :
+                               category?.icon === 'Receipt' ? Receipt :
+                               FolderOpen; // default icon
+          
+          return (
+            <div className="space-y-6">
+              {/* Header avec design Ialla */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 via-white to-pink-50 border border-gray-100">
+                <div className="absolute inset-0 bg-gradient-to-br opacity-20" 
+                     style={{ 
+                       background: category?.color?.includes('from-blue') ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' :
+                                   category?.color?.includes('from-green') ? 'linear-gradient(135deg, #059669, #047857)' :
+                                   category?.color?.includes('from-purple') ? 'linear-gradient(135deg, #7c3aed, #6d28d9)' :
+                                   category?.color?.includes('from-red') ? 'linear-gradient(135deg, #dc2626, #b91c1c)' :
+                                   category?.color?.includes('from-yellow') ? 'linear-gradient(135deg, #d97706, #b45309)' :
+                                   'linear-gradient(135deg, #3b82f6, #1d4ed8)'
+                     }}
+                />
+                <div className="relative p-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-16 h-16 bg-gradient-to-br ${category?.color || 'from-purple-600 to-pink-600'} rounded-2xl flex items-center justify-center shadow-lg`}>
+                        <IconComponent className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                          {category?.name || 'Catégorie'}
+                        </h2>
+                        <p className="text-gray-600 mt-2 text-lg">
+                          {category?.description || 'Équipes disponibles dans cette catégorie'}
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setSelectedCategory(null)}
+                      className="bg-white/80 backdrop-blur-sm border-gray-200 hover:bg-white"
+                    >
+                      Retour aux catégories
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {categoryTemplates.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Aucune équipe disponible dans cette catégorie</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {categoryTemplates.map((template) => (
+                    <Card 
+                      key={template.id} 
+                      className="group/template hover:shadow-xl transition-all duration-200 cursor-pointer border-l-4 relative bg-white/80 backdrop-blur-sm"
+                      style={{ 
+                        borderLeftColor: category?.color?.includes('from-blue') ? '#3b82f6' :
+                                       category?.color?.includes('from-green') ? '#059669' :
+                                       category?.color?.includes('from-purple') ? '#7c3aed' :
+                                       category?.color?.includes('from-red') ? '#dc2626' :
+                                       category?.color?.includes('from-yellow') ? '#d97706' :
+                                       category?.color?.includes('from-indigo') ? '#4f46e5' :
+                                       '#3b82f6'
+                      }}
+                      onClick={() => {
+                        // Navigate to ReactFlow with template data
+                        window.open(`/project/template-preview?template=${template.id}`, '_blank');
+                      }}
+                    >
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 group-hover/template:text-purple-600 transition-colors text-lg mb-2">
+                                {template.name}
+                              </h4>
+                              {template.description && (
+                                <p className="text-gray-600 text-sm mb-3 leading-relaxed">
+                                  {template.description}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-4 text-sm text-gray-600">
+                                {template.team_size && (
+                                  <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-full">
+                                    <Users className="w-4 h-4" />
+                                    <span className="font-medium">{template.team_size} personnes</span>
+                                  </span>
+                                )}
+                                {template.price_per_minute && (
+                                  <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full">
+                                    <span className="text-lg">€</span>
+                                    <span className="font-medium">{template.price_per_minute}/min</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 group-hover/template:bg-purple-100 transition-colors">
+                              <Eye className="w-5 h-5 text-purple-600" />
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              <div className="text-center mt-8">
+                <p className="text-gray-500 text-sm">
+                  Vous ne trouvez pas l'équipe adaptée ? 
+                  <Button variant="link" className="p-0 h-auto ml-1" onClick={() => setIsCreateOpen(true)}>
+                    Créez un projet sur-mesure
+                  </Button>
+                </p>
+              </div>
+            </div>
+          );
+        }
+
+        // Show category overview
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-bold">Vos futures équipes</h2>
+                <p className="text-gray-600 mt-2">Choisissez une catégorie pour explorer nos équipes pré-configurées</p>
+              </div>
+              <Button variant="outline" onClick={() => setActiveSection('start')}>
+                Retour
+              </Button>
+            </div>
+
+            {categories.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">Chargement des templates...</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categories.map((category) => {
+                  const categoryTemplates = getTemplatesByCategory(category.id);
+                  const IconComponent = category.icon === 'MessageSquare' ? MessageSquare :
+                                      category.icon === 'Cloud' ? Cloud :
+                                      category.icon === 'Receipt' ? Receipt :
+                                      FolderOpen; // default icon
+
+                  return (
+                    <Card 
+                      key={category.id} 
+                      className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
+                      onClick={() => setSelectedCategory(category.id)}
+                    >
+                      <CardHeader>
+                        <div className={`w-12 h-12 bg-gradient-to-br ${category.color || 'from-gray-600 to-gray-700'} rounded-xl flex items-center justify-center mb-4`}>
+                          <IconComponent className="w-6 h-6 text-white" />
+                        </div>
+                        <CardTitle className="group-hover:text-purple-600 transition-colors">{category.name}</CardTitle>
+                        {category.description && (
+                          <p className="text-sm text-gray-600">{category.description}</p>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-gray-600">
+                            {categoryTemplates.length} équipe{categoryTemplates.length !== 1 ? 's' : ''} disponible{categoryTemplates.length !== 1 ? 's' : ''}
+                          </div>
+                          <Button variant="ghost" size="sm" className="text-purple-600 hover:text-purple-700">
+                            Explorer →
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="text-center mt-8">
+              <p className="text-gray-500 text-sm">
+                Vous ne trouvez pas le template adapté ? 
+                <Button variant="link" className="p-0 h-auto ml-1" onClick={() => setIsCreateOpen(true)}>
+                  Créez un projet sur-mesure
+                </Button>
+              </p>
+            </div>
+          </div>
+        );
+
       case 'projects':
         return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">Mes projets</h2>
-              <Button onClick={() => setIsCreateOpen(true)}>Créer un nouveau projet</Button>
+          <div className="space-y-6">
+            {/* Header avec design Ialla */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 via-white to-pink-50 border border-gray-100">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-pink-600/10" />
+              <div className="relative p-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <FolderOpen className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Mes projets
+                    </h2>
+                    <p className="text-gray-600 mt-2 text-lg">
+                      Gérez et suivez l'avancement de vos projets
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <Tabs defaultValue="nouveaux" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="nouveaux" className="text-xs">
-                  Nouveaux projets
-                  {nouveauxProjets.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
-                      {nouveauxProjets.length}
-                    </Badge>
-                  )}
+              <TabsList className="grid w-full grid-cols-5 bg-gradient-to-r from-purple-50 to-pink-50 p-1 rounded-xl border border-gray-200/50 shadow-sm mb-4">
+                <TabsTrigger 
+                  value="nouveaux" 
+                  className="relative text-sm font-medium transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:border data-[state=active]:border-purple-200 data-[state=active]:text-purple-700 hover:bg-white/50 rounded-lg py-3 px-4 pb-4"
+                >
+                  <span className="flex items-center gap-2">
+                    Nouveaux projets
+                    {nouveauxProjets.length > 0 && (
+                      <span className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                        {nouveauxProjets.length}
+                      </span>
+                    )}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="attente-team" className="text-xs">
-                  Attente team
-                  {projetsAttenteTeam.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
-                      {projetsAttenteTeam.length}
-                    </Badge>
-                  )}
+                <TabsTrigger 
+                  value="attente-team" 
+                  className="relative text-sm font-medium transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:border data-[state=active]:border-purple-200 data-[state=active]:text-purple-700 hover:bg-white/50 rounded-lg py-3 px-4 pb-4"
+                >
+                  <span className="flex items-center gap-2">
+                    Attente team
+                    {projetsAttenteTeam.length > 0 && (
+                      <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                        {projetsAttenteTeam.length}
+                      </span>
+                    )}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="en-pause" className="text-xs">
-                  En pause
-                  {projetsEnPause.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
-                      {projetsEnPause.length}
-                    </Badge>
-                  )}
+                <TabsTrigger 
+                  value="en-pause" 
+                  className="relative text-sm font-medium transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:text-gray-700 hover:bg-white/50 rounded-lg py-3 px-4 pb-4"
+                >
+                  <span className="flex items-center gap-2">
+                    En pause
+                    {projetsEnPause.length > 0 && (
+                      <span className="bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                        {projetsEnPause.length}
+                      </span>
+                    )}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="en-cours" className="text-xs">
-                  En cours
-                  {projetsEnCours.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
-                      {projetsEnCours.length}
-                    </Badge>
-                  )}
+                <TabsTrigger 
+                  value="en-cours" 
+                  className="relative text-sm font-medium transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:border data-[state=active]:border-green-200 data-[state=active]:text-green-700 hover:bg-white/50 rounded-lg py-3 px-4 pb-4"
+                >
+                  <span className="flex items-center gap-2">
+                    En cours
+                    {projetsEnCours.length > 0 && (
+                      <span className="bg-gradient-to-r from-purple-400 to-pink-400 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                        {projetsEnCours.length}
+                      </span>
+                    )}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="termines" className="text-xs">
-                  Terminés
-                  {projetsTermines.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
-                      {projetsTermines.length}
-                    </Badge>
-                  )}
+                <TabsTrigger 
+                  value="termines" 
+                  className="relative text-sm font-medium transition-all duration-200 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:border data-[state=active]:border-purple-200 data-[state=active]:text-purple-700 hover:bg-white/50 rounded-lg py-3 px-4 pb-4"
+                >
+                  <span className="flex items-center gap-2">
+                    Terminés
+                    {projetsTermines.length > 0 && (
+                      <span className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                        {projetsTermines.length}
+                      </span>
+                    )}
+                  </span>
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="nouveaux" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <TabsContent value="nouveaux" className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {nouveauxProjets.map((p) => (
                     <ProjectCard
                       key={p.id}
@@ -395,6 +805,7 @@ const menuItems = [
                       onView={onViewProject}
                       onStart={onStartProject}
                       onEdit={refreshProjects}
+                      refreshTrigger={refreshTrigger}
                     />
                   ))}
                   {nouveauxProjets.length === 0 && (
@@ -405,8 +816,8 @@ const menuItems = [
                 </div>
               </TabsContent>
 
-              <TabsContent value="attente-team" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <TabsContent value="attente-team" className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {projetsAttenteTeam.map((p) => (
                     <ProjectCard
                       key={p.id}
@@ -425,6 +836,7 @@ const menuItems = [
                       onView={onViewProject}
                       onStart={onStartProject}
                       onEdit={refreshProjects}
+                      refreshTrigger={refreshTrigger}
                     />
                   ))}
                   {projetsAttenteTeam.length === 0 && (
@@ -435,8 +847,8 @@ const menuItems = [
                 </div>
               </TabsContent>
 
-              <TabsContent value="en-pause" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <TabsContent value="en-pause" className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {projetsEnPause.map((p) => (
                     <ProjectCard
                       key={p.id}
@@ -455,6 +867,7 @@ const menuItems = [
                       onView={onViewProject}
                       onStart={onStartProject}
                       onEdit={refreshProjects}
+                      refreshTrigger={refreshTrigger}
                     />
                   ))}
                   {projetsEnPause.length === 0 && (
@@ -465,8 +878,11 @@ const menuItems = [
                 </div>
               </TabsContent>
 
-              <TabsContent value="en-cours" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <TabsContent value="en-cours" className="space-y-6">
+                {/* Active time tracking widget */}
+                <ClientActiveTracking />
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {projetsEnCours.map((p) => (
                     <ProjectCard
                       key={p.id}
@@ -485,6 +901,7 @@ const menuItems = [
                       onView={onViewProject}
                       onStart={onStartProject}
                       onEdit={refreshProjects}
+                      refreshTrigger={refreshTrigger}
                     />
                   ))}
                   {projetsEnCours.length === 0 && (
@@ -495,8 +912,8 @@ const menuItems = [
                 </div>
               </TabsContent>
 
-              <TabsContent value="termines" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <TabsContent value="termines" className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {projetsTermines.map((p) => (
                     <ProjectCard
                       key={p.id}
@@ -515,6 +932,7 @@ const menuItems = [
                       onView={onViewProject}
                       onStart={onStartProject}
                       onEdit={refreshProjects}
+                      refreshTrigger={refreshTrigger}
                     />
                   ))}
                   {projetsTermines.length === 0 && (
@@ -525,22 +943,6 @@ const menuItems = [
                 </div>
               </TabsContent>
             </Tabs>
-
-            <CreateProjectModal
-              isOpen={isCreateOpen}
-              onClose={() => setIsCreateOpen(false)}
-              onProjectCreated={refreshProjects}
-            />
-
-            <KickoffDialog
-              open={kickoffDialogOpen}
-              projectTitle={kickoffProject?.title || ""}
-              onClose={() => {
-                setKickoffDialogOpen(false);
-                setKickoffProject(null);
-              }}
-              onConfirm={handleKickoffConfirm}
-            />
           </div>
         );
         
@@ -562,7 +964,6 @@ const menuItems = [
       case 'drive':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Drive</h2>
             {projetsEnCours.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Cloud className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -578,23 +979,28 @@ const menuItems = [
       case 'messages':
         return (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">Messages</h2>
-              {projetsEnCours.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Select value={selectedMessagesProjectId} onValueChange={setSelectedMessagesProjectId}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue placeholder="Sélectionner un projet" />
-                    </SelectTrigger>
-                    <SelectContent>
-                           {projetsEnCours.map((p) => (
-                             <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                           ))}
-                    </SelectContent>
-                  </Select>
+            {projetsEnCours.length > 0 && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <MessageSquare className="w-6 h-6 text-white" />
+                    </div>
+                    
+                    <Select value={selectedMessagesProjectId} onValueChange={setSelectedMessagesProjectId}>
+                      <SelectTrigger className="w-64 bg-white border-purple-200 focus:border-purple-400">
+                        <SelectValue placeholder="Sélectionner un projet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projetsEnCours.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
             {projetsEnCours.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -602,93 +1008,55 @@ const menuItems = [
                 <p>Démarrez un projet pour communiquer avec votre équipe</p>
               </div>
             ) : selectedMessagesProjectId && (
-              <DynamicMessageSystem projectId={selectedMessagesProjectId} />
+              <div className="h-[calc(100vh-12rem)]">
+                <EnhancedMessageSystem projectId={selectedMessagesProjectId} userType="client" />
+              </div>
             )}
           </div>
         );
 
       case 'invoices':
         return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Mes factures</h2>
-            <div className="grid gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Facture #2024-INV-001</CardTitle>
-                  <Badge variant="default">Payée</Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Projet:</span>
-                      <span>Refonte site web</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Montant:</span>
-                      <span className="font-semibold">7 500€</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Date:</span>
-                      <span className="text-sm">15/01/2024</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Facture #2024-INV-002</CardTitle>
-                  <Badge variant="outline">En attente</Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Projet:</span>
-                      <span>Application mobile</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Montant:</span>
-                      <span className="font-semibold">12 500€</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Date:</span>
-                      <span className="text-sm">01/02/2024</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="space-y-6">
+            {/* Header avec design unifié */}
+            <div className="bg-gradient-to-r from-purple-50 via-white to-pink-50 p-8 rounded-2xl border border-purple-100">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Receipt className="w-7 h-7 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    Gestion des Factures
+                  </h1>
+                  <p className="text-gray-600 mt-1">
+                    Consultez et gérez vos factures hebdomadaires
+                  </p>
+                </div>
+              </div>
             </div>
+            
+            {/* Invoice List Component */}
+            <InvoiceList />
           </div>
         );
 
       case 'kanban':
         return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">Tableau Kanban</h2>
-              {projetsEnCours.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Select value={selectedKanbanProjectId} onValueChange={setSelectedKanbanProjectId}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue placeholder="Sélectionner un projet" />
-                    </SelectTrigger>
-                    <SelectContent>
-                     {projetsEnCours.map((p) => (
-                       <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                     ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+          <div className="h-[calc(100vh-8rem)]">
             {projetsEnCours.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Kanban className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">Tableau Kanban non disponible</h3>
-                <p>Démarrez un projet pour accéder au tableau de gestion des tâches</p>
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Kanban className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">Tableau Kanban non disponible</h3>
+                  <p className="text-muted-foreground">Démarrez un projet pour accéder au tableau de gestion des tâches</p>
+                </div>
               </div>
-            ) : selectedKanbanProjectId && (
-              <ClientKanbanView />
+            ) : (
+              <ClientKanbanView 
+                availableProjects={projetsEnCours} 
+                selectedProjectId={selectedKanbanProjectId}
+                onProjectChange={setSelectedKanbanProjectId}
+              />
             )}
           </div>
         );
@@ -737,17 +1105,22 @@ const menuItems = [
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
-        <Sidebar className="w-64">
+        <Sidebar className="w-64" collapsible="icon">
           <SidebarContent>
             <div className="p-4">
-              <h3 className="font-semibold text-lg">Espace Client</h3>
-              <p className="text-sm text-muted-foreground">
-                {user?.firstName} {user?.lastName}
-              </p>
+              <div className="group-data-[collapsible=icon]:hidden">
+                <IallaLogo size="md" />
+                <p className="text-sm text-muted-foreground mt-2">
+                  {user?.firstName} {user?.lastName}
+                </p>
+              </div>
+              <div className="hidden group-data-[collapsible=icon]:flex justify-center">
+                <IallaLogo size="sm" showText={false} />
+              </div>
             </div>
             
             <SidebarGroup>
-              <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Navigation</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {menuItems.map((item) => (
@@ -782,12 +1155,23 @@ const menuItems = [
           </SidebarContent>
         </Sidebar>
 
-        <main className="flex-1">
-          <header className="h-16 border-b flex items-center justify-between px-6">
+        <main className="flex-1 bg-gradient-to-br from-purple-50/30 via-white to-pink-50/30">
+          <header className="h-16 border-b bg-white/80 backdrop-blur-sm flex items-center justify-between px-6 shadow-sm">
             <div className="flex items-center">
               <SidebarTrigger />
               <div className="ml-4">
-                <h1 className="text-xl font-semibold">Tableau de bord client</h1>
+                <h1 className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  {activeSection === 'start' ? 'Démarrer un projet' :
+                   activeSection === 'templates' ? 'Templates' :
+                   activeSection === 'projects' ? 'Mes projets' :
+                   activeSection === 'planning' ? 'Planning' :
+                   activeSection === 'drive' ? 'Drive' :
+                   activeSection === 'kanban' ? 'Kanban' :
+                   activeSection === 'messages' ? 'Messages' :
+                   activeSection === 'invoices' ? 'Factures' :
+                   activeSection === 'settings' ? 'Paramètres' :
+                   'Tableau de bord'}
+                </h1>
                 <p className="text-sm text-muted-foreground">
                   Bienvenue {user?.firstName}
                 </p>
@@ -795,7 +1179,10 @@ const menuItems = [
             </div>
             
             <div className="flex items-center gap-3">
-              <Badge variant="outline">Client</Badge>
+              <NotificationBell />
+              <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0">
+                Client
+              </Badge>
             </div>
           </header>
           
@@ -803,6 +1190,31 @@ const menuItems = [
             {renderContent()}
           </div>
         </main>
+
+        {/* Modal always rendered outside of sections */}
+        <CreateProjectModal
+          isOpen={isCreateOpen}
+          onClose={() => {
+            console.log('Modal closing...');
+            setIsCreateOpen(false);
+          }}
+          onProjectCreated={(projectId) => {
+            refreshProjects();
+            // Naviguer vers ReactFlow pour configurer les équipes
+            navigate(`/project/${projectId}`);
+          }}
+        />
+
+        {/* Other dialogs */}
+        <KickoffDialog
+          open={kickoffDialogOpen}
+          projectTitle={kickoffProject?.title || ""}
+          onClose={() => {
+            setKickoffDialogOpen(false);
+            setKickoffProject(null);
+          }}
+          onConfirm={handleKickoffConfirm}
+        />
       </div>
     </SidebarProvider>
   );

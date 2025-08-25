@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { DropResult } from '@hello-pangea/dnd';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -11,10 +11,14 @@ import {
   UpdateColumnInput
 } from '@/types/kanban';
 import { toast } from 'sonner';
+import { getStatusFromColumnTitle } from '@/utils/kanbanStatus';
 
 export const useKanbanSupabase = (boardId?: string) => {
   const [board, setBoard] = useState<KanbanBoard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const subscriptionRef = useRef<any>(null);
+  const isUpdatingRef = useRef(false);
+  const lastUpdateRef = useRef<string | null>(null);
 
   // Helper function to generate IDs
   const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -50,11 +54,12 @@ export const useKanbanSupabase = (boardId?: string) => {
           status: card.status,
           labels: card.labels || [],
           attachments: [], // Will be loaded separately via useKanbanFiles
-          comments: [],
+          comments: card.comments || [],
           progress: card.progress,
           createdAt: card.created_at,
           updatedAt: card.updated_at,
-          createdBy: card.created_by
+          createdBy: card.created_by,
+          files: card.files || [] // Add files support
         };
       });
 
@@ -133,10 +138,116 @@ export const useKanbanSupabase = (boardId?: string) => {
   useEffect(() => {
     if (boardId) {
       loadBoard(boardId);
+      
+      // Setup realtime subscription for both cards and columns
+      subscriptionRef.current = supabase
+        .channel(`kanban-${boardId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'kanban_cards',
+            filter: `board_id=eq.${boardId}`
+          },
+          async (payload) => {
+            // Create a unique identifier for this update
+            const updateId = `${payload.eventType}-${payload.new?.id || payload.old?.id}-${payload.new?.updated_at}`;
+            
+            // Skip if this is the same update we just processed
+            if (lastUpdateRef.current === updateId) {
+              return;
+            }
+            
+            // Skip if we're the ones who made the change
+            if (isUpdatingRef.current) {
+              return;
+            }
+            
+            lastUpdateRef.current = updateId;
+            
+            // For card movements, update locally instead of reloading
+            if (payload.eventType === 'UPDATE' && payload.new) {
+              const updatedCard = payload.new;
+              
+              setBoard(prev => {
+                if (!prev) return prev;
+                
+                // Update the card in the board
+                const newCards = { ...prev.cards };
+                if (newCards[updatedCard.id]) {
+                  newCards[updatedCard.id] = {
+                    ...newCards[updatedCard.id],
+                    ...updatedCard,
+                    assignedTo: updatedCard.assigned_to || [],
+                    dueDate: updatedCard.due_date,
+                    createdBy: updatedCard.created_by,
+                    updatedAt: updatedCard.updated_at
+                  };
+                }
+                
+                // Update column if card moved
+                let newColumns = [...prev.columns];
+                if (updatedCard.column_id !== prev.cards[updatedCard.id]?.columnId) {
+                  // Remove from old column
+                  newColumns = newColumns.map(col => ({
+                    ...col,
+                    cardIds: col.cardIds.filter(id => id !== updatedCard.id)
+                  }));
+                  
+                  // Add to new column
+                  const targetCol = newColumns.find(c => c.id === updatedCard.column_id);
+                  if (targetCol) {
+                    targetCol.cardIds.splice(updatedCard.position || 0, 0, updatedCard.id);
+                  }
+                }
+                
+                return {
+                  ...prev,
+                  cards: newCards,
+                  columns: newColumns,
+                  updatedAt: new Date().toISOString()
+                };
+              });
+            } else {
+              // For other changes, reload after a delay
+              setTimeout(() => {
+                loadBoard(boardId);
+              }, 300);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'kanban_columns',
+            filter: `board_id=eq.${boardId}`
+          },
+          async (payload) => {
+            // Skip column updates for now - they're less frequent
+            if (isUpdatingRef.current) {
+              return;
+            }
+            // Reload only for column structure changes
+            setTimeout(() => {
+              loadBoard(boardId);
+            }, 500);
+          }
+        )
+        .subscribe();
     } else {
       setIsLoading(false);
     }
-  }, [boardId, loadBoard]);
+    
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
+    };
+  }, [boardId]); // Removed loadBoard from dependencies to avoid infinite loop
 
   // Create a new board with default columns and team notifications
   const createBoard = useCallback(async (title: string, description?: string, projectId?: string) => {
@@ -146,22 +257,33 @@ export const useKanbanSupabase = (boardId?: string) => {
         return null;
       }
 
-      // Get real team members from project_teams
-      const { data: projectTeams, error: teamError } = await (supabase as any)
-        .from('project_teams')
-        .select('member_id, email, first_name, last_name, role')
-        .eq('project_id', projectId);
+      // Get real team members from project_bookings with profiles
+      const { data: projectBookings, error: teamError } = await (supabase as any)
+        .from('project_bookings')
+        .select(`
+          candidate_id,
+          profiles:candidate_id (
+            id,
+            email,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('project_id', projectId)
+        .eq('status', 'confirmed');
 
       if (teamError) {
         console.error('Error fetching team members:', teamError);
       }
 
-      const teamMembers = (projectTeams || []).map((member: any) => ({
-        id: member.member_id,
-        name: `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email,
-        email: member.email,
-        role: member.role || 'Membre'
-      }));
+      const teamMembers = (projectBookings || [])
+        .filter((booking: any) => booking.profiles)
+        .map((booking: any) => ({
+          id: booking.profiles.id,
+          name: `${booking.profiles.first_name || ''} ${booking.profiles.last_name || ''}`.trim() || booking.profiles.email,
+          email: booking.profiles.email,
+          role: 'Candidat'
+        }));
 
       const { data, error } = await (supabase as any)
         .from('kanban_boards')
@@ -452,6 +574,9 @@ export const useKanbanSupabase = (boardId?: string) => {
       // Get current max position for the column
       const column = board.columns.find(col => col.id === input.columnId);
       const maxPosition = column ? column.cardIds.length : 0;
+      
+      // Derive status from column title
+      const derivedStatus = column ? getStatusFromColumnTitle(column.title) : 'todo';
 
       const { data, error } = await (supabase as any)
         .from('kanban_cards')
@@ -466,11 +591,12 @@ export const useKanbanSupabase = (boardId?: string) => {
           assigned_to_avatar: assignedMember?.avatar,
           due_date: input.dueDate ? input.dueDate.split('T')[0] : null,
           priority: input.priority || 'medium',
-          status: input.status || 'todo',
+          status: derivedStatus, // Use derived status instead of input.status
           labels: input.labels || [],
           progress: 0,
           position: maxPosition,
-          created_by: '1' // TODO: Get from auth context
+          created_by: '1', // TODO: Get from auth context
+          files: input.files || [] // Add files support
         })
         .select()
         .single();
@@ -516,6 +642,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         attachments: [],
         comments: [],
         progress: data.progress,
+        files: input.files || data.files || [],
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         createdBy: data.created_by
@@ -553,6 +680,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     if (!board) return;
 
     try {
+      isUpdatingRef.current = true;
       // Find team member if assigned
       const assignedMember = input.assignedTo ? 
         board.teamMembers.find(member => member.id === input.assignedTo) : undefined;
@@ -575,6 +703,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (input.status !== undefined) updateData.status = input.status;
       if (input.labels !== undefined) updateData.labels = input.labels;
       if (input.progress !== undefined) updateData.progress = input.progress;
+      if (input.files !== undefined) updateData.files = input.files;
 
       const { data, error } = await (supabase as any)
         .from('kanban_cards')
@@ -631,6 +760,7 @@ export const useKanbanSupabase = (boardId?: string) => {
               status: data.status,
               labels: data.labels || [],
               progress: data.progress,
+              files: input.files !== undefined ? input.files : (data.files || existingCard.files || []),
               updatedAt: data.updated_at
             }
           },
@@ -639,10 +769,16 @@ export const useKanbanSupabase = (boardId?: string) => {
       });
 
       toast.success('Carte mise à jour');
+      
+      // Reset flag after a delay
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 500);
 
     } catch (error) {
       console.error('Error updating card:', error);
       toast.error('Erreur lors de la mise à jour de la carte');
+      isUpdatingRef.current = false;
     }
   }, [board]);
 
@@ -698,6 +834,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     if (!board) return;
 
     try {
+      isUpdatingRef.current = true;
       // Update positions in database
       if (source.droppableId === destination.droppableId) {
         // Same column - reorder
@@ -728,14 +865,55 @@ export const useKanbanSupabase = (boardId?: string) => {
 
         if (!sourceColumn || !destColumn) return;
 
-        // Update card's column
+        // Get the new status based on destination column title
+        const newStatus = getStatusFromColumnTitle(destColumn.title);
+
+        // Update card's column and status
          await (supabase as any)
           .from('kanban_cards')
           .update({ 
             column_id: destination.droppableId,
-            position: destination.index
+            position: destination.index,
+            status: newStatus
           })
           .eq('id', draggableId);
+
+        // If moving to "Finalisé" column, create notification for client
+        if (newStatus === 'done' && board.cards[draggableId]) {
+          const card = board.cards[draggableId];
+          
+          // Get the current user
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          // Get project details to find client
+          const { data: project } = await (supabase as any)
+            .from('projects')
+            .select('created_by,title')
+            .eq('id', board.projectId)
+            .single();
+            
+          if (project && user && project.created_by !== user.id) {
+            // Create notification for project owner (client)
+            await (supabase as any)
+              .from('notifications')
+              .insert({
+                user_id: project.created_by,
+                project_id: board.projectId,
+                type: 'task_completed',
+                title: 'Tâche terminée',
+                description: `La tâche "${card.title}" a été marquée comme finalisée et attend votre évaluation.`,
+                metadata: {
+                  cardId: draggableId,
+                  cardTitle: card.title,
+                  boardId: board.id,
+                  completedBy: user.id
+                },
+                is_read: false
+              });
+              
+            toast.success('Le client a été notifié de la finalisation de la tâche');
+          }
+        }
 
         // Update positions in source column
         const sourceCardIds = Array.from(sourceColumn.cardIds);
@@ -809,10 +987,16 @@ export const useKanbanSupabase = (boardId?: string) => {
           updatedAt: new Date().toISOString()
         };
       });
+      
+      // Reset flag after a delay
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 500);
 
     } catch (error) {
       console.error('Error handling drag end:', error);
       toast.error('Erreur lors du déplacement de la carte');
+      isUpdatingRef.current = false;
     }
   }, [board]);
 

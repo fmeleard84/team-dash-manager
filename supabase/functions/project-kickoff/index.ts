@@ -138,48 +138,9 @@ serve(async (req) => {
       }
     }
 
-    // 5. Create category-specific planning events (optional milestone events)
-    const milestones = [
-      {
-        title: `${project.title} - Phase de découverte`,
-        description: 'Analyse des besoins et définition des objectifs',
-        days_offset: 3
-      },
-      {
-        title: `${project.title} - Point d'étape`,
-        description: 'Revue des premiers livrables et ajustements',
-        days_offset: 7
-      },
-      {
-        title: `${project.title} - Présentation finale`,
-        description: 'Présentation des résultats et clôture du projet',
-        days_offset: 14
-      }
-    ];
-
+    // 5. Milestone events are disabled - only create kickoff
+    // Les événements milestone seront créés plus tard par le client s'il le souhaite
     const milestoneEvents = [];
-    for (const milestone of milestones) {
-      const milestoneDate = new Date(kickoffDateTime.getTime() + milestone.days_offset * 24 * 60 * 60 * 1000);
-      const milestoneEndDate = new Date(milestoneDate.getTime() + 60 * 60 * 1000);
-
-      const { data: milestoneEvent, error: milestoneError } = await supabase
-        .from('project_events')
-        .insert({
-          project_id: projectId,
-          title: milestone.title,
-          description: milestone.description,
-          start_at: milestoneDate.toISOString(),
-          end_at: milestoneEndDate.toISOString(),
-          created_by: teamMembers?.find(m => m.member_type === 'client')?.member_id || null,
-        })
-        .select('id')
-        .single();
-
-      if (!milestoneError && milestoneEvent) {
-        milestoneEvents.push(milestoneEvent.id);
-        console.log(`Created milestone event: ${milestone.title}`);
-      }
-    }
 
     console.log(`Project kickoff process completed successfully for project: ${projectId}`);
 

@@ -43,6 +43,10 @@ interface KanbanBoardProps {
   projectFilter?: string;
   onProjectFilterChange?: (projectId: string) => void;
   availableProjects?: Array<{ id: string; title: string }>;
+  hideTitle?: boolean;
+  userFilter?: string;
+  onUserFilterChange?: (userId: string) => void;
+  projectMembers?: string[];
 }
 
 export const KanbanBoard = ({
@@ -58,7 +62,11 @@ export const KanbanBoard = ({
   onBoardSettings,
   projectFilter,
   onProjectFilterChange,
-  availableProjects = []
+  availableProjects = [],
+  hideTitle = false,
+  userFilter,
+  onUserFilterChange,
+  projectMembers = []
 }: KanbanBoardProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -72,9 +80,20 @@ export const KanbanBoard = ({
       .map(cardId => board.cards[cardId])
       .filter(Boolean)
       .filter(card => {
-        if (!searchTerm) return true;
-        return card.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               card.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        // Search filter
+        if (searchTerm && !(
+          card.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          card.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        )) {
+          return false;
+        }
+        
+        // User filter
+        if (userFilter && userFilter !== 'all' && card.assignedTo && !card.assignedTo.includes(userFilter)) {
+          return false;
+        }
+        
+        return true;
       });
   };
 
@@ -85,31 +104,33 @@ export const KanbanBoard = ({
     ?.cardIds.length || 0;
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Board Header */}
-      <div className="border-b bg-white p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{board.title}</h1>
-            {board.description && (
-              <p className="text-muted-foreground mt-1">{board.description}</p>
-            )}
-          </div>
+    <div className="flex flex-col h-full bg-white max-w-full">
+      {/* Board Header - Fixed width */}
+      <div className="border-b bg-white p-4 space-y-4 flex-shrink-0 overflow-hidden">
+        {!hideTitle && (
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">{board.title}</h1>
+              {board.description && (
+                <p className="text-muted-foreground mt-1">{board.description}</p>
+              )}
+            </div>
 
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              {totalCards} cartes
-            </Badge>
-            <Badge variant="outline">
-              {completedCards} terminées
-            </Badge>
-            
-            <Button variant="outline" size="sm" onClick={onBoardSettings}>
-              <Settings className="w-4 h-4 mr-1" />
-              Paramètres
-            </Button>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">
+                {totalCards} cartes
+              </Badge>
+              <Badge variant="outline">
+                {completedCards} terminées
+              </Badge>
+              
+              <Button variant="outline" size="sm" onClick={onBoardSettings}>
+                <Settings className="w-4 h-4 mr-1" />
+                Paramètres
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Search and Filters */}
         <div className="flex items-center gap-2">
@@ -171,7 +192,23 @@ export const KanbanBoard = ({
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 <span>Assigné à:</span>
-                <Badge variant="secondary">Tous</Badge>
+                <Select
+                  value={userFilter || ''}
+                  onValueChange={(value) => onUserFilterChange?.(value)}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Tous" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les utilisateurs</SelectItem>
+                    {/* Use project members instead of board members */}
+                    {projectMembers.filter(member => member && member.trim() !== '').map((member) => (
+                      <SelectItem key={member} value={member}>
+                        {member}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="flex items-center gap-2">
@@ -180,7 +217,15 @@ export const KanbanBoard = ({
                 <Badge variant="secondary">Toutes</Badge>
               </div>
 
-              <Button variant="ghost" size="sm" className="ml-auto">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="ml-auto"
+                onClick={() => {
+                  setSearchTerm('');
+                  onUserFilterChange?.('all');
+                }}
+              >
                 Réinitialiser les filtres
               </Button>
             </div>
@@ -188,10 +233,10 @@ export const KanbanBoard = ({
         )}
       </div>
 
-      {/* Board Content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Board Content - Scrollable area */}
+      <div className="flex-1 overflow-x-auto overflow-y-visible max-w-full">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-4 p-4 h-full overflow-x-auto">
+          <div className="flex gap-4 p-4 min-h-full w-max">
             {board.columns
               .sort((a, b) => a.position - b.position)
               .map((column) => (
@@ -210,7 +255,7 @@ export const KanbanBoard = ({
             }
 
             {/* Add Column Button */}
-            <div className="flex items-center justify-center w-80 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 transition-colors">
+            <div className="flex items-center justify-center w-80 min-h-[600px] bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 transition-colors flex-shrink-0">
               <Button
                 variant="ghost"
                 onClick={onAddColumn}

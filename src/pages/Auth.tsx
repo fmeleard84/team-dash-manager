@@ -41,10 +41,7 @@ const Auth = () => {
 
     try {
       const success = await login(loginForm.email, loginForm.password);
-      if (success) {
-        // Redirect based on user role will be handled by the router
-        navigate('/dashboard');
-      }
+      // Redirection is now handled in AuthContext based on user role
     } finally {
       setIsLoading(false);
     }
@@ -67,26 +64,35 @@ const Auth = () => {
       return;
     }
 
+    // Debug: afficher ce qu'on envoie
+    console.log('📱 REGISTER FORM DATA:', {
+      email: registerForm.email,
+      firstName: registerForm.firstName,
+      lastName: registerForm.lastName,
+      phone: registerForm.phone,
+      companyName: registerForm.companyName,
+      role: registerForm.role
+    });
+    
     try {
       const success = await register({
         email: registerForm.email,
         password: registerForm.password,
         firstName: registerForm.firstName,
         lastName: registerForm.lastName,
-        phone: registerForm.phone || undefined,
-        companyName: registerForm.companyName || undefined,
+        phone: registerForm.phone,  // EXACTEMENT comme firstName et lastName
+        companyName: registerForm.companyName,
         role: registerForm.role
       });
 
       if (success) {
         // Tentative d'auto-connexion puis redirection
         const loggedIn = await login(registerForm.email, registerForm.password);
-        if (loggedIn) {
-          navigate('/dashboard');
-          return;
+        if (!loggedIn) {
+          // Si l'auto-connexion échoue (email à confirmer), on préremplit l'email
+          setLoginForm(prev => ({ ...prev, email: registerForm.email }));
         }
-        // Si l'auto-connexion échoue (email à confirmer), on préremplit l'email
-        setLoginForm(prev => ({ ...prev, email: registerForm.email }));
+        // Redirection is now handled in AuthContext based on user role
       }
     } finally {
       setIsLoading(false);
