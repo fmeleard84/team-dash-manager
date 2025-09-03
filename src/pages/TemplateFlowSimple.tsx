@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import ReactFlow, {
+import {
+  ReactFlow,
   MiniMap,
   Controls,
   Background,
@@ -9,8 +10,10 @@ import ReactFlow, {
   Connection,
   Edge,
   Node,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+  useNodesState,
+  useEdgesState,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Download, Upload, Copy, Euro } from 'lucide-react';
