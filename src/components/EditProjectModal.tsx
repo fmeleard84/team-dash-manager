@@ -177,7 +177,7 @@ const EditProjectModal = ({
       description="Actualisez les informations de votre projet selon vos nouveaux besoins"
       actions={
         <ModalActions
-          onSave={handleSubmit}
+          onSave={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
           onCancel={handleClose}
           saveText={isUpdating ? "Mise à jour en cours..." : "Mettre à jour le projet"}
           cancelText="Annuler"

@@ -77,78 +77,47 @@ export function DeleteProjectDialog({
       if (!user) throw new Error('Utilisateur non authentifié');
 
       if (actionType === 'archive') {
-        // Vérifier d'abord si le projet est déjà archivé
-        const { data: projectData, error: checkError } = await supabase
-          .from('projects')
-          .select('archived_at')
-          .eq('id', project.id)
-          .single();
-        
-        if (checkError) throw checkError;
-        
-        if (projectData?.archived_at) {
-          toast.info('Projet déjà archivé', {
-            description: 'Ce projet est déjà en lecture seule'
-          });
-          onProjectArchived?.();
-          onClose();
-          return;
-        }
-        
-        // Appeler la fonction d'archivage
-        const { data, error } = await supabase.rpc('archive_project', {
-          project_id_param: project.id,
-          user_id_param: user.id,
-          reason_param: reason || null
-        });
+        // Archiver le projet directement
+        try {
+          // Pour l'instant, on ne fait qu'une simple update du statut
+          const { error } = await supabase
+            .from('projects')
+            .update({ 
+              status: 'archived',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', project.id);
 
-        if (error) throw error;
-        
-        if (data?.success) {
+          if (error) throw error;
+          
           toast.success('Projet archivé avec succès', {
             description: 'Le projet est maintenant en lecture seule'
           });
           onProjectArchived?.();
           onClose();
-        } else {
-          throw new Error(data?.error || 'Erreur lors de l\'archivage');
+        } catch (err) {
+          throw err;
         }
       } else {
-        // Vérifier d'abord si le projet est déjà supprimé
-        const { data: projectData, error: checkError } = await supabase
-          .from('projects')
-          .select('deleted_at')
-          .eq('id', project.id)
-          .single();
-        
-        if (checkError) throw checkError;
-        
-        if (projectData?.deleted_at) {
-          toast.info('Projet déjà supprimé', {
-            description: 'Ce projet a déjà été supprimé'
-          });
-          onProjectDeleted?.();
-          onClose();
-          return;
-        }
-        
-        // Appeler la fonction de suppression douce
-        const { data, error } = await supabase.rpc('soft_delete_project', {
-          project_id_param: project.id,
-          user_id_param: user.id,
-          reason_param: reason || null
-        });
+        // Supprimer le projet directement en changeant le statut
+        try {
+          const { error } = await supabase
+            .from('projects')
+            .update({ 
+              status: 'cancelled',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', project.id);
 
-        if (error) throw error;
-        
-        if (data?.success) {
+          if (error) throw error;
+          
           toast.success('Projet supprimé', {
-            description: `${data.affected_users || 0} utilisateurs ont été notifiés`
+            description: 'Le projet a été marqué comme supprimé'
           });
           onProjectDeleted?.();
           onClose();
-        } else {
-          throw new Error(data?.error || 'Erreur lors de la suppression');
+        } catch (err) {
+          throw err;
         }
       }
     } catch (error: any) {

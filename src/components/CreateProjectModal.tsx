@@ -130,7 +130,7 @@ const handleClose = () => {
       description="Définissez les détails de votre projet pour que nous puissions composer l'équipe parfaite"
       actions={
         <ModalActions
-          onSave={handleSubmit}
+          onSave={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
           onCancel={handleClose}
           saveText={isCreating ? "Création en cours..." : "Créer et composer l'équipe"}
           cancelText="Annuler"

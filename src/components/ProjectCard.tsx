@@ -172,7 +172,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         
         if (data && data.length > 0) {
           console.log('🎆 Resources found in polling! Setting state.');
-          setResourceAssignments([...data]);
+          setResourceAssignments([...data] as any[]);
         }
         
         // Stop polling after finding resources or max attempts

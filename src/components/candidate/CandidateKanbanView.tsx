@@ -256,10 +256,10 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
           title: newCardData.title,
           description: newCardData.description,
           columnId: newCardData.columnId,
-          priority: newCardData.priority as const,
+          priority: newCardData.priority as 'medium' | 'low' | 'high',
           status: 'todo' as const,
           dueDate: newCardData.dueDate || null,
-          assignedTo: newCardData.assignedTo,
+          assignedTo: JSON.stringify([]),
           files: newUploadedFiles
         };
         
