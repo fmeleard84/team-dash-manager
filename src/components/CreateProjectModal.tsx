@@ -4,14 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -129,49 +123,65 @@ const handleClose = () => {
 };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[800px] p-0 gap-0 bg-gradient-to-br from-blue-50/50 via-white to-purple-50/50">
-        <DialogHeader className="p-6 pb-4 border-b bg-white/80 backdrop-blur-sm rounded-t-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <IallaLogo size="sm" />
-          </div>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Créer votre projet sur-mesure
-          </DialogTitle>
-          <DialogDescription className="text-gray-600">
-            Définissez les détails de votre projet pour que nous puissions composer l'équipe parfaite
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="title" className="text-sm font-semibold">Nom du projet *</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Refonte de notre site e-commerce"
-                required
-                disabled={isCreating}
-                className="h-12 text-base"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-semibold">Description du projet</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Décrivez vos objectifs, contraintes et besoins spécifiques..."
-                rows={4}
-                disabled={isCreating}
-                className="text-base resize-none"
-              />
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4">
+    <FullScreenModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Créer votre projet sur-mesure"
+      description="Définissez les détails de votre projet pour que nous puissions composer l'équipe parfaite"
+      actions={
+        <ModalActions
+          onSave={handleSubmit}
+          onCancel={handleClose}
+          saveText={isCreating ? "Création en cours..." : "Créer et composer l'équipe"}
+          cancelText="Annuler"
+          saveDisabled={!title.trim() || isCreating}
+          isLoading={isCreating}
+        />
+      }
+    >
+      <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Informations principales */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Informations du projet</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-sm font-semibold">Nom du projet *</Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: Refonte de notre site e-commerce"
+                  required
+                  disabled={isCreating}
+                  className="h-12 text-base"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-semibold">Description du projet</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Décrivez vos objectifs, contraintes et besoins spécifiques..."
+                  rows={5}
+                  disabled={isCreating}
+                  className="text-base resize-none"
+                />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Dates et budget */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Planning et budget</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="project_date" className="text-sm font-semibold flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
@@ -222,8 +232,16 @@ const handleClose = () => {
                 />
               </div>
             </div>
-
-            <div className="space-y-2">
+            </CardContent>
+          </Card>
+          
+          {/* Fichier */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
               <Label htmlFor="project_file" className="text-sm font-semibold flex items-center gap-2">
                 <FileUp className="w-4 h-4" />
                 Cahier des charges (optionnel)
@@ -240,8 +258,11 @@ const handleClose = () => {
                 Formats acceptés: PDF, DOC, DOCX, TXT (max 10MB)
               </p>
             </div>
-            
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            </CardContent>
+          </Card>
+          
+          {/* Note d'information */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
                   <IallaLogo size="sm" showText={false} />
@@ -257,35 +278,8 @@ const handleClose = () => {
               </div>
             </div>
           </form>
-        </div>
-        
-        <DialogFooter className="p-6 pt-0 flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isCreating}
-            className="flex-1"
-          >
-            Annuler
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={!title.trim() || isCreating}
-            className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Création en cours...
-              </>
-            ) : (
-              "Créer et composer l'équipe"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 };
 

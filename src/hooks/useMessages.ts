@@ -281,8 +281,10 @@ export const useMessages = (projectId?: string) => {
 
   // DISABLED: Set up real-time subscriptions (using useRealtimeMessages instead)
   useEffect(() => {
-    return; // Temporarily disabled to avoid conflicts
+    // Realtime subscriptions temporarily disabled
+    return;
     
+    /* Commented out to avoid unreachable code warning
     if (!projectId) return;
 
     console.log('🔄 Setting up realtime subscriptions for project:', projectId);
@@ -404,6 +406,7 @@ export const useMessages = (projectId?: string) => {
       supabase.removeChannel(attachmentsChannel);
       supabase.removeChannel(threadsChannel);
     };
+    */
   }, [projectId, selectedThread, messages]);
 
   // Initial load and reset when project changes

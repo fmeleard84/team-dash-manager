@@ -34,7 +34,7 @@ export const useClientTimeTracking = () => {
     if (!user?.id) return;
 
     try {
-      console.log('Loading active tracking for user:', user.id);
+      // console.log('Loading active tracking for user:', user.id);
       
       // Get client's projects - check both user_id and owner_id
       const { data: projects, error: projectsError } = await supabase
@@ -42,17 +42,17 @@ export const useClientTimeTracking = () => {
         .select('id, title, status')
         .or(`user_id.eq.${user.id},owner_id.eq.${user.id}`);
 
-      console.log('Projects found:', projects?.length, 'Error:', projectsError);
+      // console.log('Projects found:', projects?.length, 'Error:', projectsError);
 
       if (!projects || projects.length === 0) {
-        console.log('No projects found for this client');
+        // console.log('No projects found for this client');
         setActiveProjects([]);
         return;
       }
 
       // Get active tracking for these projects
       const projectIds = projects.map(p => p.id);
-      console.log('Looking for active tracking in projects:', projectIds);
+      // console.log('Looking for active tracking in projects:', projectIds);
       
       const { data: trackingData, error: trackingError } = await supabase
         .from('active_time_tracking')
@@ -60,7 +60,7 @@ export const useClientTimeTracking = () => {
         .in('project_id', projectIds)
         .in('status', ['active', 'paused']);
 
-      console.log('Active tracking found:', trackingData?.length, 'Error:', trackingError);
+      // console.log('Active tracking found:', trackingData?.length, 'Error:', trackingError);
 
       // Group by project
       const projectMap = new Map<string, ProjectTracking>();
@@ -102,7 +102,7 @@ export const useClientTimeTracking = () => {
       });
 
       const finalProjects = Array.from(projectMap.values()).filter(p => p.activeCandidates.length > 0);
-      console.log('Final active projects:', finalProjects.length, finalProjects);
+      // console.log('Final active projects:', finalProjects.length, finalProjects);
       setActiveProjects(finalProjects);
     } catch (error) {
       console.error('Error loading active tracking:', error);
@@ -135,7 +135,7 @@ export const useClientTimeTracking = () => {
           table: 'active_time_tracking'
         },
         (payload) => {
-          console.log('Real-time tracking update:', payload);
+          // console.log('Real-time tracking update:', payload);
           
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const newTracking = payload.new as any;

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Info } from "lucide-react";
 import { EditJobModal } from "./EditJobModal";
-import { EditRateModal } from "./EditRateModal";
 import { EditLanguagesModal } from "./EditLanguagesModal";
 import { EditExpertisesModal } from "./EditExpertisesModal";
 import { EditSeniorityModal } from "./EditSeniorityModal";
@@ -18,6 +18,39 @@ interface CandidateSettingsProps {
   candidateId: string;
   onProfileUpdate?: () => void;
 }
+
+// Fonction pour calculer le tarif journalier basé sur le prix de base et la séniorité
+const calculateDailyRate = (basePrice: number, seniority: string) => {
+  // Prix de base par minute * 60 minutes * 8 heures = prix journalier de base
+  const baseDailyRate = basePrice * 60 * 8;
+  
+  // Multiplicateurs selon la séniorité
+  const seniorityMultipliers: Record<string, number> = {
+    'junior': 1.0,
+    'intermediate': 1.15,  // Ajout du niveau intermediate
+    'confirmé': 1.3,
+    'senior': 1.6,
+    'expert': 2.0
+  };
+  
+  const multiplier = seniorityMultipliers[seniority] || 1.0;
+  
+  return Math.round(baseDailyRate * multiplier);
+};
+
+// Fonction pour calculer le tarif avec toutes les expertises et langues
+const calculateRateWithExpertise = (
+  baseRate: number, 
+  expertiseCount: number, 
+  languageCount: number
+) => {
+  // 5% par expertise, 5% par langue (comme dans ReactFlow)
+  const expertisePercentage = expertiseCount * 0.05;
+  const languagePercentage = languageCount * 0.05;
+  const totalPercentage = 1 + expertisePercentage + languagePercentage;
+  
+  return Math.round(baseRate * totalPercentage);
+};
 
 export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSettingsProps) => {
   // Early return if candidateId is not provided
@@ -31,7 +64,6 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
     );
   }
   const [isEditJobModalOpen, setIsEditJobModalOpen] = useState(false);
-  const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
   const [isEditLanguagesModalOpen, setIsEditLanguagesModalOpen] = useState(false);
   const [isEditExpertisesModalOpen, setIsEditExpertisesModalOpen] = useState(false);
   const [isEditSeniorityModalOpen, setIsEditSeniorityModalOpen] = useState(false);
@@ -55,29 +87,52 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
       
       if (error) throw error;
       
+      // Si le numéro de téléphone n'est pas dans candidate_profiles, le chercher dans profiles
+      let phone = data.phone || '';
+      if (!phone && data.user_id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('phone')
+          .eq('id', data.user_id)
+          .single();
+        
+        if (profileData?.phone) {
+          phone = profileData.phone;
+          
+          // Mettre à jour candidate_profiles avec le numéro trouvé
+          await supabase
+            .from('candidate_profiles')
+            .update({ phone: profileData.phone })
+            .eq('id', candidateId);
+        }
+      }
+      
       // Initialize personal info state
       setPersonalInfo({
         first_name: data.first_name || '',
         last_name: data.last_name || '',
         email: data.email || '',
-        phone: data.phone || ''
+        phone: phone
       });
       
-      return data;
+      return { ...data, phone };
     }
   });
 
-  // Fetch profile data separately
-  const { data: profileData } = useQuery({
+  // Fetch profile data separately with base_price
+  const { data: profileData, isLoading: profileLoading } = useQuery({
     queryKey: ['profileData', candidateData?.profile_id],
     queryFn: async () => {
       if (!candidateData?.profile_id) return null;
+      
+      console.log('Fetching profile with ID:', candidateData.profile_id);
       
       const { data, error } = await supabase
         .from('hr_profiles')
         .select(`
           id,
           name,
+          base_price,
           hr_categories (
             id,
             name
@@ -86,7 +141,38 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
         .eq('id', candidateData.profile_id)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching profile:', error);
+        
+        // Si l'erreur est "no rows", essayons de voir tous les profils disponibles
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found, listing available profiles...');
+          const { data: allProfiles } = await supabase
+            .from('hr_profiles')
+            .select('id, name')
+            .limit(10);
+          console.log('Available profiles:', allProfiles);
+        }
+        
+        return null;
+      }
+      
+      console.log('Profile fetched successfully:', data);
+      
+      // Calculer le tarif journalier basé sur le profil et la séniorité
+      if (data && data.base_price && candidateData?.seniority) {
+        const dailyRate = calculateDailyRate(data.base_price, candidateData.seniority);
+        
+        // Si le tarif n'est pas défini ou différent, le mettre à jour
+        if (!candidateData.daily_rate || Math.abs(candidateData.daily_rate - dailyRate) > 1) {
+          console.log('Updating daily rate from', candidateData.daily_rate, 'to', dailyRate);
+          await supabase
+            .from('candidate_profiles')
+            .update({ daily_rate: dailyRate })
+            .eq('id', candidateData.id);
+        }
+      }
+      
       return data;
     },
     enabled: !!candidateData?.profile_id
@@ -273,25 +359,19 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
                     <div>
                       <h4 className="font-medium">Poste / Fonction</h4>
                       <p className="text-sm text-muted-foreground">
-                        {profileData?.hr_categories?.name} - {profileData?.name}
+                        {profileLoading && candidateData?.profile_id ? (
+                          'Chargement...'
+                        ) : profileData ? (
+                          `${profileData.hr_categories?.name || 'Catégorie non définie'} - ${profileData.name || 'Profil non défini'}`
+                        ) : candidateData?.profile_id ? (
+                          <span className="text-orange-600">Profil introuvable (ID: {candidateData.profile_id})</span>
+                        ) : (
+                          <span className="text-orange-600">Métier non configuré</span>
+                        )}
                       </p>
                     </div>
                     <Button variant="outline" onClick={() => setIsEditJobModalOpen(true)}>
-                      Modifier
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Tarif journalier</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {candidateData.daily_rate}€ / jour
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={() => setIsEditRateModalOpen(true)}>
-                      Modifier
+                      {candidateData?.profile_id ? 'Modifier' : 'Configurer'}
                     </Button>
                   </div>
                 </div>
@@ -301,15 +381,95 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
                     <div>
                       <h4 className="font-medium">Séniorité</h4>
                       <p className="text-sm text-muted-foreground capitalize">
-                        {candidateData.seniority}
+                        {candidateData?.seniority ? (
+                          candidateData.seniority
+                        ) : (
+                          <span className="text-orange-600">Séniorité non définie</span>
+                        )}
                       </p>
                     </div>
                     <Button variant="outline" onClick={() => setIsEditSeniorityModalOpen(true)}>
-                      Modifier
+                      {candidateData?.seniority ? 'Modifier' : 'Configurer'}
                     </Button>
                   </div>
                 </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3">Tarification</h4>
+                  {profileData?.base_price && candidateData?.seniority ? (
+                    <div className="space-y-3">
+                      {/* Debug: afficher les valeurs de calcul */}
+                      {console.log('Calcul tarif:', {
+                        basePrice: profileData.base_price,
+                        seniority: candidateData.seniority,
+                        baseDailyWithoutMultiplier: profileData.base_price * 60 * 8,
+                        multiplier: candidateData.seniority === 'intermediate' ? 1.15 : 1,
+                        finalRate: calculateDailyRate(profileData.base_price, candidateData.seniority)
+                      })}
+                      
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-sm text-muted-foreground">Tarif journalier brut :</span>
+                          <div className="text-xs text-gray-400 mt-1">
+                            ({profileData.base_price}€/min × 480min {candidateData.seniority !== 'junior' && `× ${candidateData.seniority === 'intermediate' ? '1.15' : candidateData.seniority === 'confirmé' ? '1.3' : candidateData.seniority === 'senior' ? '1.6' : candidateData.seniority === 'expert' ? '2.0' : '1'}`})
+                          </div>
+                        </div>
+                        <span className="text-lg font-semibold">
+                          {calculateDailyRate(profileData.base_price, candidateData.seniority)}€
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">
+                          Tarif avec l'ensemble de vos expertises* :
+                        </span>
+                        <span className="text-lg font-semibold text-purple-600">
+                          {calculateRateWithExpertise(
+                            calculateDailyRate(profileData.base_price, candidateData.seniority),
+                            candidateExpertises?.length || 0,
+                            candidateLanguages?.length || 0
+                          )}€
+                        </span>
+                      </div>
+                      
+                      {(candidateExpertises?.length || 0) + (candidateLanguages?.length || 0) > 0 && (
+                        <p className="text-xs text-gray-500 italic">
+                          * Inclut +5% par expertise ({candidateExpertises?.length || 0}) et +5% par langue ({candidateLanguages?.length || 0})
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-orange-600">
+                      Configurez votre métier et séniorité pour voir vos tarifs
+                    </p>
+                  )}
+                </div>
               </div>
+            </CardContent>
+          </Card>
+          
+          {/* Carte explicative des tarifs */}
+          <Card className="bg-blue-50 border-blue-200">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Info className="w-5 h-5 text-blue-600" />
+                Comment fonctionne votre tarification ?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-700 space-y-2">
+              <p>
+                <strong>Tarif journalier brut :</strong> C'est votre tarif de base calculé selon votre métier et votre niveau de séniorité. 
+                Il correspond à 8 heures de travail par jour.
+              </p>
+              <p>
+                <strong>Tarif avec expertises :</strong> Lorsqu'un client souhaite mobiliser l'ensemble de vos compétences 
+                (expertises techniques et langues), un bonus de 5% par compétence est ajouté à votre tarif de base. 
+                Cela valorise votre polyvalence et vos compétences multiples.
+              </p>
+              <p className="pt-2 text-gray-600 italic">
+                Ces tarifs sont automatiquement appliqués lors de la création des missions. Le client voit le tarif 
+                correspondant aux compétences qu'il demande pour son projet.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -388,13 +548,6 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
             onClose={() => setIsEditJobModalOpen(false)}
             currentCandidateId={candidateId}
             currentProfileId={candidateData.profile_id}
-            onUpdate={handleUpdate}
-          />
-          <EditRateModal
-            isOpen={isEditRateModalOpen}
-            onClose={() => setIsEditRateModalOpen(false)}
-            currentCandidateId={candidateId}
-            currentRate={candidateData.daily_rate}
             onUpdate={handleUpdate}
           />
           <EditLanguagesModal

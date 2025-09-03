@@ -20,14 +20,25 @@ serve(async (req) => {
 
     const results = []
 
-    // 1. Activer le temps réel pour toutes les tables
+    // 1. Activer le temps réel pour toutes les tables CRITIQUES
     const realtimeTables = [
+      // Tables critiques pour la synchronisation client-candidat
+      'projects',
+      'hr_resource_assignments',
+      'profiles',
+      'candidate_profiles',
+      // Tables pour les notifications
+      'notifications',
+      'candidate_notifications',
+      'candidate_event_notifications',
+      // Tables kanban
       'kanban_cards',
       'kanban_columns', 
       'kanban_boards',
+      // Tables diverses
       'task_ratings',
-      'notifications',
-      'candidate_event_notifications'
+      'messages',
+      'project_bookings'
     ]
 
     for (const table of realtimeTables) {

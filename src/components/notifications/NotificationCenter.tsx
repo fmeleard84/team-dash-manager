@@ -17,7 +17,10 @@ import {
   ExternalLink,
   Calendar,
   MapPin,
-  Video
+  Video,
+  Trash2,
+  XCircle,
+  RotateCcw
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Notification } from '@/types/notifications';
@@ -42,6 +45,14 @@ const getNotificationIcon = (type: string) => {
     case 'team_complete':
     case 'team_incomplete':
       return <Users {...iconProps} />;
+    case 'project_archived':
+      return <Archive {...iconProps} className="text-blue-600" />;
+    case 'project_unarchived':
+      return <RotateCcw {...iconProps} className="text-green-600" />;
+    case 'project_deleted':
+      return <Trash2 {...iconProps} className="text-red-600" />;
+    case 'project_cancelled':
+      return <XCircle {...iconProps} className="text-orange-600" />;
     default:
       return <Bell {...iconProps} />;
   }
@@ -86,6 +97,14 @@ const getTypeLabel = (type: string) => {
       return 'Équipe complète';
     case 'team_incomplete':
       return 'Équipe incomplète';
+    case 'project_archived':
+      return 'Projet archivé';
+    case 'project_unarchived':
+      return 'Projet réactivé';
+    case 'project_deleted':
+      return 'Projet supprimé';
+    case 'project_cancelled':
+      return 'Projet annulé';
     default:
       return 'Notification';
   }

@@ -414,8 +414,37 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
   };
 
   return (
-    <div className="h-full">
+    <div className="space-y-6">
+      {/* Header with project selector */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
+        <div className="relative p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                <Layout className="w-6 h-6 text-white" />
+              </div>
+              
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="w-64 bg-white/90 backdrop-blur-sm border-white/20">
+                  <SelectValue placeholder="Sélectionner un projet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Kanban board or empty state */}
       {selectedProjectId && boardId && board ? (
+        <div className="h-[calc(100vh-20rem)]">
           <KanbanBoard
             board={board}
             onDragEnd={handleDragEnd}
@@ -436,7 +465,13 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
             projectMembers={projectMembers}
             hideTitle={true} // Nouveau prop pour cacher le titre du KanbanBoard
           />
-      ) : null}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          <Layout className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>Sélectionnez un projet pour voir le tableau Kanban</p>
+        </div>
+      )}
 
       {/* Dialog pour voir/éditer une carte */}
       <CardEditDialog

@@ -17,7 +17,8 @@ import {
 
 interface Project { 
   id: string; 
-  title: string; 
+  title: string;
+  archived_at?: string | null;
 }
 
 interface Entry { 
@@ -58,7 +59,7 @@ export default function SharedDriveView({ projects, userType = 'client' }: Share
   const [renamingItem, setRenamingItem] = useState<string | null>(null);
   const [newName, setNewName] = useState<string>("");
 
-  const basePrefix = useMemo(() => (projectId ? `project/${projectId}/` : ""), [projectId]);
+  const basePrefix = useMemo(() => (projectId ? `projects/${projectId}/` : ""), [projectId]);
   const canGoUp = useMemo(() => prefix && prefix !== basePrefix, [prefix, basePrefix]);
   const breadcrumbs = useMemo(() => {
     const currentProject = projects.find(p => p.id === projectId);
@@ -189,11 +190,31 @@ export default function SharedDriveView({ projects, userType = 'client' }: Share
   }, [projectId, basePrefix]);
 
   const createFolder = async () => {
+    // Vérifier si le projet est archivé
+    const currentProject = projects.find(p => p.id === projectId);
+    if (currentProject?.archived_at) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de créer des dossiers dans un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const folderName = prompt("Nom du dossier:");
     if (!folderName || !projectId) return;
 
     try {
-      const filePath = `${prefix}${folderName}/.keep`;
+      // Nettoyer le nom du dossier
+      const sanitizedFolderName = folderName
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Enlève les accents
+        .replace(/[^a-zA-Z0-9_\-\s]/g, '_') // Remplace les caractères spéciaux par _ (garde les espaces pour les dossiers)
+        .replace(/\s+/g, '_') // Remplace les espaces par _
+        .replace(/_+/g, '_') // Remplace les _ multiples par un seul
+        .replace(/^_|_$/g, ''); // Enlève les _ au début et à la fin
+      
+      const filePath = `${prefix}${sanitizedFolderName}/.keep`;
       const { error } = await supabase.storage
         .from('project-files')
         .upload(filePath, new Blob([]), { upsert: false });
@@ -216,27 +237,79 @@ export default function SharedDriveView({ projects, userType = 'client' }: Share
     }
   };
 
+  // Fonction pour nettoyer les noms de fichiers (enlever accents et caractères spéciaux)
+  const sanitizeFileName = (fileName: string): string => {
+    // Séparer le nom et l'extension
+    const lastDotIndex = fileName.lastIndexOf('.');
+    const nameWithoutExt = lastDotIndex > -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    const extension = lastDotIndex > -1 ? fileName.substring(lastDotIndex) : '';
+    
+    // Remplacer les accents
+    let sanitized = nameWithoutExt
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Enlève les accents
+      .replace(/[^a-zA-Z0-9_\-]/g, '_') // Remplace les caractères spéciaux par _
+      .replace(/_+/g, '_') // Remplace les _ multiples par un seul
+      .replace(/^_|_$/g, ''); // Enlève les _ au début et à la fin
+    
+    // Si le nom est vide après sanitization, utiliser un timestamp
+    if (!sanitized) {
+      sanitized = `file_${Date.now()}`;
+    }
+    
+    return sanitized + extension;
+  };
+
   const uploadFiles = async (files: FileList) => {
     if (!projectId) return;
+
+    // Vérifier si le projet est archivé
+    const currentProject = projects.find(p => p.id === projectId);
+    if (currentProject?.archived_at) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible d'ajouter des fichiers dans un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setLoading(true);
       const uploadPromises = Array.from(files).map(async (file) => {
-        const filePath = `${prefix}${file.name}`;
+        // Nettoyer le nom du fichier
+        const sanitizedName = sanitizeFileName(file.name);
+        const filePath = `${prefix}${sanitizedName}`;
+        
+        console.log(`📁 Uploading: "${file.name}" as "${sanitizedName}"`);
+        
         const { error } = await supabase.storage
           .from('project-files')
           .upload(filePath, file, { upsert: true });
         
         if (error) throw error;
-        return file.name;
+        return sanitizedName;
       });
 
-      await Promise.all(uploadPromises);
+      const uploadedNames = await Promise.all(uploadPromises);
       
-      toast({
-        title: "Fichiers téléchargés",
-        description: `${files.length} fichier(s) téléchargé(s) avec succès.`,
-      });
+      // Vérifier si des noms ont été modifiés
+      const filesArray = Array.from(files);
+      const modifiedFiles = filesArray.filter((file, index) => 
+        sanitizeFileName(file.name) !== file.name
+      );
+      
+      if (modifiedFiles.length > 0) {
+        toast({
+          title: "Fichiers téléchargés",
+          description: `${files.length} fichier(s) téléchargé(s). Note: Certains noms ont été modifiés pour supprimer les caractères spéciaux.`,
+        });
+      } else {
+        toast({
+          title: "Fichiers téléchargés",
+          description: `${files.length} fichier(s) téléchargé(s) avec succès.`,
+        });
+      }
       
       loadEntries();
     } catch (error) {
@@ -302,6 +375,17 @@ export default function SharedDriveView({ projects, userType = 'client' }: Share
   };
 
   const startRename = (name: string) => {
+    // Vérifier si le projet est archivé
+    const currentProject = projects.find(p => p.id === projectId);
+    if (currentProject?.archived_at) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de renommer des éléments dans un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setRenamingItem(name);
     setNewName(name);
   };
@@ -358,6 +442,17 @@ export default function SharedDriveView({ projects, userType = 'client' }: Share
   };
 
   const deleteItem = async (path: string, isFolder: boolean = false) => {
+    // Vérifier si le projet est archivé
+    const currentProject = projects.find(p => p.id === projectId);
+    if (currentProject?.archived_at) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de supprimer des éléments dans un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const itemType = isFolder ? "ce dossier" : "ce fichier";
     if (!confirm(`Êtes-vous sûr de vouloir supprimer ${itemType} "${path}" ?`)) return;
 
@@ -479,31 +574,39 @@ export default function SharedDriveView({ projects, userType = 'client' }: Share
           
           {projectId && (
             <div className="flex gap-2">
-              <input
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-                id="file-upload"
-              />
-              <Button
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg"
-                size="sm"
-                onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={loading}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload
-              </Button>
-              <Button 
-                className="bg-white hover:bg-purple-50 text-purple-700 border border-purple-300"
-                size="sm" 
-                onClick={createFolder} 
-                disabled={loading}
-              >
-                <FolderPlus className="w-4 h-4 mr-2" />
-                Nouveau dossier
-              </Button>
+              {projects.find(p => p.id === projectId)?.archived_at ? (
+                <div className="text-sm text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                  🔒 Projet archivé - Lecture seule
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <Button
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg"
+                    size="sm"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    disabled={loading}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload
+                  </Button>
+                  <Button 
+                    className="bg-white hover:bg-purple-50 text-purple-700 border border-purple-300"
+                    size="sm" 
+                    onClick={createFolder} 
+                    disabled={loading}
+                  >
+                    <FolderPlus className="w-4 h-4 mr-2" />
+                    Nouveau dossier
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -641,26 +744,32 @@ export default function SharedDriveView({ projects, userType = 'client' }: Share
                                   <Download className="w-4 h-4 mr-2" />
                                   Télécharger
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => startRename(entry.name)}>
-                                  <Pencil className="w-4 h-4 mr-2" />
-                                  Renommer
-                                </DropdownMenuItem>
+                                {!projects.find(p => p.id === projectId)?.archived_at && (
+                                  <DropdownMenuItem onClick={() => startRename(entry.name)}>
+                                    <Pencil className="w-4 h-4 mr-2" />
+                                    Renommer
+                                  </DropdownMenuItem>
+                                )}
                               </>
                             ) : (
                               <>
-                                <DropdownMenuItem onClick={() => startRename(entry.name)}>
-                                  <Pencil className="w-4 h-4 mr-2" />
-                                  Renommer
-                                </DropdownMenuItem>
+                                {!projects.find(p => p.id === projectId)?.archived_at && (
+                                  <DropdownMenuItem onClick={() => startRename(entry.name)}>
+                                    <Pencil className="w-4 h-4 mr-2" />
+                                    Renommer
+                                  </DropdownMenuItem>
+                                )}
                               </>
                             )}
-                            <DropdownMenuItem
-                              onClick={() => deleteItem(entry.name, !entry.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Supprimer
-                            </DropdownMenuItem>
+                            {!projects.find(p => p.id === projectId)?.archived_at && (
+                              <DropdownMenuItem
+                                onClick={() => deleteItem(entry.name, !entry.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Supprimer
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

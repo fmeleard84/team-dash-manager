@@ -127,10 +127,12 @@ export function TaskRatingDialog({
                 .from('notifications')
                 .insert({
                   user_id: candidateProfile.user_id,
-                  type: 'task_rated',
+                  type: 'success',  // Changed to valid enum value
+                  priority: 'high',
                   title: 'Nouvelle évaluation reçue',
-                  description: `Vous avez reçu une évaluation pour la tâche "${taskTitle}"${project ? ` du projet ${project.title}` : ''}`,
+                  message: `Vous avez reçu une évaluation pour la tâche "${taskTitle}"${project ? ` du projet ${project.title}` : ''}`,
                   data: {
+                    notification_type: 'task_rated',
                     task_id: taskId,
                     task_title: taskTitle,
                     project_id: projectId,

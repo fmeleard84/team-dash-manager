@@ -30,6 +30,7 @@ const KanbanPage = lazy(() => import("./pages/KanbanPage"));
 const MessagingDemo = lazy(() => import("./pages/MessagingDemo"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const AuthDebug = lazy(() => import("./pages/AuthDebug"));
+const LLMDashboard = lazy(() => import("./pages/llm/LLMDashboard"));
 
 const queryClient = new QueryClient();
 
@@ -122,6 +123,13 @@ const AppContent = () => {
                 <MessagingDemo />
               </Suspense>
             </ProtectedRoute>
+          } />
+          <Route path="/llm" element={
+            <AdminRoute>
+              <Suspense fallback={<PageLoader />}>
+                <LLMDashboard />
+              </Suspense>
+            </AdminRoute>
           } />
           
           <Route path="*" element={<NotFound />} />

@@ -53,13 +53,18 @@ export const useCandidateProjectsOptimized = () => {
           return;
         }
 
-        // Extract projects from assignments - include all statuses for planning
-        const candidateProjects = (assignments || [])
+        // Extract projects from assignments - ONLY include projects with status 'play'
+        // This ensures candidates only see planning/kanban/drive/messages for active projects
+        const allAcceptedProjects = (assignments || [])
           .filter(assignment => assignment.projects)
           .map(assignment => assignment.projects)
           .filter(Boolean) as CandidateProject[];
-
-        setProjects(candidateProjects);
+        
+        const activeProjects = allAcceptedProjects.filter(p => p.status === 'play');
+        
+        // console.log(`[useCandidateProjectsOptimized] Found ${allAcceptedProjects.length} accepted projects, ${activeProjects.length} are active (status=play)`);
+        
+        setProjects(activeProjects);
       } catch (error) {
         console.error('Error:', error);
         toast.error('Erreur de connexion');

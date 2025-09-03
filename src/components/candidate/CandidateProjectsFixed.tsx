@@ -7,6 +7,7 @@ import { Eye, Check, X, ExternalLink, Calendar, Trello, Folder, MessageSquare, U
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { IallaLogo } from "@/components/IallaLogo";
@@ -52,27 +53,77 @@ const CandidateProjectsFixed = () => {
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [completedProjects, setCompletedProjects] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [candidateProfileData, setCandidateProfileData] = useState<any>(null);
 
-  // Initialize candidate ID once
+  // Set up real-time updates for projects and assignments
+  useRealtimeProjectsFixed({
+    setProjects: setAllProjects,
+    setResourceAssignments: setAssignments,
+    userId: user?.id,
+    userType: 'candidate',
+    candidateProfile: candidateProfileData
+  });
+
+  // Initialize candidate profile once
   useEffect(() => {
-    const initCandidateId = async () => {
+    const initCandidateProfile = async () => {
       if (!user?.profile?.email) return;
       
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
-        .select('id')
+        .select('id, profile_id, seniority')
         .eq('email', user.profile.email)
         .single();
       
       if (candidateProfile) {
         setCurrentCandidateId(candidateProfile.id);
+        setCandidateProfileData(candidateProfile);
       }
     };
     
-    initCandidateId();
+    initCandidateProfile();
   }, [user?.profile?.email]);
 
-  // Fetch and categorize projects based on assignment status
+  // Function to categorize projects based on assignments
+  const categorizeProjects = (filteredAssignments: any[], actualCandidateId: string) => {
+    // Categorize based on booking_status and project status
+    const available = filteredAssignments.filter(a => 
+      a.booking_status === 'recherche' && a.projects && !a.candidate_id
+    ).map(a => ({ ...a.projects, assignment_id: a.id, created_at: a.created_at }));
+    
+    const accepted = filteredAssignments.filter(a => 
+      a.booking_status === 'accepted' && 
+      a.projects && 
+      (a.projects.status === 'attente-team' || a.projects.status === 'pause')
+    ).map(a => ({ ...a.projects, assignment_id: a.id }));
+    
+    const active = filteredAssignments.filter(a => 
+      a.booking_status === 'accepted' && 
+      a.projects && 
+      a.projects.status === 'play'
+    ).map(a => ({ ...a.projects, assignment_id: a.id }));
+    
+    const completed = filteredAssignments.filter(a => 
+      a.booking_status === 'accepted' && 
+      a.projects && 
+      a.projects.status === 'completed'
+    ).map(a => ({ ...a.projects, assignment_id: a.id }));
+    
+    setAvailableProjects(available);
+    setAcceptedProjects(accepted);
+    setActiveProjects(active);
+    setCompletedProjects(completed);
+    
+    console.log('📊 Projects categorized:', {
+      available: available.length,
+      accepted: accepted.length,
+      active: active.length,
+      completed: completed.length
+    });
+  };
+
+  // Fetch initial projects and assignments
   useEffect(() => {
     const fetchAndCategorizeProjects = async () => {
       if (!user?.profile?.email) return;
@@ -89,8 +140,12 @@ const CandidateProjectsFixed = () => {
         
         if (!candidateProfile) return;
         
+        // Set candidate profile data for realtime hook
+        setCandidateProfileData(candidateProfile);
+        
         // Use the actual candidate ID from the database
         const actualCandidateId = candidateProfile.id;
+        setCurrentCandidateId(actualCandidateId);
         console.log('Using candidate ID from DB:', actualCandidateId);
         
         // Get all assignments for this candidate
@@ -141,41 +196,8 @@ const CandidateProjectsFixed = () => {
         });
         
         setAssignments(filteredAssignments);
+        categorizeProjects(filteredAssignments, actualCandidateId);
         
-        // Categorize based on booking_status and project status
-        const available = filteredAssignments.filter(a => 
-          a.booking_status === 'recherche' && a.projects && !a.candidate_id
-        ).map(a => ({ ...a.projects, assignment_id: a.id, created_at: a.created_at }));
-        
-        const accepted = filteredAssignments.filter(a => 
-          a.booking_status === 'accepted' && 
-          a.projects && 
-          (a.projects.status === 'attente-team' || a.projects.status === 'pause')
-        ).map(a => ({ ...a.projects, assignment_id: a.id }));
-        
-        const active = filteredAssignments.filter(a => 
-          a.booking_status === 'accepted' && 
-          a.projects && 
-          a.projects.status === 'play'
-        ).map(a => ({ ...a.projects, assignment_id: a.id }));
-        
-        const completed = filteredAssignments.filter(a => 
-          a.booking_status === 'accepted' && 
-          a.projects && 
-          a.projects.status === 'terminé'
-        ).map(a => ({ ...a.projects, assignment_id: a.id }));
-        
-        setAvailableProjects(available);
-        setAcceptedProjects(accepted);
-        setActiveProjects(active);
-        setCompletedProjects(completed);
-        
-        console.log('📊 Projects categorized:', {
-          available: available.length,
-          accepted: accepted.length,
-          active: active.length,
-          completed: completed.length
-        });
       } catch (error) {
         console.error('Error categorizing projects:', error);
       } finally {
@@ -183,110 +205,43 @@ const CandidateProjectsFixed = () => {
       }
     };
     
-    if (currentCandidateId) {
+    if (user?.profile?.email) {
       fetchAndCategorizeProjects();
     }
-  }, [currentCandidateId, user?.profile?.email]);
-  
-  // Listen for real-time project status changes
+  }, [user?.profile?.email]);
+
+  // Re-categorize when assignments change from real-time updates
   useEffect(() => {
+    // Allow recategorization even if assignments is empty (could be clearing)
     if (!currentCandidateId) return;
     
-    const channel = supabase
-      .channel('project-status-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'projects'
-        },
-        (payload) => {
-          console.log('📡 Project status updated:', payload.new);
-          // Refresh the projects list when any project status changes
-          const fetchAndCategorizeProjects = async () => {
-            if (!user?.profile?.email) return;
-            
-            try {
-              const { data: candidateProfile } = await supabase
-                .from('candidate_profiles')
-                .select('id, profile_id, seniority')
-                .eq('email', user.profile.email)
-                .single();
-              
-              if (!candidateProfile) return;
-              
-              const actualCandidateId = candidateProfile.id;
-              
-              const { data: allAssignments } = await supabase
-                .from('hr_resource_assignments')
-                .select(`
-                  *,
-                  projects (*),
-                  candidate_id
-                `)
-                .eq('profile_id', candidateProfile.profile_id)
-                .eq('seniority', candidateProfile.seniority);
-              
-              if (!allAssignments) return;
-              
-              const filteredAssignments = allAssignments.filter(a => {
-                if (a.candidate_id && a.candidate_id !== actualCandidateId) {
-                  return false;
-                }
-                if (a.candidate_id === actualCandidateId) {
-                  return true;
-                }
-                if (!a.candidate_id && a.booking_status === 'recherche') {
-                  return true;
-                }
-                return false;
-              });
-              
-              setAssignments(filteredAssignments);
-              
-              const available = filteredAssignments.filter(a => 
-                a.booking_status === 'recherche' && a.projects && !a.candidate_id
-              ).map(a => ({ ...a.projects, assignment_id: a.id, created_at: a.created_at }));
-              
-              const accepted = filteredAssignments.filter(a => 
-                a.booking_status === 'accepted' && 
-                a.projects && 
-                (a.projects.status === 'attente-team' || a.projects.status === 'pause')
-              ).map(a => ({ ...a.projects, assignment_id: a.id }));
-              
-              const active = filteredAssignments.filter(a => 
-                a.booking_status === 'accepted' && 
-                a.projects && 
-                a.projects.status === 'play'
-              ).map(a => ({ ...a.projects, assignment_id: a.id }));
-              
-              const completed = filteredAssignments.filter(a => 
-                a.booking_status === 'accepted' && 
-                a.projects && 
-                a.projects.status === 'terminé'
-              ).map(a => ({ ...a.projects, assignment_id: a.id }));
-              
-              setAvailableProjects(available);
-              setAcceptedProjects(accepted);
-              setActiveProjects(active);
-              setCompletedProjects(completed);
-              
-              console.log('✅ Projects updated after status change');
-            } catch (error) {
-              console.error('Error updating projects after status change:', error);
-            }
-          };
-          
-          fetchAndCategorizeProjects();
-        }
-      )
-      .subscribe();
+    console.log('🔄 Re-categorizing projects due to assignments change:', assignments.length, 'assignments');
     
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentCandidateId, user?.profile?.email]);
+    // Filter assignments again with the current candidate ID
+    const filteredAssignments = assignments.filter(a => {
+      // If specifically assigned to another candidate, don't show
+      if (a.candidate_id && a.candidate_id !== currentCandidateId) {
+        return false;
+      }
+      
+      // If assigned to this candidate, always show
+      if (a.candidate_id === currentCandidateId) {
+        return true;
+      }
+      
+      // For unassigned projects, only show if in "recherche" status
+      if (!a.candidate_id && a.booking_status === 'recherche') {
+        return true;
+      }
+      
+      return false;
+    });
+    
+    categorizeProjects(filteredAssignments, currentCandidateId);
+  }, [assignments, currentCandidateId]);
+  
+  // No need for additional real-time channels here
+  // The useRealtimeProjectsFixed hook already handles all real-time updates
 
   const handleAcceptMission = async (resourceAssignmentId: string) => {
     try {
@@ -307,8 +262,8 @@ const CandidateProjectsFixed = () => {
       if (data?.success) {
         toast.success('Mission acceptée avec succès !');
         refetch(); // Refresh projects
-        // Re-fetch assignments to update the UI
-        window.location.reload(); // Force reload to update the list
+        // Fetch fresh data instead of reloading
+        await fetchCandidateProjects();
       } else {
         toast.error(data.message || 'Erreur lors de l\'acceptation');
       }
@@ -371,20 +326,29 @@ const CandidateProjectsFixed = () => {
       console.log('Accepting project with assignment_id:', project.assignment_id);
       console.log('Using candidate email:', user.profile.email);
       
-      const { data, error } = await supabase.functions.invoke('resource-booking', {
+      // Use debug function first to understand the issue
+      const { data: debugData, error: debugError } = await supabase.functions.invoke('debug-accept-mission', {
         body: {
-          action: 'accept_mission',
           assignment_id: project.assignment_id,
           candidate_email: user.profile.email
         }
       });
 
+      if (debugError) {
+        console.error('Debug error:', debugError);
+        console.log('Debug response:', debugData);
+      }
+
+      // If debug succeeds, it already accepted the mission
+      const data = debugData;
+      const error = debugError;
+
       if (error) throw error;
 
       if (data?.success) {
         toast.success('Mission acceptée avec succès !');
-        // Force reload to update the list
-        window.location.reload();
+        // Fetch fresh data instead of reloading
+        await fetchCandidateProjects();
       } else {
         toast.error(data?.message || 'Erreur lors de l\'acceptation');
       }

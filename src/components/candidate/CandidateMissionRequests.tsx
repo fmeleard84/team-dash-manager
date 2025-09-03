@@ -350,9 +350,26 @@ export const CandidateMissionRequests = () => {
   useEffect(() => {
     fetchMissionRequests();
 
+    if (!candidateProfile?.id) return;
+
     // Set up real-time subscription for new mission requests
     const channel = supabase
       .channel('mission-requests')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'candidate_notifications',
+          filter: `candidate_id=eq.${candidateProfile.id}`
+        },
+        (payload) => {
+          console.log('🔄 Real-time update: candidate_notifications changed', payload);
+          console.log('Event type:', payload.eventType);
+          console.log('New record:', payload.new);
+          fetchMissionRequests();
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -362,6 +379,7 @@ export const CandidateMissionRequests = () => {
           filter: `booking_status=eq.recherche`
         },
         () => {
+          console.log('🔄 Real-time update: hr_resource_assignments changed');
           fetchMissionRequests();
         }
       )
@@ -370,7 +388,7 @@ export const CandidateMissionRequests = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.email]);
+  }, [user?.email, candidateProfile?.id]);
 
   const filteredRequests = requests.filter(request => {
     if (filter === 'all') return true;

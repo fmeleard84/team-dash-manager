@@ -138,7 +138,36 @@ serve(async (req) => {
       }
     }
 
-    // 5. Milestone events are disabled - only create kickoff
+    // 5. Create notifications for candidates
+    if (teamMembers && teamMembers.length > 0) {
+      const candidateNotifications = teamMembers
+        .filter(member => member.member_type === 'resource')
+        .map(member => ({
+          candidate_id: member.member_id,
+          project_id: projectId,
+          event_id: kickoffEvent.id,
+          title: `Invitation Kickoff - ${project.title}`,
+          description: `Vous êtes invité à la réunion de lancement du projet "${project.title}"`,
+          event_date: kickoffDateTime.toISOString(),
+          location: null,
+          video_url: `https://meet.jit.si/${projectId}-kickoff`,
+          status: 'pending'
+        }));
+
+      if (candidateNotifications.length > 0) {
+        const { error: notifError } = await supabase
+          .from('candidate_event_notifications')
+          .insert(candidateNotifications);
+
+        if (notifError) {
+          console.error('Error creating candidate notifications:', notifError);
+        } else {
+          console.log(`Created ${candidateNotifications.length} candidate event notifications`);
+        }
+      }
+    }
+
+    // 6. Milestone events are disabled - only create kickoff
     // Les événements milestone seront créés plus tard par le client s'il le souhaite
     const milestoneEvents = [];
 

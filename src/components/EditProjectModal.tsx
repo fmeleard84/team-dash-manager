@@ -3,14 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { IallaLogo } from "./IallaLogo";
@@ -176,39 +170,43 @@ const EditProjectModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[800px] p-0 gap-0 bg-gradient-to-br from-blue-50/50 via-white to-purple-50/50">
-        <DialogHeader className="p-6 pb-4 border-b bg-white/80 backdrop-blur-sm rounded-t-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <IallaLogo size="sm" />
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <Edit className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Modifier votre projet
-          </DialogTitle>
-          <DialogDescription className="text-gray-600">
-            Actualisez les informations de votre projet selon vos nouveaux besoins
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="p-6 max-h-[55vh] overflow-y-auto">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="edit-title" className="text-sm font-semibold">Nom du projet *</Label>
-              <Input
-                id="edit-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Refonte de notre site e-commerce"
-                required
-                disabled={isUpdating}
-                className="h-9 text-sm"
-              />
-            </div>
-          
-            <div className="grid grid-cols-2 gap-4">
+    <FullScreenModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Modifier votre projet"
+      description="Actualisez les informations de votre projet selon vos nouveaux besoins"
+      actions={
+        <ModalActions
+          onSave={handleSubmit}
+          onCancel={handleClose}
+          saveText={isUpdating ? "Mise à jour en cours..." : "Mettre à jour le projet"}
+          cancelText="Annuler"
+          saveDisabled={!title.trim() || isUpdating}
+          isLoading={isUpdating}
+        />
+      }
+    >
+      <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Informations principales */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Informations du projet</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title" className="text-sm font-semibold">Nom du projet *</Label>
+                <Input
+                  id="edit-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: Refonte de notre site e-commerce"
+                  required
+                  disabled={isUpdating}
+                  className="h-12 text-base"
+                />
+              </div>
+              
               <div className="space-y-2">
                 <Label htmlFor="edit-description" className="text-sm font-semibold">Description du projet</Label>
                 <Textarea
@@ -218,14 +216,22 @@ const EditProjectModal = ({
                   placeholder="Décrivez vos objectifs, contraintes et besoins spécifiques..."
                   rows={5}
                   disabled={isUpdating}
-                  className="text-sm resize-none"
+                  className="text-base resize-none"
                 />
               </div>
-              
-              <div className="space-y-2">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-project_date" className="text-xs font-semibold flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
+            </CardContent>
+          </Card>
+          
+          {/* Planning et budget */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Planning et budget</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-project_date" className="text-sm font-semibold flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
                     Date de début
                   </Label>
                   <Input
@@ -235,13 +241,13 @@ const EditProjectModal = ({
                     onChange={(e) => setProjectDate(e.target.value)}
                     required
                     disabled={isUpdating}
-                    className="h-8 text-sm"
+                    className="h-12"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="edit-due_date" className="text-xs font-semibold flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-due_date" className="text-sm font-semibold flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
                     Date de fin souhaitée
                   </Label>
                   <Input
@@ -250,13 +256,13 @@ const EditProjectModal = ({
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                     disabled={isUpdating}
-                    className="h-8 text-sm"
+                    className="h-12"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="edit-client_budget" className="text-xs font-semibold flex items-center gap-1">
-                    <Euro className="w-3 h-3" />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-client_budget" className="text-sm font-semibold flex items-center gap-2">
+                    <Euro className="w-4 h-4" />
                     Budget prévu (optionnel)
                   </Label>
                   <Input
@@ -269,82 +275,64 @@ const EditProjectModal = ({
                     value={clientBudget}
                     onChange={(e) => setClientBudget(e.target.value)}
                     disabled={isUpdating}
-                    className="h-8 text-sm"
+                    className="h-12 text-base"
                   />
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-project_file" className="text-sm font-semibold flex items-center gap-2">
-                <FileUp className="w-4 h-4" />
-                Cahier des charges (optionnel)
-              </Label>
-              
-              {/* Affichage ultra-compact des fichiers existants */}
-              {existingFiles.length > 0 && (
-                <div className="p-1.5 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200/50 rounded">
-                  <div className="flex flex-wrap gap-1">
-                    {existingFiles.map((file) => (
-                      <div key={file.id} className="flex items-center gap-1 py-0.5 px-1.5 bg-white/80 rounded border border-blue-200/30">
-                        <span className="text-xs text-gray-700 truncate max-w-[150px]">{file.file_name}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteFile(file.id, file.file_path)}
-                          disabled={isUpdating}
-                          className="text-red-500 hover:text-red-700 text-xs"
-                        >
-                          ×
-                        </button>
-                      </div>
-                  ))}
+          {/* Documents */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Documents</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-project_file" className="text-sm font-semibold flex items-center gap-2">
+                  <FileUp className="w-4 h-4" />
+                  Cahier des charges (optionnel)
+                </Label>
+                
+                {/* Affichage des fichiers existants */}
+                {existingFiles.length > 0 && (
+                  <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200/50 rounded-lg">
+                    <p className="text-xs text-gray-600 mb-2">Fichiers existants :</p>
+                    <div className="flex flex-wrap gap-2">
+                      {existingFiles.map((file) => (
+                        <div key={file.id} className="flex items-center gap-2 py-1 px-3 bg-white rounded border border-blue-200/30">
+                          <span className="text-sm text-gray-700 truncate max-w-[200px]">{file.file_name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFile(file.id, file.file_path)}
+                            disabled={isUpdating}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </div>
+                    ))}
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              <Input
-                id="edit-project_file"
-                type="file"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                disabled={isUpdating}
-                className="h-10 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                accept=".pdf,.doc,.docx,.txt"
-              />
-              <p className="text-xs text-gray-500">
-                PDF, DOC, DOCX, TXT (max 10MB)
-              </p>
-            </div>
-          
-          </form>
-        </div>
-        
-        <DialogFooter className="p-6 pt-0 flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isUpdating}
-            className="flex-1"
-          >
-            Annuler
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={!title.trim() || isUpdating}
-            className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            {isUpdating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Mise à jour en cours...
-              </>
-            ) : (
-              "Mettre à jour le projet"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+                )}
+                
+                <Input
+                  id="edit-project_file"
+                  type="file"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  disabled={isUpdating}
+                  className="h-12 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  accept=".pdf,.doc,.docx,.txt"
+                />
+                <p className="text-xs text-gray-500">
+                  Formats acceptés : PDF, DOC, DOCX, TXT (max 10MB)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
+      </div>
+    </FullScreenModal>
   );
 };
 

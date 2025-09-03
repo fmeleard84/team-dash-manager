@@ -1,32 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { 
-  Users, 
-  Zap, 
-  Target, 
-  Building2, 
-  Code, 
-  TrendingUp,
-  Shield,
-  Clock,
-  Star,
   ArrowRight,
-  CheckCircle2,
   Menu,
   X,
-  Sparkles,
-  Rocket,
+  ChevronRight,
+  Users,
+  Zap,
+  Shield,
   Globe,
-  BarChart3,
-  Briefcase,
-  HeartHandshake
+  Star,
+  CheckCircle2,
 } from 'lucide-react';
+import IntroOverlay from '@/components/ui/intro-overlay';
+import HeroLyniqFixed from '@/components/ui/hero-lyniq-fixed';
 
 export const HomePage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeService, setActiveService] = useState(0);
+  const servicesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -36,147 +29,108 @@ export const HomePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const features = [
-    {
-      icon: <Zap className="w-6 h-6" />,
-      title: "Activation instantanée",
-      description: "Constituez votre équipe en quelques clics, sans processus de recrutement"
+  // Observer pour les animations au scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-inview');
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
+
+  const services = [
+    { 
+      id: '01',
+      title: 'Digital Product Design',
+      description: 'Créez des expériences utilisateur exceptionnelles avec notre expertise en design system et interface'
     },
-    {
-      icon: <Target className="w-6 h-6" />,
-      title: "Matching intelligent",
-      description: "Notre IA sélectionne les experts parfaitement adaptés à vos besoins"
+    { 
+      id: '02',
+      title: 'Team Building Externalisé',
+      description: 'Constituez des équipes d\'experts autonomes en quelques clics, sans processus de recrutement'
     },
-    {
-      icon: <Shield className="w-6 h-6" />,
-      title: "100% Autonome",
-      description: "Des équipes externes qui fonctionnent sans supervision constante"
+    { 
+      id: '03',
+      title: 'Consulting Stratégique',
+      description: 'Accélérez votre transformation digitale avec des consultants seniors spécialisés'
     },
-    {
-      icon: <Clock className="w-6 h-6" />,
-      title: "Flexible & Scalable",
-      description: "Ajustez votre équipe selon l'évolution de vos projets"
+    { 
+      id: '04',
+      title: 'AI & Automation',
+      description: 'Intégrez l\'intelligence artificielle pour automatiser et optimiser vos processus métier'
     }
   ];
 
-  const useCases = [
-    {
-      icon: <Code className="w-8 h-8" />,
-      title: "Développement Web/App",
-      description: "Créez votre produit digital avec une équipe complète de développeurs"
-    },
-    {
-      icon: <BarChart3 className="w-8 h-8" />,
-      title: "Comptabilité externalisée",
-      description: "Une équipe comptable dédiée pour votre gestion financière"
-    },
-    {
-      icon: <TrendingUp className="w-8 h-8" />,
-      title: "Force commerciale",
-      description: "Déployez une équipe commerciale sur-mesure rapidement"
-    },
-    {
-      icon: <Briefcase className="w-8 h-8" />,
-      title: "Marketing digital",
-      description: "Experts en stratégie digitale et croissance"
-    }
-  ];
-
-  const testimonials = [
-    {
-      name: "Marie Dupont",
-      role: "CEO, TechStart",
-      content: "Ialla nous a permis de lancer notre MVP en 3 mois avec une équipe de 5 développeurs experts, sans aucun recrutement.",
-      rating: 5
-    },
-    {
-      name: "Thomas Martin",
-      role: "Directeur, Innovate Corp",
-      content: "La flexibilité d'Ialla est incroyable. Nous avons pu adapter notre équipe externe selon les phases du projet.",
-      rating: 5
-    },
-    {
-      name: "Sophie Bernard",
-      role: "Fondatrice, GrowthLab",
-      content: "Plus besoin de CV ou d'entretiens. En 48h, j'avais une équipe commerciale opérationnelle.",
-      rating: 5
-    }
-  ];
-
-  const steps = [
-    {
-      number: "1",
-      title: "Définissez votre besoin",
-      description: "Décrivez votre projet et les compétences recherchées"
-    },
-    {
-      number: "2",
-      title: "Matching automatique",
-      description: "Notre IA sélectionne et assemble l'équipe idéale"
-    },
-    {
-      number: "3",
-      title: "Validation rapide",
-      description: "Validez les profils et le budget en un clic"
-    },
-    {
-      number: "4",
-      title: "Lancez votre projet",
-      description: "Votre équipe externe est opérationnelle immédiatement"
-    }
+  const stats = [
+    { number: '500+', label: 'Experts vérifiés' },
+    { number: '48h', label: 'Activation équipe' },
+    { number: '97%', label: 'Satisfaction client' },
+    { number: '15M€', label: 'Projets réalisés' }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header Navigation */}
+    <>
+      {/* Intro Overlay */}
+      <IntroOverlay />
+      
+      <div className="min-h-screen bg-white">
+      {/* Header Premium */}
       <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-transparent'
+        scrolled ? 'bg-white/95 backdrop-blur-md border-b border-gray-200' : 'bg-transparent'
       }`}>
-        <div className="container mx-auto px-6">
-          <nav className="flex items-center justify-between h-20">
+        <div className="container mx-auto">
+          <nav className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Ialla
-              </span>
+            <div className="flex items-center">
+              <Link to="/" className="text-2xl font-bold">
+                <span className="text-black">Team</span>
+                <span className="text-accent">Dash</span>
+              </Link>
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#concept" className="text-gray-700 hover:text-blue-600 transition-colors">
-                Concept
+            <div className="hidden lg:flex items-center space-x-8">
+              <a href="#services" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+                SERVICES
               </a>
-              <a href="#fonctionnement" className="text-gray-700 hover:text-blue-600 transition-colors">
-                Comment ça marche
+              <a href="#process" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+                PROCESS
               </a>
-              <a href="#usecases" className="text-gray-700 hover:text-blue-600 transition-colors">
-                Cas d'usage
+              <a href="#expertise" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+                EXPERTISE
               </a>
-              <a href="#testimonials" className="text-gray-700 hover:text-blue-600 transition-colors">
-                Témoignages
+              <a href="#about" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+                À PROPOS
               </a>
             </div>
 
             {/* CTA Buttons */}
-            <div className="hidden md:flex items-center space-x-4">
+            <div className="hidden lg:flex items-center gap-4">
               <Link to="/login">
-                <Button variant="ghost" className="text-gray-700">
+                <button className="btn-premium btn-ghost-premium">
                   Connexion
-                </Button>
+                </button>
               </Link>
               <Link to="/register">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  Commencer gratuitement
-                </Button>
+                <button className="btn-premium btn-accent-premium">
+                  Commencer
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </Link>
             </div>
 
             {/* Mobile Menu Button */}
             <button 
-              className="md:hidden"
+              className="lg:hidden p-2"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -185,30 +139,21 @@ export const HomePage = () => {
 
           {/* Mobile Menu */}
           {isMenuOpen && (
-            <div className="md:hidden bg-white border-t">
-              <div className="px-4 py-6 space-y-4">
-                <a href="#concept" className="block text-gray-700 hover:text-blue-600">
-                  Concept
-                </a>
-                <a href="#fonctionnement" className="block text-gray-700 hover:text-blue-600">
-                  Comment ça marche
-                </a>
-                <a href="#usecases" className="block text-gray-700 hover:text-blue-600">
-                  Cas d'usage
-                </a>
-                <a href="#testimonials" className="block text-gray-700 hover:text-blue-600">
-                  Témoignages
-                </a>
+            <div className="lg:hidden bg-white border-t border-gray-200">
+              <div className="container py-6 space-y-4">
+                <a href="#services" className="block text-body text-black hover:text-accent">Services</a>
+                <a href="#process" className="block text-body text-black hover:text-accent">Process</a>
+                <a href="#expertise" className="block text-body text-black hover:text-accent">Expertise</a>
+                <a href="#about" className="block text-body text-black hover:text-accent">À propos</a>
                 <div className="pt-4 space-y-3">
                   <Link to="/login" className="block">
-                    <Button variant="outline" className="w-full">
-                      Connexion
-                    </Button>
+                    <button className="btn-premium btn-secondary-premium w-full">Connexion</button>
                   </Link>
                   <Link to="/register" className="block">
-                    <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600">
-                      Commencer gratuitement
-                    </Button>
+                    <button className="btn-premium btn-accent-premium w-full">
+                      Commencer
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </Link>
                 </div>
               </div>
@@ -217,244 +162,203 @@ export const HomePage = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
-              <Rocket className="w-4 h-4" />
-              <span>La nouvelle façon de constituer des équipes</span>
-            </div>
+      {/* Hero Section Fixed Background */}
+      <HeroLyniqFixed />
 
-            {/* Main Title */}
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              Pluggez des expertises,
-              <br />
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Créez votre équipe externe
-              </span>
-            </h1>
-
-            {/* Subtitle */}
-            <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-3xl mx-auto">
-              Plus de recrutement, plus de CV. Constituez instantanément une équipe d'experts 
-              100% autonome pour tous vos projets.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-              <Link to="/register">
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-6">
-                  Créer mon équipe maintenant
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-                <a href="#fonctionnement">Voir comment ça marche</a>
-              </Button>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="flex flex-wrap justify-center gap-8 text-gray-600">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-                <span>Sans engagement</span>
+      {/* Stats Section Premium - White background that slides over hero */}
+      <section className="relative bg-white py-24 border-y border-gray-200 z-10">
+        <div className="container">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center reveal">
+                <div className="stat-num">{stat.number}</div>
+                <div className="stat-label">{stat.label}</div>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-                <span>Activation en 48h</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-                <span>+500 experts vérifiés</span>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Concept Section */}
-      <section id="concept" className="py-20 px-6 bg-white">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              Fini les contraintes RH traditionnelles
+      {/* Services Section - Liste massive style */}
+      <section id="services" className="relative py-24 bg-black text-white z-10" ref={servicesRef}>
+        <div className="container">
+          <div className="mb-16">
+            <div className="eyebrow text-accent mb-4">↳ NOS SERVICES</div>
+            <h2 className="h-display">
+              Ce que nous faisons<br />
+              <span className="text-gray-600">pour vous</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Ialla révolutionne la constitution d'équipes en connectant instantanément 
-              les bonnes expertises pour créer des équipes externes performantes.
-            </p>
           </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature, index) => (
-              <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center mb-4">
-                    <div className="text-blue-600">
-                      {feature.icon}
+          
+          <div className="space-y-0">
+            {services.map((service, index) => (
+              <div 
+                key={index}
+                className={`border-b border-gray-800 py-12 cursor-pointer transition-all duration-300 hover:pl-8 ${
+                  activeService === index ? 'pl-8' : ''
+                }`}
+                onMouseEnter={() => setActiveService(index)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-baseline gap-6 mb-4">
+                      <span className={`text-eyebrow ${activeService === index ? 'text-accent' : 'text-gray-600'}`}>
+                        {service.id}
+                      </span>
+                      <h3 className={`text-h2 font-bold transition-opacity duration-300 ${
+                        activeService === index ? 'opacity-100' : 'opacity-20'
+                      }`}>
+                        {service.title}
+                      </h3>
                     </div>
+                    {activeService === index && (
+                      <p className="text-gray-400 max-w-2xl animate-fade">
+                        {service.description}
+                      </p>
+                    )}
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Use Cases Section */}
-      <section id="usecases" className="py-20 px-6 bg-gray-50">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              Une solution pour chaque besoin
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Que vous ayez besoin de développeurs, comptables, commerciaux ou marketeurs, 
-              Ialla assemble l'équipe parfaite.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {useCases.map((useCase, index) => (
-              <Card key={index} className="bg-white hover:scale-105 transition-transform cursor-pointer">
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white">
-                    {useCase.icon}
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{useCase.title}</h3>
-                  <p className="text-gray-600 text-sm">{useCase.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works Section */}
-      <section id="fonctionnement" className="py-20 px-6 bg-white">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              Comment ça marche ?
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              4 étapes simples pour constituer votre équipe externe
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-8">
-            {steps.map((step, index) => (
-              <div key={index} className="relative">
-                {/* Connector Line */}
-                {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-12 left-1/2 w-full h-0.5 bg-gradient-to-r from-blue-200 to-purple-200"></div>
-                )}
-                
-                <div className="text-center">
-                  <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 text-white text-3xl font-bold relative z-10">
-                    {step.number}
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                  <p className="text-gray-600 text-sm">{step.description}</p>
+                  {activeService === index && (
+                    <ChevronRight className="w-8 h-8 text-accent animate-fade" />
+                  )}
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="text-center mt-12">
-            <Link to="/register">
-              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                Commencer maintenant
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </Link>
+      {/* Process Section avec cards premium */}
+      <section id="process" className="relative py-24 bg-gray-50 z-10">
+        <div className="container">
+          <div className="text-center mb-16">
+            <div className="eyebrow text-accent mb-4">↳ NOTRE PROCESS</div>
+            <h2 className="h-display mb-6">
+              Simple, rapide,<br />
+              <span className="text-gray-400">efficace</span>
+            </h2>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: '01',
+                title: 'Définition',
+                description: 'Décrivez votre besoin et vos objectifs. Notre IA analyse et identifie les profils parfaits.'
+              },
+              {
+                step: '02',
+                title: 'Matching',
+                description: 'Validation instantanée des experts sélectionnés. Budget transparent et équipe sur-mesure.'
+              },
+              {
+                step: '03',
+                title: 'Activation',
+                description: 'Votre équipe est opérationnelle en 48h. Collaboration fluide et résultats garantis.'
+              }
+            ].map((item, index) => (
+              <div key={index} className="card-premium corner-mark reveal">
+                <div className="text-eyebrow text-accent mb-4">{item.step}</div>
+                <h3 className="text-h3 font-bold mb-4">{item.title}</h3>
+                <p className="text-body text-gray-600">{item.description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section id="testimonials" className="py-20 px-6 bg-gray-50">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              Ils ont transformé leur façon de travailler
+      {/* Expertise Grid Section */}
+      <section id="expertise" className="relative py-24 bg-white z-10">
+        <div className="container">
+          <div className="mb-16">
+            <div className="eyebrow text-accent mb-4">↳ DOMAINES D'EXPERTISE</div>
+            <h2 className="h-display max-w-3xl">
+              Des experts pour chaque défi
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Découvrez comment des entreprises comme la vôtre utilisent Ialla
-            </p>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="bg-white">
-                <CardContent className="p-8">
-                  <div className="flex gap-1 mb-4">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    ))}
-                  </div>
-                  <p className="text-gray-700 mb-6 italic">"{testimonial.content}"</p>
-                  <div>
-                    <p className="font-semibold">{testimonial.name}</p>
-                    <p className="text-sm text-gray-600">{testimonial.role}</p>
-                  </div>
-                </CardContent>
-              </Card>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { icon: '💻', title: 'Développement', count: '150+ experts' },
+              { icon: '🎨', title: 'Design & UX', count: '80+ experts' },
+              { icon: '📊', title: 'Data & IA', count: '60+ experts' },
+              { icon: '📈', title: 'Marketing', count: '120+ experts' },
+              { icon: '💼', title: 'Consulting', count: '90+ experts' },
+              { icon: '🛡️', title: 'Cybersécurité', count: '40+ experts' },
+              { icon: '⚡', title: 'DevOps', count: '50+ experts' },
+              { icon: '🌐', title: 'Blockchain', count: '30+ experts' }
+            ].map((item, index) => (
+              <div key={index} className="group cursor-pointer reveal">
+                <div className="bg-gray-100 rounded-xl p-6 hover:bg-accent hover:text-white transition-all duration-300">
+                  <div className="text-4xl mb-4">{item.icon}</div>
+                  <h3 className="font-bold mb-2">{item.title}</h3>
+                  <p className="text-small opacity-60">{item.count}</p>
+                </div>
+              </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonial Section - Citation large */}
+      <section className="relative py-24 bg-black text-white z-10">
+        <div className="container max-w-4xl">
+          <div className="text-center">
+            <div className="text-6xl text-accent mb-8">"</div>
+            <blockquote className="h-display mb-8">
+              TeamDash a transformé notre façon de constituer des équipes. 
+              <span className="text-accent"> En 48h, nous avions une équipe de 8 experts</span> parfaitement 
+              alignés sur nos besoins.
+            </blockquote>
+            <div className="divider-dark-premium mx-auto w-24 mb-8"></div>
+            <div>
+              <p className="font-bold">Marie Dubois</p>
+              <p className="text-gray-400 text-small">CEO, TechCorp France</p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-20 px-6 bg-gradient-to-br from-blue-600 to-purple-600">
-        <div className="container mx-auto max-w-4xl text-center text-white">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Prêt à révolutionner votre façon de travailler ?
+      <section className="relative py-32 bg-white overflow-hidden z-10">
+        <div className="absolute inset-0 bg-accent-gradient opacity-10"></div>
+        <div className="container relative z-10 text-center">
+          <h2 className="h-display-xl mb-8">
+            Prêt à passer au<br />
+            <span className="h-hero-gradient">niveau supérieur ?</span>
           </h2>
-          <p className="text-xl mb-10 opacity-95">
-            Rejoignez les centaines d'entreprises qui ont déjà adopté Ialla 
-            pour constituer leurs équipes externes.
+          <p className="lead max-w-2xl mx-auto mb-12">
+            Rejoignez les entreprises qui ont déjà révolutionné leur façon de constituer des équipes.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/register">
-              <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-6">
-                Créer mon compte gratuitement
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
+              <button className="btn-premium btn-accent-premium px-10 py-4 text-lg">
+                Créer mon compte
+                <ArrowRight className="w-5 h-5" />
+              </button>
             </Link>
-            <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/10 text-lg px-8 py-6">
+            <button className="btn-premium btn-secondary-premium px-10 py-4 text-lg">
               Planifier une démo
-            </Button>
+            </button>
           </div>
-          <p className="mt-8 text-sm opacity-75">
-            Sans carte bancaire • Activation en 48h • Support dédié
-          </p>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 px-6">
-        <div className="container mx-auto max-w-6xl">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+      {/* Footer Premium */}
+      <footer className="relative bg-black text-white py-16 border-t border-gray-800 z-10">
+        <div className="container">
+          <div className="grid md:grid-cols-4 gap-8 mb-12">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">Ialla</span>
-              </div>
-              <p className="text-sm">
+              <h3 className="text-2xl font-bold mb-4">
+                Team<span className="text-accent">Dash</span>
+              </h3>
+              <p className="text-gray-400 text-small">
                 La plateforme qui révolutionne la constitution d'équipes externes.
               </p>
             </div>
             
             <div>
-              <h4 className="text-white font-semibold mb-4">Produit</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="text-eyebrow mb-4">PRODUIT</h4>
+              <ul className="space-y-2 text-gray-400">
                 <li><a href="#" className="hover:text-white transition-colors">Fonctionnalités</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Tarifs</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Cas d'usage</a></li>
@@ -462,8 +366,8 @@ export const HomePage = () => {
             </div>
             
             <div>
-              <h4 className="text-white font-semibold mb-4">Entreprise</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="text-eyebrow mb-4">ENTREPRISE</h4>
+              <ul className="space-y-2 text-gray-400">
                 <li><a href="#" className="hover:text-white transition-colors">À propos</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Carrières</a></li>
@@ -471,20 +375,28 @@ export const HomePage = () => {
             </div>
             
             <div>
-              <h4 className="text-white font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="text-eyebrow mb-4">SUPPORT</h4>
+              <ul className="space-y-2 text-gray-400">
                 <li><a href="#" className="hover:text-white transition-colors">Centre d'aide</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Statut</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">API</a></li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <p>&copy; 2024 Ialla. Tous droits réservés.</p>
+          <div className="divider-dark-premium mb-8"></div>
+          
+          <div className="flex flex-col md:flex-row justify-between items-center text-gray-400 text-small">
+            <p>&copy; 2024 TeamDash. Tous droits réservés.</p>
+            <div className="flex gap-6 mt-4 md:mt-0">
+              <a href="#" className="hover:text-white transition-colors">Mentions légales</a>
+              <a href="#" className="hover:text-white transition-colors">Confidentialité</a>
+              <a href="#" className="hover:text-white transition-colors">CGU</a>
+            </div>
           </div>
         </div>
       </footer>
     </div>
+    </>
   );
 };

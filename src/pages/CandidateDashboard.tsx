@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,7 +37,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ValidationPromoBanner } from "@/components/candidate/ValidationPromoBanner";
 import CandidateOnboarding from "@/components/candidate/CandidateOnboarding";
 import { useCandidateOnboarding } from "@/hooks/useCandidateOnboarding";
-import CandidateProjectsFixed from "@/components/candidate/CandidateProjectsFixed";
+import { CandidateProjectsSection } from "@/components/candidate/CandidateProjectsSection";
 import CandidatePlanningView from "@/components/candidate/CandidatePlanningView";
 import SharedPlanningView from "@/components/shared/SharedPlanningView";
 import CandidateDriveView from "@/components/candidate/CandidateDriveView";
@@ -45,12 +45,12 @@ import CandidateKanbanView from "@/components/candidate/CandidateKanbanView";
 import { CandidateNotes } from "@/components/candidate/CandidateNotes";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
 import { useUserProjects } from "@/hooks/useUserProjects";
+import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import DynamicCandidateMessages from "@/components/candidate/DynamicCandidateMessages";
 import CandidateEventNotifications from "@/components/candidate/CandidateEventNotifications";
 import { CandidateMissionRequests } from "@/components/candidate/CandidateMissionRequests";
-import { EnhancedMessageSystem } from "@/components/shared/EnhancedMessageSystem";
+import CandidateMessagesView from "@/components/candidate/CandidateMessagesView";
 import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { CandidatePayments } from "@/components/candidate/CandidatePayments";
 import CandidateRatings from "@/pages/CandidateRatings";
@@ -61,11 +61,12 @@ import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
   const [isAvailable, setIsAvailable] = useState(true);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [candidateProjects, setCandidateProjects] = useState<any[]>([]);
   const [resourceAssignments, setResourceAssignments] = useState<any[]>([]);
   const { user, logout } = useAuth();
   const { getCandidateProjects, projects: userProjects } = useUserProjects();
+  // Use optimized hook for active projects only (planning/kanban/drive/messages)
+  const { projects: activeProjects, loading: activeProjectsLoading } = useCandidateProjectsOptimized();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -99,12 +100,24 @@ const CandidateDashboard = () => {
                                candidateId && 
                                profileId;
   
+  // Memoize candidateProfile object to prevent re-renders
+  const realtimeCandidateProfile = useMemo(() => {
+    if (shouldEnableRealtime && candidateId && profileId && seniority) {
+      return { 
+        id: candidateId,
+        profile_id: profileId, 
+        seniority 
+      };
+    }
+    return null;
+  }, [shouldEnableRealtime, candidateId, profileId, seniority]);
+  
   useRealtimeProjectsFixed({
     setProjects: setCandidateProjects,
     setResourceAssignments: setResourceAssignments,
     userId: shouldEnableRealtime ? user.id : null,
     userType: 'candidate',
-    candidateProfile: shouldEnableRealtime && seniority ? { profile_id: profileId, seniority } : null
+    candidateProfile: realtimeCandidateProfile
   });
 
   // Handle URL parameters to set initial tab
@@ -158,6 +171,7 @@ const CandidateDashboard = () => {
 
   // Récupérer les projets actifs du candidat pour les messages
   useEffect(() => {
+    // console.log('[CandidateDashboard] userProjects changed, updating candidateProjects');
     const candidateProjectsList = getCandidateProjects();
     const formattedProjects = candidateProjectsList.map(p => ({
       id: p.project_id,
@@ -170,67 +184,252 @@ const CandidateDashboard = () => {
     }));
     
     setCandidateProjects(formattedProjects);
+  }, [userProjects]); // Depend on userProjects data, not the function
+  
+  // Charger les assignments avec les projets associés
+  useEffect(() => {
+    const loadAssignments = async () => {
+      if (!candidateId || !profileId) return;
+      
+      try {
+        // Charger les assignments pour ce candidat
+        // Either assignments specifically for this candidate (candidate_id matches)
+        // OR assignments looking for candidates with matching profile (booking_status = 'recherche')
+        const { data: assignments, error } = await supabase
+          .from('hr_resource_assignments')
+          .select(`
+            *,
+            projects:project_id (
+              id,
+              title,
+              description,
+              status,
+              project_date,
+              due_date,
+              client_budget,
+              owner_id
+            )
+          `)
+          .or(`candidate_id.eq.${candidateId},and(profile_id.eq.${profileId},seniority.eq.${seniority},booking_status.eq.recherche)`);
+        
+        if (error) {
+          console.error('Error loading assignments:', error);
+          return;
+        }
+        
+        // console.log('Loaded assignments:', assignments);
+        
+        // Si on a des assignments, enrichir avec les données du client et du profil HR
+        if (assignments && assignments.length > 0) {
+          const enrichedAssignments = await Promise.all(
+            assignments.map(async (assignment) => {
+              let enrichedAssignment = { ...assignment };
+              
+              // Charger les infos du client si le projet existe
+              if (assignment.projects?.owner_id) {
+                const { data: ownerProfile } = await supabase
+                  .from('profiles')
+                  .select('company_name')
+                  .eq('id', assignment.projects.owner_id)
+                  .single();
+                
+                enrichedAssignment.projects = {
+                  ...assignment.projects,
+                  owner: ownerProfile
+                };
+              }
+              
+              // Charger le profil HR si nécessaire
+              if (assignment.profile_id) {
+                const { data: hrProfile, error } = await supabase
+                  .from('hr_profiles')
+                  .select('name')
+                  .eq('id', assignment.profile_id)
+                  .single();
+                
+                if (!error && hrProfile) {
+                  enrichedAssignment.hr_profiles = hrProfile;
+                }
+              }
+              
+              return enrichedAssignment;
+            })
+          );
+          
+          // console.log('Enriched assignments:', enrichedAssignments);
+          setResourceAssignments(enrichedAssignments);
+        } else {
+          setResourceAssignments(assignments || []);
+        }
+      } catch (error) {
+        console.error('Error in loadAssignments:', error);
+      }
+    };
     
-    // Sélectionner automatiquement le premier projet
-    if (formattedProjects.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(formattedProjects[0].id);
+    loadAssignments();
+  }, [candidateId, profileId, seniority]);
+  
+  // Functions for accepting/declining missions
+  const handleAcceptMission = async (projectId: string) => {
+    try {
+      // Find the assignment for this project
+      const assignment = resourceAssignments.find(a => 
+        a.project_id === projectId && a.booking_status === 'recherche'
+      );
+      
+      if (!assignment) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de trouver l'invitation pour ce projet",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Call the resource-booking function to accept
+      const { data, error } = await supabase.functions.invoke('resource-booking', {
+        body: {
+          action: 'accept_mission',
+          assignment_id: assignment.id,
+          candidate_email: user?.email
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Mission acceptée",
+        description: "Vous avez accepté cette mission avec succès",
+      });
+
+      // Refresh projects
+      refetchIdentity();
+      getCandidateProjects();
+    } catch (error: any) {
+      console.error('Error accepting mission:', error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'accepter la mission",
+        variant: "destructive",
+      });
     }
-  }, [userProjects]);
+  };
+
+  const handleDeclineMission = async (projectId: string) => {
+    try {
+      // Find the assignment for this project
+      const assignment = resourceAssignments.find(a => 
+        a.project_id === projectId && a.booking_status === 'recherche'
+      );
+      
+      if (!assignment) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de trouver l'invitation pour ce projet",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Call the resource-booking function to decline
+      const { data, error } = await supabase.functions.invoke('resource-booking', {
+        body: {
+          action: 'decline_mission',
+          assignment_id: assignment.id,
+          candidate_email: user?.email
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Mission refusée",
+        description: "Vous avez refusé cette mission",
+      });
+
+      // Refresh projects
+      refetchIdentity();
+      getCandidateProjects();
+    } catch (error: any) {
+      console.error('Error declining mission:', error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de refuser la mission",
+        variant: "destructive",
+      });
+    }
+  };
 
   const renderContent = () => {
     switch (activeSection) {
       case 'projects':
-        return <CandidateProjectsFixed />;
+        // console.log('CandidateDashboard - resourceAssignments:', resourceAssignments);
+        // console.log('CandidateDashboard - candidateProjects:', candidateProjects);
+        // console.log('CandidateDashboard - candidateId:', candidateId);
+        
+        // Filter active projects (accepted by candidate)
+        const activeProjectsList = resourceAssignments
+          .filter(a => {
+            // console.log('Checking assignment for active:', a);
+            // Inclure les projets acceptés ET terminés (completed)
+            return (a.booking_status === 'accepted' || a.booking_status === 'completed') && a.projects;
+          })
+          .map(a => ({
+            ...a.projects,
+            // Ajouter le booking_status pour différencier actif/terminé
+            booking_status: a.booking_status,
+            hr_resource_assignments: [{
+              ...a,
+              hr_profiles: a.hr_profiles
+            }],
+            owner: a.projects?.owner
+          }));
+        
+        // Filter pending invitations (available to candidate)
+        const pendingInvitationsList = resourceAssignments
+          .filter(a => {
+            // Pour les invitations, on cherche les assignments en recherche
+            // qui correspondent au profil du candidat mais pas encore assignés
+            return a.booking_status === 'recherche' && 
+                   a.profile_id === profileId && 
+                   a.seniority === seniority &&
+                   !a.candidate_id && 
+                   a.projects;
+          })
+          .map(a => ({
+            ...a.projects,
+            hr_resource_assignments: [{
+              ...a,
+              hr_profiles: a.hr_profiles
+            }],
+            owner: a.projects?.owner
+          }));
+        
+        // console.log('CandidateDashboard - activeProjectsList:', activeProjectsList);
+        // console.log('CandidateDashboard - pendingInvitationsList:', pendingInvitationsList);
+        
+        return (
+          <CandidateProjectsSection
+            activeProjects={activeProjectsList}
+            pendingInvitations={pendingInvitationsList}
+            onViewProject={(id) => navigate(`/candidate/project/${id}`)}
+            onAcceptMission={handleAcceptMission}
+            onDeclineMission={handleDeclineMission}
+          />
+        );
         
       case 'planning':
-        return candidateId ? (
-          <div className="space-y-6">
-            {/* Header unifié avec le client */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-              <div className="relative p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                      <CalendarDays className="w-6 h-6 text-white" />
-                    </div>
-                    
-                    <Select value={selectedProjectId || ''} onValueChange={setSelectedProjectId}>
-                      <SelectTrigger className="w-64 bg-white/90 backdrop-blur-sm border-white/20">
-                        <SelectValue placeholder="Sélectionner un projet" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {candidateProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Affichage du planning ou message d'absence */}
-            {selectedProjectId ? (
-              <SharedPlanningView 
-                mode="candidate" 
-                projects={candidateProjects.filter(p => p.id === selectedProjectId)} 
-                candidateId={candidateId} 
-              />
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <CalendarDays className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Sélectionnez un projet pour voir le planning</p>
-              </div>
-            )}
-          </div>
+        return candidateId && activeProjects.length > 0 ? (
+          <SharedPlanningView 
+            mode="candidate" 
+            projects={activeProjects} 
+            candidateId={candidateId} 
+          />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <CalendarDays className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Planning non disponible</p>
-            <p className="text-sm mt-2">Complétez votre profil pour accéder au planning</p>
+            <p className="text-sm mt-2">Aucun projet actif. Le planning sera disponible lorsque le client aura démarré le projet.</p>
           </div>
         );
         
@@ -238,100 +437,24 @@ const CandidateDashboard = () => {
         return <CandidateDriveView />;
         
       case 'kanban':
-        return candidateId ? (
-          <div className="space-y-6">
-            {/* Header unifié avec le client */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-              <div className="relative p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                      <Layout className="w-6 h-6 text-white" />
-                    </div>
-                    
-                    <Select value={selectedProjectId || ''} onValueChange={setSelectedProjectId}>
-                      <SelectTrigger className="w-64 bg-white/90 backdrop-blur-sm border-white/20">
-                        <SelectValue placeholder="Sélectionner un projet" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {candidateProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Affichage du kanban ou message d'absence */}
-            {selectedProjectId ? (
-              <div className="h-[calc(100vh-20rem)]">
-                <CandidateKanbanView projectId={selectedProjectId} />
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Layout className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Sélectionnez un projet pour voir le tableau Kanban</p>
-              </div>
-            )}
-          </div>
+        return candidateId && activeProjects.length > 0 ? (
+          <CandidateKanbanView />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <Layout className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Kanban non disponible</p>
-            <p className="text-sm mt-2">Complétez votre profil pour accéder au tableau Kanban</p>
+            <p className="text-sm mt-2">Aucun projet actif. Le Kanban sera disponible lorsque le client aura démarré le projet.</p>
           </div>
         );
         
       case 'messages':
-        return candidateId ? (
-          <div className="space-y-6">
-            {/* Header unifié avec le client */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-              <div className="relative p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                      <MessageSquare className="w-6 h-6 text-white" />
-                    </div>
-                    
-                    <Select value={selectedProjectId || ''} onValueChange={setSelectedProjectId}>
-                      <SelectTrigger className="w-64 bg-white/90 backdrop-blur-sm border-white/20">
-                        <SelectValue placeholder="Sélectionner un projet" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {candidateProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Affichage des messages ou message d'absence */}
-            {selectedProjectId ? (
-              <EnhancedMessageSystem projectId={selectedProjectId} userType="candidate" />
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Sélectionnez un projet pour voir les messages</p>
-              </div>
-            )}
-          </div>
+        return candidateId && activeProjects.length > 0 ? (
+          <CandidateMessagesView />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Messagerie non disponible</p>
-            <p className="text-sm mt-2">Complétez votre profil pour accéder aux messages</p>
+            <p className="text-sm mt-2">Aucun projet actif. La messagerie sera disponible lorsque le client aura démarré le projet.</p>
           </div>
         );
         

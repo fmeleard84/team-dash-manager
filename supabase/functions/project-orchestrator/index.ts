@@ -105,7 +105,7 @@ serve(async (req) => {
         throw new Error(`Projet non trouvé: ${projectError?.message}`);
       }
 
-      console.log(`[project-orchestrator] Found project: ${project.title}`);
+      console.log(`[project-orchestrator] Found project: ${project.title}, status: ${project.status}`);
 
       // 2. Récupérer les ressources acceptées via hr_resource_assignments
       const { data: acceptedAssignments, error: assignmentsError } = await supabaseClient
@@ -115,12 +115,7 @@ serve(async (req) => {
           profile_id,
           seniority,
           booking_status,
-          hr_profiles!inner(
-            id,
-            name,
-            category_id,
-            hr_categories(name)
-          )
+          candidate_id
         `)
         .eq('project_id', projectId)
         .eq('booking_status', 'accepted');
@@ -129,27 +124,135 @@ serve(async (req) => {
         throw new Error(`Erreur récupération ressources: ${assignmentsError.message}`);
       }
 
+      console.log(`[project-orchestrator] Found ${acceptedAssignments?.length || 0} accepted assignments`);
+
       // 3. Récupérer les profils candidats correspondants
       const candidateProfiles = [];
       for (const assignment of acceptedAssignments || []) {
-        const { data: candidateProfile, error: candidateError } = await supabaseClient
-          .from('candidate_profiles')
-          .select('id, first_name, last_name, email, profile_id, seniority')
-          .eq('profile_id', assignment.profile_id)
-          .eq('seniority', assignment.seniority)
-          .eq('status', 'disponible')
+        // Get profile info first
+        const { data: hrProfile } = await supabaseClient
+          .from('hr_profiles')
+          .select('id, name, category_id')
+          .eq('id', assignment.profile_id)
           .single();
         
+        // Get category name if exists
+        let categoryName = hrProfile?.name || 'Général';
+        if (hrProfile?.category_id) {
+          const { data: category } = await supabaseClient
+            .from('hr_categories')
+            .select('name')
+            .eq('id', hrProfile.category_id)
+            .single();
+          if (category) {
+            categoryName = category.name;
+          }
+        }
+        
+        let candidateProfile = null;
+        let candidateError = null;
+        
+        // If candidate_id is already assigned, get that specific candidate
+        if (assignment.candidate_id) {
+          console.log(`[project-orchestrator] Getting assigned candidate: ${assignment.candidate_id}`);
+          const result = await supabaseClient
+            .from('candidate_profiles')
+            .select('id, first_name, last_name, email, profile_id, seniority, status')
+            .eq('id', assignment.candidate_id)
+            .single();
+          
+          candidateProfile = result.data;
+          candidateError = result.error;
+        } else {
+          // Otherwise, find a matching candidate by profile and seniority
+          console.log(`[project-orchestrator] Finding candidate for profile: ${assignment.profile_id}, seniority: ${assignment.seniority}`);
+          const result = await supabaseClient
+            .from('candidate_profiles')
+            .select('id, first_name, last_name, email, profile_id, seniority, status')
+            .eq('profile_id', assignment.profile_id)
+            .eq('seniority', assignment.seniority)
+            // Don't filter by status - candidates are already accepted
+            // Only exclude candidates in 'qualification' status
+            .neq('status', 'qualification')
+            .single();
+          
+          candidateProfile = result.data;
+          candidateError = result.error;
+        }
+        
         if (candidateProfile && !candidateError) {
+          console.log(`[project-orchestrator] Found candidate: ${candidateProfile.first_name} ${candidateProfile.last_name} (${candidateProfile.id})`);
           candidateProfiles.push({
             ...candidateProfile,
-            profile_type: assignment.hr_profiles.hr_categories?.name || assignment.hr_profiles.name
+            assignment_id: assignment.id,
+            profile_type: categoryName
           });
+        } else {
+          console.error(`[project-orchestrator] Could not find candidate for assignment ${assignment.id}:`, candidateError?.message);
         }
       }
 
       const resources = candidateProfiles;
+      console.log(`[project-orchestrator] Found ${resources.length} candidate profiles`);
+      
+      if (resources.length === 0) {
+        console.error('[project-orchestrator] NO CANDIDATES FOUND! Cannot proceed with project setup.');
+        throw new Error('Aucun candidat trouvé pour les ressources acceptées. Vérifiez que les candidats existent dans candidate_profiles.');
+      }
+      
       const allMembers = [project.owner_id, ...resources.map((r: any) => r.id)];
+      console.log(`[project-orchestrator] Team members: ${allMembers.join(', ')}`);
+
+      // 1.5 Ajouter tous les membres dans project_teams pour le kickoff
+      console.log('[project-orchestrator] Adding team members to project_teams table');
+      
+      // D'abord, ajouter le client
+      const { data: ownerProfile } = await supabaseClient
+        .from('profiles')
+        .select('id, email, first_name, last_name')
+        .eq('id', project.owner_id)
+        .single();
+      
+      const teamMembersToInsert = [];
+      
+      if (ownerProfile) {
+        teamMembersToInsert.push({
+          project_id: projectId,
+          member_id: ownerProfile.id,
+          member_type: 'client',
+          email: ownerProfile.email,
+          first_name: ownerProfile.first_name || '',
+          last_name: ownerProfile.last_name || '',
+          role: 'owner'
+        });
+      }
+      
+      // Ensuite, ajouter tous les candidats
+      for (const resource of resources) {
+        teamMembersToInsert.push({
+          project_id: projectId,
+          member_id: resource.id,
+          member_type: 'resource',
+          email: resource.email,
+          first_name: resource.first_name || '',
+          last_name: resource.last_name || '',
+          role: resource.profile_type || 'member',
+          profile_type: resource.profile_type,
+          seniority: resource.seniority
+        });
+      }
+      
+      // Insérer dans project_teams
+      const { error: teamError } = await supabaseClient
+        .from('project_teams')
+        .insert(teamMembersToInsert);
+      
+      if (teamError) {
+        console.error('[project-orchestrator] Error inserting team members:', teamError);
+        // Ne pas faire échouer tout le processus pour ça
+      } else {
+        console.log(`[project-orchestrator] Added ${teamMembersToInsert.length} members to project_teams`);
+      }
 
       // 2. Le kickoff sera créé par project-kickoff, pas ici
       // Mais on a besoin de la date pour les autres événements

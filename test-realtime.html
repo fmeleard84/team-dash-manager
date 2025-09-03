@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Realtime</title>
+</head>
+<body>
+    <h1>Test Supabase Realtime</h1>
+    <button onclick="enableRealtime()">Enable Realtime on Tables</button>
+    <button onclick="testRealtime()">Test Realtime Connection</button>
+    <div id="result"></div>
+    
+    <script>
+        async function enableRealtime() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Enabling realtime...';
+            
+            try {
+                const response = await fetch('https://egdelmcijszuapcpglsy.supabase.co/functions/v1/fix-realtime-direct', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA4OTM4MTcsImV4cCI6MjA0NjQ2OTgxN30.n3S2pWGbMTZW6nPA6_I3KCMuN1fW5NCGMnfm5PHQZis'
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                result.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                result.innerHTML = 'Error: ' + error.message;
+            }
+        }
+        
+        async function testRealtime() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Testing realtime connection...';
+            
+            // Import Supabase client
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            
+            const supabase = createClient(
+                'https://egdelmcijszuapcpglsy.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA4OTM4MTcsImV4cCI6MjA0NjQ2OTgxN30.n3S2pWGbMTZW6nPA6_I3KCMuN1fW5NCGMnfm5PHQZis'
+            );
+            
+            const channel = supabase
+                .channel('test-channel')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'hr_resource_assignments' },
+                    (payload) => {
+                        console.log('Realtime event:', payload);
+                        result.innerHTML += '<br>Received event: ' + JSON.stringify(payload);
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Channel status:', status);
+                    result.innerHTML = 'Channel status: ' + status + '<br>Listening for changes on hr_resource_assignments...';
+                });
+                
+            setTimeout(() => {
+                result.innerHTML += '<br>Still listening... Try updating an assignment in another tab.';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

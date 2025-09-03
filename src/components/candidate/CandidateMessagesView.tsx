@@ -1,7 +1,7 @@
 import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
-import DynamicMessageSystem from "@/components/messages/DynamicMessageSystem";
+import { EnhancedMessageSystem } from "@/components/shared/EnhancedMessageSystem";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageCircle, Users } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 
@@ -40,30 +40,37 @@ export default function CandidateMessagesView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-primary" />
-          <h1 className="text-2xl font-bold">Messages de projet</h1>
+      {/* Header with project selector */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
+        <div className="relative p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                <MessageCircle className="w-6 h-6 text-white" />
+              </div>
+              
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="w-64 bg-white/90 backdrop-blur-sm border-white/20">
+                  <SelectValue placeholder="Sélectionner un projet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
-        
-        {projects.length > 1 && (
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="w-80">
-              <SelectValue placeholder="Sélectionner un projet" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
       {selectedProjectId ? (
-        <DynamicMessageSystem projectId={selectedProjectId} />
+        <div className="h-[calc(100vh-12rem)]">
+          <EnhancedMessageSystem projectId={selectedProjectId} userType="candidate" />
+        </div>
       ) : (
         <Card>
           <CardContent className="p-8 text-center">

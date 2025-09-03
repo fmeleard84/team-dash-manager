@@ -898,11 +898,13 @@ export const useKanbanSupabase = (boardId?: string) => {
               .from('notifications')
               .insert({
                 user_id: project.created_by,
-                project_id: board.projectId,
-                type: 'task_completed',
+                type: 'info',  // Changed to valid enum value
+                priority: 'medium',
                 title: 'Tâche terminée',
-                description: `La tâche "${card.title}" a été marquée comme finalisée et attend votre évaluation.`,
-                metadata: {
+                message: `La tâche "${card.title}" a été marquée comme finalisée et attend votre évaluation.`,
+                data: {  // Changed to use data instead of separate fields
+                  project_id: board.projectId,
+                  notification_type: 'task_completed',
                   cardId: draggableId,
                   cardTitle: card.title,
                   boardId: board.id,

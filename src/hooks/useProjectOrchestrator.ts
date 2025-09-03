@@ -7,6 +7,8 @@ export const useProjectOrchestrator = () => {
 
   const setupProject = async (projectId: string, kickoffDate?: string) => {
     setIsLoading(true);
+    console.log('🚀 Starting project setup for:', projectId);
+    
     try {
       // First call the project-orchestrator for general setup
       const { data, error } = await supabase.functions.invoke('project-orchestrator', {
@@ -15,10 +17,16 @@ export const useProjectOrchestrator = () => {
           projectId
         }
       });
+      
+      console.log('📦 Project orchestrator response:', { data, error });
 
       if (error) {
         console.error('Erreur orchestration projet:', error);
-        toast.error('Erreur lors de la configuration du projet');
+        console.error('Error details:', { data, error });
+        
+        // Show more specific error message
+        const errorMessage = data?.error || error?.message || 'Erreur lors de la configuration du projet';
+        toast.error(errorMessage);
         return false;
       }
 

@@ -12,11 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink, Check, X, Video, FolderOpen, CalendarPlus, Briefcase, Clock, MapPin, Users } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 
-interface Project { id: string; title: string }
+interface Project { id: string; title: string; archived_at?: string | null }
 interface EventRow {
   id: string;
   title: string;
@@ -206,11 +206,30 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     } else {
       setAllEvents([]);
     }
-  }, [projects]);
+  }, [projects.length]); // Utiliser projects.length au lieu de projects pour éviter les re-renders
+
+  const handleCreateEvent = async () => {
+    await handleCreate();
+  };
+
+  const handleUpdateEvent = async () => {
+    await handleUpdate();
+  };
 
   const handleCreate = async () => {
     if (!projectId || !title || !date || !startTime) {
       toast({ title: "Champs manquants", description: "Titre, date et heure de début requis" });
+      return;
+    }
+    
+    // Vérifier si le projet est archivé
+    const currentProject = projects.find(p => p.id === projectId);
+    if (currentProject?.archived_at) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible d'ajouter des événements dans un projet archivé.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -341,6 +360,17 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
       toast({ title: "Champs manquants", description: "Titre, date et heure de début requis" });
       return;
     }
+    
+    // Vérifier si le projet est archivé
+    const currentProject = projects.find(p => p.id === projectId);
+    if (currentProject?.archived_at) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de modifier des événements dans un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -433,6 +463,20 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   };
 
   const handleDelete = async (id: string) => {
+    // Vérifier si le projet est archivé  
+    const event = allEvents.find(e => e.id === id);
+    if (event) {
+      const currentProject = projects.find(p => p.id === event.project_id);
+      if (currentProject?.archived_at) {
+        toast({
+          title: "Action non autorisée",
+          description: "Impossible de supprimer des événements dans un projet archivé.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     console.log(`Attempting to delete event with ID: ${id}`);
     const { error } = await supabase.from("project_events").delete().eq("id", id);
     if (error) {
@@ -515,25 +559,81 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
 
   return (
     <div className="space-y-6">
-      {/* Main Dialog for creating events */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg">
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvel événement
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-purple-200" aria-describedby="new-event-desc">
-              <DialogHeader className="bg-gradient-to-r from-blue-500 to-purple-500 -m-6 mb-4 p-4 rounded-t-lg">
-                <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
-                  <CalendarPlus className="w-6 h-6" />
-                  Nouvel événement
-                </DialogTitle>
-                <DialogDescription id="new-event-desc" className="text-blue-100 mt-1 text-sm">
-                  Planifiez un événement pour votre équipe projet
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
+      {/* Header avec design unifié - comme dans Drive et Kanban */}
+      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+              <CalendarDays className="w-6 h-6 text-white" />
+            </div>
+            
+            <Select value={filterProjectId} onValueChange={setFilterProjectId}>
+              <SelectTrigger className="w-64 bg-white border-purple-200 focus:border-purple-400">
+                <SelectValue placeholder="Tous les projets" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les projets</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Toggle view mode */}
+            <Button
+              variant={viewMode === 'calendar' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('calendar')}
+              className={viewMode === 'calendar' ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white' : ''}
+            >
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              Calendrier
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white' : ''}
+            >
+              <List className="w-4 h-4 mr-2" />
+              Liste
+            </Button>
+            
+            {/* New event button */}
+            <Button 
+              onClick={() => setIsDialogOpen(true)}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvel événement
+            </Button>
+          </div>
+      </div>
+
+      {/* Main Modal for creating events */}
+      <FullScreenModal
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        title="Nouvel événement"
+        description="Planifiez un événement pour votre équipe projet"
+        actions={
+          <ModalActions
+            onSave={handleCreateEvent}
+            onCancel={() => {
+              resetForm();
+              setIsDialogOpen(false);
+            }}
+            saveText="Créer l'événement"
+            cancelText="Annuler"
+            saveDisabled={!title || !projectId || !date || !startTime}
+          />
+        }
+      >
+        <div className="space-y-4">
                 {/* Projet avec icône et style amélioré */}
                 <div className="bg-white/60 p-3 rounded-lg border border-purple-100">
                   <label className="text-sm font-semibold text-purple-700 flex items-center gap-2 mb-2">
@@ -696,39 +796,31 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                     className="border-purple-200 focus:border-purple-400 bg-white min-h-[60px] text-sm"
                   />
                 </div>
+        </div>
+      </FullScreenModal>
 
-                {/* Bouton de création avec gradient */}
-                <Button 
-                  onClick={handleCreate} 
-                  disabled={!projectId || !title || !date || !startTime || loading} 
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-2 shadow-lg"
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Création...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <CalendarPlus className="w-4 h-4" />
-                      Créer l'événement
-                    </span>
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-      </Dialog>
-
-      {/* Edit Event Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md" aria-describedby="edit-event-desc">
-          <DialogHeader>
-            <DialogTitle>Modifier l'événement</DialogTitle>
-            <DialogDescription id="edit-event-desc">
-              Modifiez les détails de cet événement. Les participants seront automatiquement notifiés des changements.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
+      {/* Edit Event Modal */}
+      <FullScreenModal
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        title="Modifier l'événement"
+        description="Modifiez les détails de cet événement. Les participants seront automatiquement notifiés des changements."
+        actions={
+          <ModalActions
+            onSave={handleUpdateEvent}
+            onDelete={() => editingEvent && handleDelete(editingEvent.id)}
+            onCancel={() => {
+              setEditingEvent(null);
+              setIsEditDialogOpen(false);
+            }}
+            saveText="Enregistrer"
+            deleteText="Supprimer"
+            cancelText="Annuler"
+            saveDisabled={!title || !date || !startTime || loading}
+          />
+        }
+      >
+        <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Projet</label>
               <Select value={projectId} onValueChange={setProjectId}>
@@ -808,13 +900,9 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
               </Select>
               <Textarea value={attendeesEmails} onChange={(e) => setAttendeesEmails(e.target.value)} placeholder="email1@ex.com, email2@ex.com" />
             </div>
-
-            <Button onClick={handleUpdate} disabled={!projectId || loading} className="w-full">
-              Modifier
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </FullScreenModal>
+      </div>
 
       {/* Events section */}
       <Card>

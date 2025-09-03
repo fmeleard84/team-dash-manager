@@ -10,14 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { FullScreenModal, ModalActions, useFullScreenModal } from '@/components/ui/fullscreen-modal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -38,6 +31,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useCandidateProjectsOptimized } from '@/hooks/useCandidateProjectsOptimized';
 
 interface TimeSession {
   id: string;
@@ -63,14 +57,15 @@ interface ProjectSummary {
 
 export default function CandidateActivities() {
   const { user } = useAuth();
+  const { projects: candidateProjects } = useCandidateProjectsOptimized();
   const [sessions, setSessions] = useState<TimeSession[]>([]);
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'all'>('month');
   
-  // Edit duration dialog states
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  // Edit duration modal states
+  const editModal = useFullScreenModal();
   const [editingSession, setEditingSession] = useState<TimeSession | null>(null);
   const [editHours, setEditHours] = useState('0');
   const [editMinutes, setEditMinutes] = useState('0');
@@ -212,8 +207,8 @@ export default function CandidateActivities() {
     window.URL.revokeObjectURL(url);
   };
 
-  // Open edit dialog for a session
-  const openEditDialog = (session: TimeSession) => {
+  // Open edit modal for a session
+  const openEditModal = (session: TimeSession) => {
     if (session.status !== 'completed') {
       toast.error('Vous ne pouvez modifier que les sessions terminées');
       return;
@@ -227,7 +222,7 @@ export default function CandidateActivities() {
     setEditHours(hours.toString());
     setEditMinutes(minutes.toString());
     setEditComment(''); // Reset comment
-    setEditDialogOpen(true);
+    editModal.open();
   };
 
   // Update session duration
@@ -311,7 +306,7 @@ export default function CandidateActivities() {
       if (error) throw error;
 
       toast.success('Durée mise à jour avec succès');
-      setEditDialogOpen(false);
+      editModal.close();
       await loadSessions(); // Refresh the list
     } catch (error) {
       console.error('Error updating duration:', error);
@@ -321,10 +316,12 @@ export default function CandidateActivities() {
     }
   };
 
-  // Get unique projects for filter
-  const uniqueProjects = Array.from(
-    new Set(sessions.map(s => JSON.stringify({ id: s.project_id, title: s.project_title })))
-  ).map(s => JSON.parse(s));
+  // Use candidate projects from the optimized hook (same as Drive and Planning)
+  // This ensures consistency across all sections
+  const uniqueProjects = candidateProjects.map(project => ({
+    id: project.id,
+    title: project.title
+  }));
 
   if (loading) {
     return (
@@ -496,7 +493,7 @@ export default function CandidateActivities() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => openEditDialog(session)}
+                            onClick={() => openEditModal(session)}
                             className="h-8 w-8"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -512,81 +509,121 @@ export default function CandidateActivities() {
         </CardContent>
       </Card>
 
-      {/* Edit Duration Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Modifier la durée</DialogTitle>
-            <DialogDescription>
-              Ajustez la durée de cette session si vous avez oublié de démarrer ou arrêter le chronomètre au bon moment.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {editingSession && (
-            <div className="space-y-4 py-4">
-              <div className="text-sm text-gray-600">
-                <p><strong>Projet:</strong> {editingSession.project_title}</p>
-                <p><strong>Activité:</strong> {editingSession.activity_description}</p>
-                <p><strong>Date:</strong> {format(new Date(editingSession.start_time), 'dd MMM yyyy HH:mm', { locale: fr })}</p>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="hours">Heures</Label>
-                  <Input
-                    id="hours"
-                    type="number"
-                    min="0"
-                    value={editHours}
-                    onChange={(e) => setEditHours(e.target.value)}
-                  />
+      {/* Edit Duration Modal */}
+      <FullScreenModal
+        isOpen={editModal.isOpen}
+        onClose={editModal.close}
+        title="Modifier la durée de l'activité"
+        description="Ajustez la durée de cette session si vous avez oublié de démarrer ou arrêter le chronomètre au bon moment."
+        actions={
+          <ModalActions
+            onSave={updateSessionDuration}
+            onCancel={editModal.close}
+            saveText={updating ? 'Mise à jour...' : 'Sauvegarder'}
+            saveDisabled={updating || !editComment.trim()}
+            isLoading={updating}
+          />
+        }
+      >
+        {editingSession && (
+          <div className="space-y-6">
+            {/* Session Info Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Informations de la session</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Projet</p>
+                    <p className="font-medium">{editingSession.project_title}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Date</p>
+                    <p className="font-medium">
+                      {format(new Date(editingSession.start_time), 'dd MMM yyyy HH:mm', { locale: fr })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Durée actuelle</p>
+                    <p className="font-medium">{formatDuration(editingSession.duration_minutes || 0)}</p>
+                  </div>
                 </div>
                 <div>
-                  <Label htmlFor="minutes">Minutes</Label>
-                  <Input
-                    id="minutes"
-                    type="number"
-                    min="0"
-                    max="59"
-                    value={editMinutes}
-                    onChange={(e) => setEditMinutes(e.target.value)}
-                  />
+                  <p className="text-sm text-muted-foreground">Activité</p>
+                  <p className="font-medium">{editingSession.activity_description}</p>
                 </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="comment">Raison de la modification *</Label>
+              </CardContent>
+            </Card>
+
+            {/* Duration Edit Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Nouvelle durée</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="hours">Heures</Label>
+                    <Input
+                      id="hours"
+                      type="number"
+                      min="0"
+                      value={editHours}
+                      onChange={(e) => setEditHours(e.target.value)}
+                      className="text-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="minutes">Minutes</Label>
+                    <Input
+                      id="minutes"
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={editMinutes}
+                      onChange={(e) => setEditMinutes(e.target.value)}
+                      className="text-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 mb-2">Calcul du nouveau coût</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      {(parseInt(editHours) || 0)} h {(parseInt(editMinutes) || 0)} min × {editingSession.hourly_rate}€/min
+                    </span>
+                    <span className="text-lg font-bold text-green-600">
+                      {((parseInt(editHours) || 0) * 60 + (parseInt(editMinutes) || 0)) * editingSession.hourly_rate}€
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Reason Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Raison de la modification</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <Textarea
                   id="comment"
                   placeholder="Ex: J'ai oublié de démarrer le chronomètre au début de la réunion..."
                   value={editComment}
                   onChange={(e) => setEditComment(e.target.value)}
-                  className="min-h-[80px]"
+                  className="min-h-[120px]"
                   required
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Ce commentaire sera visible par le client
+                <p className="text-xs text-muted-foreground mt-2">
+                  <span className="text-orange-500">⚠️</span> Ce commentaire sera visible par le client et servira de justification pour cette modification.
                 </p>
-              </div>
-              
-              <div className="text-sm text-gray-600">
-                <p>Nouveau coût: <strong className="text-green-600">
-                  {((parseInt(editHours) || 0) * 60 + (parseInt(editMinutes) || 0)) * editingSession.hourly_rate}€
-                </strong></p>
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Annuler
-            </Button>
-            <Button onClick={updateSessionDuration} disabled={updating}>
-              {updating ? 'Mise à jour...' : 'Sauvegarder'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </FullScreenModal>
     </div>
   );
 }

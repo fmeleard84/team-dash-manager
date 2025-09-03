@@ -13,7 +13,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Download, Upload, Copy } from 'lucide-react';
+import { ArrowLeft, Save, Download, Upload, Copy, Euro } from 'lucide-react';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
@@ -55,6 +55,15 @@ const TemplateFlowSimple = () => {
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [hrResources, setHrResources] = useState<Map<string, HRResource>>(new Map());
   const [selectedResource, setSelectedResource] = useState<HRResource | null>(null);
+  
+  // Calculer le prix total par minute de toutes les ressources
+  const calculateTotalPrice = () => {
+    let total = 0;
+    hrResources.forEach(resource => {
+      total += resource.calculated_price || 0;
+    });
+    return total;
+  };
 
   const onNodesChange = useCallback((changes: any[]) => {
     setNodes((nds) => {
@@ -263,7 +272,7 @@ const TemplateFlowSimple = () => {
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-white/80 backdrop-blur-sm">
+      <div className="relative flex items-center justify-between p-4 border-b bg-white/80 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
@@ -279,6 +288,21 @@ const TemplateFlowSimple = () => {
             </p>
           </div>
         </div>
+        
+        {/* Prix total au centre */}
+        {hrResources.size > 0 && (
+          <div className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg shadow-lg">
+            <div className="flex items-center gap-2">
+              <Euro className="w-5 h-5" />
+              <span className="text-lg font-bold">
+                {calculateTotalPrice().toFixed(2)}€/min
+              </span>
+            </div>
+            <p className="text-xs text-center opacity-90">
+              Total de {hrResources.size} ressource{hrResources.size > 1 ? 's' : ''}
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <Button

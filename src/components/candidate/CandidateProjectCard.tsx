@@ -19,7 +19,8 @@ import {
   Eye,
   Sparkles,
   Loader2,
-  Play
+  Play,
+  Pause
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -178,6 +179,12 @@ export const CandidateProjectCard = ({
                 {config.badge.icon}
                 {config.badge.text}
               </Badge>
+              {project.status === 'pause' && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Pause className="w-3 h-3" />
+                  En pause
+                </Badge>
+              )}
               {type === 'available' && (
                 <Badge variant="outline" className="text-xs">
                   <Clock className="w-3 h-3 mr-1" />

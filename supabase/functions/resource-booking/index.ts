@@ -98,15 +98,7 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
   // Get resource assignments for this project
   const { data: resourceAssignments, error: resourceError } = await supabase
     .from('hr_resource_assignments')
-    .select(`
-      *,
-      hr_profiles (
-        id,
-        name,
-        category_id,
-        hr_categories (name)
-      )
-    `)
+    .select('*')
     .eq('project_id', projectId)
     .eq('booking_status', 'recherche')
 
@@ -115,6 +107,15 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
   let notificationsSent = 0
 
   for (const assignment of resourceAssignments) {
+    // Fetch hr_profile data separately
+    const { data: hrProfile } = await supabase
+      .from('hr_profiles')
+      .select('id, name, category_id')
+      .eq('id', assignment.profile_id)
+      .single()
+    
+    // Add hr_profiles to assignment for backward compatibility
+    assignment.hr_profiles = hrProfile
     // Find matching candidates based on exact profile match AND availability status
     const { data: candidates, error: candidatesError } = await supabase
       .from('candidate_profiles')
@@ -242,6 +243,12 @@ async function acceptMissionByProject(supabase: any, project_id: string, candida
   // Take the first matching assignment
   const targetAssignment = assignments[0];
   console.log('Found matching assignment:', targetAssignment.id, 'for candidate:', candidate_email);
+  console.log('Assignment details:', {
+    id: targetAssignment.id,
+    profile_id: targetAssignment.profile_id,
+    seniority: targetAssignment.seniority,
+    booking_status: targetAssignment.booking_status
+  });
 
   // Accept the mission directly without using mission-management.ts (which has booking_data issues)
   return await acceptMissionDirect(supabase, targetAssignment.id, candidate_email, project_id);
@@ -249,6 +256,19 @@ async function acceptMissionByProject(supabase: any, project_id: string, candida
 
 async function acceptMissionDirect(supabase: any, assignment_id: string, candidate_email: string, project_id: string) {
   console.log('acceptMissionDirect called with:', { assignment_id, candidate_email, project_id });
+
+  // First get the candidate ID from the email
+  const { data: candidateProfile, error: candidateError } = await supabase
+    .from('candidate_profiles')
+    .select('id')
+    .eq('email', candidate_email)
+    .single();
+
+  if (candidateError || !candidateProfile) {
+    throw new Error(`Candidate not found: ${candidate_email}`);
+  }
+
+  console.log('Found candidate ID:', candidateProfile.id, 'for email:', candidate_email);
 
   // Check if assignment is still available
   const { data: assignment, error: fetchError } = await supabase
@@ -265,11 +285,12 @@ async function acceptMissionDirect(supabase: any, assignment_id: string, candida
     throw new Error('Cette mission n\'est plus disponible');
   }
 
-  // Update assignment status to accepted
+  // Update assignment status to accepted AND set candidate_id
   const { error: updateError } = await supabase
     .from('hr_resource_assignments')
     .update({
       booking_status: 'accepted',
+      candidate_id: candidateProfile.id,  // IMPORTANT: Link the candidate!
       updated_at: new Date().toISOString()
     })
     .eq('id', assignment_id)
@@ -278,6 +299,8 @@ async function acceptMissionDirect(supabase: any, assignment_id: string, candida
   if (updateError) {
     throw new Error(`Failed to update assignment: ${updateError.message}`);
   }
+
+  console.log(`Assignment ${assignment_id} updated: booking_status=accepted, candidate_id=${candidateProfile.id}`);
 
   // Check if all assignments for this project are now accepted
   await checkAndUpdateProjectStatusDirect(supabase, project_id);
@@ -360,10 +383,10 @@ async function acceptMission(supabase: any, candidateId: string, resourceAssignm
     )
   }
 
-  // Update assignment status to booked
+  // Update assignment status to accepted
   const { error: updateError } = await supabase
     .from('hr_resource_assignments')
-    .update({ booking_status: 'booké' })
+    .update({ booking_status: 'accepted' })
     .eq('id', resourceAssignmentId)
 
   if (updateError) throw new Error(`Update error: ${updateError.message}`)

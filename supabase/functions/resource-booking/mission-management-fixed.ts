@@ -7,7 +7,7 @@ export async function acceptMission(
   try {
     console.log('Accepting mission:', { assignmentId, candidateEmail });
 
-    // Get assignment details with all necessary relations
+    // Get assignment details with project relation only
     const { data: assignment, error: fetchError } = await supabase
       .from('hr_resource_assignments')
       .select(`
@@ -17,12 +17,6 @@ export async function acceptMission(
           title,
           owner_id,
           status
-        ),
-        hr_profiles:profile_id (
-          name,
-          hr_categories:category_id (
-            name
-          )
         )
       `)
       .eq('id', assignmentId)
@@ -37,6 +31,20 @@ export async function acceptMission(
     if (assignment.booking_status !== 'recherche') {
       console.log('Assignment not available, current status:', assignment.booking_status);
       throw new Error('Cette mission n\'est plus disponible');
+    }
+
+    // Get hr_profile name separately if needed
+    let profileName = 'Unknown';
+    if (assignment.profile_id) {
+      const { data: hrProfile } = await supabase
+        .from('hr_profiles')
+        .select('name')
+        .eq('id', assignment.profile_id)
+        .single();
+      
+      if (hrProfile) {
+        profileName = hrProfile.name;
+      }
     }
 
     // Get candidate ID from email
@@ -82,11 +90,13 @@ export async function acceptMission(
           .insert({
             user_id: assignment.projects.owner_id,
             title: 'Ressource acceptée',
-            message: `Le poste ${assignment.hr_profiles?.name || 'Unknown'} a été accepté pour le projet ${assignment.projects?.title || 'Unknown'}`,
-            type: 'resource_accepted',
-            metadata: {
+            message: `Le poste ${profileName} a été accepté pour le projet ${assignment.projects?.title || 'Unknown'}`,
+            type: 'success',  // Changed to valid enum value
+            priority: 'high',
+            data: {  // Changed from metadata to data
               project_id: assignment.project_id,
-              assignment_id: assignmentId
+              assignment_id: assignmentId,
+              notification_type: 'resource_accepted'
             }
           });
         
@@ -104,7 +114,7 @@ export async function acceptMission(
       assignment: {
         id: assignmentId,
         project_title: assignment.projects?.title,
-        profile_name: assignment.hr_profiles?.name,
+        profile_name: profileName,
         status: 'accepted'
       }
     };
@@ -141,9 +151,10 @@ async function checkAndUpdateProjectStatus(supabase: any, projectId: string) {
     console.log(`Project ${projectId}: ${acceptedCount}/${totalCount} resources accepted`);
 
     // Determine new project status
-    let newStatus = 'nouveaux';
+    // Note: DB constraint only allows 'play', 'pause', 'completed', 'archivé'
+    let newStatus = 'pause';
     if (allAccepted) {
-      newStatus = 'attente-team'; // Ready to start
+      newStatus = 'play'; // All resources accepted, project can start
     } else if (someAccepted) {
       newStatus = 'pause'; // Partially staffed
     }

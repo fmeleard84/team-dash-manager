@@ -17,8 +17,8 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { candidateEmail } = await req.json()
-    const emailToCheck = candidateEmail || 'fmeleard+ressource_5@gmail.com'
+    const body = await req.json().catch(() => ({}))
+    const emailToCheck = body.candidateEmail || 'fmeleard+ressource_27_08_cdp@gmail.com'
 
     console.log('=== DEBUGGING CANDIDATE MATCHING ===')
     console.log('Candidate email:', emailToCheck)

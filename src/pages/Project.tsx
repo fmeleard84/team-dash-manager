@@ -20,7 +20,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Download, Upload, Users, Network } from 'lucide-react';
+import { ArrowLeft, Save, Download, Upload, Users, Network, Euro } from 'lucide-react';
 import AIGraphGenerator from '@/components/AIGraphGenerator';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
@@ -119,11 +119,25 @@ const Project = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const [isArchived, setIsArchived] = useState(false);
   
   // Supprimé car causait des re-renders infinis
 
   // Handler pour les changements de nœuds
   const onNodesChange = useCallback((changes: NodeChange[]) => {
+    // Bloquer les modifications si le projet est archivé
+    if (isArchived) {
+      // Autoriser uniquement les changements de sélection et de position pour navigation
+      const allowedChanges = changes.filter(change => 
+        change.type === 'select' || 
+        (change.type === 'position' && 'dragging' in change && !change.dragging)
+      );
+      if (allowedChanges.length > 0) {
+        setNodes((nds) => applyNodeChanges(allowedChanges, nds));
+      }
+      return;
+    }
+    
     // Handle node removals separately to clean up resources
     changes.forEach(change => {
       if (change.type === 'remove' && 'id' in change) {
@@ -140,10 +154,29 @@ const Project = () => {
     
     // Apply all changes using ReactFlow's utility function
     setNodes((nds) => applyNodeChanges(changes, nds));
-  }, []);
+  }, [isArchived]);
 
   // Handler pour les changements d'edges
   const onEdgesChange = useCallback((changes: any[]) => {
+    // Bloquer les modifications si le projet est archivé
+    if (isArchived) {
+      // Autoriser uniquement la sélection pour navigation
+      const allowedChanges = changes.filter(change => change.type === 'select');
+      if (allowedChanges.length > 0) {
+        setEdges((eds) => {
+          let newEdges = [...eds];
+          allowedChanges.forEach(change => {
+            const edgeIndex = newEdges.findIndex(e => e.id === change.id);
+            if (edgeIndex !== -1) {
+              newEdges[edgeIndex] = { ...newEdges[edgeIndex], selected: change.selected };
+            }
+          });
+          return newEdges;
+        });
+      }
+      return;
+    }
+    
     setEdges((eds) => {
       let newEdges = [...eds];
       changes.forEach(change => {
@@ -158,13 +191,22 @@ const Project = () => {
       });
       return newEdges;
     });
-  }, []);
+  }, [isArchived]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedResource, setSelectedResource] = useState<HRResource | null>(null);
   const [hrResources, setHrResources] = useState<Map<string, HRResource>>(new Map());
   const [selectedEdge, setSelectedEdge] = useState<{ source: HRProfile; target: HRProfile } | null>(null);
   const [profiles, setProfiles] = useState<HRProfile[]>([]);
+  
+  // Calculer le prix total par minute de toutes les ressources
+  const calculateTotalPrice = () => {
+    let total = 0;
+    hrResources.forEach(resource => {
+      total += resource.calculated_price || 0;
+    });
+    return total;
+  };
   
   // Log quand selectedEdge change
   useEffect(() => {
@@ -434,6 +476,16 @@ const Project = () => {
 
       if (projectError) throw projectError;
       setProject(projectData as Project);
+      
+      // Vérifier si le projet est archivé
+      if (projectData?.archived_at) {
+        setIsArchived(true);
+        toast({
+          title: "Projet archivé",
+          description: "Ce projet est en lecture seule. Aucune modification n'est autorisée.",
+          variant: "default",
+        });
+      }
 
       // Fetch HR resource assignments
       console.log('Fetching hr_resource_assignments for project_id:', id);
@@ -709,6 +761,16 @@ const Project = () => {
   // Défini après handleEdgeClick
 
   const handleProfileSelect = (profile: HRProfile) => {
+    // Bloquer l'ajout de ressources si le projet est archivé
+    if (isArchived) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible d'ajouter des ressources à un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const nodeId = crypto.randomUUID();
     
     // Créer une nouvelle ressource HR
@@ -755,6 +817,16 @@ const Project = () => {
   };
 
   const handleResourceUpdate = (updatedResource: HRResource) => {
+    // Bloquer les modifications si le projet est archivé
+    if (isArchived) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de modifier les ressources d'un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Mettre à jour dans le Map
     setHrResources(prev => new Map(prev).set(updatedResource.id, updatedResource));
 
@@ -811,6 +883,16 @@ const Project = () => {
 
   const onConnect = useCallback(
     (params: Connection) => {
+      // Bloquer la création de connexions si le projet est archivé
+      if (isArchived) {
+        toast({
+          title: "Action non autorisée",
+          description: "Impossible de créer des connexions dans un projet archivé.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       console.log('🔗 Creating new edge connection:', params);
       const newEdge = {
         ...params,
@@ -826,11 +908,21 @@ const Project = () => {
       console.log('✅ New edge created:', newEdge);
       setEdges((eds) => addEdge(newEdge, eds));
     },
-    [setEdges],
+    [setEdges, isArchived],
   );
 
   const handleCanvasDrop = useCallback(async (event: React.DragEvent) => {
     event.preventDefault();
+    
+    // Bloquer le drop si le projet est archivé
+    if (isArchived) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible d'ajouter des ressources à un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
       const profile: HRProfile = JSON.parse(event.dataTransfer.getData('application/json'));
@@ -1046,6 +1138,16 @@ const Project = () => {
 
   const saveFlow = async () => {
     if (!id) return;
+    
+    // Bloquer la sauvegarde si le projet est archivé
+    if (isArchived) {
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de sauvegarder les modifications d'un projet archivé.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Vérifier l'authentification de l'utilisateur
     const { data: auth } = await supabase.auth.getUser();
@@ -1443,6 +1545,67 @@ const Project = () => {
                 continue; // Passer au suivant sans mettre à jour
               }
 
+              // NOUVEAU: Détecter les changements CRITIQUES qui nécessitent un remplacement
+              console.log('🔍 Checking for critical changes:', {
+                currentAssignment: currentAssignment ? {
+                  booking_status: currentAssignment.booking_status,
+                  seniority: currentAssignment.seniority,
+                  profile_id: currentAssignment.profile_id,
+                  languages: currentAssignment.languages,
+                  expertises: currentAssignment.expertises
+                } : null,
+                newAssignment: {
+                  seniority: cleanAssignment.seniority,
+                  profile_id: cleanAssignment.profile_id,
+                  booking_status: cleanAssignment.booking_status,
+                  languages: cleanAssignment.languages,
+                  expertises: cleanAssignment.expertises
+                }
+              });
+
+              // Détecter les changements critiques SEULEMENT s'il y a vraiment un changement
+              const isCriticalChange = currentAssignment && 
+                (currentAssignment.booking_status === 'accepted' || 
+                 currentAssignment.booking_status === 'booké') && // PAS pour 'recherche' car pas de candidat assigné
+                (
+                  currentAssignment.profile_id !== cleanAssignment.profile_id || // Changement de métier
+                  currentAssignment.seniority !== cleanAssignment.seniority || // Changement de séniorité
+                  JSON.stringify(currentAssignment.languages || []) !== JSON.stringify(cleanAssignment.languages || []) || // Changement de langues
+                  JSON.stringify(currentAssignment.expertises || []) !== JSON.stringify(cleanAssignment.expertises || []) // Changement d'expertises
+                );
+
+              if (isCriticalChange) {
+                console.log('🚨 CRITICAL CHANGE DETECTED - Using resource modification system');
+                console.log('Old seniority:', currentAssignment.seniority, 'New seniority:', cleanAssignment.seniority);
+                
+                // Appeler la fonction simplifiée handle-resource-change
+                const { data: modificationResult, error: modError } = await supabase.functions.invoke('handle-resource-change', {
+                  body: {
+                    assignmentId: assignment.id,
+                    oldData: currentAssignment,
+                    newData: cleanAssignment
+                  }
+                });
+
+                if (modError) {
+                  console.error('Resource modification error:', modError);
+                  toast({
+                    title: "Erreur de modification",
+                    description: "Impossible de gérer le changement de ressource",
+                    variant: "destructive"
+                  });
+                } else {
+                  console.log('Resource modification result:', modificationResult);
+                  if (modificationResult.requiresRebooking) {
+                    toast({
+                      title: "Ressource modifiée",
+                      description: "La recherche d'un nouveau candidat est en cours. L'ancien candidat a été notifié.",
+                    });
+                  }
+                }
+                continue; // Passer au suivant, la modification est gérée
+              }
+
               console.log('Changes detected, attempting update...');
               const { data: updateResult, error: updateError } = await supabase
                 .from('hr_resource_assignments')
@@ -1631,11 +1794,32 @@ const Project = () => {
                     {id === 'template-preview' ? 'Construisez votre équipe idéale' : project.title}
                   </h1>
                   <p className="text-sm text-gray-600">
-                    {id === 'template-preview' ? 'Personnalisez ce template selon vos besoins' : 'Gestion des ressources humaines'}
+                    {id === 'template-preview' ? 'Personnalisez ce template selon vos besoins' : 
+                     isArchived ? '🔒 Projet archivé - Lecture seule' : 'Gestion des ressources humaines'}
                   </p>
                 </div>
+                {isArchived && (
+                  <div className="ml-4 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
+                    Archivé
+                  </div>
+                )}
               </div>
             </div>
+            
+            {/* Prix total au centre */}
+            {hrResources.size > 0 && (
+              <div className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg shadow-lg">
+                <div className="flex items-center gap-2">
+                  <Euro className="w-5 h-5" />
+                  <span className="text-lg font-bold">
+                    {calculateTotalPrice().toFixed(2)}€/min
+                  </span>
+                </div>
+                <p className="text-xs text-center opacity-90">
+                  Total de {hrResources.size} ressource{hrResources.size > 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
             
             {/* Right section */}
             <div className="flex items-center gap-4">
@@ -1661,14 +1845,16 @@ const Project = () => {
                     </Button>
                   </>
                 )}
-                <Button 
-                  onClick={saveFlow} 
-                  disabled={isSaving}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
-                </Button>
+                {!isArchived && (
+                  <Button 
+                    onClick={saveFlow} 
+                    disabled={isSaving || isArchived}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -1701,11 +1887,13 @@ const Project = () => {
                 animated: true
               }}
               fitView={false} // Désactiver fitView automatique qui peut causer des problèmes
-              nodesDraggable={true}
-              nodesConnectable={true}
+              nodesDraggable={!isArchived} // Désactiver le drag si archivé
+              nodesConnectable={!isArchived} // Désactiver les connexions si archivé
               nodesFocusable={true}
               panOnDrag={[1, 2]}
               selectionOnDrag={false}
+              elementsSelectable={true} // Permettre la sélection pour voir les détails
+              deleteKeyCode={isArchived ? null : 'Delete'} // Désactiver la suppression si archivé
               minZoom={0.1} // Permettre de dézoomer plus
               maxZoom={2} // Limiter le zoom max
               defaultViewport={{ x: 0, y: 0, zoom: 1 }} // Vue par défaut

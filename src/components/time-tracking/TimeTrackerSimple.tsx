@@ -77,7 +77,8 @@ export const TimeTrackerSimple = () => {
               id,
               title,
               status,
-              client_budget
+              client_budget,
+              archived_at
             )
           `)
           .or(`candidate_id.eq.${candidateProfile.id},and(profile_id.eq.${candidateProfile.profile_id},seniority.eq.${candidateProfile.seniority})`)
@@ -91,9 +92,9 @@ export const TimeTrackerSimple = () => {
 
         console.log('Found assignments:', assignments);
 
-        // Filter projects that are in 'play' status
+        // Filter projects that are in 'play' status and not archived
         const activeProjects = (assignments || [])
-          .filter(a => a.projects && a.projects.status === 'play')
+          .filter(a => a.projects && a.projects.status === 'play' && !a.projects.archived_at)
           .map(a => a.projects as Project);
 
         console.log('Active projects:', activeProjects);
@@ -227,7 +228,10 @@ export const TimeTrackerSimple = () => {
               <Clock className="w-10 h-10 mx-auto mb-3 opacity-50" />
               <p className="text-sm">Aucun projet actif</p>
               <p className="text-xs mt-1">
-                Vous devez avoir un projet en cours (status "play") pour démarrer le chronomètre
+                Vous devez avoir un projet actif (non en pause) pour démarrer le chronomètre
+              </p>
+              <p className="text-xs mt-1 text-orange-600">
+                Les projets en pause ne permettent pas le suivi du temps
               </p>
             </div>
           ) : (

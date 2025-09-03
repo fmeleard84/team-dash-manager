@@ -9,9 +9,10 @@ interface UseRealtimeProjectsFixedOptions {
   // Données utilisateur pour filtrer
   userId?: string;
   userType: 'client' | 'candidate';
-  candidateProfile?: { profile_id: string; seniority: string } | null;
+  candidateProfile?: { id?: string; profile_id: string; seniority: string } | null;
 }
 
+// Fixed realtime hook for projects
 export const useRealtimeProjectsFixed = ({
   setProjects,
   setResourceAssignments,
@@ -24,13 +25,15 @@ export const useRealtimeProjectsFixed = ({
   // Use refs to avoid stale closures
   const setProjectsRef = useRef(setProjects);
   const setResourceAssignmentsRef = useRef(setResourceAssignments);
+  const userTypeRef = useRef(userType);
   
   // Update refs when values change
   setProjectsRef.current = setProjects;
   setResourceAssignmentsRef.current = setResourceAssignments;
+  userTypeRef.current = userType;
 
   const handleProjectUpdate = useCallback(async (payload: any) => {
-    console.log('🔄 REALTIME PROJECTS FIXED: Project event:', payload.eventType, payload.new || payload.old);
+    // // console.log('🔄 REALTIME PROJECTS FIXED: Project event:', payload.eventType, payload.new || payload.old);
     
     const updatedProject = payload.new || payload.old;
     if (!updatedProject) return;
@@ -44,10 +47,25 @@ export const useRealtimeProjectsFixed = ({
       }
       
       if (payload.eventType === 'INSERT' && !exists) {
+        // Ne pas ajouter si le projet est archivé ou supprimé
+        if (updatedProject.archived_at || updatedProject.deleted_at) {
+          return prev;
+        }
         return [...prev, { ...updatedProject, _realtimeUpdated: Date.now() }];
       }
       
       if (payload.eventType === 'UPDATE') {
+        // Si le projet vient d'être archivé ou supprimé, le retirer de la liste des projets actifs
+        if (updatedProject.archived_at || updatedProject.deleted_at) {
+          return prev.filter(p => p.id !== updatedProject.id);
+        }
+        
+        // Si le projet n'existe pas dans la liste et n'est pas archivé/supprimé, l'ajouter
+        if (!exists && !updatedProject.archived_at && !updatedProject.deleted_at) {
+          return [...prev, { ...updatedProject, _realtimeUpdated: Date.now() }];
+        }
+        
+        // Sinon, mettre à jour normalement
         return prev.map(p => 
           p.id === updatedProject.id 
             ? { ...p, ...updatedProject, _realtimeUpdated: Date.now() }
@@ -57,13 +75,41 @@ export const useRealtimeProjectsFixed = ({
       
       return prev;
     });
+    
+    // For candidates, also update the projects in assignments
+    if (userTypeRef.current === 'candidate') {
+      setResourceAssignmentsRef.current!(prev => {
+        return prev.map(a => {
+          if (a.project_id === updatedProject.id || a.projects?.id === updatedProject.id) {
+            return { ...a, projects: updatedProject, _realtimeUpdated: Date.now() };
+          }
+          return a;
+        });
+      });
+    }
   }, []);
 
   const handleAssignmentUpdate = useCallback(async (payload: any) => {
-    console.log('👥 REALTIME ASSIGNMENTS FIXED: Assignment event:', payload.eventType, payload.new || payload.old);
+    // // console.log('👥 REALTIME ASSIGNMENTS FIXED: Assignment event:', payload.eventType, payload.new || payload.old);
     
     const updatedAssignment = payload.new || payload.old;
     if (!updatedAssignment) return;
+
+    // Pour les candidats, on doit fetch le projet associé car il n'est pas dans le payload
+    if (updatedAssignment.project_id) {
+      try {
+        const { data: project } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('id', updatedAssignment.project_id)
+          .single();
+        
+        // Ajouter les données du projet à l'assignment
+        updatedAssignment.projects = project;
+      } catch (error) {
+        console.error('Error fetching project for assignment:', error);
+      }
+    }
 
     // Update resource assignments state directly
     setResourceAssignmentsRef.current!(prev => {
@@ -114,18 +160,33 @@ export const useRealtimeProjectsFixed = ({
   }, []);
 
   useEffect(() => {
-    if (!userId) {
-      console.log('❌ REALTIME PROJECTS FIXED: No userId provided');
-      return;
-    }
+    // console.log('🔄 REALTIME PROJECTS FIXED: useEffect triggered with:', {
+    //   userId,
+    //   userType,
+    //   candidateId: candidateProfile?.id,
+    //   profileId: candidateProfile?.profile_id,
+    //   seniority: candidateProfile?.seniority
+    // });
+    
+    const setupChannels = async () => {
+      if (!userId) {
+        // console.log('❌ REALTIME PROJECTS FIXED: No userId provided');
+        return;
+      }
 
-    console.log('🔄 REALTIME PROJECTS FIXED: Setting up subscriptions for:', userType, userId);
+      // console.log('🔄 REALTIME PROJECTS FIXED: Setting up subscriptions for:', userType, userId);
 
-    // Clean up existing channels
-    channelsRef.current.forEach(channel => {
-      supabase.removeChannel(channel);
-    });
-    channelsRef.current = [];
+      // Clean up existing channels properly
+      if (channelsRef.current.length > 0) {
+        channelsRef.current.forEach(channel => {
+          if (channel) {
+            supabase.removeChannel(channel);
+          }
+        });
+        channelsRef.current = [];
+        // Wait a bit to avoid channel conflicts
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
     // Projects channel - filter by user if client
     const projectsChannelName = `realtime-projects-${userType}-${userId}`;
@@ -142,7 +203,7 @@ export const useRealtimeProjectsFixed = ({
         handleProjectUpdate
       )
       .subscribe((status) => {
-        console.log('📡 Projects channel:', status);
+        // console.log('📡 Projects channel:', status);
       });
 
     // Assignments channel - filter appropriately
@@ -150,7 +211,8 @@ export const useRealtimeProjectsFixed = ({
     let assignmentsChannel;
     
     if (userType === 'candidate' && candidateProfile) {
-      // Pour candidat: écouter les assignments qui correspondent à son profil
+      // Pour candidat: écouter les assignments qui correspondent à son profil OU son candidate_id
+      // On ne peut pas faire un OR dans le filter, donc on écoute tout et on filtre côté client
       assignmentsChannel = supabase
         .channel(assignmentsChannelName)
         .on(
@@ -158,13 +220,23 @@ export const useRealtimeProjectsFixed = ({
           {
             event: '*',
             schema: 'public',
-            table: 'hr_resource_assignments',
-            filter: `profile_id=eq.${candidateProfile.profile_id}`
+            table: 'hr_resource_assignments'
+            // Pas de filter - on va filtrer dans le handler
           },
-          handleAssignmentUpdate
+          async (payload) => {
+            const assignment = payload.new || payload.old;
+            // Filter: soit c'est notre profile_id ET seniority, soit c'est notre candidate_id
+            if (assignment && (
+              (assignment.profile_id === candidateProfile.profile_id && 
+               assignment.seniority === candidateProfile.seniority) ||
+              assignment.candidate_id === candidateProfile.id
+            )) {
+              await handleAssignmentUpdate(payload);
+            }
+          }
         )
         .subscribe((status) => {
-          console.log('👥 Assignments channel (candidate):', status);
+          // console.log('👥 Assignments channel (candidate):', status);
         });
     } else {
       // Pour client: écouter tous les assignments (on filtrera côté client)
@@ -180,26 +252,72 @@ export const useRealtimeProjectsFixed = ({
           handleAssignmentUpdate
         )
         .subscribe((status) => {
-          console.log('👥 Assignments channel (client):', status);
+          // console.log('👥 Assignments channel (client):', status);
+        });
+    }
+
+    // 3. Écouter les notifications pour les candidats
+    let notificationsChannel = null;
+    if (userType === 'candidate' && candidateProfile?.id) {
+      const notificationsChannelName = `notifications-${candidateProfile.id}`;
+      notificationsChannel = supabase
+        .channel(notificationsChannelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'candidate_notifications',
+            filter: `candidate_id=eq.${candidateProfile.id}`
+          },
+          (payload) => {
+            // console.log('🔔 New notification received:', payload);
+            // Trigger assignment update to refresh the projects
+            handleAssignmentUpdate(payload);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'candidate_notifications',
+            filter: `candidate_id=eq.${candidateProfile.id}`
+          },
+          (payload) => {
+            // console.log('🔔 Notification updated:', payload);
+            handleAssignmentUpdate(payload);
+          }
+        )
+        .subscribe((status) => {
+          // console.log('🔔 Notifications channel:', status);
         });
     }
 
     // Store channels for cleanup
-    channelsRef.current = [projectsChannel, assignmentsChannel];
+    channelsRef.current = notificationsChannel 
+      ? [projectsChannel, assignmentsChannel, notificationsChannel]
+      : [projectsChannel, assignmentsChannel];
+
+    };
+
+    setupChannels();
 
     return () => {
-      console.log('🛑 REALTIME PROJECTS FIXED: Cleaning up channels');
+      // console.log('🛑 REALTIME PROJECTS FIXED: Cleaning up channels');
       channelsRef.current.forEach(channel => {
-        supabase.removeChannel(channel);
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
       });
       channelsRef.current = [];
     };
-  }, [userId, userType, candidateProfile, handleProjectUpdate, handleAssignmentUpdate]);
+  }, [userId, userType, candidateProfile?.id, candidateProfile?.profile_id, candidateProfile?.seniority]); // Remove callbacks from dependencies
 
   return {
     // Utility function to force refresh if needed
     forceRefresh: () => {
-      console.log('🔄 REALTIME PROJECTS FIXED: Force refresh requested');
+      // console.log('🔄 REALTIME PROJECTS FIXED: Force refresh requested');
       // This could trigger refetch if needed, but ideally shouldn't be necessary
     }
   };

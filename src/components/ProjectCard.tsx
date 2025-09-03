@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, Edit, Clock, TrendingUp, CheckCircle2, AlertCircle, Rocket, Calendar, Euro } from "lucide-react";
+import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, Edit, Clock, TrendingUp, CheckCircle2, AlertCircle, Rocket, Calendar, Euro, Archive, RotateCcw } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -31,14 +31,16 @@ interface ResourceAssignment {
   id: string;
   profile_id: string;
   booking_status: string;
+  calculated_price?: number;  // Prix déjà calculé avec les pourcentages
   hr_profiles?: {
     name: string;
     is_ai?: boolean;
+    base_price?: number;
   };
   candidate_profiles?: {
     first_name: string;
     last_name: string;
-    profile_title?: string;
+    daily_rate?: number;
   };
 }
 
@@ -49,6 +51,9 @@ interface ProjectCardProps {
   onView: (id: string) => void;
   onStart?: (project: { id: string; title: string; kickoffISO?: string }) => void;
   onEdit?: () => void;
+  onArchive?: (id: string) => void;
+  onUnarchive?: (id: string) => void;
+  isArchived?: boolean;
   refreshTrigger?: number; // Optional prop to force refresh
 }
 
@@ -56,12 +61,13 @@ interface PlankaProject {
   planka_url: string;
 }
 
-export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart, onEdit, refreshTrigger }: ProjectCardProps) {
+export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart, onEdit, onArchive, onUnarchive, isArchived = false, refreshTrigger }: ProjectCardProps) {
   const { user } = useAuth();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
   const [isBookingTeam, setIsBookingTeam] = useState(false);
   const [showKickoff, setShowKickoff] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -73,6 +79,34 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       month: 'short',
       year: 'numeric'
     });
+  };
+  
+  // Calcul du prix cumulé par minute des ressources
+  const calculateTotalPricePerMinute = () => {
+    if (resourceAssignments.length === 0) return 0;
+    
+    let totalPerMinute = 0;
+    
+    console.log('💰 Calcul des prix pour', resourceAssignments.length, 'ressources');
+    
+    resourceAssignments.forEach(assignment => {
+      // Utiliser calculated_price qui contient déjà le prix avec les pourcentages appliqués
+      if (assignment.calculated_price) {
+        // calculated_price est déjà en €/minute avec les pourcentages des langues et expertises
+        console.log('  - Ressource calculated_price:', assignment.calculated_price, '€/min (avec pourcentages)');
+        totalPerMinute += assignment.calculated_price;
+      }
+      // Fallback pour les candidats avec daily_rate si calculated_price n'existe pas
+      else if (assignment.candidate_profiles?.daily_rate) {
+        // Convertir tarif journalier en tarif par minute (8h par jour, 60 min par heure)
+        const minuteRate = assignment.candidate_profiles.daily_rate / (8 * 60);
+        console.log('  - Candidat daily_rate:', assignment.candidate_profiles.daily_rate, '=> minute:', minuteRate);
+        totalPerMinute += minuteRate;
+      }
+    });
+    
+    console.log('💰 Prix total par minute:', totalPerMinute);
+    return totalPerMinute;
   };
 
   useEffect(() => {
@@ -125,14 +159,11 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             id,
             profile_id,
             booking_status,
-            hr_profiles (
-              name,
-              is_ai
-            ),
+            calculated_price,
             candidate_profiles (
               first_name,
               last_name,
-              profile_title
+              daily_rate
             )
           `)
           .eq('project_id', project.id);
@@ -216,15 +247,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           id,
           profile_id,
           booking_status,
-          hr_profiles (
-            name,
-            is_ai
-          ),
-          candidate_profiles (
-            first_name,
-            last_name,
-            profile_title
-          )
+          calculated_price,
+          seniority
         `)
         .eq('project_id', project.id);
 
@@ -239,8 +263,34 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       setResourceAssignments([...data || []]);
       console.log('📊 Resource assignments state after update:', data);
       
-      // Si on trouve des ressources, on arrête le polling immédiatement
+      // Récupérer les noms des profils HR séparément
       if (data && data.length > 0) {
+        const profileIds = [...new Set(data.map(a => a.profile_id).filter(Boolean))];
+        
+        if (profileIds.length > 0) {
+          // Récupérer les profils HR
+          const { data: profiles } = await supabase
+            .from('hr_profiles')
+            .select('id, name')
+            .in('id', profileIds);
+          
+          if (profiles) {
+            const namesMap: Record<string, string> = {};
+            profiles.forEach(p => {
+              namesMap[p.id] = p.name;
+            });
+            setProfileNames(namesMap);
+            
+            // Ajouter les profils aux assignments pour le reste du code
+            setResourceAssignments(prevAssignments => 
+              prevAssignments.map(assignment => ({
+                ...assignment,
+                hr_profiles: profiles.find(p => p.id === assignment.profile_id)
+              }))
+            );
+          }
+        }
+        
         console.log('🎆 Resources found! Stopping any active polling.');
         console.log('🎯 Button should be active now!');
       } else {
@@ -261,9 +311,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     if (project.status === 'pause' || project.status === 'attente-team') {
       // If starting, show kickoff dialog first
       setShowKickoff(true);
-    } else {
-      // If pausing, directly update status
-      await onStatusToggle(project.id, 'pause');
+    } else if (project.status === 'play') {
+      // If pausing from play status, call toggle with current status
+      await onStatusToggle(project.id, project.status);
     }
   };
 
@@ -282,8 +332,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         throw updateError;
       }
 
-      // Then call the resource booking function
-      const { data, error } = await supabase.functions.invoke('resource-booking', {
+      // Then call the resource booking function (using debug version temporarily)
+      const { data, error } = await supabase.functions.invoke('resource-booking-debug', {
         body: {
           projectId: project.id,
           action: 'find_candidates'
@@ -336,9 +386,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   const getBookingProgress = () => {
     if (resourceAssignments.length === 0) return { percentage: 0, text: 'Aucune ressource' };
     
-    // Vérifier les statuts de booking (accepted = booké)
+    // Vérifier les statuts de booking
     const bookedCount = resourceAssignments.filter(assignment => 
-      assignment.booking_status === 'booké' || assignment.booking_status === 'accepted'
+      assignment.booking_status === 'accepted'
     ).length;
     const percentage = (bookedCount / resourceAssignments.length) * 100;
     
@@ -360,7 +410,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   const bookingProgress = getBookingProgress();
   const allResourcesBooked = resourceAssignments.every(assignment => 
-    assignment.booking_status === 'booké' || assignment.booking_status === 'accepted'
+    assignment.booking_status === 'accepted'
   );
   
   // Déterminer si le projet peut être démarré
@@ -370,8 +420,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     resourceAssignments.every(assignment => {
       // Les IA sont toujours disponibles
       if (assignment.hr_profiles?.is_ai) return true;
-      // Les ressources humaines doivent être bookées ou acceptées
-      return assignment.booking_status === 'booké' || assignment.booking_status === 'accepted';
+      // Les ressources humaines doivent être acceptées
+      return assignment.booking_status === 'accepted';
     });
   
   console.log('🎯 Project', project.id, 'start conditions:');
@@ -436,118 +486,126 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   return (
     <>
-      <Card className={`group relative overflow-hidden transition-all duration-300 hover:shadow-xl border ${statusConfig.borderColor} bg-white`}>
-        {/* Accent gradient top bar */}
-        <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${statusConfig.gradient}`} />
+      <Card className="group relative bg-white border border-[#ECEEF1] rounded-2xl p-6 shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
         
-        <CardHeader className="pb-3">
+        <div className="space-y-4">
+          {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge 
-                  variant={statusConfig.badge.variant}
-                  className={project.status === 'pause' ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 flex items-center gap-1" : "flex items-center gap-1"}
-                >
-                  {statusConfig.badge.icon}
-                  {statusConfig.badge.text}
-                </Badge>
-                {canStartProject && (
-                  <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 animate-pulse">
-                    <Rocket className="w-3 h-3 mr-1" />
-                    Ready!
+              {(project.status === 'pause' || project.status === 'nouveaux') && (
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-[#F1F3F5] text-[#6B7280] text-xs font-medium px-2 py-1 rounded">
+                    New
                   </Badge>
-                )}
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">{project.title}</h3>
+                </div>
+              )}
+              <h3 className="text-xl font-bold text-[#0E0F12] line-clamp-1">{project.title}</h3>
               {project.description && (
-                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{project.description}</p>
+                <p className="text-sm text-[#6B7280] line-clamp-1 mt-1">{project.description}</p>
               )}
             </div>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-[#6B7280] hover:text-[#0E0F12] hover:bg-[#F7F8FA] rounded">
+                  <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowEditModal(true)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Éditer
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => onDelete(project.id)}
-                  className="text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Supprimer
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="bg-white border-[#ECEEF1]">
+                {!isArchived && (
+                  <>
+                    <DropdownMenuItem onClick={() => setShowEditModal(true)} className="hover:bg-[#F7F8FA] text-[#0E0F12]">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Éditer
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => onArchive?.(project.id)}
+                      className="hover:bg-blue-50 text-blue-600"
+                    >
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archiver
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => onDelete(project.id)}
+                      className="hover:bg-red-50 text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {isArchived && (
+                  <DropdownMenuItem 
+                    onClick={() => onUnarchive?.(project.id)}
+                    className="hover:bg-green-50 text-green-600"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Désarchiver
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </CardHeader>
         
-        <CardContent className="space-y-4">
-          {/* Key metrics */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className={`flex items-center gap-2 p-2.5 rounded-lg bg-gradient-to-r ${statusConfig.lightGradient} border ${statusConfig.borderColor}`}>
-              <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${statusConfig.gradient} flex items-center justify-center text-white`}>
-                <Euro className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Budget</p>
-                <p className="text-sm font-semibold text-gray-900">{formatCurrency(project.clientBudget)}</p>
+          {/* Meta pills with price */}
+          <div className="flex flex-wrap gap-3">
+            {/* Budget */}
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
+              <Euro className="h-4 w-4 text-[#7B3EF4]" />
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-[#6B7280] uppercase">Budget</span>
+                <span className="text-sm font-medium text-[#0E0F12]">{formatCurrency(project.clientBudget)}</span>
               </div>
             </div>
             
-            <div className={`flex items-center gap-2 p-2.5 rounded-lg bg-gradient-to-r ${statusConfig.lightGradient} border ${statusConfig.borderColor}`}>
-              <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${statusConfig.gradient} flex items-center justify-center text-white`}>
-                <Calendar className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Début</p>
-                <p className="text-sm font-semibold text-gray-900">{formatDate(project.date)}</p>
+            {/* Date */}
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
+              <Calendar className="h-4 w-4 text-[#7B3EF4]" />
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-[#6B7280] uppercase">Début</span>
+                <span className="text-sm font-medium text-[#0E0F12]">{formatDate(project.date)}</span>
               </div>
             </div>
+
+            {/* Prix total par minute */}
+            {resourceAssignments.length > 0 && (
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
+                <Euro className="h-4 w-4 text-[#7B3EF4]" />
+                <span className="text-sm font-medium text-[#0E0F12]">
+                  {calculateTotalPricePerMinute().toFixed(2)}€/min
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Team progress */}
           {resourceAssignments.length > 0 && (
-            <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-900">Équipe projet</span>
-                </div>
-                <span className="text-xs font-medium text-gray-600">{bookingProgress.text}</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[#6B7280]">{bookingProgress.text}</span>
               </div>
               
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div className="w-full bg-[#E7EAF0] rounded-full h-1.5 overflow-hidden">
                 <div 
-                  className={`h-2 rounded-full transition-all duration-500 bg-gradient-to-r ${
-                    bookingProgress.percentage === 100 
-                      ? 'from-green-500 to-emerald-500' 
-                      : 'from-blue-600 to-purple-600'
-                  }`}
+                  className="h-1.5 bg-[#7B3EF4] transition-all duration-300"
                   style={{ width: `${bookingProgress.percentage}%` }}
                 />
               </div>
               
-              <div className="flex flex-wrap gap-1">
-                {resourceAssignments.map((assignment) => {
-                  const isBooked = assignment.booking_status === 'booké' || assignment.booking_status === 'accepted';
+              <div className="flex flex-wrap gap-1.5">
+                {[...new Set(resourceAssignments.map(a => a.profile_id).filter(Boolean))].map((profileId) => {
+                  const profileAssignments = resourceAssignments.filter(a => a.profile_id === profileId);
+                  const hasBooked = profileAssignments.some(a => a.booking_status === 'accepted');
+                  const profileName = profileNames[profileId] || 'Métier';
+                  
                   return (
-                    <Badge 
-                      key={assignment.id} 
-                      variant={isBooked ? 'default' : 'outline'}
-                      className={`text-xs ${isBooked ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0' : ''}`}
+                    <span
+                      key={profileId} 
+                      className="text-xs px-2 py-1 rounded bg-[#F4F6F9] text-[#0E0F12]"
                     >
-                      {assignment.hr_profiles?.name || 
-                       (assignment.candidate_profiles ? 
-                        `${assignment.candidate_profiles.first_name} ${assignment.candidate_profiles.last_name}${assignment.candidate_profiles.profile_title ? ` - ${assignment.candidate_profiles.profile_title}` : ''}` : 
-                        'Ressource')}
-                      {isBooked && ' ✓'}
-                    </Badge>
+                      {profileName}
+                      {hasBooked && ' ✓'}
+                    </span>
                   );
                 })}
               </div>
@@ -555,48 +613,33 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           )}
 
           {/* Actions */}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="flex items-center justify-between pt-2">
+            <button
               onClick={() => onView(project.id)}
-              className="flex-1"
+              className="text-sm text-[#0E0F12] underline-offset-4 hover:underline"
             >
-              <Eye className="w-4 h-4 mr-2" />
               {project.status === 'pause' ? 'Créer vos équipes' : 'Voir détails'}
-            </Button>
+            </button>
 
-            {/* Booking Team button OU Play/Pause selon l'état */}
+            {/* CTA principal unique selon l'état */}
             {(project.status === 'pause' || project.status === 'attente-team') && (
               <>
-                {console.log('🔘 Button render - resourceAssignments.length:', resourceAssignments.length)}
-                {console.log('🔘 Button render - resourceAssignments:', resourceAssignments)}
-                {/* Si aucune ressource n'est définie, on affiche le bouton Démarrer désactivé avec tooltip */}
                 {resourceAssignments.length === 0 ? (
-                  <div className="flex-1 relative group">
-                    <Button
-                      size="sm"
-                      disabled={true}
-                      className="w-full bg-gray-100 text-gray-400 cursor-not-allowed"
-                    >
-                      <Users className="w-4 h-4 mr-2" />
-                      Créer l'équipe d'abord
-                    </Button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                      Cliquez sur "Créer vos équipes" pour ajouter des candidats
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                    </div>
-                  </div>
+                  <Button
+                    size="sm"
+                    disabled={true}
+                    className="h-11 px-5 bg-[#F7F8FA] text-[#6B7280] rounded-full font-medium cursor-not-allowed"
+                  >
+                    Créer l'équipe d'abord
+                  </Button>
                 ) : (
-                  /* Si le projet a des ressources, afficher le bon bouton selon l'état */
                   <>
                     {/* Si les ressources ne sont pas encore bookées, afficher Booker les équipes */}
                     {!canStartProject && hasResourcesInDraft() && (
                       <Button
-                        size="sm"
                         onClick={handleBookingTeam}
                         disabled={isBookingTeam || isBookingRequested}
-                        className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white"
+                        className="h-11 px-5 bg-[#7B3EF4] hover:bg-[#6A35D3] text-white rounded-full shadow-[0_6px_20px_rgba(123,62,244,0.18)] transition-all duration-200 font-medium"
                       >
                         {isBookingTeam ? (
                           <>
@@ -610,7 +653,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                           </>
                         ) : (
                           <>
-                            <Users className="w-4 h-4 mr-2" />
                             Booker les équipes
                           </>
                         )}
@@ -620,10 +662,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                     {/* Si toutes les ressources sont confirmées, afficher Démarrer le projet */}
                     {canStartProject && (
                       <Button
-                        size="sm"
                         onClick={handleStatusToggle}
                         disabled={isSyncing}
-                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
+                        className="h-11 px-5 bg-[#7B3EF4] hover:bg-[#6A35D3] text-white rounded-full shadow-[0_6px_20px_rgba(123,62,244,0.18)] transition-all duration-200 font-medium"
                       >
                         {isSyncing ? (
                           <>
@@ -632,7 +673,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                           </>
                         ) : (
                           <>
-                            <Play className="w-4 h-4 mr-2" />
                             Démarrer le projet
                           </>
                         )}
@@ -642,11 +682,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                     {/* Si le booking est en cours sans être en draft */}
                     {!canStartProject && !hasResourcesInDraft() && (
                       <Button
-                        size="sm"
                         disabled={true}
-                        className="flex-1 bg-gray-100 text-gray-500"
+                        className="h-11 px-5 bg-[#F7F8FA] text-[#6B7280] rounded-full font-medium cursor-not-allowed"
                       >
-                        <Clock className="w-4 h-4 mr-2" />
                         En attente de confirmation
                       </Button>
                     )}
@@ -658,10 +696,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             {/* Pause pour les projets en cours */}
             {project.status === 'play' && (
               <Button
-                size="sm"
                 onClick={handleStatusToggle}
                 disabled={isSyncing}
-                className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                className="h-11 px-5 bg-[#7B3EF4] hover:bg-[#6A35D3] text-white rounded-full shadow-[0_6px_20px_rgba(123,62,244,0.18)] transition-all duration-200 font-medium"
               >
                 {isSyncing ? (
                   <>
@@ -670,14 +707,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   </>
                 ) : (
                   <>
-                    <Pause className="w-4 h-4 mr-2" />
                     Mettre en pause
                   </>
                 )}
               </Button>
             )}
           </div>
-        </CardContent>
+        </div>
       </Card>
 
       <KickoffDialog
