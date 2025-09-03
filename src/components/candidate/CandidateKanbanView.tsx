@@ -446,7 +446,10 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
       {selectedProjectId && boardId && board ? (
         <div className="h-[calc(100vh-20rem)]">
           <KanbanBoard
-            board={board}
+            board={{
+              ...board,
+              cards: Array.isArray(board.cards) ? board.cards : Object.values(board.cards || {})
+            }}
             onDragEnd={handleDragEnd}
             onAddColumn={handleAddColumn} // Use our custom handler
             onAddCard={handleAddCard} // Use our custom handler
