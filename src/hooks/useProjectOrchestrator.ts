@@ -31,16 +31,23 @@ export const useProjectOrchestrator = () => {
       }
 
       // Then call the project-kickoff for planning synchronization
+      console.log('📅 Calling project-kickoff with:', { projectId, kickoffDate });
       const { data: kickoffData, error: kickoffError } = await supabase.functions.invoke('project-kickoff', {
         body: {
           projectId,
           kickoffDate
         }
       });
+      
+      console.log('📅 Project kickoff response:', { kickoffData, kickoffError });
 
       if (kickoffError) {
         console.error('Erreur création kickoff:', kickoffError);
-        toast.error('Erreur lors de la création du planning de lancement');
+        console.error('Kickoff error details:', { kickoffData, kickoffError });
+        
+        // Show detailed error message
+        const kickoffErrorMessage = kickoffData?.error || kickoffError?.message || 'Erreur lors de la création du planning de lancement';
+        toast.error(kickoffErrorMessage);
         return false;
       }
 

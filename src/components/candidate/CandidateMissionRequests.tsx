@@ -105,29 +105,42 @@ export const CandidateMissionRequests = () => {
     try {
       setLoading(true);
       
-      // D'abord récupérer le profil candidat avec ses langues et expertises
+      // D'abord récupérer le profil candidat
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
-        .select(`
-          *,
-          candidate_languages (
-            language_id,
-            hr_languages (
-              id,
-              code,
-              name
-            )
-          ),
-          candidate_expertises (
-            expertise_id,
-            hr_expertises (
-              id,
-              name
-            )
-          )
-        `)
-        .eq('email', user.email)
+        .select('*')
+        .eq('id', user.id)
         .single();
+      
+      // Puis récupérer les langues et expertises séparément
+      let candidateLanguagesData = [];
+      let candidateExpertisesData = [];
+      
+      if (candidateProfile) {
+        // Récupérer les langues
+        const { data: langData } = await supabase
+          .from('candidate_languages')
+          .select('*, hr_languages(*)')
+          .eq('candidate_id', candidateProfile.id);
+        
+        if (langData) {
+          candidateLanguagesData = langData;
+        }
+        
+        // Récupérer les expertises
+        const { data: expData } = await supabase
+          .from('candidate_expertises')
+          .select('*, hr_expertises(*)')
+          .eq('candidate_id', candidateProfile.id);
+        
+        if (expData) {
+          candidateExpertisesData = expData;
+        }
+        
+        // Ajouter les données au profil pour compatibilité
+        candidateProfile.candidate_languages = candidateLanguagesData;
+        candidateProfile.candidate_expertises = candidateExpertisesData;
+      }
       
       console.log('Candidate profile:', candidateProfile);
       

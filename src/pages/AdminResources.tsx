@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -107,6 +107,15 @@ const AdminResources = () => {
 
   // Tab state
   const [activeTab, setActiveTab] = useState('categories');
+  
+  // Counts for sidebar
+  const counts = {
+    categories: categories.length,
+    profiles: profiles.length,
+    languages: languages.length,
+    expertises: expertises.length,
+    templates: templateCategories.length
+  };
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '' });
@@ -406,8 +415,16 @@ const AdminResources = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <AdminSidebar 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab}
+        counts={counts}
+      />
+      
+      {/* Main content */}
+      <div className="flex-1 px-8 py-6 overflow-y-auto">
         {/* Header avec design Ialla */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-purple-50 border border-gray-100 mb-6">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10" />
@@ -452,18 +469,10 @@ const AdminResources = () => {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="categories">Catégories HR ({categories.length})</TabsTrigger>
-            <TabsTrigger value="profiles">Profils ({profiles.length})</TabsTrigger>
-            <TabsTrigger value="languages">Langues ({languages.length})</TabsTrigger>
-            <TabsTrigger value="expertises">Expertises ({expertises.length})</TabsTrigger>
-            <TabsTrigger value="templates">Templates ({templateCategories.length})</TabsTrigger>
-          </TabsList>
-
+        {/* Content based on active tab */}
+        <div className="space-y-6">
           {/* Catégories */}
-          <TabsContent value="categories">
+          {activeTab === 'categories' && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -547,10 +556,10 @@ const AdminResources = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
           {/* Profils - Similar structure but with more fields */}
-          <TabsContent value="profiles">
+          {activeTab === 'profiles' && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -692,10 +701,10 @@ const AdminResources = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
           {/* Langues */}
-          <TabsContent value="languages">
+          {activeTab === 'languages' && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -805,10 +814,10 @@ const AdminResources = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
           {/* Expertises */}
-          <TabsContent value="expertises">
+          {activeTab === 'expertises' && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -924,10 +933,10 @@ const AdminResources = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
           {/* Templates */}
-          <TabsContent value="templates">
+          {activeTab === 'templates' && (
             <div className="space-y-6">
               {/* Template Categories */}
               <Card>
@@ -1340,8 +1349,8 @@ const AdminResources = () => {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
 
         {/* Dialog Template de Projet */}
         <Dialog open={projectTemplateDialog.open} onOpenChange={(open) => {

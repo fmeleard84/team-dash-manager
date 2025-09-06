@@ -34,11 +34,11 @@ export const useCandidateOnboarding = () => {
     try {
       setIsLoading(true);
 
-      // Vérifier si le candidat existe en utilisant user_id (lien avec auth.users)
+      // Vérifier si le candidat existe en utilisant l'ID universel
       let { data: candidate, error } = await supabase
         .from('candidate_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)  // ID universel maintenant
         .single();
 
       if (error && error.code === 'PGRST116') {

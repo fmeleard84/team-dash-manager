@@ -85,30 +85,30 @@ export const HomePage = () => {
       <div className="min-h-screen bg-white">
       {/* Header Premium */}
       <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? 'bg-white/95 backdrop-blur-md border-b border-gray-200' : 'bg-transparent'
+        scrolled ? 'bg-black/90 backdrop-blur-md border-b border-white/20' : 'bg-transparent'
       }`}>
         <div className="container mx-auto">
           <nav className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/" className="text-2xl font-bold">
-                <span className="text-black">Team</span>
-                <span className="text-accent">Dash</span>
+                <span className="text-white">Team</span>
+                <span className="text-white">Dash</span>
               </Link>
             </div>
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-8">
-              <a href="#services" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+              <a href="#services" className="text-eyebrow font-bold text-white/70 hover:text-white transition-colors">
                 SERVICES
               </a>
-              <a href="#process" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+              <a href="#process" className="text-eyebrow font-bold text-white/70 hover:text-white transition-colors">
                 PROCESS
               </a>
-              <a href="#expertise" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+              <a href="#expertise" className="text-eyebrow font-bold text-white/70 hover:text-white transition-colors">
                 EXPERTISE
               </a>
-              <a href="#about" className="text-eyebrow text-gray-500 hover:text-black transition-colors">
+              <a href="#about" className="text-eyebrow font-bold text-white/70 hover:text-white transition-colors">
                 À PROPOS
               </a>
             </div>
@@ -116,12 +116,12 @@ export const HomePage = () => {
             {/* CTA Buttons */}
             <div className="hidden lg:flex items-center gap-4">
               <Link to="/login">
-                <button className="btn-premium btn-ghost-premium">
+                <button className="px-6 py-2 text-white border border-white/30 hover:bg-white/10 rounded-lg transition-all">
                   Connexion
                 </button>
               </Link>
               <Link to="/register">
-                <button className="btn-premium btn-accent-premium">
+                <button className="px-6 py-2 bg-white text-black hover:bg-white/90 rounded-lg transition-all flex items-center gap-2">
                   Commencer
                   <ArrowRight className="w-4 h-4" />
                 </button>
@@ -133,7 +133,7 @@ export const HomePage = () => {
               className="lg:hidden p-2"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMenuOpen ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}
             </button>
           </nav>
 

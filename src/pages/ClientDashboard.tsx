@@ -23,7 +23,7 @@ import {
   Settings, 
   LogOut,
   Kanban,
-  CalendarClock,
+  Calendar,
   Cloud,
   MessageSquare,
   Rocket,
@@ -37,8 +37,7 @@ import {
 import { IallaLogo } from "@/components/IallaLogo";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useTemplates } from "@/hooks/useTemplates";
-import SharedPlanningView from "@/components/shared/SharedPlanningView";
-import DriveView from "@/components/client/DriveView";
+import SimpleDriveView from "@/components/drive/SimpleDriveView";
 import CreateProjectModal from "@/components/CreateProjectModal";
 import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectsSection } from '@/components/client/ProjectsSection';
@@ -48,11 +47,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ClientKanbanView from "@/components/client/ClientKanbanView";
 import { EnhancedMessageSystem } from "@/components/shared/EnhancedMessageSystem";
 import { InvoiceList } from "@/components/invoicing/InvoiceList";
-import { KickoffDialog } from "@/components/KickoffDialog";
+// KickoffDialog now handled in ProjectCard component
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import ClientMetricsDashboard from "./ClientMetricsDashboard";
+import PlanningPage from "./PlanningPage";
 
 const ClientDashboard = () => {
 const [searchParams, setSearchParams] = useSearchParams();
@@ -88,8 +88,8 @@ useEffect(() => {
 const [isCreating, setIsCreating] = useState(false);
 const [selectedKanbanProjectId, setSelectedKanbanProjectId] = useState<string>("");
 const [selectedMessagesProjectId, setSelectedMessagesProjectId] = useState<string>("");
-const [kickoffDialogOpen, setKickoffDialogOpen] = useState(false);
-const [kickoffProject, setKickoffProject] = useState<{ id: string; title: string } | null>(null);
+const [selectedDriveProjectId, setSelectedDriveProjectId] = useState<string>("");
+// Removed: kickoff dialog state - now handled in ProjectCard
 const [refreshTrigger, setRefreshTrigger] = useState(0);
 
 const { setupProject, isLoading: isOrchestrating } = useProjectOrchestrator();
@@ -106,7 +106,7 @@ useRealtimeProjectsFixed({
 // Handle URL parameters for section navigation
 useEffect(() => {
   const section = searchParams.get('section');
-  if (section && ['start', 'dashboard', 'templates', 'projects', 'planning', 'drive', 'kanban', 'messages', 'invoices', 'settings'].includes(section)) {
+  if (section && ['start', 'dashboard', 'templates', 'projects', 'calc', 'planning', 'drive', 'kanban', 'messages', 'invoices', 'settings'].includes(section)) {
     setActiveSection(section);
   }
 }, [searchParams]);
@@ -133,6 +133,7 @@ useEffect(() => {
       const activeProjects = (activeData || []).filter(p => p.status === 'play');
       if (!selectedKanbanProjectId && activeProjects.length > 0) setSelectedKanbanProjectId(activeProjects[0].id);
       if (!selectedMessagesProjectId && activeProjects.length > 0) setSelectedMessagesProjectId(activeProjects[0].id);
+      if (!selectedDriveProjectId && activeProjects.length > 0) setSelectedDriveProjectId(activeProjects[0].id);
     }
     
     // Charger les projets archivés séparément
@@ -289,43 +290,25 @@ const onToggleStatus = async (id: string, currentStatus: string) => {
 };
 
 const onStartProject = async (project: { id: string; title: string; kickoffISO?: string }) => {
-  if (project.kickoffISO) {
-    // Direct start with kickoff - setup the project
-    try {
-      const success = await setupProject(project.id, project.kickoffISO);
-      if (!success) {
-        toast({ 
-          title: "Erreur", 
-          description: "Échec de la configuration du projet." 
-        });
-        return;
-      }
-
-      await refreshProjects();
-      toast({ 
-        title: "Projet configuré avec succès!", 
-        description: "Planning, Kanban, Drive, notifications créés et équipe invitée au kickoff." 
-      });
-    } catch (error) {
-      console.error('Error starting project:', error);
-      toast({ 
-        title: "Erreur", 
-        description: "Une erreur s'est produite lors de la configuration." 
-      });
-    }
-  } else {
-    // Legacy flow - open dialog
-    setKickoffProject(project);
-    setKickoffDialogOpen(true);
-  }
-};
-
-const handleKickoffConfirm = async (kickoffISO: string) => {
-  if (!kickoffProject) return;
+  console.log('🎯 onStartProject called with:', project);
   
+  // Don't check status anymore - check if tools exist instead
+  // The project-orchestrator will check if kanban already exists
+  // This allows projects in 'play' status (after all accept) to be started with kickoff
+  
+  // Always expect kickoffISO from ProjectCard
+  if (!project.kickoffISO) {
+    console.error('onStartProject called without kickoffISO:', project);
+    toast({ 
+      title: "Erreur", 
+      description: "Date de kickoff manquante." 
+    });
+    return;
+  }
+
   try {
-    // Use the project orchestrator which already handles event creation
-    const success = await setupProject(kickoffProject.id, kickoffISO);
+    console.log('📅 Calling setupProject with:', project.id, project.kickoffISO);
+    const success = await setupProject(project.id, project.kickoffISO);
     if (!success) {
       toast({ 
         title: "Erreur", 
@@ -334,21 +317,21 @@ const handleKickoffConfirm = async (kickoffISO: string) => {
       return;
     }
 
-    setKickoffDialogOpen(false);
-    setKickoffProject(null);
     await refreshProjects();
     toast({ 
       title: "Projet configuré avec succès!", 
       description: "Planning, Kanban, Drive, notifications créés et équipe invitée au kickoff." 
     });
   } catch (error) {
-    console.error('Error in handleKickoffConfirm:', error);
+    console.error('Error starting project:', error);
     toast({ 
       title: "Erreur", 
       description: "Une erreur s'est produite lors de la configuration." 
     });
   }
 };
+
+// Removed: handleKickoffConfirm - now handled in onStartProject
 
 // Handler pour ouvrir le dialogue de suppression
 const handleDeleteRequest = (project: DbProject) => {
@@ -549,8 +532,8 @@ const menuItems = [
   { id: 'start', label: 'Commencer', icon: Rocket },
   { id: 'dashboard', label: 'Tableau de bord', icon: Activity },
   { id: 'projects', label: 'Mes projets', icon: FolderOpen },
+  { id: 'planning', label: 'Planning', icon: Calendar },
   ...(hasActiveProjects ? [
-    { id: 'planning', label: 'Planning', icon: CalendarClock },
     { id: 'drive', label: 'Drive', icon: Cloud },
     { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
@@ -894,31 +877,51 @@ const menuItems = [
         );
         
       case 'planning':
-        return (
-          <div className="space-y-4">
-            {projetsEnCours.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CalendarClock className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">Planning non disponible</h3>
-                <p>Démarrez un projet pour accéder au planning partagé</p>
-              </div>
-            ) : (
-              <SharedPlanningView mode="client" projects={projetsEnCours} />
-            )}
-          </div>
-        );
+        return <PlanningPage userType="client" userEmail={user?.email} userName={user?.user_metadata?.name} />;
 
       case 'drive':
         return (
           <div className="space-y-4">
+            {projetsEnCours.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <Cloud className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-800">Drive du Projet</h2>
+                      <p className="text-sm text-gray-600">Gérez et partagez les fichiers du projet</p>
+                    </div>
+                  </div>
+                  
+                  <Select value={selectedDriveProjectId} onValueChange={setSelectedDriveProjectId}>
+                    <SelectTrigger className="w-64 bg-white border-blue-200 focus:border-blue-400">
+                      <SelectValue placeholder="Sélectionner un projet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projetsEnCours.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            
             {projetsEnCours.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Cloud className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <h3 className="text-lg font-medium mb-2">Espace de stockage non disponible</h3>
                 <p>Démarrez un projet pour accéder aux fichiers partagés</p>
               </div>
-            ) : (
-              <DriveView />
+            ) : selectedDriveProjectId && (
+              <SimpleDriveView 
+                projectId={selectedDriveProjectId}
+                userType="client"
+              />
             )}
           </div>
         );
@@ -1124,6 +1127,7 @@ const menuItems = [
                   {activeSection === 'start' ? 'Démarrer un projet' :
                    activeSection === 'templates' ? 'Templates' :
                    activeSection === 'projects' ? 'Mes projets' :
+                   activeSection === 'calc' ? 'Calendrier Calc' :
                    activeSection === 'planning' ? 'Planning' :
                    activeSection === 'drive' ? 'Drive' :
                    activeSection === 'kanban' ? 'Kanban' :
@@ -1165,17 +1169,6 @@ const menuItems = [
           }}
         />
 
-        {/* Other dialogs */}
-        <KickoffDialog
-          open={kickoffDialogOpen}
-          projectTitle={kickoffProject?.title || ""}
-          onClose={() => {
-            setKickoffDialogOpen(false);
-            setKickoffProject(null);
-          }}
-          onConfirm={handleKickoffConfirm}
-        />
-        
         {/* Dialog de suppression/archivage */}
         {projectToDelete && (
           <DeleteProjectDialog

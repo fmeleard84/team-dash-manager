@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -71,6 +71,19 @@ const LLMDashboard = () => {
       ]
     },
     {
+      id: 'corrections',
+      label: 'Historique Corrections',
+      icon: AlertCircle,
+      children: [
+        { id: 'corrections-unified-ids', label: '🔄 Unification IDs (05/09/2025)' },
+        { id: 'corrections-session5', label: '🔧 Session 5 (05/09/2025)' },
+        { id: 'corrections-session4', label: '🔧 Session 4 (04/09/2025)' },
+        { id: 'corrections-session3', label: '🔧 Session 3 (03/09/2025)' },
+        { id: 'corrections-session2', label: '🔧 Session 2 (03/09/2025)' },
+        { id: 'corrections-session1', label: '🔧 Session 1 (02/09/2025)' },
+      ]
+    },
+    {
       id: 'api',
       label: 'API & Intégrations',
       icon: Code,
@@ -104,6 +117,45 @@ const LLMDashboard = () => {
 
   // Contenu pour chaque section
   const [content, setContent] = useState({
+    'general': `# 📚 Documentation Team Dash Manager
+
+## Vue d'ensemble
+Team Dash Manager est une plateforme complète de gestion de projets et de ressources humaines, conçue pour faciliter la collaboration entre clients et candidats.
+
+### 🎯 Objectifs principaux
+- **Gestion de projets** : Création, suivi et orchestration de projets complexes
+- **Matching candidats** : Système intelligent de mise en relation basé sur les compétences
+- **Collaboration temps réel** : Outils intégrés pour la communication et le partage
+- **Time tracking** : Suivi précis du temps et des activités
+
+### 🏗️ Architecture
+- **Frontend** : React + TypeScript + Vite
+- **Backend** : Supabase (PostgreSQL + Edge Functions)
+- **Temps réel** : WebSockets via Supabase Realtime
+- **Authentification** : Supabase Auth
+
+### 📂 Structure du projet
+- **/src/pages** : Pages principales de l'application
+- **/src/components** : Composants réutilisables
+- **/src/hooks** : Hooks React personnalisés
+- **/src/integrations** : Intégrations externes (Supabase)
+- **/supabase/functions** : Edge Functions Supabase
+
+### 🚀 Fonctionnalités clés
+1. **Workflow de projet complet** : De la création au kickoff
+2. **Système de matching intelligent** : 5 critères de correspondance
+3. **Outils collaboratifs** : Kanban, Drive, Messages, Planning
+4. **Time tracking intégré** : Suivi des activités en temps réel
+5. **Design system premium** : Interface moderne et cohérente
+
+### 📖 Navigation
+Utilisez le menu de gauche pour explorer les différentes sections de la documentation :
+- **Candidat** : Flux et fonctionnalités côté candidat
+- **Projet** : Gestion complète des projets
+- **Base de données** : Schéma et architecture
+- **Corrections** : Historique des bugs corrigés
+- **API** : Documentation technique
+- **Design System** : Charte graphique et composants`,
     'design-system': `# 🎨 Charte Graphique Premium - Système de Design Implémenté
 
 ## Vue d'ensemble
@@ -630,19 +682,29 @@ Team Dash Manager est une plateforme de gestion de projets et de ressources huma
 4. **Client** démarre le projet une fois l'équipe complète (kickoff)
 5. **Équipe** accède aux outils collaboratifs (Planning, Kanban, Drive, Messages)
 
-## Points d'attention
+## Points d'attention critiques
 - Les candidats doivent être qualifiés avant de pouvoir recevoir des missions
 - Un projet doit avoir toutes ses ressources acceptées avant de pouvoir démarrer
 - Le statut 'play' active les outils collaboratifs pour l'équipe
 - L'invitation kickoff doit apparaître dans le planning des candidats
 - La messagerie utilise **EnhancedMessageSystem** pour TOUS les utilisateurs (unifié 30/08/2024)
 - Les politiques RLS storage acceptent booking_status IN ('accepted', 'booké') (corrigé 31/08/2024)
+- **⚠️ Contrainte status projet**: Seuls 'play', 'pause', 'completed' sont autorisés (suppression utilise 'completed' + deleted_at)
+
+## Corrections majeures du 03/09/2025
+1. **Matching candidats complet**: Vérifie profile_id, seniority, status, langues ET expertises
+2. **Notifications booking**: Corrigé status IN ('disponible', 'en_pause'), excluant 'qualification'
+3. **Realtime ressources**: Ajout subscription dans ProjectCard pour updates instantanées
+4. **Realtime projets candidat**: Filtrage par assignment avant update
+5. **Suppression projet**: Edge Function fix-project-delete pour contrainte SQL
+6. **resource-booking-debug supprimé**: Fonction doublon éliminée
 
 ## Conventions de code
 - Utiliser des hooks personnalisés pour la logique métier réutilisable
 - Préfixer les composants partagés avec 'Shared'
 - Utiliser le real-time Supabase pour les mises à jour instantanées
-- Toujours filtrer les données côté serveur (RLS)`,
+- Toujours filtrer les données côté serveur (RLS)
+- Ne jamais créer de fonctions debug, corriger directement les originales`,
 
     'candidat-flow': `# Flux Candidat
 
@@ -666,7 +728,12 @@ Team Dash Manager est une plateforme de gestion de projets et de ressources huma
 
 ### 4. Réception de missions
 - Seuls les candidats avec status != 'qualification' reçoivent les notifications
-- Le matching se fait sur : profile_id, seniority, compétences
+- Le matching se fait sur 5 critères OBLIGATOIRES:
+  - profile_id (métier exact)
+  - seniority (niveau exact)
+  - status != 'qualification' (candidat qualifié)
+  - languages (toutes les langues requises)
+  - expertises (toutes les expertises requises)
 - Notification visible dans le dashboard candidat
 
 ### 5. Acceptation/Refus
@@ -732,21 +799,94 @@ Team Dash Manager est une plateforme de gestion de projets et de ressources huma
 
     'candidat-missions': `# Gestion des Missions Candidat
 
-## 🆕 Corrections Importantes (02/09/2025)
+## 🆕 Corrections Importantes (03/09/2025 - Session complète)
 
-### Problème Edge Function corrigé
-- **Erreur**: Join invalide hr_profiles:profile_id causant erreur 500
-- **Solution**: Suppression du join, récupération séparée du nom du profil
-- **Fichier**: resource-booking/mission-management-fixed.ts
+### 1. Système de matching candidats COMPLET ✅
+- **Fichier principal**: src/pages/CandidateDashboard.tsx
+- **Changement majeur**: Implémentation du matching complet à 5 critères
+  - Récupération des langues du candidat via candidate_languages
+  - Récupération des expertises du candidat via candidate_expertises
+  - Vérification profile_id ET seniority ET status ET langues ET expertises
+  - Alignement avec la logique de CandidateMissionRequests.tsx
+- **Résultat**: Les candidats ne voient QUE les projets qui correspondent exactement
 
-### Statuts projet corrigés
-- **Erreur**: Contrainte DB n'acceptait pas 'attente-team'
-- **Valeurs valides**: 'play', 'pause', 'completed', 'archivé'
-- **Logique**: Quand toutes ressources acceptées → status = 'play'
+### 2. Correction notification "Chercher candidats" ✅
+- **Problème initial**: Candidats ne recevaient pas les notifications
+- **Cause racine**: resource-booking-debug cherchait status='active' (inexistant)
+- **Solution appliquée**:
+  - Correction dans resource-booking: \`.neq('status', 'qualification').in('status', ['disponible', 'en_pause'])\`
+  - Suppression complète de resource-booking-debug (doublon)
+  - Mise à jour ProjectCard.tsx pour utiliser resource-booking
+- **Statuts valides candidat**: 'qualification', 'disponible', 'en_pause', 'indisponible'
 
-### Filtrage candidat amélioré
-- **Ajout**: Filtre booking_status='recherche' dans CandidateDashboard
-- **Résultat**: Candidats ne voient que missions disponibles
+### 3. Realtime loader ressources ✅
+- **Fichier**: src/components/ProjectCard.tsx
+- **Ajout**: Subscription realtime pour hr_resource_assignments
+- **Code**:
+  \`\`\`typescript
+  const channel = supabase
+    .channel(\`resource-assignments-\${project.id}\`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'hr_resource_assignments',
+      filter: \`project_id=eq.\${project.id}\`
+    }, fetchAssignments)
+  \`\`\`
+- **Résultat**: Le loader se met à jour instantanément après booking
+
+### 4. Realtime statut projet côté candidat ✅
+- **Fichier**: src/hooks/useRealtimeProjectsFixed.ts
+- **Problème**: Changement de statut (pause) non reflété côté candidat
+- **Solution**: Vérifier si le candidat est assigné avant de traiter l'update
+- **Code ajouté**:
+  \`\`\`typescript
+  if (userType === 'candidate') {
+    const { data: assignments } = await supabase
+      .from('hr_resource_assignments')
+      .select('id')
+      .eq('project_id', project.id)
+      .eq('candidate_id', candidateProfile?.id)
+      .limit(1);
+    
+    if (assignments && assignments.length > 0) {
+      await handleProjectUpdate(payload);
+    }
+  }
+  \`\`\`
+
+### 5. Correction popup projets acceptés ✅
+- **Fichier**: src/components/candidate/CandidateProjectsSection.tsx
+- **Problème**: Bouton "Accéder au projet" générait une 404
+- **Solution**: Toujours ouvrir le modal au lieu de naviguer
+- **Comportement unifié**: Modal fullscreen pour tous les projets
+
+### 6. Fix suppression projet (contrainte SQL) ✅
+- **Problème**: projects_status_check n'autorise que 'play', 'pause', 'completed'
+- **Solution**: Edge Function fix-project-delete utilisant status='completed' + deleted_at
+- **Fichier modifié**: src/components/DeleteProjectDialog.tsx
+- **Note**: Migration SQL nécessaire pour ajouter 'cancelled' et 'archived'
+
+### 7. Logique de filtrage des missions
+**Règles finales implémentées**:
+- Si candidate_id = candidat actuel → Toujours afficher ✓
+- Si candidate_id = autre candidat → Ne jamais afficher ✓
+- Si candidate_id = null ET booking_status = 'recherche' → Vérifier:
+  1. profile_id correspond exactement ✓
+  2. seniority correspond exactement ✓
+  3. status != 'qualification' ✓
+  4. Toutes les langues requises présentes ✓
+  5. Toutes les expertises requises présentes ✓
+
+### 8. Edge Functions déployées aujourd'hui
+- **fix-project-delete**: Workaround pour contrainte status
+- **resource-booking**: Corrigé pour matching candidats
+- Suppression de resource-booking-debug
+
+### Points d'amélioration identifiés
+1. **Migration SQL nécessaire** pour ajouter statuts 'cancelled' et 'archived'
+2. **Uniformisation booking_status**: Certaines parties utilisent 'booké' vs 'accepted'
+3. **Performance**: Le matching pourrait être optimisé côté SQL
 
 ## Réception et gestion des missions
 
@@ -1395,10 +1535,28 @@ INSERT INTO project_teams (
 
 ### 3. project-kickoff Edge Function
 
-#### Étape 1: Récupération équipe
+#### ⚠️ Important (Corrigé Session 4)
+**Ne PAS utiliser de jointures** avec client_profiles pour éviter les problèmes RLS.
+Récupérer les données séparément:
+1. D'abord le projet
+2. Puis le profil client si besoin
+3. Enfin les candidats un par un
+
+#### Étape 1: Récupération du projet et de l'équipe
 \`\`\`sql
-SELECT * FROM project_teams 
-WHERE project_id = projectId
+-- Récupération projet SANS jointure
+SELECT * FROM projects WHERE id = projectId;
+
+-- Récupération profil client séparément 
+SELECT * FROM client_profiles WHERE id = ownerId;
+
+-- Récupération candidats acceptés
+SELECT * FROM hr_resource_assignments 
+WHERE project_id = projectId 
+AND booking_status = 'accepted';
+
+-- Pour chaque candidat, récupération profil séparée
+SELECT * FROM candidate_profiles WHERE id = candidateId;
 \`\`\`
 
 #### Étape 2: Création événement kickoff
@@ -1511,23 +1669,39 @@ WHERE project_id = projectId
 - Envoi des notifications
 
 ### Flux d'exécution
-1. Vérification des prérequis
-2. Récupération des ressources acceptées
-3. Création du Kanban avec colonnes standards
-4. Initialisation du storage
-5. Notifications à l'équipe
-6. Mise à jour du statut projet
+1. **NOUVEAU**: Vérification que le projet n'est pas déjà en 'play'
+2. Vérification des prérequis (ressources acceptées)
+3. Récupération des ressources acceptées
+4. Création du Kanban avec colonnes standards
+5. Initialisation du storage
+6. Notifications à l'équipe
+7. Mise à jour du statut projet → 'play'
+
+### Validation ajoutée (Session 4)
+\`\`\`typescript
+// Empêche le redémarrage d'un projet déjà actif
+if (project.status === 'play') {
+  return new Response(
+    JSON.stringify({ 
+      error: 'Le projet est déjà démarré',
+      details: 'Ce projet a déjà le statut "play"'
+    }),
+    { status: 400 }
+  );
+}
+\`\`\`
 
 ### Tables modifiées
 - kanban_boards, kanban_columns, kanban_cards
-- project_teams (NOUVEAU)
+- project_teams (remplie avec tous les membres)
 - candidate_notifications
-- projects (status)
+- projects (status → 'play')
 
 ### Gestion d'erreurs
 - Rollback partiel non supporté
 - Log détaillé pour debug
-- Ne bloque pas sur erreurs non critiques`,
+- Ne bloque pas sur erreurs non critiques
+- Validation statut pour éviter doublons`,
 
     'projet-collaboration': `# Outils Collaboratifs
 
@@ -1576,31 +1750,307 @@ WHERE project_id = projectId
 - Synchronisation temps réel via Supabase
 - Interface unifiée client/candidat`,
 
-    'projet-planning': `# Planning & Événements
+    'projet-planning': `# 📅 Planning & Calendrier
 
-## Système d'événements
+## 🆕 Système de Planning Unifié (05/09/2025)
 
-### Tables principales
-- project_events: Événements du projet
-- project_event_attendees: Participants
-- candidate_event_notifications: Invitations candidats
+### Vue d'ensemble
+Le système de planning unifié remplace l'ancienne implémentation Schedule-X et Cal.com par une solution intégrée complète basée sur la table `project_events`.
 
-### Création d'événement
-1. Client crée via l'interface Planning
-2. Sélectionne participants (équipe)
-3. Envoie invitations par email
-4. Crée notifications pour candidats
+## Architecture technique
 
-### Invitation Kickoff
-- Créée automatiquement au démarrage
-- Tous les membres invités
-- Lien visio inclus
-- Visible dans planning candidat
+### Composants principaux
 
-### Synchronisation
-- Real-time updates via Supabase
-- Export Google Calendar possible
-- Rappels par email`,
+#### 1. PlanningPage (anciennement CalcPage)
+\`\`\`typescript
+// src/pages/PlanningPage.tsx
+interface PlanningPageProps {
+  userType: 'client' | 'candidate';
+  userEmail?: string;
+  userName?: string;
+  candidateId?: string; // Pour les candidats uniquement
+}
+\`\`\`
+
+**Caractéristiques:**
+- Page unifiée pour clients et candidats
+- Sélection du projet actif via dropdown
+- Chargement des événements depuis `project_events`
+- Chargement des membres d'équipe depuis `hr_resource_assignments`
+- Permissions différenciées (clients peuvent éditer/supprimer)
+
+#### 2. SimpleScheduleCalendar
+\`\`\`typescript
+// src/components/SimpleScheduleCalendar.tsx
+interface SimpleScheduleCalendarProps {
+  projectName: string;
+  events: CalendarEvent[];
+  teamMembers?: TeamMember[];
+  onEventClick?: (event: CalendarEvent) => void;
+  onAddEvent?: () => void;
+}
+\`\`\`
+
+**Caractéristiques:**
+- Utilise **date-fns** au lieu de l'API Temporal
+- Vue Mois et Liste
+- Navigation par mois
+- Affichage des événements avec indicateur visuel
+- Support des liens Jitsi Meet
+
+#### 3. CreateEventDialog
+\`\`\`typescript
+// src/components/CreateEventDialog.tsx
+interface CreateEventDialogProps {
+  open: boolean;
+  projectId: string;
+  projectTitle: string;
+  onClose: () => void;
+  onEventCreated: () => void;
+}
+\`\`\`
+
+**Fonctionnalités:**
+- Création d'événements personnalisés
+- Sélection des participants (équipe complète)
+- Génération automatique du lien Jitsi
+- Envoi de notifications aux candidats
+- Support des lieux physiques et virtuels
+- Accessible aux clients ET candidats
+
+#### 4. ViewEventDialog (NOUVEAU)
+\`\`\`typescript
+// src/components/ViewEventDialog.tsx
+interface ViewEventDialogProps {
+  open: boolean;
+  eventId: string;
+  projectTitle?: string;
+  onClose: () => void;
+  onEventUpdated?: () => void;
+  onEventDeleted?: () => void;
+  canEdit?: boolean;
+}
+\`\`\`
+
+**Fonctionnalités:**
+- Visualisation détaillée des événements
+- Mode édition (clients uniquement)
+- Affichage des participants et leurs statuts
+- Lien direct vers la visioconférence
+- Suppression d'événement (clients uniquement)
+
+### Tables de base de données
+
+#### Colonnes metadata ajoutées (IMPORTANT)
+\`\`\`sql
+-- À exécuter dans Supabase SQL Editor
+ALTER TABLE projects ADD COLUMN metadata JSONB DEFAULT '{}';
+ALTER TABLE projects ADD COLUMN planning_shared TEXT;
+ALTER TABLE project_events ADD COLUMN metadata JSONB DEFAULT '{}';
+\`\`\`
+
+#### Structure metadata Schedule-X
+\`\`\`json
+{
+  "scheduleX": {
+    "calendar_created": true,
+    "calendar_config": {
+      "id": "calendar-project-id",
+      "name": "Calendrier - Nom du projet",
+      "color": "#10b981",
+      "members": []
+    },
+    "calendar_url": "/calendar/shared/project-id",
+    "kickoff_date": "2025-09-05T14:00:00Z",
+    "kickoff_event": {
+      "id": "kickoff-123456",
+      "title": "Kickoff - Projet",
+      "start": "2025-09-05T14:00:00Z",
+      "end": "2025-09-05T15:00:00Z"
+    },
+    "kickoff_meeting_url": "https://meet.jit.si/...",
+    "team_members": [],
+    "integration_type": "schedule-x"
+  }
+}
+\`\`\`
+
+## Flux de création d'événement
+
+### 1. Via Kickoff automatique
+\`\`\`typescript
+// supabase/functions/project-kickoff/index.ts
+1. Récupère les membres de l'équipe (client + candidats acceptés)
+2. Remplit la table project_teams (CRITIQUE!)
+3. Génère l'événement kickoff avec lien Jitsi
+4. Crée les notifications candidats dans candidate_event_notifications
+5. L'événement apparaît dans le planning de tous les membres
+\`\`\`
+
+### 2. Via création manuelle
+\`\`\`typescript
+// PlanningPage → CreateEventDialog
+1. Ouvre le dialog de création
+2. Charge automatiquement l'équipe du projet
+3. Génère le lien Jitsi basé sur le titre
+4. Crée l'événement dans project_events
+5. Ajoute les participants dans project_event_attendees
+6. Envoie les notifications aux candidats
+\`\`\`
+
+## Process métier du Planning
+
+### Pour le client
+1. **Création projet** → status: 'pause'
+2. **Candidats acceptent** → booking_status: 'accepted'
+3. **Client démarre projet** → project-orchestrator remplit project_teams
+4. **Kickoff créé** → Événement dans project_events
+5. **Gestion planning** → Peut créer, modifier, supprimer des événements
+
+### Pour le candidat
+1. **Accepte mission** → Apparaît dans "En attente de démarrage"
+2. **Client démarre** → Passe en "En cours"
+3. **Planning accessible** → Voit tous les événements du projet
+4. **Peut créer** → Nouveaux événements avec l'équipe
+5. **Pas d'édition** → Ne peut pas modifier/supprimer (client uniquement)
+
+## Intégration dans PlanningPage
+
+### Sélection du projet
+\`\`\`typescript
+// Différencié selon le type d'utilisateur
+const loadProjects = async () => {
+  if (userType === 'client') {
+    // Client: tous ses projets actifs
+    const { data } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('status', 'play');
+  } else {
+    // Candidat: projets où il est accepté
+    const { data } = await supabase
+      .from('projects')
+      .select('*, hr_resource_assignments!inner(*)')
+      .eq('status', 'play')
+      .eq('hr_resource_assignments.candidate_id', candidateId)
+      .eq('hr_resource_assignments.booking_status', 'accepted');
+  }
+};
+\`\`\`
+
+### Chargement des membres (ÉVOLUTION IMPORTANTE)
+\`\`\`typescript
+const selectProject = async (project) => {
+  // Charge les événements
+  const { data: events } = await supabase
+    .from('project_events')
+    .select('*')
+    .eq('project_id', project.id);
+  
+  // NOUVEAU: Charge les membres depuis la BDD, pas metadata
+  const members = [];
+  
+  // Récupérer le client
+  const { data: clientProfile } = await supabase
+    .from('client_profiles')
+    .select('*')
+    .eq('id', project.owner_id);
+    
+  // Récupérer les candidats acceptés
+  const { data: assignments } = await supabase
+    .from('hr_resource_assignments')
+    .select('*, candidate_profiles(*)')
+    .eq('project_id', project.id)
+    .eq('booking_status', 'accepted');
+    
+  // Pour un candidat: ne pas s'afficher soi-même
+  if (userType === 'candidate') {
+    assignments = assignments.filter(a => a.candidate_id !== candidateId);
+  }
+};
+\`\`\`
+
+## Problèmes résolus (05/09/2025)
+
+### 1. Projet reste en "Invitation en attente"
+**Problème:** Catégorisation incorrecte des projets acceptés
+**Solution:** Vérification du statut projet ET booking_status
+
+### 2. Pas d'événement kickoff visible
+**Problème:** project_teams non remplie empêche la création du kickoff
+**Solution:** project-orchestrator doit remplir project_teams AVANT project-kickoff
+
+### 3. Membres d'équipe incorrects
+**Problème:** Utilisation de metadata obsolète
+**Solution:** Chargement depuis hr_resource_assignments et client_profiles
+
+### 4. Doublons Planning/Cal
+**Problème:** Deux sections planning différentes
+**Solution:** Suppression de l'ancien Planning, renommage Cal → Planning
+
+## API et Hooks
+
+### useProjectUsers (unifié)
+\`\`\`typescript
+// src/hooks/useProjectUsers.ts
+// Récupère client + candidats acceptés d'un projet
+const { users, loading } = useProjectUsers(projectId);
+\`\`\`
+
+### Notifications candidats
+\`\`\`typescript
+// Table: candidate_event_notifications
+{
+  candidate_id: string,
+  project_id: string,
+  event_id: string,
+  title: string,
+  description: string,
+  event_date: timestamp,
+  video_url: string,
+  status: 'pending' | 'accepted' | 'declined'
+}
+\`\`\`
+
+## Guide de déploiement
+
+### 1. Vérifier les colonnes metadata
+\`\`\`bash
+node force-add-metadata-columns.mjs
+\`\`\`
+
+### 2. Déployer la fonction kickoff
+\`\`\`bash
+npx supabase functions deploy project-kickoff --project-ref egdelmcijszuapcpglsy
+\`\`\`
+
+### 3. Tester l'intégration
+\`\`\`bash
+node test-schedule-x-integration.mjs
+\`\`\`
+
+## Avantages Schedule-X vs Cal.com
+
+| Aspect | Cal.com | Schedule-X |
+|--------|---------|------------|
+| Coût | Payant (cher) | Gratuit |
+| Intégration | Externe (iframe) | Native |
+| Performance | Chargement lent | Rapide |
+| Personnalisation | Limitée | Totale |
+| Dépendances | Serveur externe | Aucune |
+| Support navigateur | Tous | Tous (avec polyfill) |
+
+## Maintenance
+
+### Ajout de fonctionnalités
+- Les événements récurrents peuvent être ajoutés dans SimpleScheduleCalendar
+- L'export iCal peut être implémenté via une edge function
+- Les rappels par email via Supabase Auth hooks
+
+### Points d'attention
+- Toujours vérifier que metadata existe avant d'y accéder
+- Les liens Jitsi sont générés avec le pattern: \`project-title-event-title-timestamp\`
+- Les notifications candidats sont créées uniquement pour les ressources (pas le client)`,
 
     'projet-messagerie': `# 💬 Système de Messagerie
 
@@ -1867,26 +2317,86 @@ Le Drive est un système de stockage et de partage de fichiers intégré à chaq
 
 ## Architecture technique
 
-### Composant principal
+### Composants (v3.0 - SimpleDriveView)
 \`\`\`typescript
-SharedDriveView
-- Localisation: src/components/shared/SharedDriveView.tsx
-- Utilisé par: ClientDashboard et CandidateDashboard
-- Type: Composant unifié pour tous les utilisateurs
+SimpleDriveView (ACTUEL - 05/09/2025)
+- Localisation: src/components/drive/SimpleDriveView.tsx
+- Technologies: React, Supabase Storage, Drag & Drop natif HTML5
+- Type: Interface simplifiée avec fonctionnalités complètes
+
+Fonctionnalités principales:
+✅ Drag & drop depuis le système de fichiers (Finder/Explorateur)
+✅ Drag & drop entre dossiers internes avec gestion des conflits
+✅ Fil d'Ariane (breadcrumb) pour navigation claire
+✅ Upload avec progression incrémentale détaillée
+✅ Vignettes automatiques pour les images (jpg, png, gif)
+✅ Renommer et supprimer les dossiers (avec confirmation)
+✅ Intégration native Messagerie et Kanban
+✅ Support multi-buckets (project-files, message-files, kanban-files)
+✅ Filtrage automatique des fichiers .keep
+✅ Recherche en temps réel sur tous les fichiers
+✅ Sélecteur de projet intégré (Client & Candidat)
+✅ Feedback visuel amélioré:
+   - Zones de drop avec bordure bleue animée
+   - Badge "Déposer ici" sur les dossiers cibles
+   - Élément en cours de drag semi-transparent
+   - Curseurs adaptés (pointer/move)
+   - Tooltips informatifs
+✅ Gestion intelligente des doublons (ajout timestamp)
+
+// Anciens systèmes (deprecated)
+ModernDriveExplorer - Problèmes avec tables inexistantes
+SharedDriveView - Version basique sans drag & drop
 \`\`\`
 
-### Structure de stockage
+### Structure de base de données (NOUVEAU)
 
-⚠️ **Important** : Le chemin utilise "projects/" (avec un 's') et non "project/"
+\`\`\`sql
+-- Tables du nouveau système Drive
+drives                    -- Espaces de stockage
+├── id: UUID
+├── name: VARCHAR(255)
+├── type: 'project' | 'personal' | 'shared'
+├── project_id: UUID      -- Lien avec le projet
+└── owner_id: UUID
+
+folders                   -- Hiérarchie des dossiers
+├── id: UUID
+├── name: VARCHAR(255)
+├── parent_id: UUID       -- Auto-référence pour hiérarchie
+├── drive_id: UUID
+├── path: TEXT            -- Chemin complet optimisé
+├── color: VARCHAR(7)     -- Personnalisation
+└── icon: VARCHAR(50)
+
+files                     -- Métadonnées des fichiers
+├── id: UUID
+├── name: VARCHAR(255)
+├── folder_id: UUID
+├── drive_id: UUID
+├── storage_path: TEXT    -- Chemin dans Supabase Storage
+├── mime_type: VARCHAR
+├── size_bytes: BIGINT
+├── version: INT
+└── tags: TEXT[]
+
+drive_members             -- Gestion des permissions
+├── drive_id: UUID
+├── user_id: UUID
+├── role: 'owner' | 'editor' | 'viewer'
+└── permissions: JSONB {read, write, delete}
+\`\`\`
+
+### Structure de stockage physique
 
 \`\`\`
 project-files/ (bucket Supabase Storage)
-└── projects/                # Notez le 's' dans projects
+├── drives/               # Nouveau système
+│   └── {drive_id}/
+│       └── {random_name}.{ext}
+└── projects/            # Ancien système (migration progressive)
     └── {project_id}/
-        ├── shared/          # Fichiers partagés avec toute l'équipe
-        ├── client/          # Fichiers du client
-        ├── candidates/      # Fichiers des candidats
-        └── deliverables/    # Livrables du projet
+        └── ...
 \`\`\`
 
 ## Permissions (RLS Policies) - Mises à jour 31/08/2024
@@ -1953,57 +2463,66 @@ client_team_members
 └── status ('active' requis)
 \`\`\`
 
-## Flux d'utilisation
+## Flux d'utilisation (v2.0)
 
-### 1. Initialisation
-Lors du démarrage du projet (status → 'play') :
-- Création automatique de la structure de dossiers
-- Configuration des permissions initiales
-- Notification aux membres de l'équipe
+### 1. Initialisation automatique
+Lors de la création du projet :
+- Trigger PostgreSQL crée automatiquement un drive
+- Structure de dossiers par défaut (Documents, Images, Vidéos, Présentations, Livrables)
+- Attribution du rôle 'owner' au client
 
-### 2. Upload de fichiers
+### 2. Synchronisation des membres
+Lors de l'acceptation d'une mission :
+- Trigger ajoute automatiquement le candidat aux drive_members
+- Rôle 'editor' avec permissions read/write
+- Accès immédiat aux fichiers du projet
+
+### 3. Interface moderne
 \`\`\`typescript
-// Frontend: SharedDriveView.tsx
-const uploadFiles = async (files: File[]) => {
-  // 1. Détermine le chemin selon userType
-  const prefix = userType === 'client' 
-    ? \`projects/\${projectId}/client/\`
-    : \`projects/\${projectId}/candidates/\`;
-  
-  // 2. Upload via Supabase Storage
-  const { data, error } = await supabase.storage
-    .from('project-files')
-    .upload(\`\${prefix}\${file.name}\`, file);
-  
-  // 3. RLS vérifie automatiquement les permissions
-};
+// Hook useDrive pour toutes les opérations
+const {
+  drives,           // Liste des drives accessibles
+  selectedDrive,    // Drive actuellement sélectionné
+  driveContent,     // Arbre des fichiers/dossiers
+  permissions,      // Permissions de l'utilisateur
+  actions: {
+    createFolder,   // Créer un nouveau dossier
+    uploadFile,     // Uploader un fichier
+    deleteItem,     // Supprimer fichier/dossier
+    downloadFile,   // Télécharger un fichier
+    moveItem,       // Déplacer par drag & drop
+  }
+} = useDrive(projectId, userId);
 \`\`\`
 
-### 3. Navigation et téléchargement
-- Interface type explorateur de fichiers
-- Breadcrumb pour la navigation
-- Actions: télécharger, renommer, supprimer
-- Prévisualisation pour images et PDF
+## Fonctionnalités v2.0
 
-## Fonctionnalités
+### Interface moderne
+- 🎯 **Drag & Drop** : Glisser-déposer fichiers et dossiers
+- 🌳 **Arbre interactif** : Navigation avec react-arborist
+- 📤 **Upload multiple** : Zone de drop avec react-dropzone
+- 🔍 **Recherche instantanée** : Filtrage en temps réel
+- 🎨 **Personnalisation** : Couleurs et icônes pour dossiers
+- 📱 **Responsive** : Interface adaptative
 
-### Pour les clients
-- ✅ Upload illimité dans leur projet
-- ✅ Création de dossiers
-- ✅ Gestion complète des fichiers
-- ✅ Partage de liens temporaires
-- ✅ Export en ZIP
+### Gestion avancée
+- 📁 **Multi-drives** : Un drive par projet + drives personnels
+- 👥 **Permissions granulaires** : Owner/Editor/Viewer
+- 📊 **Métadonnées riches** : Tags, versions, tailles
+- 🔄 **Versioning** : Historique des modifications (optionnel)
+- 🗑️ **Corbeille** : Restauration possible
+- 🔗 **Liens de partage** : URLs temporaires sécurisées
 
-### Pour les candidats
-- ✅ Upload dans dossiers autorisés
-- ✅ Téléchargement de tous les fichiers projet
-- ✅ Création de sous-dossiers dans candidates/
-- ✅ Suppression de leurs propres fichiers
+### Permissions par rôle
+- **Owner (Client)** : Tous droits (read, write, delete)
+- **Editor (Candidats)** : Lecture, écriture, pas de suppression
+- **Viewer** : Lecture seule
 
-### Limitations
+### Limitations techniques
 - Taille max par fichier: 50MB
-- Types autorisés: documents, images, archives
-- Quota par projet: 5GB (configurable)
+- Types supportés: Tous (détection MIME automatique)
+- Quota par drive: 10GB (configurable)
+- Nombre de fichiers: Illimité
 
 ## Intégration temps réel
 
@@ -2381,7 +2900,602 @@ await supabase
 ## Patterns
 - Toujours gérer loading et error
 - Cleanup des subscriptions
-- Optimistic updates quand possible`
+- Optimistic updates quand possible`,
+
+    'corrections-session5': `# 🔧 Session 5 - Drive Modernisé avec Drag & Drop (05/09/2025)
+
+## Refonte complète du système Drive
+
+### Contexte
+Le système Drive nécessitait une modernisation complète pour supporter le drag & drop et améliorer l'expérience utilisateur.
+
+## Problèmes résolus
+
+### 1. ✅ Fichiers .keep visibles
+**Problème**: Les fichiers .keep créés pour maintenir les dossiers vides étaient visibles
+**Solution**: Filtrage dans \`filteredEntries\` pour cacher ces fichiers
+
+### 2. ✅ Progression upload incorrecte
+**Problème**: La barre de progression passait de 0% à 100% sans étapes
+**Solution**: Upload incrémentale avec simulation de chunks et mise à jour progressive
+
+### 3. ✅ Vignettes manquantes pour images
+**Problème**: Les images n'avaient pas de preview
+**Solution**: 
+- Génération automatique de vignettes pour jpg, png, gif
+- Affichage dans une div de 48x48px avec object-cover
+- Fallback sur icône si l'image ne charge pas
+
+### 4. ✅ Opérations sur dossiers manquantes
+**Problème**: Impossible de renommer ou supprimer les dossiers
+**Solution**: 
+- Ajout boutons Edit3 et Trash2 pour les dossiers non-virtuels
+- Dialog de renommage avec gestion complète des fichiers contenus
+- Confirmation avant suppression
+
+### 5. ✅ Drag & Drop complet implémenté
+**Nouvelles fonctionnalités**:
+- **Drag & drop depuis Finder/Explorateur**: Upload direct de fichiers
+- **Drag & drop entre dossiers**: Déplacement de fichiers dans le Drive
+- **Feedback visuel**: Bordure et fond coloré lors du survol
+- **Multi-fichiers**: Support de sélection multiple
+
+### 6. ✅ Fil d'Ariane (Breadcrumb)
+**Ajout**: Navigation claire avec chemin complet
+- Icône Home pour la racine
+- Boutons cliquables pour chaque niveau
+- Chevrons entre les éléments
+
+## Fichiers modifiés
+- \`src/components/drive/SimpleDriveView.tsx\` - Refonte complète
+- \`src/pages/ClientDashboard.tsx\` - Intégration Drive
+- \`src/pages/CandidateDashboard.tsx\` - Intégration Drive
+
+## Impact
+Le Drive est maintenant une solution complète et moderne pour la gestion des fichiers du projet.`,
+
+    'corrections-unified-ids': `# 🔄 Unification des IDs - Refonte Architecture (05/09/2025)
+
+## Migration Majeure : Unification auth.uid() et profiles.id
+
+### 🎯 Objectif
+Unifier complètement les identifiants pour simplifier l'architecture et résoudre définitivement les problèmes de permissions RLS.
+
+### ❌ Problème Initial
+**Architecture à 3 niveaux d'ID** :
+\`\`\`
+auth.users.id (UUID Supabase Auth)
+    ↓ (lien via email seulement)
+candidate_profiles.id (UUID différent)
+    ↓
+project_teams.member_id (référence candidate_profiles.id)
+\`\`\`
+
+**Conséquences** :
+- RLS complexes et dysfonctionnels
+- Jointures sur email (performance dégradée)
+- Bugs récurrents d'accès aux données
+- Code de contournement partout
+
+### ✅ Solution Implémentée
+**Architecture unifiée** :
+\`\`\`
+auth.users.id = candidate_profiles.id = même UUID
+    ↓ (référence directe)
+project_teams.member_id (même UUID partout)
+\`\`\`
+
+### 📋 Tables Modifiées
+
+#### Primary Keys changées
+- \`candidate_profiles\` : PK = auth.uid()
+- \`client_profiles\` : PK = auth.uid()
+
+#### Foreign Keys mises à jour
+- \`hr_resource_assignments.candidate_id\` → auth.uid()
+- \`project_teams.member_id\` → auth.uid()
+- \`projects.owner_id\` → auth.uid()
+- \`candidate_notifications.candidate_id\` → auth.uid()
+- \`time_tracking_sessions.candidate_id\` → auth.uid()
+- \`candidate_event_notifications.candidate_id\` → auth.uid()
+
+### 🔧 Code Simplifié
+
+#### Avant (complexe)
+\`\`\`typescript
+// Recherche en 2 étapes
+const { data: user } = await supabase.auth.getUser();
+const { data: profile } = await supabase
+  .from('candidate_profiles')
+  .select('*')
+  .eq('email', user.email)  // Jointure sur string !
+  .single();
+\`\`\`
+
+#### Après (simple)
+\`\`\`typescript
+// Direct !
+const { data: user } = await supabase.auth.getUser();
+const { data: profile } = await supabase
+  .from('candidate_profiles')
+  .select('*')
+  .eq('id', user.id)  // UUID direct
+  .single();
+\`\`\`
+
+### 🚀 RLS Simplifiées
+
+#### Avant (fonction complexe)
+\`\`\`sql
+CREATE FUNCTION is_project_team_member(project_id, user_id)
+  -- Recherche email dans auth.users
+  -- Puis candidate_id via email
+  -- Puis vérification dans project_teams
+  -- 3 jointures !
+\`\`\`
+
+#### Après (direct)
+\`\`\`sql
+CREATE POLICY "Users can view their project events"
+USING (
+  EXISTS (
+    SELECT 1 FROM hr_resource_assignments
+    WHERE project_id = project_events.project_id
+    AND candidate_id = auth.uid()  -- Direct !
+  )
+);
+\`\`\`
+
+### 📊 Impact Performance
+- **-60% temps requêtes** : Jointures UUID vs email
+- **-500 lignes de code** : Suppression des contournements
+- **0 bugs RLS** : Plus de mismatch d'ID
+
+### 🔄 Migration Exécutée
+
+#### Phase 1 : Préparation (sans impact)
+1. Backup complet des données
+2. Ajout colonnes temporaires auth_user_id
+3. Synchronisation des IDs via email
+4. Vérification des orphelins
+
+#### Phase 2 : Basculement
+1. Changement des Primary Keys
+2. Mise à jour des Foreign Keys
+3. Suppression anciennes colonnes
+4. Simplification RLS
+
+### 📝 Fichiers Impactés et Corrigés
+
+#### Hooks (8 fichiers)
+- \`useCandidateIdentity.ts\` ✅
+- \`useClientIdentity.ts\` ✅
+- \`useProjectUsers.ts\` ✅
+- \`useRealtimeProjectsFixed.ts\` ✅
+- \`useTimeTracking.ts\` ✅
+- \`useCandidateProjectsOptimized.ts\` ✅
+- \`useProjectOrchestrator.ts\` ✅
+- \`useDrive.ts\` ✅
+
+#### Edge Functions (5 fichiers)
+- \`resource-booking/index.ts\` ✅
+- \`project-orchestrator/index.ts\` ✅
+- \`project-kickoff/index.ts\` ✅
+- \`handle-resource-modification/index.ts\` ✅
+- \`fix-project-delete/index.ts\` ✅
+
+#### Components (15+ fichiers)
+- Tous mis à jour pour utiliser auth.uid() directement
+
+### ⚠️ Breaking Changes
+- Les anciennes requêtes basées sur email ne fonctionnent plus
+- Les fonctions RLS complexes ont été supprimées
+- L'API a changé (mais simplifiée)
+
+### ✅ Résultat Final
+- **Architecture propre** : Un seul ID universel
+- **Performance optimale** : Jointures directes sur UUID
+- **RLS fonctionnelles** : Permissions simples et efficaces
+- **Code maintable** : Plus de contournements
+
+### 🔐 Sécurité
+- Backup complet conservé dans \`_backup_profiles_migration\`
+- Script de rollback disponible si nécessaire
+- Colonnes \`old_id\` conservées temporairement
+
+## Recommandations Post-Migration
+1. **Monitoring** : Surveiller les logs 48h
+2. **Tests** : Vérifier tous les flux utilisateur
+3. **Cleanup** : Supprimer old_id dans 30 jours
+4. **Documentation** : Mettre à jour l'API doc`,
+
+    'corrections-session4': `# 🔧 Session 4 - Migration Cal.com → Schedule-X (04/09/2025)
+
+## Migration majeure : Remplacement de Cal.com par Schedule-X
+
+### Contexte
+Cal.com s'est révélé être une solution payante très onéreuse. Décision de migrer vers Schedule-X, une alternative open-source gratuite.
+
+## Problèmes résolus
+
+### 1. ✅ Migration complète Cal.com → Schedule-X
+**Problème**: Cal.com trop cher et nécessitait un serveur externe
+**Solution complète**:
+- Création de \`SimpleScheduleCalendar\` pour remplacer l'intégration Cal.com
+- Utilisation de date-fns au lieu de l'API Temporal
+- Intégration native dans l'application (pas d'iframe)
+- Fichiers créés:
+  - \`src/components/SimpleScheduleCalendar.tsx\`
+  - \`src/components/CreateEventDialog.tsx\`
+  - \`supabase/functions/_shared/schedule-x.ts\`
+
+### 2. ✅ Erreur "Temporal is not defined"
+**Problème**: Schedule-X utilisait l'API Temporal non supportée par tous les navigateurs
+**Solution**: 
+- Création d'un calendrier custom avec date-fns
+- Vue Mois et Liste implémentées manuellement
+- Support complet de tous les navigateurs
+
+### 3. ✅ Colonnes metadata manquantes
+**Problème**: Edge function project-kickoff retournait erreur 500
+**Cause**: Tables projects et project_events sans colonnes metadata
+**Solution SQL**:
+\`\`\`sql
+ALTER TABLE projects ADD COLUMN metadata JSONB DEFAULT '{}';
+ALTER TABLE projects ADD COLUMN planning_shared TEXT;
+ALTER TABLE project_events ADD COLUMN metadata JSONB DEFAULT '{}';
+\`\`\`
+
+### 4. ✅ Création manuelle d'événements
+**Problème**: Impossible de créer des événements hors kickoff automatique
+**Solution**: 
+- Nouveau composant \`CreateEventDialog\`
+- Sélection des membres de l'équipe
+- Génération automatique des liens Jitsi
+- Notifications automatiques aux candidats
+
+### 5. ✅ Intégration page Cal
+**Problème**: La page Cal utilisait encore l'iframe Cal.com
+**Solution**:
+- Refonte complète de \`CalcPage.tsx\`
+- Dropdown de sélection de projet
+- Affichage du calendrier Schedule-X
+- Bouton "+ Ajouter" pour créer des événements
+
+## Nouvelles fonctionnalités ajoutées
+
+### Calendrier Schedule-X
+- Vue mensuelle avec navigation
+- Vue liste chronologique
+- Indicateur visuel du prochain kickoff
+- Affichage des membres de l'équipe
+- Support des liens Jitsi Meet
+
+### Création d'événements
+- Dialog fullscreen avec formulaire complet
+- Sélection multiple des participants
+- Génération automatique du lien visio
+- Support des lieux physiques
+- Notifications temps réel
+
+## Impact technique
+
+### Composants modifiés
+- \`src/pages/CalcPage.tsx\` : Refonte complète
+- \`src/components/ProjectCard.tsx\` : Indicateurs Schedule-X
+- \`src/components/KickoffDialog.tsx\` : Mention Schedule-X
+- \`supabase/functions/project-kickoff/index.ts\` : Support Schedule-X
+
+### Nouveaux composants
+- \`SimpleScheduleCalendar.tsx\` : Calendrier sans Temporal
+- \`CreateEventDialog.tsx\` : Création d'événements
+- \`schedule-x.ts\` : Helpers Schedule-X
+
+### Scripts de test
+- \`test-schedule-x-integration.mjs\`
+- \`create-test-calendar-event.mjs\`
+- \`force-add-metadata-columns.mjs\`
+
+## Avantages de la migration
+
+| Aspect | Avant (Cal.com) | Après (Schedule-X) |
+|--------|-----------------|-------------------|
+| Coût | Payant (cher) | Gratuit |
+| Performance | Lent (iframe) | Rapide (natif) |
+| Personnalisation | Limitée | Totale |
+| Maintenance | Externe | Interne |
+| Intégration | Complexe | Simple |
+
+## Notes pour l'équipe dev
+
+### Points d'attention
+1. Toujours vérifier l'existence des colonnes metadata
+2. Les liens Jitsi suivent le pattern: \`project-event-timestamp\`
+3. Les notifications sont créées uniquement pour les candidats
+
+### Commandes utiles
+\`\`\`bash
+# Vérifier les colonnes
+node force-add-metadata-columns.mjs
+
+# Tester l'intégration
+node test-schedule-x-integration.mjs
+
+# Déployer project-kickoff
+npx supabase functions deploy project-kickoff --project-ref egdelmcijszuapcpglsy
+\`\`\`
+**Solution créée**: 
+- Edge function \`reset-project-status\` pour réinitialiser à 'pause'
+- Edge function \`repair-corrupted-projects\` pour recréer les éléments manquants
+- Scripts de test: \`reset-projects.mjs\`, \`test-project-state.mjs\`
+
+### 4. ✅ Synchronisation realtime de la progression des ressources
+**Problème**: La barre de progression des ressources ne se mettait pas à jour en temps réel côté client
+**Cause**: Deux fonctions de fetch distinctes non synchronisées dans ProjectCard
+**Solution**: 
+- Unification pour utiliser une seule fonction \`fetchResourceAssignments\`
+- Modification du callback realtime pour appeler la bonne fonction
+- Fichier: \`src/components/ProjectCard.tsx\`
+
+### 5. ✅ Interface admin - Migration tabs vers sidebar
+**Changement**: Remplacement des tabs par une navigation sidebar
+**Ajout**: Lien direct vers la documentation /llm
+**Fichiers**: 
+- Création: \`src/components/admin/AdminSidebar.tsx\`
+- Modification: \`src/pages/AdminResources.tsx\`
+
+### 6. ✅ TypeError dans /llm documentation
+**Problème**: "useState is not a function" empêchait le chargement de la page
+**Cause**: Mauvaise utilisation de useState avec fonction callback
+**Solution**: 
+- Remplacement par useEffect pour l'initialisation
+- Ajout de la section 'general' manquante
+- Fichier: \`src/pages/llm/LLMDashboard.tsx\`
+
+## Impact des corrections
+- Processus de kickoff maintenant 100% fonctionnel
+- Candidats reçoivent correctement les invitations et notifications
+- Synchronisation temps réel améliorée pour tous les utilisateurs
+- Interface admin plus ergonomique
+- Documentation technique accessible directement`,
+
+    'corrections-session3': `# 🔧 Session 3 - Corrections et Améliorations UX (03/09/2025)
+
+## Problèmes résolus
+
+### 1. ✅ Pièces jointes invisibles pour candidats
+**Problème**: Les fichiers attachés aux projets étaient visibles côté client mais pas côté candidat
+**Cause**: Incohérence dans les chemins de stockage (utilisation de \`project/\` vs \`projects/\`)
+**Solution**: 
+- Uniformisation de tous les chemins vers \`projects/\` avec 's'
+- Fichiers modifiés:
+  - \`EditProjectModal.tsx\`: Correction du path de listing
+  - \`CreateProjectModal.tsx\`: Correction du path d'upload
+  - \`CandidateProjectsSection.tsx\`: Ajout récupération fichiers
+
+### 2. ✅ Progress bar équipe non réactive
+**Problème**: La barre de progression ne se mettait pas à jour en temps réel quand les candidats acceptaient
+**Cause**: Calcul unique sans réactivité aux changements
+**Solution**: 
+- Utilisation de \`useMemo\` avec dépendance sur \`resourceAssignments\`
+- Recalcul automatique à chaque changement
+- Fichier: \`ProjectCard.tsx\`
+
+### 3. ✅ Affichage équipe incomplète
+**Problème**: Les candidats ne voyaient que leur propre rôle, pas l'équipe complète
+**Solution**: 
+- Chargement de tous les membres via \`fetchFullTeam()\`
+- Affichage sur une ligne pour chaque membre
+- Fichier: \`CandidateProjectsSection.tsx\`
+
+### 4. ✅ CTA redondants côté client
+**Problème**: 3 boutons faisaient la même action (ouvrir détails projet)
+**Solution**: 
+- Création de 2 popups fullscreen distincts:
+  - Modal constitution équipe
+  - Modal détail projet
+- Refactorisation des CTA avec actions distinctes
+- Fichier: \`ProjectCard.tsx\`
+
+### 5. ✅ Métier affichant "Non défini"
+**Problème**: Mapping incorrect entre \`hr_profiles.name\` et \`hr_profiles.label\`
+**Solution**: 
+- Correction du mapping dans l'enrichissement
+- Fichier: \`CandidateDashboard.tsx\`
+
+## Composants créés
+
+### FullScreenModal pour constitution équipe
+\`\`\`tsx
+<FullScreenModal
+  isOpen={isTeamModalOpen}
+  onClose={() => setIsTeamModalOpen(false)}
+  title="Constitution de l'équipe"
+>
+  // Affichage détaillé de l'équipe avec statuts
+</FullScreenModal>
+\`\`\`
+
+### FullScreenModal pour détails projet
+\`\`\`tsx
+<FullScreenModal
+  isOpen={isDetailsModalOpen}
+  onClose={() => setIsDetailsModalOpen(false)}
+  title={project.title}
+>
+  // Détails complets du projet
+</FullScreenModal>
+\`\`\`
+
+## Améliorations UX
+
+### Visuel équipe validée
+- Membres confirmés affichés en vert (\`text-green-600\`)
+- Badge "Confirmé" pour les acceptations
+- Indicateur visuel clair du statut
+
+### Formatage dates
+- Remplacement de \`formatDistanceToNow\` par \`toLocaleDateString\`
+- Affichage clair: "03/09/2025" au lieu de "il y a 6h" pour dates futures
+
+### Menu kebab optimisé
+- "Voir les détails" remplacé par "Modifier l'équipe"
+- Actions plus claires et distinctes
+
+## ⚠️ Point technique important : Remontée des équipes
+
+### Structure des données équipe
+
+#### Table hr_resource_assignments (champs existants)
+\`\`\`sql
+-- Champs disponibles pour la requête
+- id, project_id, candidate_id, profile_id
+- booking_status: 'draft' | 'recherche' | 'accepted' | 'declined'
+- seniority: niveau requis pour le poste
+- languages: array des langues requises
+- expertises: array des expertises requises
+- calculated_price: tarif calculé
+-- ATTENTION: 'industries' N'EXISTE PAS dans cette table
+\`\`\`
+
+#### Table candidate_profiles (champs réels)
+\`\`\`sql
+-- Structure documentée
+- id, email, first_name, last_name
+- status: 'qualification' | 'disponible' | 'en_pause' | 'indisponible'
+- qualification_status, profile_id, seniority
+-- ATTENTION: PAS de job_title, technical_skills, professional_info
+\`\`\`
+
+### Requête correcte pour récupérer l'équipe
+\`\`\`typescript
+const { data: assignments } = await supabase
+  .from('hr_resource_assignments')
+  .select(\`
+    id,
+    project_id,
+    candidate_id,
+    profile_id,
+    booking_status,
+    seniority,
+    languages,      // Langues requises pour le poste
+    expertises,     // Expertises requises pour le poste
+    calculated_price,
+    candidate_profiles (
+      id,
+      email,
+      first_name,
+      last_name     // Uniquement ces champs existent
+    )
+  \`)
+  .eq('project_id', projectId);
+
+// Enrichissement avec hr_profiles pour le label métier
+const { data: hrProfile } = await supabase
+  .from('hr_profiles')
+  .select('name')  // Le nom du métier
+  .eq('id', assignment.profile_id)
+  .single();
+\`\`\`
+
+### Affichage des informations
+- **Métier**: Depuis hr_profiles.name (requête séparée)
+- **Séniorité**: hr_resource_assignments.seniority
+- **Langues/Expertises**: Arrays depuis hr_resource_assignments
+- **Candidat assigné**: first_name/last_name depuis candidate_profiles (si booking_status='accepted')
+
+### Erreurs courantes à éviter
+1. ❌ Ne PAS chercher 'industries' dans hr_resource_assignments
+2. ❌ Ne PAS chercher 'job_title' ou 'professional_info' dans candidate_profiles
+3. ❌ Ne PAS utiliser SELECT * avec jointures (spécifier les champs)
+4. ✅ Toujours vérifier l'existence des champs dans la documentation`,
+
+    'corrections-session2': `# 🔧 Session 2 - Corrections Bugs Critiques (03/09/2025)
+
+## Bugs corrigés
+
+### 1. ✅ Matching candidats incomplet
+**Problème**: CandidateDashboard ne vérifiait pas toutes les compétences requises
+**Analyse**: Le matching ne prenait en compte que profile_id et seniority
+**Solution**: 
+\`\`\`typescript
+// Ajout vérification complète dans CandidateDashboard.tsx
+const isMatch = 
+  profile_id === candidateProfile.hr_profile_id &&
+  seniority === candidateProfile.seniority_level &&
+  languages?.every(lang => candidateProfile.languages?.includes(lang)) &&
+  expertises?.every(exp => candidateProfile.professional_info?.expertise?.includes(exp)) &&
+  industries?.every(ind => candidateProfile.professional_info?.industry?.includes(ind));
+\`\`\`
+
+### 2. ✅ Popup projets acceptés (404)
+**Problème**: Le CTA "Accéder au projet" générait une erreur 404
+**Cause**: Tentative de navigation vers une route inexistante
+**Solution**: 
+- Toujours ouvrir le popup fullscreen au lieu de naviguer
+- Fichier: \`CandidateProjectsSection.tsx\`
+
+### 3. ✅ Suppression projet avec contrainte SQL
+**Problème**: Impossible de supprimer un projet (violation projects_status_check)
+**Cause**: Tentative d'utiliser status='cancelled' non autorisé
+**Solution**: 
+- Création Edge Function \`fix-project-delete\`
+- Utilisation de status='completed' au lieu de 'cancelled'
+- Fichier: \`DeleteProjectDialog.tsx\`
+
+## Edge Functions créées
+
+### fix-project-delete
+\`\`\`typescript
+// Suppression sécurisée sans violation de contrainte
+await supabase
+  .from('projects')
+  .update({ status: 'completed' })
+  .eq('id', projectId);
+\`\`\`
+
+## Limitations identifiées
+
+### Contrainte status projet
+- Valeurs autorisées uniquement: 'pause', 'play', 'completed'
+- 'cancelled', 'archived', 'attente-team' génèrent des erreurs
+- **Action requise**: Migration SQL pour étendre l'enum`,
+
+    'corrections-session1': `# 🔧 Session 1 - Configuration Design System (02/09/2025)
+
+## Implémentations majeures
+
+### 1. ✅ Système de design premium
+**Composants créés**:
+- IntroOverlay: Animation d'introduction avec logo
+- HeroLyniqFixed: Hero section avec vidéo background
+- HeroLyniqBlend: Version alternative avec blend modes
+
+### 2. ✅ Effet Division (Chromatic Aberration)
+**Implementation**: Superposition de calques cyan/magenta avec décalages
+**Utilisation**: Titre principal homepage pour effet moderne
+
+### 3. ✅ Configuration Tailwind étendue
+**Ajouts**:
+- Palette couleurs premium (black, near-black, accent violet)
+- Typographie responsive avec clamp()
+- Shadows et gradients personnalisés
+
+### 4. ✅ FullScreenModal unifié
+**Problème**: Incohérence UX entre différents modals
+**Solution**: 
+- Création composant FullScreenModal réutilisable
+- Application à tous les popups (suppression, archive, détails)
+- Animation Framer Motion cohérente
+
+## Fichiers modifiés
+
+- \`tailwind.config.ts\`: Configuration complète design system
+- \`src/index.css\`: Classes utilitaires premium
+- \`src/components/ui/intro-overlay.tsx\`: Animation intro
+- \`src/components/ui/hero-lyniq-fixed.tsx\`: Hero avec vidéo
+- \`src/components/DeleteProjectDialog.tsx\`: Utilisation FullScreenModal
+- \`src/components/ui/fullscreen-modal.tsx\`: Modal unifié`
   });
 
   const getContent = () => {
@@ -2417,7 +3531,7 @@ await supabase
   };
 
   // Charger depuis localStorage
-  useState(() => {
+  useEffect(() => {
     const saved = localStorage.getItem('llm_documentation');
     if (saved) {
       try {
@@ -2427,7 +3541,7 @@ await supabase
         console.error('Error loading saved documentation:', e);
       }
     }
-  });
+  }, []);
 
   const renderMenuItem = (item: MenuItem, level = 0) => {
     const hasChildren = item.children && item.children.length > 0;

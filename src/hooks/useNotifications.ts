@@ -187,7 +187,7 @@ export const useNotifications = () => {
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
         .select('id')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (!candidateProfile) {

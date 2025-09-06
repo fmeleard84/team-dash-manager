@@ -243,7 +243,7 @@ export const useMessages = (projectId?: string) => {
   const markAsRead = async (threadId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) return;
+      if (!user?.id) return;
 
       // Get unread messages in this thread
       const { data: unreadMessages } = await supabase
@@ -272,7 +272,7 @@ export const useMessages = (projectId?: string) => {
         .from('message_participants')
         .update({ last_read_at: new Date().toISOString() })
         .eq('thread_id', threadId)
-        .eq('email', user.email);
+        .eq('id', user.id);
 
     } catch (error: any) {
       console.error('Error marking messages as read:', error);

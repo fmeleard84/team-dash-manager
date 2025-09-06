@@ -100,16 +100,27 @@ export function ProjectsSection({
   const [selectedFilters, setSelectedFilters] = useState<string[]>(['en-cours', 'nouveau', 'attente-team', 'pause']);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Fusionner tous les projets avec leur catégorie
+  // Fusionner tous les projets avec leur catégorie et mapper les noms de propriétés
   const allProjects = [
     ...projects.map(p => ({ 
       ...p, 
+      // Mapper les noms de propriétés pour ProjectCard
+      date: p.project_date,
+      clientBudget: p.client_budget,
+      dueDate: p.due_date,
       category: p.status === 'play' ? 'en-cours' : 
                 p.status === 'attente-team' ? 'attente-team' : 
                 p.status === 'pause' ? 'pause' : 
                 p.status === 'completed' ? 'completed' : 'nouveau' 
     })),
-    ...archivedProjects.map(p => ({ ...p, category: 'archived' }))
+    ...archivedProjects.map(p => ({ 
+      ...p, 
+      // Mapper les noms de propriétés pour ProjectCard
+      date: p.project_date,
+      clientBudget: p.client_budget,
+      dueDate: p.due_date,
+      category: 'archived' 
+    }))
   ];
 
   // Projets filtrés
@@ -318,7 +329,7 @@ export function ProjectsSection({
                   isArchived={project.category === 'archived'}
                   onView={() => onViewProject(project.id)}
                   onStatusToggle={(id, _) => onToggleStatus(id, project.status)}
-                  onStart={() => onStartProject(project)}
+                  onStart={(projectWithKickoff) => onStartProject(projectWithKickoff)}
                   onDelete={() => onDeleteRequest(project)}
                   onArchive={() => onArchiveProject(project.id)}
                   onUnarchive={() => onUnarchiveProject(project.id)}

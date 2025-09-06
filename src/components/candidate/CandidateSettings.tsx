@@ -89,11 +89,11 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
       
       // Si le numéro de téléphone n'est pas dans candidate_profiles, le chercher dans profiles
       let phone = data.phone || '';
-      if (!phone && data.user_id) {
+      if (!phone) {
         const { data: profileData } = await supabase
           .from('profiles')
           .select('phone')
-          .eq('id', data.user_id)
+          .eq('id', candidateId)  // Utiliser directement candidateId (ID universel)
           .single();
         
         if (profileData?.phone) {
@@ -244,19 +244,18 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
       if (candidateError) throw candidateError;
 
       // Mettre à jour aussi profiles pour le téléphone (pour l'affichage dans AuthContext)
-      if (candidateData?.user_id) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            first_name: personalInfo.first_name,
-            last_name: personalInfo.last_name,
-            phone: personalInfo.phone
-          })
-          .eq('id', candidateData.user_id);
+      // Avec l'ID universel, on utilise directement candidateId
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: personalInfo.first_name,
+          last_name: personalInfo.last_name,
+          phone: personalInfo.phone
+        })
+        .eq('id', candidateId);
 
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
-        }
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
       }
 
       toast({

@@ -1,165 +1,143 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const { email } = await req.json()
-    const targetEmail = email || 'fmeleard+ressource_5@gmail.com'
-
-    console.log('🔧 Création profil candidat pour:', targetEmail)
-
-    // 1. Récupérer le profil utilisateur
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('*')
-      .eq('email', targetEmail)
-      .single()
-
-    if (profileError || !profile) {
-      console.error('❌ Profil utilisateur non trouvé:', profileError)
-      return new Response(
-        JSON.stringify({ error: 'User profile not found', details: profileError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
-      )
+    const { candidateId } = await req.json();
+    
+    if (!candidateId) {
+      throw new Error('candidateId is required');
     }
 
-    console.log('✅ Profil utilisateur trouvé:', profile.id)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 2. Vérifier si le profil candidat existe déjà
-    const { data: existingCandidate } = await supabaseClient
+    console.log(`🔧 Création du profil pour le candidat ${candidateId}...`);
+
+    // 1. Récupérer les infos de l'utilisateur depuis auth.users
+    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(candidateId);
+    
+    if (userError || !user) {
+      console.error('Utilisateur non trouvé dans auth.users');
+      throw new Error(`Utilisateur non trouvé: ${userError?.message || 'Unknown error'}`);
+    }
+
+    console.log('Utilisateur trouvé:', user.email);
+    console.log('Metadata:', user.user_metadata);
+
+    // 2. Vérifier si le profil existe déjà
+    const { data: existingProfile } = await supabase
       .from('candidate_profiles')
       .select('*')
-      .eq('email', targetEmail)
-      .maybeSingle()
+      .eq('id', candidateId)
+      .maybeSingle();
 
-    console.log('🔍 Existing candidate check:', existingCandidate)
-
-    if (existingCandidate && !req.url.includes('force=true')) {
-      console.log('⚠️ Profil candidat existe déjà:', existingCandidate.id)
+    if (existingProfile) {
+      console.log('Le profil existe déjà');
+      const needsOnboarding = !existingProfile.profile_id || !existingProfile.seniority;
+      
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Candidate profile already exists',
-          candidateId: existingCandidate.id,
-          candidate: existingCandidate
+        JSON.stringify({
+          success: true,
+          message: 'Le profil existe déjà',
+          profile: existingProfile,
+          needsOnboarding
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
     }
 
-    // 3. Récupérer l'ID du profil "Directeur marketing"
-    const { data: marketingProfile, error: profileIdError } = await supabaseClient
-      .from('hr_profiles')
-      .select('id')
-      .eq('name', 'Directeur marketing')
-      .single()
+    // 3. Créer le profil candidat avec l'ID universel
+    console.log('Création du profil candidat...');
+    
+    const profileData = {
+      id: candidateId, // ID universel
+      email: user.email || '',
+      first_name: user.user_metadata?.first_name || user.user_metadata?.firstName || '',
+      last_name: user.user_metadata?.last_name || user.user_metadata?.lastName || '',
+      phone: user.user_metadata?.phone || '',
+      status: 'disponible', // Statut initial disponible
+      qualification_status: 'pending',
+      seniority: 'junior', // Valeur par défaut, sera changée dans l'onboarding
+      profile_id: null, // NULL pour forcer l'onboarding
+      daily_rate: 0,
+      password_hash: '',
+      is_email_verified: user.email_confirmed_at !== null
+    };
 
-    if (profileIdError || !marketingProfile) {
-      console.error('❌ Profil marketing non trouvé:', profileIdError)
-      return new Response(
-        JSON.stringify({ error: 'Marketing profile not found', details: profileIdError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
-      )
-    }
-
-    console.log('✅ Profil marketing trouvé:', marketingProfile.id)
-
-    // 4. Créer le profil candidat
-    const { data: newCandidate, error: createError } = await supabaseClient
+    const { data: newProfile, error: insertError } = await supabase
       .from('candidate_profiles')
-      .insert({
-        email: targetEmail,
-        first_name: profile.first_name || 'Meleard R',
-        last_name: profile.last_name || 'Francis R',
-        profile_id: marketingProfile.id,
-        seniority: 'intermediate',
-        qualification_status: 'qualified',
-        status: 'disponible',
-        password_hash: '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .insert(profileData)
       .select()
-      .single()
+      .single();
 
-    if (createError) {
-      console.error('❌ Erreur création candidat:', createError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to create candidate profile', details: createError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
+    if (insertError) {
+      console.error('Erreur création profil candidat:', insertError);
+      throw insertError;
     }
 
-    console.log('✅ Profil candidat créé:', newCandidate.id)
+    console.log('✅ Profil candidat créé avec succès');
 
-    // 5. Ajouter les langues (Français et Anglais)
-    const { data: languages, error: languagesError } = await supabaseClient
-      .from('hr_languages')
-      .select('id, name')
-      .in('name', ['Français', 'Anglais'])
-
-    if (!languagesError && languages) {
-      const languageInserts = languages.map(lang => ({
-        candidate_id: newCandidate.id,
-        language_id: lang.id
-      }))
-
-      await supabaseClient
-        .from('candidate_languages')
-        .insert(languageInserts)
-
-      console.log('✅ Langues ajoutées:', languages.map(l => l.name).join(', '))
-    }
-
-    // 6. Ajouter les expertises (Google Ads et Content Marketing)
-    const { data: expertises, error: expertisesError } = await supabaseClient
-      .from('hr_expertises')
-      .select('id, name')
-      .in('name', ['Google Ads', 'Content Marketing'])
-
-    if (!expertisesError && expertises) {
-      const expertiseInserts = expertises.map(exp => ({
-        candidate_id: newCandidate.id,
-        expertise_id: exp.id
-      }))
-
-      await supabaseClient
-        .from('candidate_expertises')
-        .insert(expertiseInserts)
-
-      console.log('✅ Expertises ajoutées:', expertises.map(e => e.name).join(', '))
+    // 4. Créer aussi dans la table profiles si nécessaire
+    const { error: profilesError } = await supabase
+      .from('profiles')
+      .insert({
+        id: candidateId,
+        email: user.email || '',
+        role: 'candidate',
+        first_name: user.user_metadata?.first_name || user.user_metadata?.firstName || '',
+        last_name: user.user_metadata?.last_name || user.user_metadata?.lastName || '',
+        phone: user.user_metadata?.phone || ''
+      });
+    
+    if (profilesError && profilesError.code !== '23505') { // Ignorer si existe déjà
+      console.log('Note: Profil général déjà existant ou erreur:', profilesError.message);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Profil candidat créé avec succès',
-        candidateProfile: newCandidate,
-        languages: languages?.map(l => l.name) || [],
-        expertises: expertises?.map(e => e.name) || []
+        message: 'Profil créé avec succès - L\'onboarding va se déclencher',
+        profile: newProfile,
+        needsOnboarding: true
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
+    );
 
   } catch (error) {
-    console.error('💥 Erreur:', error)
+    console.error('Erreur:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    )
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Erreur lors de la création du profil candidat'
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        }, 
+        status: 500 
+      }
+    );
   }
-})
+});

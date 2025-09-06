@@ -98,11 +98,11 @@ export default function CandidateSkillTest() {
       if (!user?.id) return;
 
       try {
-        // Récupérer le profil du candidat
+        // Récupérer le profil du candidat avec l'ID universel
         const { data: candidateData, error: candidateError } = await supabase
           .from('candidate_profiles')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('id', user.id)  // ID universel maintenant
           .single();
 
         if (candidateError) throw candidateError;

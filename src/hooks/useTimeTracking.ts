@@ -38,7 +38,7 @@ export const useTimeTracking = () => {
 
   // Load candidate's hourly rate
   const loadCandidateRate = async () => {
-    if (!user?.email) return;
+    if (!user?.id) return;
 
     try {
       // Get candidate profile
@@ -58,7 +58,7 @@ export const useTimeTracking = () => {
             )
           )
         `)
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (!candidateProfile) return;
@@ -138,7 +138,7 @@ export const useTimeTracking = () => {
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
         .select('id, first_name, last_name')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (!candidateProfile) {
@@ -332,7 +332,7 @@ export const useTimeTracking = () => {
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
         .select('id')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (!candidateProfile) return;
@@ -376,7 +376,7 @@ export const useTimeTracking = () => {
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
         .select('id')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (!candidateProfile) return;

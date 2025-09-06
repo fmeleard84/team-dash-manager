@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FullScreenModal, ModalActions } from '@/components/ui/fullscreen-modal';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   FolderOpen, 
   Filter,
@@ -17,7 +18,9 @@ import {
   Eye,
   X,
   FileText,
-  Euro
+  Euro,
+  Paperclip,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -39,6 +42,8 @@ interface CandidateProject {
     booking_status: string;
     profile_id: string;
     seniority: string;
+    languages?: string[];
+    expertises?: string[];
     start_date?: string;
     end_date?: string;
     hr_profiles?: {
@@ -100,6 +105,111 @@ export function CandidateProjectsSection({
   
   // État pour le modal de détails
   const [selectedProject, setSelectedProject] = useState<CandidateProject | null>(null);
+  const [projectFiles, setProjectFiles] = useState<any[]>([]);
+  const [fullTeam, setFullTeam] = useState<any[]>([]);
+
+  // Fonction pour charger les fichiers du projet
+  const fetchProjectFiles = async (projectId: string) => {
+    try {
+      const { data: files, error } = await supabase.storage
+        .from('project-files')
+        .list(`projects/${projectId}`, {
+          limit: 10,
+          offset: 0
+        });
+      
+      if (error) {
+        console.error("Erreur chargement fichiers:", error);
+      } else if (files && files.length > 0) {
+        // Filtrer les fichiers réels (pas les placeholders)
+        const realFiles = files.filter(file => 
+          !file.name.startsWith('.') && 
+          file.name !== 'undefined' &&
+          file.metadata
+        );
+        setProjectFiles(realFiles);
+      }
+    } catch (error) {
+      console.error("Erreur inattendue chargement fichiers:", error);
+    }
+  };
+
+  // Fonction pour charger toute l'équipe du projet
+  const fetchFullTeam = async (projectId: string) => {
+    console.log("🔍 [fetchFullTeam] Chargement équipe pour projet:", projectId);
+    try {
+      const { data: assignments, error } = await supabase
+        .from('hr_resource_assignments')
+        .select(`
+          id,
+          project_id,
+          candidate_id,
+          profile_id,
+          booking_status,
+          seniority,
+          languages,
+          expertises,
+          calculated_price,
+          created_at,
+          candidate_profiles (
+            id,
+            email,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+      
+      console.log("📊 [fetchFullTeam] Résultat requête:", { assignments, error });
+      
+      if (error) {
+        console.error("❌ [fetchFullTeam] Erreur chargement équipe:", error);
+        setFullTeam([]);
+      } else if (assignments && assignments.length > 0) {
+        console.log(`✅ [fetchFullTeam] ${assignments.length} membres trouvés`);
+        
+        // Enrichir avec les informations hr_profiles
+        const enrichedAssignments = await Promise.all(assignments.map(async (a) => {
+          // Récupérer le hr_profile pour avoir le label du métier
+          const { data: hrProfile, error: profileError } = await supabase
+            .from('hr_profiles')
+            .select('name')
+            .eq('id', a.profile_id)
+            .single();
+          
+          if (profileError) {
+            console.warn("⚠️ [fetchFullTeam] Erreur récupération hr_profile:", profileError);
+          }
+          
+          return {
+            ...a,
+            hr_profiles: hrProfile ? { label: hrProfile.name } : null,
+            candidate_profiles: a.candidate_profiles || null
+          };
+        }));
+        
+        console.log("🎯 [fetchFullTeam] Équipe enrichie:", enrichedAssignments);
+        setFullTeam(enrichedAssignments);
+      } else {
+        console.log("⚠️ [fetchFullTeam] Aucun membre d'équipe trouvé");
+        setFullTeam([]);
+      }
+    } catch (error) {
+      console.error("Erreur inattendue chargement équipe:", error);
+    }
+  };
+
+  // Charger les fichiers et l'équipe quand un projet est sélectionné
+  useEffect(() => {
+    if (selectedProject) {
+      fetchProjectFiles(selectedProject.id);
+      fetchFullTeam(selectedProject.id);
+    } else {
+      setProjectFiles([]);
+      setFullTeam([]);
+    }
+  }, [selectedProject]);
 
   // Catégoriser tous les projets
   const allProjects = [
@@ -109,10 +219,11 @@ export function CandidateProjectsSection({
     })),
     ...activeProjects.map(p => ({ 
       ...p, 
-      // Utiliser booking_status pour déterminer si le projet est terminé pour ce candidat
-      category: p.booking_status === 'completed' ? 'termines' :
-                p.status === 'play' ? 'en-cours' : 
-                p.status === 'completed' ? 'termines' : 'attente-kickoff'
+      // Le candidat a accepté (booking_status='accepted'), donc on regarde le statut du projet
+      category: p.booking_status === 'completed' ? 'termines' :  // Projet terminé pour ce candidat
+                p.status === 'completed' ? 'termines' :  // Projet globalement terminé
+                p.status === 'play' ? 'en-cours' :  // Projet démarré (kickoff fait)
+                'attente-kickoff'  // Projet accepté mais pas encore démarré
     }))
   ];
 
@@ -125,7 +236,7 @@ export function CandidateProjectsSection({
   const statusCounts = {
     'invitations': pendingInvitations.length,
     'en-cours': activeProjects.filter(p => p.booking_status !== 'completed' && p.status === 'play').length,
-    'attente-kickoff': activeProjects.filter(p => p.booking_status !== 'completed' && (p.status === 'attente-team' || p.status === 'pause')).length,
+    'attente-kickoff': activeProjects.filter(p => p.booking_status === 'accepted' && p.status !== 'play' && p.status !== 'completed').length,
     'termines': activeProjects.filter(p => p.booking_status === 'completed' || p.status === 'completed').length,
   };
 
@@ -341,9 +452,10 @@ export function CandidateProjectsSection({
                           <div className="flex items-center gap-1.5 text-gray-600">
                             <Calendar className="w-4 h-4" />
                             <span>
-                              Début {formatDistanceToNow(new Date(project.project_date), { 
-                                addSuffix: true, 
-                                locale: fr 
+                              Début le {new Date(project.project_date).toLocaleDateString('fr-FR', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
                               })}
                             </span>
                           </div>
@@ -358,18 +470,13 @@ export function CandidateProjectsSection({
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        if (project.status === 'play') {
-                          // Pour les projets actifs, naviguer vers le projet
-                          onViewProject(project.id);
-                        } else {
-                          // Pour les autres, ouvrir le modal de détails
-                          setSelectedProject(project);
-                        }
+                        // Toujours ouvrir le modal de détails pour tous les projets
+                        setSelectedProject(project);
                       }}
                       className="flex items-center gap-1"
                     >
                       <Eye className="w-4 h-4" />
-                      {project.status === 'play' ? 'Accéder au projet' : 'Voir les détails'}
+                      Voir les détails du projet
                     </Button>
                     
                     {project.category === 'invitations' && (
@@ -505,7 +612,7 @@ export function CandidateProjectsSection({
                 
                 {/* Budget */}
                 {selectedProject.client_budget && (
-                  <div className="bg-purple-50 rounded-lg p-4 md:col-span-2">
+                  <div className="bg-purple-50 rounded-lg p-4">
                     <div className="flex items-center gap-2 text-sm text-purple-600 mb-1">
                       <Euro className="w-4 h-4" />
                       <span>Budget du projet</span>
@@ -518,7 +625,124 @@ export function CandidateProjectsSection({
                     </p>
                   </div>
                 )}
+
+                {/* Fichiers attachés */}
+                {projectFiles.length > 0 && (
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-sm text-blue-600 mb-3">
+                      <Paperclip className="w-4 h-4" />
+                      <span>Fichiers attachés ({projectFiles.length})</span>
+                    </div>
+                    <div className="space-y-2">
+                      {projectFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between bg-white rounded p-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                            <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={async () => {
+                              const { data } = await supabase.storage
+                                .from('project-files')
+                                .download(`projects/${selectedProject.id}/${file.name}`);
+                              if (data) {
+                                const url = URL.createObjectURL(data);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = file.name;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }
+                            }}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Constitution de l'équipe */}
+              {fullTeam.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-purple-600" />
+                    Constitution de l'équipe complète ({fullTeam.length} membre{fullTeam.length > 1 ? 's' : ''})
+                  </h3>
+                  <div className="space-y-3">
+                    {fullTeam.map((assignment, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-4 flex-1">
+                            <div>
+                              <span className="font-semibold text-gray-900">
+                                {assignment.hr_profiles?.label || 'Poste non défini'}
+                              </span>
+                              <span className="text-gray-400 mx-2">•</span>
+                              <span className="text-gray-700">
+                                {assignment.seniority || 'Séniorité non définie'}
+                              </span>
+                            </div>
+                          </div>
+                          {assignment.booking_status === 'accepted' && (
+                            <Badge className="bg-green-100 text-green-700 border-green-200">
+                              ✓ Confirmé
+                            </Badge>
+                          )}
+                          {assignment.booking_status === 'recherche' && (
+                            <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                              En recherche
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-4 text-sm">
+                          {assignment.languages && assignment.languages.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-500">Langues:</span>
+                              <div className="flex gap-1">
+                                {assignment.languages.map((lang: string, i: number) => (
+                                  <Badge key={i} variant="secondary" className="text-xs">
+                                    {lang}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {assignment.expertises && assignment.expertises.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-500">Expertises:</span>
+                              <div className="flex gap-1">
+                                {assignment.expertises.map((exp: string, i: number) => (
+                                  <Badge key={i} variant="secondary" className="text-xs">
+                                    {exp}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {assignment.booking_status === 'accepted' && assignment.candidate_profiles && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <span className="text-sm text-gray-600">
+                              Candidat: <span className="font-medium text-gray-900">
+                                {assignment.candidate_profiles.first_name} {assignment.candidate_profiles.last_name}
+                              </span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         )}
       </FullScreenModal>

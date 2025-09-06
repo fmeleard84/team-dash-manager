@@ -25,8 +25,8 @@ import {
   FileText,
   Star,
   Activity,
-  CalendarDays,
-  Layout
+  Layout,
+  Cloud
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -38,9 +38,7 @@ import { ValidationPromoBanner } from "@/components/candidate/ValidationPromoBan
 import CandidateOnboarding from "@/components/candidate/CandidateOnboarding";
 import { useCandidateOnboarding } from "@/hooks/useCandidateOnboarding";
 import { CandidateProjectsSection } from "@/components/candidate/CandidateProjectsSection";
-import CandidatePlanningView from "@/components/candidate/CandidatePlanningView";
-import SharedPlanningView from "@/components/shared/SharedPlanningView";
-import CandidateDriveView from "@/components/candidate/CandidateDriveView";
+import SimpleDriveView from "@/components/drive/SimpleDriveView";
 import CandidateKanbanView from "@/components/candidate/CandidateKanbanView";
 import { CandidateNotes } from "@/components/candidate/CandidateNotes";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
@@ -57,12 +55,16 @@ import CandidateRatings from "@/pages/CandidateRatings";
 import CandidateActivities from "@/pages/CandidateActivities";
 import { TimeTrackerSimple } from "@/components/time-tracking/TimeTrackerSimple";
 import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
+import PlanningPage from "./PlanningPage";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
   const [isAvailable, setIsAvailable] = useState(true);
   const [candidateProjects, setCandidateProjects] = useState<any[]>([]);
   const [resourceAssignments, setResourceAssignments] = useState<any[]>([]);
+  const [candidateLanguages, setCandidateLanguages] = useState<string[]>([]);
+  const [candidateExpertises, setCandidateExpertises] = useState<string[]>([]);
+  const [selectedDriveProjectId, setSelectedDriveProjectId] = useState<string>("");
   const { user, logout } = useAuth();
   const { getCandidateProjects, projects: userProjects } = useUserProjects();
   // Use optimized hook for active projects only (planning/kanban/drive/messages)
@@ -89,6 +91,13 @@ const CandidateDashboard = () => {
       setIsAvailable(candidateStatus === 'disponible' || candidateStatus === null);
     }
   }, [candidateStatus]);
+
+  // Set default Drive project when activeProjects change
+  useEffect(() => {
+    if (!selectedDriveProjectId && activeProjects.length > 0) {
+      setSelectedDriveProjectId(activeProjects[0].id);
+    }
+  }, [activeProjects]);
 
   // Set up fixed real-time project updates for candidate (only after onboarding)
   // Use user.id for channel identification, profile_id for filtering
@@ -186,15 +195,56 @@ const CandidateDashboard = () => {
     setCandidateProjects(formattedProjects);
   }, [userProjects]); // Depend on userProjects data, not the function
   
+  // Charger les langues et expertises du candidat
+  useEffect(() => {
+    const loadCandidateSkills = async () => {
+      if (!candidateId || !user?.email) return;
+      
+      try {
+        // Récupérer les langues du candidat
+        const { data: langData } = await supabase
+          .from('candidate_languages')
+          .select(`
+            hr_languages (
+              name
+            )
+          `)
+          .eq('candidate_id', candidateId);
+        
+        if (langData) {
+          const langs = langData.map(cl => cl.hr_languages?.name).filter(Boolean);
+          setCandidateLanguages(langs);
+        }
+        
+        // Récupérer les expertises du candidat
+        const { data: expData } = await supabase
+          .from('candidate_expertises')
+          .select(`
+            hr_expertises (
+              name
+            )
+          `)
+          .eq('candidate_id', candidateId);
+        
+        if (expData) {
+          const exps = expData.map(ce => ce.hr_expertises?.name).filter(Boolean);
+          setCandidateExpertises(exps);
+        }
+      } catch (error) {
+        console.error('Error loading candidate skills:', error);
+      }
+    };
+    
+    loadCandidateSkills();
+  }, [candidateId, user]);
+
   // Charger les assignments avec les projets associés
   useEffect(() => {
     const loadAssignments = async () => {
-      if (!candidateId || !profileId) return;
+      if (!candidateId || !profileId || !candidateStatus) return;
       
       try {
-        // Charger les assignments pour ce candidat
-        // Either assignments specifically for this candidate (candidate_id matches)
-        // OR assignments looking for candidates with matching profile (booking_status = 'recherche')
+        // Récupérer TOUS les assignments en recherche ou assignés à ce candidat
         const { data: assignments, error } = await supabase
           .from('hr_resource_assignments')
           .select(`
@@ -210,7 +260,7 @@ const CandidateDashboard = () => {
               owner_id
             )
           `)
-          .or(`candidate_id.eq.${candidateId},and(profile_id.eq.${profileId},seniority.eq.${seniority},booking_status.eq.recherche)`);
+          .or(`candidate_id.eq.${candidateId},booking_status.eq.recherche`);
         
         if (error) {
           console.error('Error loading assignments:', error);
@@ -219,10 +269,72 @@ const CandidateDashboard = () => {
         
         // console.log('Loaded assignments:', assignments);
         
-        // Si on a des assignments, enrichir avec les données du client et du profil HR
-        if (assignments && assignments.length > 0) {
+        // FILTRAGE COMPLET : appliquer la logique de matching comme dans CandidateMissionRequests
+        const filteredAssignments = (assignments || []).filter(assignment => {
+          // Si déjà assigné à ce candidat, toujours montrer
+          if (assignment.candidate_id === candidateId) {
+            return true;
+          }
+          
+          // Si assigné à un autre candidat, ne pas montrer
+          if (assignment.candidate_id && assignment.candidate_id !== candidateId) {
+            return false;
+          }
+          
+          // Pour les missions en recherche, vérifier le matching complet
+          if (assignment.booking_status === 'recherche') {
+            // 1. PROFILE MATCH: Le candidat doit avoir le bon métier
+            const profileMatch = assignment.profile_id === profileId;
+            
+            // 2. SENIORITY MATCH: Le candidat doit avoir la bonne séniorité
+            const seniorityMatch = assignment.seniority === seniority;
+            
+            // 3. STATUS CHECK: Le candidat doit être qualifié et disponible
+            const statusMatch = candidateStatus !== 'qualification' && 
+                              (candidateStatus === 'disponible' || candidateStatus === 'en_pause');
+            
+            // 4. LANGUAGES MATCH: Le candidat doit avoir toutes les langues requises
+            const languagesMatch = !assignment.languages?.length || 
+              assignment.languages.every(lang => candidateLanguages.includes(lang));
+            
+            // 5. EXPERTISES MATCH: Le candidat doit avoir toutes les expertises requises
+            const expertisesMatch = !assignment.expertises?.length || 
+              assignment.expertises.every(exp => candidateExpertises.includes(exp));
+            
+            // Debug pour comprendre le matching
+            if (!profileMatch || !seniorityMatch || !statusMatch || !languagesMatch || !expertisesMatch) {
+              console.log('Assignment filtered out:', assignment.projects?.title, {
+                profileMatch,
+                seniorityMatch,
+                statusMatch,
+                languagesMatch,
+                expertisesMatch,
+                required: {
+                  profile_id: assignment.profile_id,
+                  seniority: assignment.seniority,
+                  languages: assignment.languages,
+                  expertises: assignment.expertises
+                },
+                candidate: {
+                  profile_id: profileId,
+                  seniority: seniority,
+                  status: candidateStatus,
+                  languages: candidateLanguages,
+                  expertises: candidateExpertises
+                }
+              });
+            }
+            
+            return profileMatch && seniorityMatch && statusMatch && languagesMatch && expertisesMatch;
+          }
+          
+          return false;
+        });
+        
+        // Si on a des assignments filtrés, enrichir avec les données du client et du profil HR
+        if (filteredAssignments && filteredAssignments.length > 0) {
           const enrichedAssignments = await Promise.all(
-            assignments.map(async (assignment) => {
+            filteredAssignments.map(async (assignment) => {
               let enrichedAssignment = { ...assignment };
               
               // Charger les infos du client si le projet existe
@@ -248,7 +360,10 @@ const CandidateDashboard = () => {
                   .single();
                 
                 if (!error && hrProfile) {
-                  enrichedAssignment.hr_profiles = hrProfile;
+                  // Utiliser label au lieu de name pour la cohérence
+                  enrichedAssignment.hr_profiles = {
+                    label: hrProfile.name
+                  };
                 }
               }
               
@@ -259,7 +374,7 @@ const CandidateDashboard = () => {
           // console.log('Enriched assignments:', enrichedAssignments);
           setResourceAssignments(enrichedAssignments);
         } else {
-          setResourceAssignments(assignments || []);
+          setResourceAssignments(filteredAssignments || []);
         }
       } catch (error) {
         console.error('Error in loadAssignments:', error);
@@ -267,7 +382,7 @@ const CandidateDashboard = () => {
     };
     
     loadAssignments();
-  }, [candidateId, profileId, seniority]);
+  }, [candidateId, profileId, seniority, candidateStatus, candidateLanguages, candidateExpertises]);
   
   // Functions for accepting/declining missions
   const handleAcceptMission = async (projectId: string) => {
@@ -386,14 +501,13 @@ const CandidateDashboard = () => {
           }));
         
         // Filter pending invitations (available to candidate)
+        // Le filtrage complet a déjà été fait dans loadAssignments
         const pendingInvitationsList = resourceAssignments
           .filter(a => {
-            // Pour les invitations, on cherche les assignments en recherche
-            // qui correspondent au profil du candidat mais pas encore assignés
+            // Les invitations sont les assignments en recherche
+            // Soit ils n'ont pas de candidat assigné, soit c'est ce candidat
             return a.booking_status === 'recherche' && 
-                   a.profile_id === profileId && 
-                   a.seniority === seniority &&
-                   !a.candidate_id && 
+                   (!a.candidate_id || a.candidate_id === candidateId) && 
                    a.projects;
           })
           .map(a => ({
@@ -419,22 +533,59 @@ const CandidateDashboard = () => {
         );
         
       case 'planning':
-        return candidateId && activeProjects.length > 0 ? (
-          <SharedPlanningView 
-            mode="candidate" 
-            projects={activeProjects} 
-            candidateId={candidateId} 
-          />
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <CalendarDays className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Planning non disponible</p>
-            <p className="text-sm mt-2">Aucun projet actif. Le planning sera disponible lorsque le client aura démarré le projet.</p>
-          </div>
-        );
+        return <PlanningPage 
+          userType="candidate" 
+          userEmail={user?.email} 
+          userName={user?.user_metadata?.name} 
+          candidateId={candidateId}
+        />;
         
       case 'drive':
-        return <CandidateDriveView />;
+        return (
+          <div className="space-y-4">
+            {activeProjects.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <Cloud className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-800">Drive du Projet</h2>
+                      <p className="text-sm text-gray-600">Gérez et partagez les fichiers du projet</p>
+                    </div>
+                  </div>
+                  
+                  <Select value={selectedDriveProjectId} onValueChange={setSelectedDriveProjectId}>
+                    <SelectTrigger className="w-64 bg-white border-blue-200 focus:border-blue-400">
+                      <SelectValue placeholder="Sélectionner un projet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeProjects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            
+            {activeProjects.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Cloud className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">Espace de stockage non disponible</h3>
+                <p>Vous devez être assigné à un projet actif pour accéder au drive</p>
+              </div>
+            ) : selectedDriveProjectId && (
+              <SimpleDriveView 
+                projectId={selectedDriveProjectId}
+                userType="candidate"
+              />
+            )}
+          </div>
+        );
         
       case 'kanban':
         return candidateId && activeProjects.length > 0 ? (

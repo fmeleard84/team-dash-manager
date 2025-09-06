@@ -15,16 +15,12 @@ export default function HeroLyniqFixed() {
           playsInline
           className="absolute inset-0 h-full w-full object-cover"
         >
-          <source src="/src/assets/video_hp_charlie.mp4" type="video/mp4" />
+          <source src="/src/assets/video_hp_2.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
         
-        {/* Light gradient overlays for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/10" />
-        
-        {/* Hero Content */}
-        <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-6 md:px-12">
+        {/* Hero Content - No z-index to allow mix-blend-mode */}
+        <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-6 md:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-8">
               
@@ -48,29 +44,15 @@ export default function HeroLyniqFixed() {
                 transition={{ duration: 0.8, ease: [0.43, 0.13, 0.23, 0.96] }}
                 className="relative"
               >
-                {/* Division effect layers */}
+                {/* Main title with mix-blend-mode effect */}
                 <h1 className="font-black leading-[0.85] tracking-[-0.03em]
-                         text-[clamp(3rem,8vw,7rem)] relative">
-                  {/* Bottom layer - cyan shift */}
-                  <div className="absolute inset-0 opacity-60" style={{ transform: 'translate(-2px, 2px)' }}>
-                    <span className="block text-cyan-400 mix-blend-screen">Digital</span>
-                    <span className="block text-cyan-400 mix-blend-screen">design</span>
-                    <span className="block text-cyan-400 mix-blend-screen">studio</span>
-                  </div>
-                  
-                  {/* Middle layer - magenta shift */}
-                  <div className="absolute inset-0 opacity-60" style={{ transform: 'translate(2px, -2px)' }}>
-                    <span className="block text-pink-500 mix-blend-screen">Digital</span>
-                    <span className="block text-pink-500 mix-blend-screen">design</span>
-                    <span className="block text-pink-500 mix-blend-screen">studio</span>
-                  </div>
-                  
-                  {/* Top layer - main text */}
-                  <div className="relative mix-blend-lighten">
-                    <span className="block text-white">Digital</span>
-                    <span className="block text-white">design</span>
-                    <span className="block text-white">studio</span>
-                  </div>
+                         text-[clamp(3rem,8vw,7rem)] text-white"
+                    style={{ 
+                      mixBlendMode: 'difference'
+                    }}>
+                  <span className="block">Digital</span>
+                  <span className="block">design</span>
+                  <span className="block">studio</span>
                 </h1>
               </motion.div>
 

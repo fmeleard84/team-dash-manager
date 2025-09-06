@@ -27,9 +27,9 @@ export function useCandidateIdentity(): CandidateIdentity & { refetch: () => voi
   const [refreshKey, setRefreshKey] = useState(0);
 
   const loadCandidateIdentity = useCallback(async () => {
-    if (!user?.email) {
+    if (!user?.id) {
       setIsLoading(false);
-      setError('No user email found');
+      setError('No user ID found');
       return;
     }
 
@@ -37,11 +37,11 @@ export function useCandidateIdentity(): CandidateIdentity & { refetch: () => voi
       setIsLoading(true);
       setError(null);
 
-      // First try to get candidate profile by email
+      // Direct query with unified ID
       const { data: candidateProfile, error: candidateError } = await supabase
         .from('candidate_profiles')
         .select('id, profile_id, email, seniority, status')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (candidateError) {

@@ -39,11 +39,11 @@ export function useCandidateProfile() {
       console.log('🔍 Recherche du profil pour user:', user.id);
 
       try {
-        // Récupérer le profil du candidat par user_id
+        // Récupérer le profil du candidat par ID universel
         const { data: candidateData, error: candidateError } = await supabase
           .from('candidate_profiles')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('id', user.id)  // ID universel maintenant
           .single();
 
         if (candidateData && !candidateError) {

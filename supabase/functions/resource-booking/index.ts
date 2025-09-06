@@ -127,6 +127,7 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
         seniority,
         profile_id,
         status,
+        qualification_status,
         candidate_languages (
           language_id,
           hr_languages (code, name)
@@ -139,7 +140,8 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
       .eq('profile_id', assignment.profile_id)
       .eq('seniority', assignment.seniority)
       .or('is_email_verified.eq.true,keycloak_user_id.not.is.null')
-      .or('status.eq.disponible,status.is.null')  // Accept disponible or null status
+      .neq('status', 'qualification')  // Candidate must NOT be in qualification
+      .in('status', ['disponible', 'en_pause'])  // Accept disponible or en_pause candidates
 
     if (candidatesError) {
       console.error('Candidates error:', candidatesError)
@@ -159,25 +161,41 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
       const hasRequiredExpertises = requiredExpertises.every(exp => candidateExpertises.includes(exp))
 
       // Debug logging
-      console.log(`Candidate ${candidate.first_name} ${candidate.last_name}:`)
+      console.log(`Candidate ${candidate.first_name} ${candidate.last_name} (${candidate.email}):`)
+      console.log(`  Status: ${candidate.status}, Qualification: ${candidate.qualification_status}`)
       console.log(`  Languages: ${candidateLanguages.join(', ')} | Required: ${requiredLanguages.join(', ')} | Match: ${hasRequiredLanguages}`)
       console.log(`  Expertises: ${candidateExpertises.join(', ')} | Required: ${requiredExpertises.join(', ')} | Match: ${hasRequiredExpertises}`)
+      console.log(`  Final match: ${hasRequiredLanguages && hasRequiredExpertises}`)
 
       return hasRequiredLanguages && hasRequiredExpertises
     })
 
     // Send notifications to matching candidates
     for (const candidate of filteredCandidates) {
-      // Check if notification already exists
+      // Check if an UNREAD notification already exists for this specific assignment
+      // Important: We only check for unread status to allow re-notification after accept/decline
       const { data: existingNotification } = await supabase
         .from('candidate_notifications')
-        .select('id')
+        .select('id, status')
         .eq('candidate_id', candidate.id)
         .eq('resource_assignment_id', assignment.id)
         .eq('status', 'unread')
         .single()
 
-      if (!existingNotification) {
+      // Also check if candidate previously declined this specific assignment
+      // If they declined before, we shouldn't re-notify them
+      const { data: previouslyDeclined } = await supabase
+        .from('candidate_notifications')
+        .select('id')
+        .eq('candidate_id', candidate.id)
+        .eq('resource_assignment_id', assignment.id)
+        .eq('status', 'declined')
+        .single()
+
+      // Only create notification if:
+      // 1. No unread notification exists AND
+      // 2. Candidate hasn't previously declined this assignment
+      if (!existingNotification && !previouslyDeclined) {
         // Create notification
         const { error: notificationError } = await supabase
           .from('candidate_notifications')
@@ -186,12 +204,20 @@ async function findCandidatesForProject(supabase: any, projectId: string) {
             project_id: projectId,
             resource_assignment_id: assignment.id,
             title: `Nouveau projet: ${project.title}`,
-            description: `Poste: ${assignment.hr_profiles.name}\nDescription: ${project.description || 'Pas de description'}`
+            description: `Poste: ${assignment.hr_profiles.name}\nDescription: ${project.description || 'Pas de description'}`,
+            status: 'unread'
           })
 
         if (!notificationError) {
           notificationsSent++
+          console.log(`Notification sent to candidate ${candidate.email} for assignment ${assignment.id}`)
+        } else {
+          console.log(`Failed to create notification for candidate ${candidate.email}:`, notificationError.message)
         }
+      } else if (existingNotification) {
+        console.log(`Notification already exists for candidate ${candidate.email}`)
+      } else if (previouslyDeclined) {
+        console.log(`Candidate ${candidate.email} previously declined this assignment, skipping`)
       }
     }
   }
@@ -228,7 +254,7 @@ async function acceptMissionByProject(supabase: any, project_id: string, candida
     .select('id, booking_status, profile_id, seniority')
     .eq('project_id', project_id)
     .eq('booking_status', 'recherche')
-    .eq('profile_id', candidateProfile.profile_id)
+    .eq('profile_id', candidateProfile.profile_id)  // This should match the hr_profile ID, not candidate ID
     .eq('seniority', candidateProfile.seniority);
 
   if (assignmentsError) {

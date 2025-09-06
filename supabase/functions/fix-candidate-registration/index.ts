@@ -8,7 +8,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -16,167 +16,189 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // SQL to fix candidate registration
-    const sql = `
-      -- First, let's modify the candidate_profiles table to make some fields nullable during registration
-      ALTER TABLE candidate_profiles 
-        ALTER COLUMN password_hash DROP NOT NULL,
-        ALTER COLUMN daily_rate SET DEFAULT 0,
-        ALTER COLUMN seniority SET DEFAULT 'junior',
-        ALTER COLUMN category_id DROP NOT NULL;
+    console.log('🔧 Correction du trigger handle_new_user pour l\'ID universel...');
 
-      -- Add user_id column to link with auth.users
-      ALTER TABLE candidate_profiles 
-        ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
-
-      -- Create unique index on user_id
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_candidate_profiles_user_id ON candidate_profiles(user_id);
-
-      -- Update the handle_new_user function to also create candidate_profiles entry
-      CREATE OR REPLACE FUNCTION public.handle_new_user()
-      RETURNS trigger AS $$
-      DECLARE
-        user_role TEXT;
-        default_category_id UUID;
-      BEGIN
-          -- Get the role from metadata
-          user_role := COALESCE(new.raw_user_meta_data->>'role', 'client');
-          
-          -- Always create a profile entry
-          INSERT INTO public.profiles (
-              id,
-              email,
-              first_name,
-              last_name,
-              role,
-              phone,
-              company_name
-          )
-          VALUES (
-              new.id,
-              new.email,
-              COALESCE(new.raw_user_meta_data->>'first_name', ''),
-              COALESCE(new.raw_user_meta_data->>'last_name', ''),
-              user_role,
-              new.raw_user_meta_data->>'phone',
-              CASE 
-                  WHEN user_role = 'client' THEN new.raw_user_meta_data->>'company_name'
-                  ELSE NULL
-              END
-          )
-          ON CONFLICT (id) DO NOTHING;
-          
-          -- If the user is a candidate, also create a candidate_profiles entry
-          IF user_role = 'candidate' THEN
-              -- Get a default category_id (first one available)
-              SELECT id INTO default_category_id FROM hr_categories LIMIT 1;
-              
-              INSERT INTO public.candidate_profiles (
-                  user_id,
-                  email,
-                  first_name,
-                  last_name,
-                  phone,
-                  daily_rate,
-                  seniority,
-                  category_id,
-                  is_email_verified
-              )
-              VALUES (
-                  new.id,
-                  new.email,
-                  COALESCE(new.raw_user_meta_data->>'first_name', ''),
-                  COALESCE(new.raw_user_meta_data->>'last_name', ''),
-                  new.raw_user_meta_data->>'phone',
-                  0, -- Default daily rate
-                  'junior', -- Default seniority
-                  default_category_id, -- Will be NULL if no categories exist yet
-                  false -- Email not verified yet
-              )
-              ON CONFLICT (user_id) DO NOTHING;
-          END IF;
-          
-          RETURN new;
-      EXCEPTION
-          WHEN OTHERS THEN
-              -- Log error but don't fail the user creation
-              RAISE WARNING 'Error in handle_new_user: %', SQLERRM;
-              RETURN new;
-      END;
-      $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-      -- Update RLS policies for candidate_profiles to use user_id
-      DROP POLICY IF EXISTS "Candidates can view their own profile" ON public.candidate_profiles;
-      DROP POLICY IF EXISTS "Candidates can update their own profile" ON public.candidate_profiles;
-
-      -- Create new policies using user_id
-      CREATE POLICY "Candidates can view their own profile" 
-      ON public.candidate_profiles 
-      FOR SELECT 
-      USING (user_id = auth.uid() OR auth.uid() IN (
-          SELECT id FROM profiles WHERE role = 'admin'
-      ));
-
-      CREATE POLICY "Candidates can update their own profile" 
-      ON public.candidate_profiles 
-      FOR UPDATE 
-      USING (user_id = auth.uid());
-
-      -- Also update the policy for viewing assignments to use user_id
-      DROP POLICY IF EXISTS "Candidates can view their own assignments" ON public.candidate_project_assignments;
-
-      CREATE POLICY "Candidates can view their own assignments" 
-      ON public.candidate_project_assignments 
-      FOR SELECT 
-      USING (
-          candidate_id IN (
-              SELECT id FROM candidate_profiles WHERE user_id = auth.uid()
-          )
-          OR 
-          auth.uid() IN (
-              SELECT id FROM profiles WHERE role IN ('admin', 'client')
-          )
-      );
-
-      -- Update policy for updating assignments
-      DROP POLICY IF EXISTS "Candidates can update their own assignments" ON public.candidate_project_assignments;
-
-      CREATE POLICY "Candidates can update their own assignments" 
-      ON public.candidate_project_assignments 
-      FOR UPDATE 
-      USING (
-          candidate_id IN (
-              SELECT id FROM candidate_profiles WHERE user_id = auth.uid()
-          )
-      );
+    // 1. Supprimer l'ancien trigger
+    const dropTriggerQuery = `
+      DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
     `;
 
-    // Execute the SQL
-    const { error } = await supabase.rpc('exec_sql', { sql_query: sql });
+    await supabase.rpc('exec_sql', { sql: dropTriggerQuery });
+    console.log('✅ Ancien trigger supprimé');
 
-    if (error) {
-      console.error('Error executing SQL:', error);
-      throw error;
+    // 2. Créer la nouvelle fonction handle_new_user avec ID universel
+    const createFunctionQuery = `
+      CREATE OR REPLACE FUNCTION public.handle_new_user()
+      RETURNS trigger AS $$
+      BEGIN
+        -- Insert into profiles (pour tous les utilisateurs)
+        INSERT INTO public.profiles (id, email, role, first_name, last_name, company_name, phone)
+        VALUES (
+          new.id, 
+          new.email,
+          COALESCE(new.raw_user_meta_data->>'role', 'candidate')::app_role,
+          new.raw_user_meta_data->>'first_name',
+          new.raw_user_meta_data->>'last_name',
+          new.raw_user_meta_data->>'company_name',
+          new.raw_user_meta_data->>'phone'
+        )
+        ON CONFLICT (id) DO NOTHING;
+        
+        -- Si c'est un candidat, créer aussi candidate_profiles avec ID universel
+        IF COALESCE(new.raw_user_meta_data->>'role', 'candidate') = 'candidate' THEN
+          INSERT INTO public.candidate_profiles (
+            id,  -- ID universel (auth.uid)
+            email,
+            first_name,
+            last_name,
+            phone,
+            status,
+            qualification_status,
+            seniority,
+            daily_rate,
+            password_hash,
+            is_email_verified
+          ) VALUES (
+            new.id,  -- Utiliser l'ID universel comme clé primaire
+            new.email,
+            COALESCE(new.raw_user_meta_data->>'first_name', new.raw_user_meta_data->>'firstName', ''),
+            COALESCE(new.raw_user_meta_data->>'last_name', new.raw_user_meta_data->>'lastName', ''),
+            new.raw_user_meta_data->>'phone',
+            'qualification',  -- Statut initial
+            'pending',  -- En attente de qualification
+            'junior',  -- Séniorité par défaut
+            0,  -- Taux journalier par défaut
+            '',  -- Password hash vide (auth géré par Supabase Auth)
+            false  -- Email non vérifié par défaut
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            email = EXCLUDED.email,
+            first_name = COALESCE(EXCLUDED.first_name, candidate_profiles.first_name),
+            last_name = COALESCE(EXCLUDED.last_name, candidate_profiles.last_name),
+            phone = COALESCE(EXCLUDED.phone, candidate_profiles.phone),
+            updated_at = NOW();
+        
+        -- Si c'est un client, créer aussi client_profiles avec ID universel  
+        ELSIF new.raw_user_meta_data->>'role' = 'client' THEN
+          INSERT INTO public.client_profiles (
+            id,  -- ID universel (auth.uid)
+            email,
+            first_name,
+            last_name,
+            company_name,
+            phone,
+            user_id  -- Garder pour compatibilité
+          ) VALUES (
+            new.id,  -- Utiliser l'ID universel comme clé primaire
+            new.email,
+            COALESCE(new.raw_user_meta_data->>'first_name', new.raw_user_meta_data->>'firstName', ''),
+            COALESCE(new.raw_user_meta_data->>'last_name', new.raw_user_meta_data->>'lastName', ''),
+            new.raw_user_meta_data->>'company_name',
+            new.raw_user_meta_data->>'phone',
+            new.id::text
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            email = EXCLUDED.email,
+            first_name = COALESCE(EXCLUDED.first_name, client_profiles.first_name),
+            last_name = COALESCE(EXCLUDED.last_name, client_profiles.last_name),
+            company_name = COALESCE(EXCLUDED.company_name, client_profiles.company_name),
+            phone = COALESCE(EXCLUDED.phone, client_profiles.phone),
+            updated_at = NOW();
+        END IF;
+        
+        RETURN new;
+      EXCEPTION
+        WHEN OTHERS THEN
+          -- Log l'erreur mais ne pas bloquer la création de l'utilisateur
+          RAISE WARNING 'Error in handle_new_user: %', SQLERRM;
+          RETURN new;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+    `;
+
+    const { error: functionError } = await supabase.rpc('exec_sql', {
+      sql: createFunctionQuery
+    });
+
+    if (functionError) {
+      console.error('Erreur création fonction:', functionError);
+      throw functionError;
     }
 
+    console.log('✅ Nouvelle fonction créée avec ID universel');
+
+    // 3. Recréer le trigger
+    const createTriggerQuery = `
+      CREATE TRIGGER on_auth_user_created
+        AFTER INSERT ON auth.users
+        FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+    `;
+
+    const { error: triggerError } = await supabase.rpc('exec_sql', {
+      sql: createTriggerQuery
+    });
+
+    if (triggerError) {
+      console.error('Erreur création trigger:', triggerError);
+      throw triggerError;
+    }
+
+    console.log('✅ Trigger recréé');
+
+    // 4. Vérifier la structure
+    const checkQuery = `
+      SELECT 
+        event_object_schema,
+        event_object_table,
+        trigger_name,
+        action_timing,
+        event_manipulation
+      FROM information_schema.triggers
+      WHERE trigger_name = 'on_auth_user_created';
+    `;
+
+    const { data: checkData } = await supabase.rpc('exec_sql', {
+      sql: checkQuery
+    });
+
+    console.log('📊 Trigger vérifié:', checkData);
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Candidate registration fix applied successfully'
+      JSON.stringify({
+        success: true,
+        message: 'Trigger handle_new_user corrigé pour utiliser l\'ID universel',
+        details: {
+          function_updated: true,
+          trigger_recreated: true,
+          changes: [
+            'candidate_profiles.id = auth.uid (ID universel)',
+            'client_profiles.id = auth.uid (ID universel)',
+            'Gestion des erreurs améliorée',
+            'Support des deux formats de metadata (first_name et firstName)'
+          ]
+        }
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     );
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Erreur:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Erreur lors de la correction du trigger'
+      }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        }, 
+        status: 500 
       }
     );
   }

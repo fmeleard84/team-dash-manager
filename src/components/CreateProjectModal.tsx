@@ -26,9 +26,10 @@ const CreateProjectModal = ({
   console.log('CreateProjectModal rendered with isOpen:', isOpen);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [projectDate, setProjectDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  // Get today's date for minimum date validation
+  const today = new Date().toISOString().split('T')[0];
+  
+  const [projectDate, setProjectDate] = useState(today);
   const [clientBudget, setClientBudget] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -44,27 +45,56 @@ const CreateProjectModal = ({
       return;
     }
 
+    // Validate dates
+    if (projectDate < today) {
+      toast.error("La date de début ne peut pas être dans le passé");
+      return;
+    }
+
+    if (dueDate && dueDate < projectDate) {
+      toast.error("La date de fin doit être après la date de début");
+      return;
+    }
+
     setIsCreating(true);
     try {
+      // Log the data being sent for debugging
+      const projectData = {
+        title: title.trim(),
+        description: description.trim() || null,
+        project_date: projectDate,
+        client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : null,
+        due_date: dueDate.trim() !== "" ? dueDate : null,
+        owner_id: user.id,
+        status: 'pause'
+      };
+      
+      console.log("📊 Données projet à créer:", projectData);
+      console.log("📅 project_date:", projectData.project_date);
+      console.log("📅 due_date:", projectData.due_date);
+      console.log("💰 client_budget:", projectData.client_budget);
+
       const { data: project, error } = await supabase
         .from("projects")
-        .insert({
-          title: title.trim(),
-          description: description.trim() || null,
-          project_date: projectDate,
-          client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : null,
-          due_date: dueDate.trim() !== "" ? dueDate : null,
-          owner_id: user.id,
-          status: 'pause'
-        })
+        .insert(projectData)
         .select()
         .single();
 
       if (error) {
-        console.error("Erreur création projet:", error);
-        toast.error("Erreur lors de la création du projet");
+        console.error("❌ Erreur création projet:", error);
+        console.error("❌ Détails de l'erreur:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        toast.error(`Erreur lors de la création du projet: ${error.message}`);
         return;
       }
+      
+      console.log("✅ Projet créé avec succès:", project);
+      console.log("📅 Dates enregistrées - project_date:", project.project_date, "due_date:", project.due_date);
+      console.log("💰 Budget enregistré:", project.client_budget);
 
       // Handle file upload to storage
       if (file) {
@@ -74,7 +104,7 @@ const CreateProjectModal = ({
           .replace(/_{2,}/g, '_')
           .replace(/^_|_$/g, '');
         
-        const path = `project/${project.id}/${sanitizedFileName}`;
+        const path = `projects/${project.id}/${sanitizedFileName}`;
         const { error: uploadError } = await supabase.storage
           .from('project-files')
           .upload(path, file, { upsert: true });
@@ -114,7 +144,7 @@ const handleClose = () => {
   if (!isCreating) {
     setTitle("");
     setDescription("");
-    setProjectDate(new Date().toISOString().split('T')[0]);
+    setProjectDate(today);
     setClientBudget("");
     setDueDate("");
     setFile(null);
@@ -192,6 +222,7 @@ const handleClose = () => {
                   type="date"
                   value={projectDate}
                   onChange={(e) => setProjectDate(e.target.value)}
+                  min={today}
                   required
                   disabled={isCreating}
                   className="h-12"
@@ -208,6 +239,7 @@ const handleClose = () => {
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
+                  min={projectDate || today}
                   disabled={isCreating}
                   className="h-12"
                 />

@@ -40,6 +40,9 @@ const EditProjectModal = ({
   const [file, setFile] = useState<File | null>(null);
   const [existingFiles, setExistingFiles] = useState<any[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Get today's date for minimum date validation
+  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     if (project && isOpen) {
@@ -61,7 +64,7 @@ const EditProjectModal = ({
       // For now, try to list files from storage
       const { data: files, error } = await supabase.storage
         .from('project-files')
-        .list(`project/${projectId}`, {
+        .list(`projects/${projectId}`, {
           limit: 100,
           offset: 0
         });
@@ -73,7 +76,7 @@ const EditProjectModal = ({
         const transformedFiles = (files || []).map((file) => ({
           id: file.name,
           file_name: file.name,
-          file_path: `project/${projectId}/${file.name}`
+          file_path: `projects/${projectId}/${file.name}`
         }));
         setExistingFiles(transformedFiles);
       }
@@ -86,17 +89,36 @@ const EditProjectModal = ({
     e.preventDefault();
     if (!title.trim() || !project) return;
 
+    // Validate dates
+    if (projectDate < today) {
+      toast.error("La date de début ne peut pas être dans le passé");
+      return;
+    }
+
+    if (dueDate && dueDate < projectDate) {
+      toast.error("La date de fin doit être après la date de début");
+      return;
+    }
+
     setIsUpdating(true);
     try {
+      // Log the data being sent for debugging
+      const updateData = {
+        title: title.trim(),
+        description: description.trim() || null,
+        project_date: projectDate,
+        client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : null,
+        due_date: dueDate.trim() !== "" ? dueDate : null,
+      };
+      
+      console.log("📊 Données projet à mettre à jour:", updateData);
+      console.log("📅 project_date:", updateData.project_date);
+      console.log("📅 due_date:", updateData.due_date);
+      console.log("💰 client_budget:", updateData.client_budget);
+
       const { error } = await supabase
         .from("projects")
-        .update({
-          title: title.trim(),
-          description: description.trim() || null,
-          project_date: projectDate,
-          client_budget: clientBudget.trim() !== "" ? Number(clientBudget) : null,
-          due_date: dueDate.trim() !== "" ? dueDate : null,
-        })
+        .update(updateData)
         .eq("id", project.id);
 
       if (error) {
@@ -113,7 +135,7 @@ const EditProjectModal = ({
           .replace(/_{2,}/g, '_')
           .replace(/^_|_$/g, '');
         
-        const path = `project/${project.id}/${sanitizedFileName}`;
+        const path = `projects/${project.id}/${sanitizedFileName}`;
         const { error: uploadError } = await supabase.storage
           .from('project-files')
           .upload(path, file, { upsert: true });
@@ -239,6 +261,7 @@ const EditProjectModal = ({
                     type="date"
                     value={projectDate}
                     onChange={(e) => setProjectDate(e.target.value)}
+                    min={today}
                     required
                     disabled={isUpdating}
                     className="h-12"
@@ -255,6 +278,7 @@ const EditProjectModal = ({
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
+                    min={projectDate || today}
                     disabled={isUpdating}
                     className="h-12"
                   />

@@ -122,9 +122,6 @@ export const useProjectUsers = (projectId: string | null) => {
 
         if (assignments) {
           for (const assignment of assignments) {
-            // Debug temporaire pour voir l'expertise
-            console.log('Assignment job_title:', assignment.job_title, 'pour candidat:', assignment.candidate_id);
-            
             // Récupérer les infos du candidat séparément si candidate_id existe
             if (assignment.candidate_id) {
               const { data: candidate, error: candError } = await supabase

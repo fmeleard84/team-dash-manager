@@ -78,9 +78,12 @@ export const useRealtimeProjectsFixed = ({
     
     // For candidates, also update the projects in assignments
     if (userTypeRef.current === 'candidate') {
+      console.log('📝 [REALTIME] Updating project in assignments for candidate. Project:', updatedProject.title, 'Status:', updatedProject.status);
       setResourceAssignmentsRef.current!(prev => {
+        console.log('📝 [REALTIME] Current assignments:', prev.length);
         return prev.map(a => {
           if (a.project_id === updatedProject.id || a.projects?.id === updatedProject.id) {
+            console.log('📝 [REALTIME] Found matching assignment, updating project status to:', updatedProject.status);
             return { ...a, projects: updatedProject, _realtimeUpdated: Date.now() };
           }
           return a;
@@ -189,6 +192,7 @@ export const useRealtimeProjectsFixed = ({
       }
 
     // Projects channel - filter by user if client
+    // For candidates: listen to ALL projects (we'll filter client-side based on assignments)
     const projectsChannelName = `realtime-projects-${userType}-${userId}`;
     const projectsChannel = supabase
       .channel(projectsChannelName)
@@ -200,10 +204,32 @@ export const useRealtimeProjectsFixed = ({
           table: 'projects',
           ...(userType === 'client' ? { filter: `owner_id=eq.${userId}` } : {})
         },
-        handleProjectUpdate
+        async (payload) => {
+          // For candidates, only process updates for projects they're assigned to
+          if (userType === 'candidate') {
+            const project = payload.new || payload.old;
+            if (!project) return;
+            
+            // Check if candidate is assigned to this project
+            const { data: assignments } = await supabase
+              .from('hr_resource_assignments')
+              .select('id')
+              .eq('project_id', project.id)
+              .eq('candidate_id', candidateProfile?.id)
+              .limit(1);
+            
+            // Only update if candidate is assigned to this project
+            if (assignments && assignments.length > 0) {
+              await handleProjectUpdate(payload);
+            }
+          } else {
+            // For clients, process all their projects
+            await handleProjectUpdate(payload);
+          }
+        }
       )
       .subscribe((status) => {
-        // console.log('📡 Projects channel:', status);
+        console.log('📡 Projects channel:', status, 'for', userType);
       });
 
     // Assignments channel - filter appropriately

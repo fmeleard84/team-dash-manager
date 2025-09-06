@@ -28,7 +28,7 @@ const Header = () => {
     }
   };
   return (
-    <header className="w-full border-b border-gray-200/50 bg-white/80 backdrop-blur-sm shadow-sm">
+    <header className="w-full border-b border-gray-200/50 bg-white/90 backdrop-blur-md shadow-sm">
       <div className="container flex h-20 items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group">
           <IallaLogo size="md" />

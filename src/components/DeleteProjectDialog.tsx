@@ -1,18 +1,12 @@
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { FullScreenModal, ModalActions } from '@/components/ui/fullscreen-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   AlertTriangle, 
   Archive, 
@@ -132,11 +126,13 @@ export function DeleteProjectDialog({
           return;
         }
         
-        // Appeler la fonction de suppression douce
-        const { data, error } = await supabase.rpc('soft_delete_project', {
-          project_id_param: project.id,
-          user_id_param: user.id,
-          reason_param: reason || null
+        // Utiliser la nouvelle edge function qui contourne le problème de contrainte
+        const { data, error } = await supabase.functions.invoke('fix-project-delete', {
+          body: {
+            project_id: project.id,
+            user_id: user.id,
+            reason: reason || null
+          }
         });
 
         if (error) throw error;
@@ -175,157 +171,181 @@ export function DeleteProjectDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-orange-500" />
-            Action sur le projet
-          </DialogTitle>
-          <DialogDescription>
-            Choisissez l'action à effectuer sur le projet "{project.title}"
-          </DialogDescription>
-        </DialogHeader>
+    <FullScreenModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Gestion du projet"
+      description={`Choisissez l'action à effectuer sur le projet "${project.title}"`}
+      preventClose={isProcessing}
+      actions={
+        <ModalActions
+          onCancel={handleClose}
+          cancelText="Annuler"
+          customActions={
+            <Button
+              variant={actionType === 'delete' ? 'destructive' : 'default'}
+              onClick={handleAction}
+              disabled={!isConfirmationValid() || isProcessing}
+              className={actionType === 'archive' ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}
+            >
+              {isProcessing ? (
+                <>Traitement...</>
+              ) : (
+                <>
+                  {actionType === 'archive' ? (
+                    <>
+                      <Archive className="w-4 h-4 mr-2" />
+                      Archiver le projet
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Supprimer le projet
+                    </>
+                  )}
+                </>
+              )}
+            </Button>
+          }
+        />
+      }
+    >
+      <div className="space-y-6">
+        {/* Header avec icône */}
+        <div className="flex items-center gap-3 pb-4 border-b">
+          <Shield className="w-8 h-8 text-orange-500" />
+          <div>
+            <h2 className="text-xl font-semibold">Action sur le projet</h2>
+            <p className="text-sm text-gray-600">Sélectionnez une action ci-dessous</p>
+          </div>
+        </div>
 
-        <div className="space-y-6">
-          {/* Choix de l'action */}
-          <div className="space-y-3">
-            <Label>Type d'action</Label>
-            <RadioGroup value={actionType} onValueChange={(v) => setActionType(v as ActionType)}>
-              <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50">
+        {/* Cards pour le choix de l'action */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Type d'action</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RadioGroup value={actionType} onValueChange={(v) => setActionType(v as ActionType)} className="space-y-4">
+              <div className="flex items-start space-x-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                   onClick={() => setActionType('archive')}>
                 <RadioGroupItem value="archive" id="archive" className="mt-1" />
                 <label htmlFor="archive" className="flex-1 cursor-pointer">
-                  <div className="flex items-center gap-2 font-medium">
-                    <Archive className="w-4 h-4 text-blue-500" />
+                  <div className="flex items-center gap-2 font-medium text-base">
+                    <Archive className="w-5 h-5 text-blue-500" />
                     Archiver le projet
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 mt-2">
                     Le projet devient lecture seule. Toutes les données restent accessibles mais aucune modification n'est possible.
-                    Cette action est réversible.
+                    <span className="block mt-1 text-blue-600 font-medium">✓ Cette action est réversible</span>
                   </p>
                 </label>
               </div>
               
-              <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50">
+              <div className="flex items-start space-x-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                   onClick={() => setActionType('delete')}>
                 <RadioGroupItem value="delete" id="delete" className="mt-1" />
                 <label htmlFor="delete" className="flex-1 cursor-pointer">
-                  <div className="flex items-center gap-2 font-medium">
-                    <Trash2 className="w-4 h-4 text-red-500" />
+                  <div className="flex items-center gap-2 font-medium text-base">
+                    <Trash2 className="w-5 h-5 text-red-500" />
                     Supprimer le projet
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 mt-2">
                     Suppression définitive. Les données financières et historiques sont conservées mais le projet n'est plus accessible.
-                    Cette action est irréversible.
+                    <span className="block mt-1 text-red-600 font-medium">⚠ Cette action est irréversible</span>
                   </p>
                 </label>
               </div>
             </RadioGroup>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Avertissements selon l'action */}
-          {actionType === 'delete' && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Attention - Action irréversible</AlertTitle>
-              <AlertDescription className="space-y-2 mt-2">
-                <p>La suppression entraînera :</p>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li className="flex items-center gap-2">
-                    <Users className="w-3 h-3" />
-                    Perte d'accès pour tous les membres de l'équipe
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <HardDrive className="w-3 h-3" />
-                    Suppression des accès Drive, Kanban et Messages
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <FileText className="w-3 h-3" />
-                    Les factures et paiements restent accessibles pour l'historique
-                  </li>
-                </ul>
-              </AlertDescription>
-            </Alert>
-          )}
+        {/* Avertissements selon l'action */}
+        {actionType === 'delete' && (
+          <Alert variant="destructive" className="border-red-200 bg-red-50">
+            <AlertTriangle className="h-5 w-5" />
+            <AlertTitle className="text-base">Attention - Action irréversible</AlertTitle>
+            <AlertDescription className="space-y-3 mt-3">
+              <p className="font-medium">La suppression entraînera :</p>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-3">
+                  <Users className="w-4 h-4 mt-0.5 text-red-600" />
+                  <span>Perte d'accès pour tous les membres de l'équipe</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <HardDrive className="w-4 h-4 mt-0.5 text-red-600" />
+                  <span>Suppression des accès Drive, Kanban et Messages</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <FileText className="w-4 h-4 mt-0.5 text-red-600" />
+                  <span>Les factures et paiements restent accessibles pour l'historique</span>
+                </li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
 
-          {actionType === 'archive' && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>Information - Archivage</AlertTitle>
-              <AlertDescription>
-                L'archivage permet de conserver toutes les données en lecture seule.
-                Vous pourrez réactiver le projet à tout moment depuis la section "Projets archivés".
-              </AlertDescription>
-            </Alert>
-          )}
+        {actionType === 'archive' && (
+          <Alert className="border-blue-200 bg-blue-50">
+            <Info className="h-5 w-5 text-blue-600" />
+            <AlertTitle className="text-base text-blue-900">Information - Archivage</AlertTitle>
+            <AlertDescription className="text-blue-800 mt-2">
+              L'archivage permet de conserver toutes les données en lecture seule.
+              Vous pourrez réactiver le projet à tout moment depuis la section "Projets archivés".
+            </AlertDescription>
+          </Alert>
+        )}
 
-          {/* Raison (optionnelle) */}
-          <div className="space-y-2">
-            <Label htmlFor="reason">
-              Raison (optionnel)
-            </Label>
-            <Textarea
-              id="reason"
-              placeholder="Expliquez pourquoi vous effectuez cette action..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-            />
-          </div>
+        {/* Raison (optionnelle) */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              <Label htmlFor="reason" className="text-base font-medium">
+                Raison de l'action (optionnel)
+              </Label>
+              <Textarea
+                id="reason"
+                placeholder="Expliquez pourquoi vous effectuez cette action..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Confirmation */}
-          <div className="space-y-2">
-            <Label htmlFor="confirmation">
-              Pour confirmer, tapez <span className="font-mono font-bold">{getRequiredText()}</span>
-            </Label>
-            <Input
-              id="confirmation"
-              type="text"
-              placeholder="Tapez le texte de confirmation"
-              value={confirmationText}
-              onChange={(e) => setConfirmationText(e.target.value)}
-              className={!isConfirmationValid() && confirmationText ? 'border-red-500' : ''}
-            />
-            {confirmationText && !isConfirmationValid() && (
-              <p className="text-sm text-red-500">
-                Le texte ne correspond pas
-              </p>
-            )}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={isProcessing}
-          >
-            Annuler
-          </Button>
-          <Button
-            variant={actionType === 'delete' ? 'destructive' : 'default'}
-            onClick={handleAction}
-            disabled={!isConfirmationValid() || isProcessing}
-          >
-            {isProcessing ? (
-              <>Traitement...</>
-            ) : (
-              <>
-                {actionType === 'archive' ? (
-                  <>
-                    <Archive className="w-4 h-4 mr-2" />
-                    Archiver le projet
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Supprimer le projet
-                  </>
-                )}
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {/* Confirmation */}
+        <Card className={actionType === 'delete' ? 'border-red-200' : 'border-blue-200'}>
+          <CardHeader>
+            <CardTitle className="text-lg">Confirmation requise</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <Label htmlFor="confirmation" className="text-base">
+                Pour confirmer, tapez exactement : 
+                <span className="font-mono font-bold text-lg ml-2 text-gray-900">
+                  {getRequiredText()}
+                </span>
+              </Label>
+              <Input
+                id="confirmation"
+                type="text"
+                placeholder="Tapez le texte de confirmation"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                className={`text-base ${!isConfirmationValid() && confirmationText ? 'border-red-500 focus:border-red-500' : ''}`}
+              />
+              {confirmationText && !isConfirmationValid() && (
+                <p className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  Le texte ne correspond pas exactement
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </FullScreenModal>
   );
 }

@@ -21,7 +21,7 @@ export const ValidationPromoBanner = () => {
       const { data } = await supabase
         .from('candidate_profiles')
         .select('qualification_status')
-        .eq('user_id', user.id)
+        .eq('id', user.id)  // ID universel maintenant
         .single();
 
       if (data) {

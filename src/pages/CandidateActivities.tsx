@@ -73,15 +73,15 @@ export default function CandidateActivities() {
   const [updating, setUpdating] = useState(false);
 
   const loadSessions = async () => {
-    if (!user?.email) return;
+    if (!user?.id) return;
 
     setLoading(true);
     try {
-      // Get candidate profile
+      // Get candidate profile (using unified ID)
       const { data: candidateProfile } = await supabase
         .from('candidate_profiles')
         .select('id')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (!candidateProfile) return;

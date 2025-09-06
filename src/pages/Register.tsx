@@ -206,13 +206,24 @@ export const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-6 py-12">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 bg-grid-gray-100 bg-grid opacity-5"></div>
+    <div className="min-h-screen relative flex items-center justify-center px-6 py-12">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: 'url(/src/assets/new_user.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        {/* Dark overlay for better readability */}
+        <div className="absolute inset-0 bg-black/40"></div>
+      </div>
       
       <div className="w-full max-w-md relative z-10">
         {/* Back to Home */}
-        <Link to="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8 transition-colors">
+        <Link to="/" className="inline-flex items-center gap-2 text-white hover:text-gray-200 mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           <span>Retour à l'accueil</span>
         </Link>

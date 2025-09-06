@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardHeader, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, Edit, Clock, TrendingUp, CheckCircle2, AlertCircle, Rocket, Calendar, Euro, Archive, RotateCcw } from "lucide-react";
+import { FullScreenModal, ModalActions } from "./ui/fullscreen-modal";
+import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, Edit, Clock, TrendingUp, CheckCircle2, AlertCircle, Rocket, Calendar, Euro, Archive, RotateCcw, Paperclip, Download, Info, FileText, Video, Link2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -49,7 +50,7 @@ interface ProjectCardProps {
   onStatusToggle: (id: string, status: string) => void;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
-  onStart?: (project: { id: string; title: string; kickoffISO?: string }) => void;
+  onStart?: (project: { id: string; title: string; kickoffISO?: string }) => void | Promise<void>;
   onEdit?: () => void;
   onArchive?: (id: string) => void;
   onUnarchive?: (id: string) => void;
@@ -72,6 +73,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   const [showKickoff, setShowKickoff] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isBookingRequested, setIsBookingRequested] = useState(false);
+  const [projectFiles, setProjectFiles] = useState<any[]>([]);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showProjectDetailsModal, setShowProjectDetailsModal] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
@@ -119,6 +123,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     console.log('🎮 ProjectCard initial mount - fetching resources in 100ms');
     const timer = setTimeout(() => {
       fetchResourceAssignments();
+      fetchProjectFiles();
     }, 100);
     return () => clearTimeout(timer);
   }, []);
@@ -160,7 +165,12 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             profile_id,
             booking_status,
             calculated_price,
-            candidate_profiles (
+            seniority,
+            languages,
+            expertises,
+            industries,
+            candidate_id,
+            candidate_profiles!candidate_id (
               first_name,
               last_name,
               daily_rate
@@ -227,6 +237,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       if (event.detail.projectId === project.id) {
         console.log('🔔 Project updated event received, refreshing resources...');
         fetchResourceAssignments();
+        fetchProjectFiles();
       }
     };
     
@@ -236,6 +247,72 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       window.removeEventListener('projectUpdated', handleProjectUpdate as EventListener);
     };
   }, [project.id]);
+
+  // Real-time subscription for resource assignments
+  useEffect(() => {
+    console.log('📡 Setting up realtime subscription for resource assignments');
+    
+    // Initial fetch - use the main fetchResourceAssignments function
+    fetchResourceAssignments();
+    
+    const channel = supabase
+      .channel(`resource-assignments-${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'hr_resource_assignments',
+          filter: `project_id=eq.${project.id}`
+        },
+        (payload) => {
+          console.log('🔄 Resource assignment change detected:', payload);
+          console.log('📦 Change type:', payload.eventType);
+          console.log('📦 New data:', payload.new);
+          console.log('📦 Old data:', payload.old);
+          // Refresh resource assignments when any change occurs
+          // Call the main fetchResourceAssignments function to update the UI
+          fetchResourceAssignments();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to resource assignments changes');
+        }
+      });
+
+    return () => {
+      console.log('🔌 Cleaning up realtime subscription for resource assignments');
+      supabase.removeChannel(channel);
+    };
+  }, [project.id]);
+
+  // Fonction pour charger les fichiers du projet
+  const fetchProjectFiles = async () => {
+    try {
+      const { data: files, error } = await supabase.storage
+        .from('project-files')
+        .list(`projects/${project.id}`, {
+          limit: 10,
+          offset: 0
+        });
+      
+      if (error) {
+        console.error("Erreur chargement fichiers:", error);
+      } else if (files && files.length > 0) {
+        // Filtrer les fichiers réels (pas les placeholders)
+        const realFiles = files.filter(file => 
+          !file.name.startsWith('.') && 
+          file.name !== 'undefined' &&
+          file.metadata
+        );
+        setProjectFiles(realFiles);
+      }
+    } catch (error) {
+      console.error("Erreur inattendue chargement fichiers:", error);
+    }
+  };
 
   const fetchResourceAssignments = async () => {
     console.log('🔎 Fetching resource assignments for project:', project.id);
@@ -248,7 +325,15 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           profile_id,
           booking_status,
           calculated_price,
-          seniority
+          seniority,
+          languages,
+          expertises,
+          candidate_id,
+          candidate_profiles!candidate_id (
+            first_name,
+            last_name,
+            daily_rate
+          )
         `)
         .eq('project_id', project.id);
 
@@ -308,7 +393,11 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       return;
     }
     
-    if (project.status === 'pause' || project.status === 'attente-team') {
+    // Si le projet est en play sans kickoff (tous ont accepté mais pas encore de planning)
+    if (isPlayWithoutKickoff) {
+      console.log('🚀 Opening kickoff dialog for play project without tools');
+      setShowKickoff(true);
+    } else if (project.status === 'pause' || project.status === 'attente-team') {
       // If starting, show kickoff dialog first
       setShowKickoff(true);
     } else if (project.status === 'play') {
@@ -332,8 +421,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         throw updateError;
       }
 
-      // Then call the resource booking function (using debug version temporarily)
-      const { data, error } = await supabase.functions.invoke('resource-booking-debug', {
+      // Then call the resource booking function
+      const { data, error } = await supabase.functions.invoke('resource-booking', {
         body: {
           projectId: project.id,
           action: 'find_candidates'
@@ -363,11 +452,18 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   const startProject = async (kickoffISO: string) => {
     try {
+      console.log('🚀 startProject called with kickoffISO:', kickoffISO);
       setIsSyncing(true);
+      
       // Trigger the project setup with kickoff
       if (onStart) {
-        onStart({ id: project.id, title: project.title, kickoffISO });
+        console.log('✅ Calling onStart with:', { id: project.id, title: project.title, kickoffISO });
+        await onStart({ id: project.id, title: project.title, kickoffISO });
+      } else {
+        console.error('❌ onStart is not defined!');
+        toast.error('Fonction de démarrage non définie');
       }
+      
       setShowKickoff(false);
     } catch (error) {
       console.error('Error starting project:', error);
@@ -383,7 +479,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     }
   };
 
-  const getBookingProgress = () => {
+  // Calculer la progression des ressources avec useMemo pour mise à jour réactive
+  const bookingProgress = useMemo(() => {
+    console.log('📊 Recalculating booking progress with', resourceAssignments.length, 'assignments');
     if (resourceAssignments.length === 0) return { percentage: 0, text: 'Aucune ressource' };
     
     // Vérifier les statuts de booking
@@ -392,11 +490,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     ).length;
     const percentage = (bookedCount / resourceAssignments.length) * 100;
     
+    console.log('✅ Booking progress:', bookedCount, '/', resourceAssignments.length, '=', percentage + '%');
+    
     return {
       percentage,
       text: `${bookedCount}/${resourceAssignments.length} ressources confirmées`
     };
-  };
+  }, [resourceAssignments]); // Recalculer quand resourceAssignments change
   
   // Check if team booking has been requested (resources in 'recherche' status)
   const hasBookingInProgress = () => {
@@ -408,25 +508,33 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     return resourceAssignments.some(assignment => assignment.booking_status === 'draft');
   };
 
-  const bookingProgress = getBookingProgress();
   const allResourcesBooked = resourceAssignments.every(assignment => 
     assignment.booking_status === 'accepted'
   );
   
   // Déterminer si le projet peut être démarré
   // On peut démarrer UNIQUEMENT quand toutes les ressources humaines sont confirmées (IA toujours disponible)
-  const canStartProject = (project.status === 'pause' || project.status === 'attente-team') && 
-    resourceAssignments.length > 0 && 
+  // Inclure aussi les projets 'play' qui n'ont pas encore d'outils collaboratifs (pas de planning)
+  const allResourcesAccepted = resourceAssignments.length > 0 && 
     resourceAssignments.every(assignment => {
       // Les IA sont toujours disponibles
       if (assignment.hr_profiles?.is_ai) return true;
       // Les ressources humaines doivent être acceptées
       return assignment.booking_status === 'accepted';
     });
+
+  // Un projet 'play' sans outils collaboratifs est un projet qui vient d'être accepté par tous
+  // mais qui n'a pas encore eu son kickoff
+  const isPlayWithoutKickoff = project.status === 'play' && !project.planning_shared;
+  
+  const canStartProject = ((project.status === 'pause' || project.status === 'attente-team') || isPlayWithoutKickoff) && 
+    allResourcesAccepted;
   
   console.log('🎯 Project', project.id, 'start conditions:');
-  console.log('  - Status is pause or attente-team:', project.status === 'pause' || project.status === 'attente-team');
-  console.log('  - All resources booked:', allResourcesBooked);
+  console.log('  - Status:', project.status);
+  console.log('  - Planning shared:', project.planning_shared);
+  console.log('  - Is play without kickoff:', isPlayWithoutKickoff);
+  console.log('  - All resources accepted:', allResourcesAccepted);
   console.log('  - Has resources:', resourceAssignments.length > 0, '(count:', resourceAssignments.length, ')');
   console.log('  - Can start:', canStartProject);
   console.log('  - Resource details:', resourceAssignments.map(r => ({
@@ -514,9 +622,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               <DropdownMenuContent align="end" className="bg-white border-[#ECEEF1]">
                 {!isArchived && (
                   <>
+                    <DropdownMenuItem onClick={() => onView(project.id)} className="hover:bg-[#F7F8FA] text-[#0E0F12]">
+                      <Users className="h-4 w-4 mr-2" />
+                      Modifier l'équipe
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setShowEditModal(true)} className="hover:bg-[#F7F8FA] text-[#0E0F12]">
                       <Edit className="h-4 w-4 mr-2" />
-                      Éditer
+                      Éditer le projet
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => onArchive?.(project.id)}
@@ -547,6 +659,60 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             </DropdownMenu>
           </div>
         
+          {/* Indicateur Schedule-X pour les projets démarrés */}
+          {project.status === 'play' && (project.metadata?.scheduleX?.calendar_created || project.metadata?.calcom?.calendar_created) && (
+            <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex flex-col gap-2">
+                {/* Calendrier équipe */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">
+                      📅 Calendrier équipe actif
+                    </span>
+                  </div>
+                  <a 
+                    href={project.metadata.scheduleX?.calendar_url || project.metadata.calcom?.calendar_url || "/calendar"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
+                  >
+                    <Link2 className="w-3 h-3" />
+                    Voir le calendrier
+                  </a>
+                </div>
+                
+                {/* Date de kickoff */}
+                {(project.metadata.scheduleX?.kickoff_date || project.metadata.calcom?.kickoff_date) && (
+                  <div className="flex items-center justify-between pt-2 border-t border-green-200">
+                    <div className="flex items-center gap-2">
+                      <Rocket className="w-4 h-4 text-green-600" />
+                      <span className="text-xs text-green-700">
+                        Kickoff: {new Date(project.metadata.scheduleX?.kickoff_date || project.metadata.calcom?.kickoff_date).toLocaleDateString('fr-FR', {
+                          day: 'numeric',
+                          month: 'long',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    {(project.metadata.scheduleX?.kickoff_meeting_url || project.metadata.calcom?.kickoff_meeting_url) && (
+                      <a 
+                        href={project.metadata.scheduleX?.kickoff_meeting_url || project.metadata.calcom?.kickoff_meeting_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
+                      >
+                        <Video className="w-3 h-3" />
+                        Rejoindre
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        
           {/* Meta pills with price */}
           <div className="flex flex-wrap gap-3">
             {/* Budget */}
@@ -576,6 +742,16 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                 </span>
               </div>
             )}
+
+            {/* Fichiers attachés */}
+            {projectFiles.length > 0 && (
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
+                <Paperclip className="h-4 w-4 text-[#7B3EF4]" />
+                <span className="text-sm font-medium text-[#0E0F12]">
+                  {projectFiles.length} fichier{projectFiles.length > 1 ? 's' : ''} attaché{projectFiles.length > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Team progress */}
@@ -601,7 +777,11 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   return (
                     <span
                       key={profileId} 
-                      className="text-xs px-2 py-1 rounded bg-[#F4F6F9] text-[#0E0F12]"
+                      className={`text-xs px-2 py-1 rounded transition-colors ${
+                        hasBooked 
+                          ? 'bg-green-100 text-green-700 font-medium border border-green-200' 
+                          : 'bg-[#F4F6F9] text-[#0E0F12] border border-gray-200'
+                      }`}
                     >
                       {profileName}
                       {hasBooked && ' ✓'}
@@ -614,15 +794,29 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-2">
-            <button
-              onClick={() => onView(project.id)}
-              className="text-sm text-[#0E0F12] underline-offset-4 hover:underline"
-            >
-              {project.status === 'pause' ? 'Créer vos équipes' : 'Voir détails'}
-            </button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowTeamModal(true)}
+                className="flex items-center gap-1.5 text-sm text-[#0E0F12] hover:bg-[#F7F8FA]"
+              >
+                <Users className="h-4 w-4" />
+                Équipe
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowProjectDetailsModal(true)}
+                className="flex items-center gap-1.5 text-sm text-[#0E0F12] hover:bg-[#F7F8FA]"
+              >
+                <Info className="h-4 w-4" />
+                Détails
+              </Button>
+            </div>
 
             {/* CTA principal unique selon l'état */}
-            {(project.status === 'pause' || project.status === 'attente-team') && (
+            {(project.status === 'pause' || project.status === 'attente-team' || isPlayWithoutKickoff) && (
               <>
                 {resourceAssignments.length === 0 ? (
                   <Button
@@ -693,8 +887,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               </>
             )}
 
-            {/* Pause pour les projets en cours */}
-            {project.status === 'play' && (
+            {/* Pause pour les projets en cours qui ont déjà des outils collaboratifs */}
+            {project.status === 'play' && !isPlayWithoutKickoff && (
               <Button
                 onClick={handleStatusToggle}
                 disabled={isSyncing}
@@ -736,6 +930,238 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           client_budget: project.clientBudget,
         }}
       />
+
+      {/* Modal Constitution de l'équipe */}
+      <FullScreenModal
+        isOpen={showTeamModal}
+        onClose={() => setShowTeamModal(false)}
+        title="Constitution de l'équipe"
+        description={`Équipe du projet "${project.title}"`}
+      >
+        <div className="space-y-4">
+          {resourceAssignments.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Users className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600">Aucune ressource définie pour ce projet</p>
+              <Button
+                onClick={() => {
+                  setShowTeamModal(false);
+                  onView(project.id);
+                }}
+                className="mt-4"
+              >
+                Définir l'équipe
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-purple-50 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-600">Progression de l'équipe</p>
+                    <p className="text-lg font-semibold text-purple-900 mt-1">{bookingProgress.text}</p>
+                  </div>
+                  <div className="text-3xl font-bold text-purple-700">
+                    {Math.round(bookingProgress.percentage)}%
+                  </div>
+                </div>
+                <div className="w-full bg-purple-100 rounded-full h-2 mt-3">
+                  <div 
+                    className="h-2 bg-purple-600 rounded-full transition-all duration-300"
+                    style={{ width: `${bookingProgress.percentage}%` }}
+                  />
+                </div>
+              </div>
+
+              {resourceAssignments.map((assignment, index) => (
+                <div key={index} className="bg-white border border-gray-200 rounded-lg p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Users className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">
+                          {profileNames[assignment.profile_id] || 'Poste non défini'}
+                        </h4>
+                        <p className="text-sm text-gray-600">{assignment.seniority || 'Séniorité non définie'}</p>
+                        {assignment.languages && assignment.languages.length > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            <span className="font-medium">Langues:</span> {assignment.languages.join(', ')}
+                          </p>
+                        )}
+                        {assignment.expertises && assignment.expertises.length > 0 && (
+                          <p className="text-xs text-gray-500">
+                            <span className="font-medium">Expertises:</span> {assignment.expertises.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {assignment.booking_status === 'accepted' ? (
+                      <Badge className="bg-green-100 text-green-700 border-green-200">
+                        ✓ Confirmé
+                      </Badge>
+                    ) : assignment.booking_status === 'recherche' ? (
+                      <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                        En recherche
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        Brouillon
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {assignment.booking_status === 'accepted' && assignment.candidate_profiles && (
+                    <div className="mt-3 pt-3 border-t">
+                      <div className="text-sm">
+                        <span className="text-gray-500">Candidat assigné: </span>
+                        <span className="font-medium text-gray-900">
+                          {assignment.candidate_profiles.first_name} {assignment.candidate_profiles.last_name}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {assignment.calculated_price && (
+                    <div className="mt-3 pt-3 border-t">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Tarif</span>
+                        <span className="font-semibold text-gray-900">
+                          {assignment.calculated_price.toFixed(2)}€/min
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              <div className="mt-6 pt-6 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Prix total par minute</span>
+                  <span className="text-xl font-bold text-purple-700">
+                    {calculateTotalPricePerMinute().toFixed(2)}€/min
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </FullScreenModal>
+
+      {/* Modal Détails du projet */}
+      <FullScreenModal
+        isOpen={showProjectDetailsModal}
+        onClose={() => setShowProjectDetailsModal(false)}
+        title={project.title}
+        description="Détails complets du projet"
+      >
+        <div className="space-y-6">
+          {/* Description */}
+          {project.description && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
+              <p className="text-gray-700 whitespace-pre-wrap">{project.description}</p>
+            </div>
+          )}
+
+          {/* Informations */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Informations</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>Date de début</span>
+                </div>
+                <p className="font-semibold">
+                  {formatDate(project.date)}
+                </p>
+              </div>
+
+              {project.dueDate && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>Date de fin</span>
+                  </div>
+                  <p className="font-semibold">
+                    {formatDate(project.dueDate)}
+                  </p>
+                </div>
+              )}
+
+              {project.clientBudget && (
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-purple-600 mb-1">
+                    <Euro className="h-4 w-4" />
+                    <span>Budget du projet</span>
+                  </div>
+                  <p className="font-semibold text-purple-700">
+                    {formatCurrency(project.clientBudget)}
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                  <Info className="h-4 w-4" />
+                  <span>Statut</span>
+                </div>
+                <Badge variant={project.status === 'play' ? 'default' : 'secondary'}>
+                  {project.status === 'play' ? 'En cours' : 
+                   project.status === 'pause' ? 'En pause' : 
+                   project.status === 'attente-team' ? 'En attente' : 
+                   project.status === 'completed' ? 'Terminé' : project.status}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Fichiers attachés */}
+          {projectFiles.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                Fichiers attachés ({projectFiles.length})
+              </h3>
+              <div className="space-y-2">
+                {projectFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-purple-600" />
+                      <span className="text-sm font-medium text-gray-700">{file.name}</span>
+                      {file.metadata?.size && (
+                        <span className="text-xs text-gray-500">
+                          ({(file.metadata.size / 1024).toFixed(1)} KB)
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        const { data } = await supabase.storage
+                          .from('project-files')
+                          .download(`projects/${project.id}/${file.name}`);
+                        if (data) {
+                          const url = URL.createObjectURL(data);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = file.name;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </FullScreenModal>
     </>
   );
 }

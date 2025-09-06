@@ -470,7 +470,7 @@ export const useSlackLikeMessages = (projectId?: string) => {
 
   // Mark messages as read
   const markAsRead = useCallback(async (threadId: string) => {
-    if (!user?.email) return;
+    if (!user?.id) return;
 
     try {
       const { data: unreadMessages } = await supabase
@@ -497,7 +497,7 @@ export const useSlackLikeMessages = (projectId?: string) => {
         .from('message_participants')
         .update({ last_read_at: new Date().toISOString() })
         .eq('thread_id', threadId)
-        .eq('email', user.email);
+        .eq('id', user.id);
 
       await fetchThreads();
 

@@ -106,6 +106,25 @@ serve(async (req) => {
       }
 
       console.log(`[project-orchestrator] Found project: ${project.title}, status: ${project.status}`);
+      
+      // Vérifier si le projet a déjà des outils collaboratifs (kanban créé)
+      const { data: existingKanban } = await supabaseClient
+        .from('kanban_boards')
+        .select('id')
+        .eq('project_id', projectId)
+        .single();
+      
+      if (existingKanban) {
+        console.log(`[project-orchestrator] Project already has collaborative tools (kanban exists)`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Le projet est déjà configuré',
+            details: 'Ce projet a déjà ses outils collaboratifs (planning, kanban, etc.) configurés.'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
 
       // 2. Récupérer les ressources acceptées via hr_resource_assignments
       const { data: acceptedAssignments, error: assignmentsError } = await supabaseClient

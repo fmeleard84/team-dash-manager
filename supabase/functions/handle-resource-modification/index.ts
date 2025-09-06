@@ -550,8 +550,8 @@ async function startCandidateSearch(
   
   for (const candidate of filteredCandidates) {
     try {
-      // Vérifier si une notification existe déjà
-      const { data: existingNotif } = await supabase
+      // Check if an UNREAD notification already exists
+      const { data: existingUnreadNotif } = await supabase
         .from('candidate_notifications')
         .select('id')
         .eq('candidate_id', candidate.id)
@@ -559,7 +559,19 @@ async function startCandidateSearch(
         .eq('status', 'unread')
         .single();
 
-      if (!existingNotif) {
+      // Check if candidate previously declined this assignment
+      const { data: previouslyDeclined } = await supabase
+        .from('candidate_notifications')
+        .select('id')
+        .eq('candidate_id', candidate.id)
+        .eq('resource_assignment_id', assignmentId)
+        .eq('status', 'declined')
+        .single();
+
+      // Only create notification if:
+      // 1. No unread notification exists AND
+      // 2. Candidate hasn't previously declined
+      if (!existingUnreadNotif && !previouslyDeclined) {
         // Créer la notification
         const { error } = await supabase
           .from('candidate_notifications')
@@ -582,10 +594,14 @@ ${assignment.projects?.description || ''}`,
 
         if (!error) {
           notificationsCreated++;
-          console.log(`Notification created for candidate ${candidate.first_name} ${candidate.last_name}`);
+          console.log(`Notification created for candidate ${candidate.first_name} ${candidate.last_name} (${candidate.email})`);
         } else {
           console.error('Error creating notification:', error);
         }
+      } else if (existingUnreadNotif) {
+        console.log(`Unread notification already exists for ${candidate.first_name} ${candidate.last_name}`);
+      } else if (previouslyDeclined) {
+        console.log(`Candidate ${candidate.first_name} ${candidate.last_name} previously declined, skipping`);
       }
     } catch (e) {
       console.error('Error processing candidate:', e);

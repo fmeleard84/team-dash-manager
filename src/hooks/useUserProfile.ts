@@ -32,7 +32,7 @@ export const useUserProfile = () => {
 
   useEffect(() => {
     const fetchProfiles = async () => {
-      if (!user?.email) {
+      if (!user?.id) {
         setLoading(false);
         return;
       }
@@ -45,7 +45,7 @@ export const useUserProfile = () => {
           const { data: candidate, error: candidateError } = await supabase
             .from('candidate_profiles')
             .select('id, email, first_name, last_name, phone, seniority, daily_rate, status, profile_type')
-            .eq('email', user.email)
+            .eq('id', user.id)
             .maybeSingle();
 
           if (!candidateError && candidate) {
@@ -58,7 +58,7 @@ export const useUserProfile = () => {
           const { data: client, error: clientError } = await supabase
             .from('client_profiles')
             .select('id, email, first_name, last_name, phone, company_name, user_id')
-            .eq('email', user.email)
+            .eq('id', user.id)
             .maybeSingle();
 
           if (!clientError && client) {
@@ -73,7 +73,7 @@ export const useUserProfile = () => {
     };
 
     fetchProfiles();
-  }, [user?.email, user?.role]);
+  }, [user?.id, user?.role]);
 
   return {
     candidateProfile,

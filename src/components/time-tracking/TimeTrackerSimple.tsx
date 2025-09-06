@@ -49,7 +49,7 @@ export const TimeTrackerSimple = () => {
   // Load all projects where candidate is assigned
   useEffect(() => {
     const loadProjects = async () => {
-      if (!user?.email) return;
+      if (!user?.id) return;
       
       setLoadingProjects(true);
       try {
@@ -57,7 +57,7 @@ export const TimeTrackerSimple = () => {
         const { data: candidateProfile } = await supabase
           .from('candidate_profiles')
           .select('id, profile_id, seniority')
-          .eq('email', user.email)
+          .eq('id', user.id)
           .single();
         
         if (!candidateProfile) {
