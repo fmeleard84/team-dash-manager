@@ -141,7 +141,8 @@ useEffect(() => {
 // Use realtime hook for projects
 useRealtimeProjectsFixed({
   setProjects: (updater) => {
-    const allProjects = typeof updater === 'function' ? updater(projects) : updater;
+    const currentProjects = [...projects, ...archivedProjects];
+    const allProjects = typeof updater === 'function' ? updater(currentProjects) : updater;
     const active = allProjects?.filter(p => !p.archived_at && !p.deleted_at) || [];
     const archived = allProjects?.filter(p => p.archived_at || p.deleted_at) || [];
     setProjects(active);
@@ -263,6 +264,7 @@ const renderStartContent = () => {
       >
         <ProjectsSection
           projects={projects}
+          archivedProjects={archivedProjects}
           resourceAssignments={resourceAssignments}
           onCreateProject={() => setIsCreateOpen(true)}
           refreshTrigger={refreshTrigger}

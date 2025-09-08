@@ -24,7 +24,7 @@ const sizeClasses = {
   lg: 'h-13 px-6 text-lg'
 };
 
-export function Button({ 
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ 
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -34,9 +34,10 @@ export function Button({
   className,
   disabled,
   ...props 
-}: ButtonProps) {
+}, ref) => {
   return (
     <ShadcnButton
+      ref={ref}
       className={cn(
         'rounded-2xl font-semibold transition-all duration-200',
         variantClasses[variant],
@@ -62,4 +63,6 @@ export function Button({
       )}
     </ShadcnButton>
   );
-}
+});
+
+Button.displayName = 'Button';

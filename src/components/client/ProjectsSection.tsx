@@ -30,17 +30,18 @@ interface DbProject {
 }
 
 interface ProjectsSectionProps {
-  projects: DbProject[];
-  archivedProjects: DbProject[];
-  resourceAssignments: any[];
-  onViewProject: (id: string) => void;
-  onToggleStatus: (id: string, status: string) => void;
-  onStartProject: (project: any) => void;
-  onDeleteRequest: (project: DbProject) => void;
-  onArchiveProject: (id: string) => void;
-  onUnarchiveProject: (id: string) => void;
-  onCreateProject: () => void;
-  onViewTemplates: () => void;
+  projects?: DbProject[];
+  archivedProjects?: DbProject[];
+  resourceAssignments?: any[];
+  onViewProject?: (id: string) => void;
+  onToggleStatus?: (id: string, status: string) => void;
+  onStartProject?: (project: any) => void;
+  onDeleteRequest?: (project: DbProject) => void;
+  onArchiveProject?: (id: string) => void;
+  onUnarchiveProject?: (id: string) => void;
+  onCreateProject?: () => void;
+  onViewTemplates?: () => void;
+  refreshTrigger?: number;
 }
 
 // Configuration des statuts avec leurs styles
@@ -84,17 +85,18 @@ const statusConfig = {
 };
 
 export function ProjectsSection({
-  projects,
-  archivedProjects,
-  resourceAssignments,
-  onViewProject,
-  onToggleStatus,
-  onStartProject,
-  onDeleteRequest,
-  onArchiveProject,
-  onUnarchiveProject,
-  onCreateProject,
-  onViewTemplates,
+  projects = [],
+  archivedProjects = [],
+  resourceAssignments = [],
+  onViewProject = () => {},
+  onToggleStatus = () => {},
+  onStartProject = () => {},
+  onDeleteRequest = () => {},
+  onArchiveProject = () => {},
+  onUnarchiveProject = () => {},
+  onCreateProject = () => {},
+  onViewTemplates = () => {},
+  refreshTrigger = 0,
 }: ProjectsSectionProps) {
   // État pour les filtres
   const [selectedFilters, setSelectedFilters] = useState<string[]>(['en-cours', 'nouveau', 'attente-team', 'pause']);
@@ -102,7 +104,7 @@ export function ProjectsSection({
 
   // Fusionner tous les projets avec leur catégorie et mapper les noms de propriétés
   const allProjects = [
-    ...projects.map(p => ({ 
+    ...(projects || []).map(p => ({ 
       ...p, 
       // Mapper les noms de propriétés pour ProjectCard
       date: p.project_date,
@@ -113,7 +115,7 @@ export function ProjectsSection({
                 p.status === 'pause' ? 'pause' : 
                 p.status === 'completed' ? 'completed' : 'nouveau' 
     })),
-    ...archivedProjects.map(p => ({ 
+    ...(archivedProjects || []).map(p => ({ 
       ...p, 
       // Mapper les noms de propriétés pour ProjectCard
       date: p.project_date,
@@ -130,12 +132,12 @@ export function ProjectsSection({
 
   // Compteurs par statut
   const statusCounts = {
-    'en-cours': projects.filter(p => p.status === 'play').length,
-    'nouveau': projects.filter(p => p.status === 'pause' && !resourceAssignments.some(a => a.project_id === p.id && a.booking_status === 'recherche')).length,
-    'attente-team': projects.filter(p => p.status === 'attente-team').length,
-    'pause': projects.filter(p => p.status === 'pause' && resourceAssignments.some(a => a.project_id === p.id && a.booking_status === 'recherche')).length,
-    'completed': projects.filter(p => p.status === 'completed').length,
-    'archived': archivedProjects.length,
+    'en-cours': (projects || []).filter(p => p.status === 'play').length,
+    'nouveau': (projects || []).filter(p => p.status === 'pause' && !(resourceAssignments || []).some(a => a.project_id === p.id && a.booking_status === 'recherche')).length,
+    'attente-team': (projects || []).filter(p => p.status === 'attente-team').length,
+    'pause': (projects || []).filter(p => p.status === 'pause' && (resourceAssignments || []).some(a => a.project_id === p.id && a.booking_status === 'recherche')).length,
+    'completed': (projects || []).filter(p => p.status === 'completed').length,
+    'archived': (archivedProjects || []).length,
   };
 
   const toggleFilter = (filter: string) => {
