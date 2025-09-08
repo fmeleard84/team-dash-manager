@@ -107,13 +107,50 @@ const [refreshTrigger, setRefreshTrigger] = useState(0);
 const { setupProject, isLoading: isOrchestrating } = useProjectOrchestrator();
 const { categories, templates, getTemplatesByCategory } = useTemplates();
 
+// Load initial projects
+useEffect(() => {
+  const loadProjects = async () => {
+    if (!user?.id) return;
+    
+    const { data: projectsData, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('owner_id', user.id);
+    
+    if (!error && projectsData) {
+      const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);
+      const archived = projectsData.filter(p => p.archived_at || p.deleted_at);
+      setProjects(active);
+      setArchivedProjects(archived);
+    }
+    
+    // Load resource assignments
+    const { data: assignmentsData } = await supabase
+      .from('hr_resource_assignments')
+      .select('*')
+      .in('project_id', projectsData?.map(p => p.id) || []);
+    
+    if (assignmentsData) {
+      setResourceAssignments(assignmentsData);
+    }
+  };
+  
+  loadProjects();
+}, [user?.id]);
+
 // Use realtime hook for projects
 useRealtimeProjectsFixed({
+  setProjects: (updater) => {
+    const allProjects = typeof updater === 'function' ? updater(projects) : updater;
+    const active = allProjects?.filter(p => !p.archived_at && !p.deleted_at) || [];
+    const archived = allProjects?.filter(p => p.archived_at || p.deleted_at) || [];
+    setProjects(active);
+    setArchivedProjects(archived);
+  },
+  setResourceAssignments,
   userId: user?.id,
-  userRole: 'client',
-  onProjectsUpdate: setProjects,
-  onArchivedProjectsUpdate: setArchivedProjects,
-  onResourceAssignmentsUpdate: setResourceAssignments
+  userType: 'client',
+  candidateProfile: null
 });
 
 // Calculate metrics
@@ -233,7 +270,7 @@ const renderStartContent = () => {
       </PageSection>
 
       {/* Archived Projects */}
-      {archivedProjects.length > 0 && (
+      {archivedProjects && archivedProjects.length > 0 && (
         <PageSection title="Projets archivés">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {archivedProjects.map((project) => (
@@ -281,7 +318,7 @@ const renderKanbanContent = () => {
             <SelectValue placeholder="Sélectionner un projet" />
           </SelectTrigger>
           <SelectContent>
-            {playProjects.map(project => (
+            {playProjects?.map(project => (
               <SelectItem key={project.id} value={project.id}>
                 {project.title}
               </SelectItem>
@@ -322,7 +359,7 @@ const renderMessagesContent = () => {
             <SelectValue placeholder="Sélectionner un projet" />
           </SelectTrigger>
           <SelectContent>
-            {playProjects.map(project => (
+            {playProjects?.map(project => (
               <SelectItem key={project.id} value={project.id}>
                 {project.title}
               </SelectItem>
@@ -367,7 +404,7 @@ const renderDriveContent = () => {
             <SelectValue placeholder="Sélectionner un projet" />
           </SelectTrigger>
           <SelectContent>
-            {playProjects.map(project => (
+            {playProjects?.map(project => (
               <SelectItem key={project.id} value={project.id}>
                 {project.title}
               </SelectItem>
@@ -410,7 +447,7 @@ const renderWikiContent = () => {
             <SelectValue placeholder="Sélectionner un projet" />
           </SelectTrigger>
           <SelectContent>
-            {playProjects.map(project => (
+            {playProjects?.map(project => (
               <SelectItem key={project.id} value={project.id}>
                 {project.title}
               </SelectItem>

@@ -111,6 +111,37 @@ const CandidateDashboard = () => {
     }
   }, [candidateStatus]);
 
+  // Load initial assignments and set default projects
+  useEffect(() => {
+    const loadInitialData = async () => {
+      if (!candidateId) return;
+      
+      // Load resource assignments for this candidate
+      const { data: assignmentsData } = await supabase
+        .from('hr_resource_assignments')
+        .select('*')
+        .or(`candidate_id.eq.${candidateId},booking_status.eq.recherche`);
+      
+      if (assignmentsData) {
+        setResourceAssignments(assignmentsData);
+      }
+      
+      // Load candidate languages and expertises
+      const { data: candidateData } = await supabase
+        .from('candidate_profiles')
+        .select('languages, expertises')
+        .eq('id', candidateId)
+        .single();
+      
+      if (candidateData) {
+        setCandidateLanguages(candidateData.languages || []);
+        setCandidateExpertises(candidateData.expertises || []);
+      }
+    };
+    
+    loadInitialData();
+  }, [candidateId]);
+
   // Set default Drive and Wiki projects when activeProjects change
   useEffect(() => {
     if (activeProjects && activeProjects.length > 0) {
@@ -125,11 +156,15 @@ const CandidateDashboard = () => {
 
   // Use realtime hook for candidate projects
   useRealtimeProjectsFixed({
+    setProjects: setCandidateProjects,
+    setResourceAssignments,
     userId: user?.id,
-    userRole: 'candidate',
-    candidateId: candidateId,
-    onProjectsUpdate: setCandidateProjects,
-    onResourceAssignmentsUpdate: setResourceAssignments
+    userType: 'candidate',
+    candidateProfile: candidateProfile ? {
+      id: candidateId,
+      profile_id: profileId,
+      seniority: seniority || ''
+    } : null
   });
 
   // Update availability in database
@@ -259,7 +294,7 @@ const CandidateDashboard = () => {
 
     return (
       <PageSection title="Tableau Kanban">
-        {activeProjects.map(project => (
+        {activeProjects?.map(project => (
           <div key={project.id} className="mb-8">
             <h3 className="text-lg font-semibold mb-4">{project.title}</h3>
             <CandidateKanbanView projectId={project.id} />
@@ -332,7 +367,7 @@ const CandidateDashboard = () => {
               <SelectValue placeholder="Sélectionner un projet" />
             </SelectTrigger>
             <SelectContent>
-              {activeProjects.map(project => (
+              {activeProjects?.map(project => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.title}
                 </SelectItem>
@@ -373,7 +408,7 @@ const CandidateDashboard = () => {
               <SelectValue placeholder="Sélectionner un projet" />
             </SelectTrigger>
             <SelectContent>
-              {activeProjects.map(project => (
+              {activeProjects?.map(project => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.title}
                 </SelectItem>
