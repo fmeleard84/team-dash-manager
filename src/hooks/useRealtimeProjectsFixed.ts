@@ -26,11 +26,13 @@ export const useRealtimeProjectsFixed = ({
   const setProjectsRef = useRef(setProjects);
   const setResourceAssignmentsRef = useRef(setResourceAssignments);
   const userTypeRef = useRef(userType);
+  const candidateProfileRef = useRef(candidateProfile);
   
   // Update refs when values change
   setProjectsRef.current = setProjects;
   setResourceAssignmentsRef.current = setResourceAssignments;
   userTypeRef.current = userType;
+  candidateProfileRef.current = candidateProfile;
 
   const handleProjectUpdate = useCallback(async (payload: any) => {
     // // console.log('🔄 REALTIME PROJECTS FIXED: Project event:', payload.eventType, payload.new || payload.old);
@@ -93,7 +95,7 @@ export const useRealtimeProjectsFixed = ({
   }, []);
 
   const handleAssignmentUpdate = useCallback(async (payload: any) => {
-    // // console.log('👥 REALTIME ASSIGNMENTS FIXED: Assignment event:', payload.eventType, payload.new || payload.old);
+    console.log('👥 REALTIME ASSIGNMENTS: Event:', payload.eventType, 'Assignment ID:', payload.new?.id || payload.old?.id);
     
     const updatedAssignment = payload.new || payload.old;
     if (!updatedAssignment) return;
@@ -119,27 +121,128 @@ export const useRealtimeProjectsFixed = ({
       const exists = prev.some(a => a.id === updatedAssignment.id);
       
       if (payload.eventType === 'DELETE') {
-        return prev.filter(a => a.id !== updatedAssignment.id);
+        console.log('🗑️ REALTIME: Removing assignment from list');
+        // Mark state as changed to trigger reload in CandidateDashboard
+        return prev.filter(a => a.id !== updatedAssignment.id).map(a => ({ ...a, _realtimeDeleted: Date.now() }));
       }
       
       if (payload.eventType === 'INSERT' && !exists) {
+        console.log('➕ REALTIME: Adding new assignment to list');
         return [...prev, { ...updatedAssignment, _realtimeUpdated: Date.now() }];
       }
       
       if (payload.eventType === 'UPDATE') {
-        return prev.map(a => 
-          a.id === updatedAssignment.id 
-            ? { ...a, ...updatedAssignment, _realtimeUpdated: Date.now() }
-            : a
-        );
+        console.log('🔄 REALTIME: Updating assignment', { 
+          assignmentId: updatedAssignment.id,
+          exists,
+          userType: userTypeRef.current 
+        });
+        
+        // For candidates, check if the update makes the assignment incompatible
+        if (userTypeRef.current === 'candidate' && candidateProfileRef.current) {
+          const newAssignment = payload.new;
+          const oldAssignment = payload.old;
+          
+          // Check if candidate was previously assigned or matching
+          const wasMatching = (
+            // Either specifically assigned to this candidate
+            oldAssignment?.candidate_id === candidateProfileRef.current.id ||
+            // Or was in search mode matching this candidate's profile
+            (oldAssignment?.booking_status === 'recherche' &&
+             !oldAssignment?.candidate_id && // Important: only if no specific candidate yet
+             oldAssignment?.profile_id === candidateProfileRef.current.profile_id &&
+             oldAssignment?.seniority === candidateProfileRef.current.seniority)
+          );
+          
+          // Check if candidate still matches after the update
+          const stillMatches = (
+            // Either specifically assigned to this candidate
+            newAssignment?.candidate_id === candidateProfileRef.current.id ||
+            // Or is in search mode matching this candidate's profile
+            (newAssignment?.booking_status === 'recherche' &&
+             !newAssignment?.candidate_id && // Important: only if no specific candidate yet
+             newAssignment?.profile_id === candidateProfileRef.current.profile_id &&
+             newAssignment?.seniority === candidateProfileRef.current.seniority)
+          );
+          
+          // Special case: when candidate accepts, it transitions from generic match to specific assignment
+          const isAcceptanceTransition = (
+            oldAssignment?.booking_status === 'recherche' &&
+            newAssignment?.booking_status === 'accepted' &&
+            newAssignment?.candidate_id === candidateProfileRef.current.id
+          );
+          
+          console.log('🔍 REALTIME: Assignment compatibility check', {
+            assignmentId: updatedAssignment.id,
+            wasMatching,
+            stillMatches,
+            isAcceptanceTransition,
+            exists,
+            oldBookingStatus: oldAssignment?.booking_status,
+            newBookingStatus: newAssignment?.booking_status,
+            oldCandidateId: oldAssignment?.candidate_id,
+            newCandidateId: newAssignment?.candidate_id,
+            ourCandidateId: candidateProfileRef.current.id
+          });
+          
+          // Case 1: Was matching but no longer matches - REMOVE
+          if (wasMatching && !stillMatches) {
+            console.log('🚫 REALTIME: Assignment no longer compatible, removing from list');
+            return prev.filter(a => a.id !== updatedAssignment.id).map(a => ({ ...a, _realtimeDeleted: Date.now() }));
+          }
+          
+          // Case 2: Wasn't matching but now matches - ADD only if not exists
+          if (!wasMatching && stillMatches && !exists) {
+            console.log('✅ REALTIME: Assignment now compatible, adding to list');
+            return [...prev, { ...updatedAssignment, _realtimeUpdated: Date.now() }];
+          }
+          
+          // Case 3: Was matching and still matches OR acceptance transition - UPDATE
+          if ((wasMatching && stillMatches) || isAcceptanceTransition) {
+            console.log('🔄 REALTIME: Assignment compatible, updating', {
+              bookingStatus: updatedAssignment.booking_status,
+              candidateId: updatedAssignment.candidate_id,
+              isAcceptanceTransition
+            });
+            
+            // Always update if exists (most common case)
+            if (exists) {
+              return prev.map(a => 
+                a.id === updatedAssignment.id 
+                  ? { ...a, ...updatedAssignment, _realtimeUpdated: Date.now() }
+                  : a
+              );
+            }
+            // If doesn't exist (shouldn't happen but safety), add it
+            return [...prev, { ...updatedAssignment, _realtimeUpdated: Date.now() }];
+          }
+          
+          // Case 4: Wasn't matching and still doesn't match - IGNORE
+          if (!wasMatching && !stillMatches) {
+            console.log('⏭️ REALTIME: Assignment not relevant, ignoring');
+            return prev;
+          }
+        }
+        
+        // For clients or fallback: just update if exists
+        if (exists) {
+          return prev.map(a => 
+            a.id === updatedAssignment.id 
+              ? { ...a, ...updatedAssignment, _realtimeUpdated: Date.now() }
+              : a
+          );
+        }
+        
+        // Don't add if doesn't exist (to prevent duplicates)
+        return prev;
       }
       
       return prev;
     });
 
-    // Si un assignment change de statut, ça peut changer le statut du projet
-    // On va fetch et update le projet correspondant
-    if (updatedAssignment.project_id && payload.eventType === 'UPDATE') {
+    // Si un assignment est créé ou change de statut, on doit mettre à jour/ajouter le projet
+    // Ceci corrige le problème où les candidats ne voient pas les nouveaux projets en temps réel
+    if (updatedAssignment.project_id && (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE')) {
       try {
         const { data: project, error } = await supabase
           .from('projects')
@@ -148,13 +251,28 @@ export const useRealtimeProjectsFixed = ({
           .single();
         
         if (!error && project) {
-          setProjectsRef.current!(prev => 
-            prev.map(p => 
-              p.id === project.id 
-                ? { ...p, ...project, _realtimeUpdated: Date.now() }
-                : p
-            )
-          );
+          setProjectsRef.current!(prev => {
+            const existingProjectIndex = prev.findIndex(p => p.id === project.id);
+            
+            // Si le projet n'existe pas encore dans la liste, on l'ajoute
+            // Cela peut arriver avec INSERT ou UPDATE (ex: passage de draft à recherche)
+            if (existingProjectIndex === -1) {
+              console.log('🆕 Nouveau projet détecté via assignment:', project.title, '(Event:', payload.eventType, ')');
+              return [...prev, { ...project, _realtimeUpdated: Date.now() }];
+            }
+            
+            // Si le projet existe déjà, on le met à jour
+            if (existingProjectIndex !== -1) {
+              console.log('🔄 Mise à jour projet existant:', project.title);
+              return prev.map(p => 
+                p.id === project.id 
+                  ? { ...p, ...project, _realtimeUpdated: Date.now() }
+                  : p
+              );
+            }
+            
+            return prev;
+          });
         }
       } catch (error) {
         console.error('Error fetching updated project:', error);
@@ -251,18 +369,50 @@ export const useRealtimeProjectsFixed = ({
           },
           async (payload) => {
             const assignment = payload.new || payload.old;
-            // Filter: soit c'est notre profile_id ET seniority, soit c'est notre candidate_id
-            if (assignment && (
-              (assignment.profile_id === candidateProfile.profile_id && 
-               assignment.seniority === candidateProfile.seniority) ||
-              assignment.candidate_id === candidateProfile.id
-            )) {
+            
+            // Pour DELETE, on doit vérifier l'ancienne valeur (payload.old)
+            // Pour INSERT/UPDATE, on vérifie la nouvelle valeur (payload.new)
+            const relevantAssignment = payload.eventType === 'DELETE' ? payload.old : payload.new;
+            
+            // IMPORTANT: Pour UPDATE/DELETE, on doit traiter si l'assignment était OU est pour nous
+            const wasForUs = payload.old && (
+              payload.old.candidate_id === candidateProfile.id ||
+              (payload.old.booking_status === 'recherche' &&
+               !payload.old.candidate_id && // Only if no specific candidate
+               payload.old.profile_id === candidateProfile.profile_id &&
+               payload.old.seniority === candidateProfile.seniority)
+            );
+            
+            const isForUs = payload.new && (
+              payload.new.candidate_id === candidateProfile.id ||
+              (payload.new.booking_status === 'recherche' &&
+               !payload.new.candidate_id && // Only if no specific candidate
+               payload.new.profile_id === candidateProfile.profile_id &&
+               payload.new.seniority === candidateProfile.seniority)
+            );
+            
+            // Special: acceptance transition (from generic to specific assignment)
+            const isAcceptance = payload.old?.booking_status === 'recherche' &&
+                                payload.new?.booking_status === 'accepted' &&
+                                payload.new?.candidate_id === candidateProfile.id;
+            
+            // Process if assignment was for us, is for us, or is an acceptance
+            if (wasForUs || isForUs || isAcceptance) {
+              console.log('🔔 Realtime assignment event for candidate:', {
+                eventType: payload.eventType,
+                assignmentId: relevantAssignment.id,
+                wasForUs,
+                isForUs,
+                isAcceptance,
+                ourCandidateId: candidateProfile.id,
+                bookingStatus: relevantAssignment.booking_status
+              });
               await handleAssignmentUpdate(payload);
             }
           }
         )
         .subscribe((status) => {
-          // console.log('👥 Assignments channel (candidate):', status);
+          console.log('👥 Assignments channel (candidate):', status);
         });
     } else {
       // Pour client: écouter tous les assignments (on filtrera côté client)

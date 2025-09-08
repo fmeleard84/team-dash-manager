@@ -454,7 +454,41 @@ serve(async (req) => {
         console.error('[project-orchestrator] Storage initialization failed:', storageErr);
       }
 
-      // 5. Appeler nc-orchestrator pour la structure Nextcloud (si configuré)
+      // 5. Créer la page Wiki initiale du projet
+      try {
+        console.log('[project-orchestrator] Creating initial wiki page for project');
+        
+        // Créer la page wiki racine du projet
+        const { data: wikiPage, error: wikiError } = await supabaseClient
+          .from('wiki_pages')
+          .insert({
+            project_id: projectId,
+            title: `Wiki - ${project.title}`,
+            content: `# Bienvenue dans le Wiki du projet ${project.title}\n\n## Description du projet\n${project.description || 'Description à compléter'}\n\n## Équipe du projet\n${resources.map((r: any) => `- **${r.first_name} ${r.last_name}** - ${r.profile_type || 'Ressource'} (${r.seniority})`).join('\n')}\n\n## Dates importantes\n- **Date de début**: ${new Date(project.project_date).toLocaleDateString('fr-FR')}\n- **Date de fin prévue**: ${project.due_date ? new Date(project.due_date).toLocaleDateString('fr-FR') : 'À définir'}\n\n## Documentation\nAjoutez ici la documentation importante du projet.\n\n## Notes de réunion\nVos notes de réunion seront ajoutées ici.\n\n## Ressources utiles\n- Liens\n- Documents\n- Références`,
+            slug: 'home',
+            parent_id: null,
+            created_by: project.owner_id,
+            updated_by: project.owner_id,
+            is_published: true,
+            metadata: {
+              category: 'root',
+              tags: ['documentation', 'projet'],
+              auto_created: true
+            }
+          })
+          .select()
+          .single();
+
+        if (wikiError) {
+          console.error('[project-orchestrator] Wiki creation error:', wikiError);
+        } else {
+          console.log('[project-orchestrator] Wiki created successfully:', wikiPage.id);
+        }
+      } catch (wikiErr) {
+        console.error('[project-orchestrator] Wiki initialization failed:', wikiErr);
+      }
+
+      // 6. Appeler nc-orchestrator pour la structure Nextcloud (si configuré)
       try {
         const { data: ncData, error: ncError } = await supabaseClient.functions.invoke('nc-orchestrator', {
           body: {

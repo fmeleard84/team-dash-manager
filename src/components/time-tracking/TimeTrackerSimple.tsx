@@ -26,6 +26,7 @@ interface Project {
   title: string;
   status: string;
   client_budget?: number;
+  calculated_price?: number; // Taux par minute pour ce projet
 }
 
 export const TimeTrackerSimple = () => {
@@ -66,13 +67,14 @@ export const TimeTrackerSimple = () => {
           return;
         }
 
-        // Get all assignments for this candidate
+        // Get all assignments for this candidate with calculated_price
         const { data: assignments, error: assignmentsError } = await supabase
           .from('hr_resource_assignments')
           .select(`
             id,
             booking_status,
             project_id,
+            calculated_price,
             projects (
               id,
               title,
@@ -81,7 +83,7 @@ export const TimeTrackerSimple = () => {
               archived_at
             )
           `)
-          .or(`candidate_id.eq.${candidateProfile.id},and(profile_id.eq.${candidateProfile.profile_id},seniority.eq.${candidateProfile.seniority})`)
+          .eq('candidate_id', user.id)
           .eq('booking_status', 'accepted');
 
         if (assignmentsError) {
@@ -92,10 +94,13 @@ export const TimeTrackerSimple = () => {
 
         console.log('Found assignments:', assignments);
 
-        // Filter projects that are in 'play' status and not archived
+        // Filter projects that are in 'play' status and not archived, include calculated_price
         const activeProjects = (assignments || [])
           .filter(a => a.projects && a.projects.status === 'play' && !a.projects.archived_at)
-          .map(a => a.projects as Project);
+          .map(a => ({
+            ...a.projects,
+            calculated_price: a.calculated_price
+          } as Project));
 
         console.log('Active projects:', activeProjects);
         setProjects(activeProjects);
@@ -254,11 +259,18 @@ export const TimeTrackerSimple = () => {
                       >
                         <div className="flex items-center justify-between w-full">
                           <span>{project.title}</span>
-                          {project.client_budget && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              {project.client_budget}€
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {project.calculated_price && (
+                              <Badge variant="secondary" className="text-xs">
+                                {project.calculated_price.toFixed(2)}€/min
+                              </Badge>
+                            )}
+                            {project.client_budget && (
+                              <Badge variant="outline" className="text-xs">
+                                Budget: {project.client_budget}€
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </SelectItem>
                     ))}

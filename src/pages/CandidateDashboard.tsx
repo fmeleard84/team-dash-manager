@@ -26,7 +26,8 @@ import {
   Star,
   Activity,
   Layout,
-  Cloud
+  Cloud,
+  BookOpen
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -56,6 +57,7 @@ import CandidateActivities from "@/pages/CandidateActivities";
 import { TimeTrackerSimple } from "@/components/time-tracking/TimeTrackerSimple";
 import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
 import PlanningPage from "./PlanningPage";
+import WikiView from "@/components/wiki/WikiView";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
@@ -65,6 +67,9 @@ const CandidateDashboard = () => {
   const [candidateLanguages, setCandidateLanguages] = useState<string[]>([]);
   const [candidateExpertises, setCandidateExpertises] = useState<string[]>([]);
   const [selectedDriveProjectId, setSelectedDriveProjectId] = useState<string>("");
+  const [selectedWikiProjectId, setSelectedWikiProjectId] = useState<string>("");
+  const [isWikiFullscreen, setIsWikiFullscreen] = useState(false);
+  const [assignmentTrigger, setAssignmentTrigger] = useState(0); // Force reload trigger
   const { user, logout } = useAuth();
   const { getCandidateProjects, projects: userProjects } = useUserProjects();
   // Use optimized hook for active projects only (planning/kanban/drive/messages)
@@ -92,10 +97,13 @@ const CandidateDashboard = () => {
     }
   }, [candidateStatus]);
 
-  // Set default Drive project when activeProjects change
+  // Set default Drive and Wiki projects when activeProjects change
   useEffect(() => {
     if (!selectedDriveProjectId && activeProjects.length > 0) {
       setSelectedDriveProjectId(activeProjects[0].id);
+    }
+    if (!selectedWikiProjectId && activeProjects.length > 0) {
+      setSelectedWikiProjectId(activeProjects[0].id);
     }
   }, [activeProjects]);
 
@@ -141,6 +149,7 @@ const CandidateDashboard = () => {
   const menuItems = [
     { id: 'projects', label: 'Mes projets', icon: Briefcase },
     { id: 'planning', label: 'Planning', icon: Calendar },
+    { id: 'wiki', label: 'Wiki', icon: BookOpen },
     { id: 'drive', label: 'Drive', icon: FolderOpen },
     { id: 'kanban', label: 'Kanban', icon: Trello },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
@@ -382,7 +391,19 @@ const CandidateDashboard = () => {
     };
     
     loadAssignments();
-  }, [candidateId, profileId, seniority, candidateStatus, candidateLanguages, candidateExpertises]);
+  }, [candidateId, profileId, seniority, candidateStatus, candidateLanguages, candidateExpertises, assignmentTrigger]);
+  
+  // Watch for realtime updates and trigger reload
+  useEffect(() => {
+    // Check if any resourceAssignments have _realtimeUpdated or _realtimeDeleted property
+    const hasRealtimeUpdate = resourceAssignments.some(a => a._realtimeUpdated || a._realtimeDeleted);
+    
+    if (hasRealtimeUpdate) {
+      console.log('🔄 Realtime change detected, triggering reload...');
+      // Trigger a reload by changing the trigger value
+      setAssignmentTrigger(prev => prev + 1);
+    }
+  }, [resourceAssignments]);
   
   // Functions for accepting/declining missions
   const handleAcceptMission = async (projectId: string) => {
@@ -539,6 +560,49 @@ const CandidateDashboard = () => {
           userName={user?.user_metadata?.name} 
           candidateId={candidateId}
         />;
+        
+      case 'wiki':
+        return (
+          <div className="space-y-4">
+            {activeProjects.length > 0 && !isWikiFullscreen && (
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Wiki collaboratif</h2>
+                    <p className="text-sm text-gray-600 mt-1">Documentation et notes partagées du projet</p>
+                  </div>
+                  <Select value={selectedWikiProjectId} onValueChange={setSelectedWikiProjectId}>
+                    <SelectTrigger className="w-[250px]">
+                      <SelectValue placeholder="Sélectionner un projet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {activeProjects.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p>Aucun projet actif avec wiki disponible</p>
+              </div>
+            ) : selectedWikiProjectId && (
+              <div className={isWikiFullscreen ? "fixed inset-0 z-50" : "h-[calc(100vh-16rem)]"}>
+                <WikiView 
+                  projectId={selectedWikiProjectId}
+                  userType="candidate"
+                  onFullscreenChange={setIsWikiFullscreen}
+                />
+              </div>
+            )}
+          </div>
+        );
         
       case 'drive':
         return (

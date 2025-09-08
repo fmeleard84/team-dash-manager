@@ -1,201 +1,126 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://egdelmcijszuapcpglsy.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxNjIyMDAsImV4cCI6MjA2OTczODIwMH0.JYV-JxosrfE7kMtFw3XLs27PGf3Fn-rDyJLDWeYXF_U'
+const supabaseUrl = 'https://egdelmcijszuapcpglsy.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxNjIyMDAsImV4cCI6MjA2OTczODIwMH0.JYV-JxosrfE7kMtFw3XLs27PGf3Fn-rDyJLDWeYXF_U';
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function debugMatching() {
-  console.log('🔍 Analyse du problème de matching candidat-projet\n')
-  console.log('='*50)
-
-  try {
-    // 1. Trouver le candidat
-    const candidateEmail = 'fmeleard+ressource_27_08_cdp@gmail.com'
-    console.log(`\n1️⃣ Recherche du candidat: ${candidateEmail}`)
-    
-    const { data: authUser, error: authError } = await supabase
-      .from('auth.users')
-      .select('id, email')
-      .eq('email', candidateEmail)
-      .single()
-    
-    if (authError || !authUser) {
-      console.error('❌ Candidat non trouvé dans auth.users')
-      return
-    }
-    
-    console.log(`✅ Auth user trouvé: ${authUser.id}`)
-    
-    // 2. Vérifier le profil candidat
-    console.log('\n2️⃣ Vérification du profil candidat:')
-    const { data: candidateProfile, error: profileError } = await supabase
-      .from('candidate_profiles')
-      .select(`
+async function debugMatchingIssue() {
+  console.log('=== DEBUG DU PROBLÈME DE MATCHING ===\n');
+  
+  const candidateId = '7f24d9c5-54eb-4185-815b-79daf6cdf4da';
+  
+  // 1. Récupérer les assignments comme le fait le code
+  console.log('1. REQUÊTE COMME DANS LE CODE:');
+  const { data: assignments } = await supabase
+    .from('hr_resource_assignments')
+    .select(`
+      *,
+      projects (
         id,
-        first_name,
-        last_name,
-        email,
-        profile_id,
-        seniority,
+        title,
+        description,
         status,
-        qualification_status,
-        language,
-        expertise
-      `)
-      .eq('id', authUser.id)
-      .single()
+        project_date,
+        due_date,
+        client_budget,
+        owner_id
+      )
+    `)
+    .or(`candidate_id.eq.${candidateId},booking_status.eq.recherche`);
     
-    if (profileError) {
-      console.error('❌ Erreur profil candidat:', profileError)
-      return
-    }
+  console.log(`Nombre d'assignations trouvées: ${assignments?.length || 0}`);
+  
+  if (assignments && assignments.length > 0) {
+    console.log('\n2. ANALYSE DES ASSIGNATIONS:');
     
-    console.log('Profil candidat:')
-    console.log(`  - ID: ${candidateProfile.id}`)
-    console.log(`  - Nom: ${candidateProfile.first_name} ${candidateProfile.last_name}`)
-    console.log(`  - Profile (métier): ${candidateProfile.profile_id}`)
-    console.log(`  - Séniorité: ${candidateProfile.seniority}`)
-    console.log(`  - Status: ${candidateProfile.status}`)
-    console.log(`  - Qualification: ${candidateProfile.qualification_status}`)
-    console.log(`  - Langue: ${candidateProfile.language}`)
-    console.log(`  - Expertise: ${candidateProfile.expertise}`)
-    
-    // 3. Chercher le projet "for cdp"
-    console.log('\n3️⃣ Recherche du projet "for cdp":')
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select(`
-        id,
-        name,
-        status,
-        owner_id,
-        created_at
-      `)
-      .ilike('name', '%for cdp%')
-      .single()
-    
-    if (projectError) {
-      console.error('❌ Projet non trouvé:', projectError)
-      return
-    }
-    
-    console.log('Projet trouvé:')
-    console.log(`  - ID: ${project.id}`)
-    console.log(`  - Nom: ${project.name}`)
-    console.log(`  - Status: ${project.status}`)
-    console.log(`  - Owner: ${project.owner_id}`)
-    
-    // 4. Vérifier les ressources demandées
-    console.log('\n4️⃣ Ressources demandées pour ce projet:')
-    const { data: resources, error: resourcesError } = await supabase
-      .from('hr_resource_assignments')
-      .select(`
-        id,
-        profile_id,
-        seniority,
-        booking_status,
-        candidate_id,
-        language,
-        expertise
-      `)
-      .eq('project_id', project.id)
-    
-    if (resourcesError) {
-      console.error('❌ Erreur ressources:', resourcesError)
-      return
-    }
-    
-    console.log(`Nombre de ressources: ${resources.length}`)
-    resources.forEach((r, i) => {
-      console.log(`\nRessource ${i+1}:`)
-      console.log(`  - Profile demandé: ${r.profile_id}`)
-      console.log(`  - Séniorité demandée: ${r.seniority}`)
-      console.log(`  - Langue demandée: ${r.language}`)
-      console.log(`  - Expertise demandée: ${r.expertise}`)
-      console.log(`  - Booking status: ${r.booking_status}`)
-      console.log(`  - Candidat assigné: ${r.candidate_id || 'Aucun'}`)
-    })
-    
-    // 5. Vérifier le matching
-    console.log('\n5️⃣ Analyse du matching:')
-    console.log('Comparaison candidat vs ressource demandée:')
-    
-    const resource = resources[0] // Prendre la première ressource
-    if (resource) {
-      console.log('\n📋 Critères de matching:')
-      
-      // Profile
-      const profileMatch = candidateProfile.profile_id === resource.profile_id
-      console.log(`  ✓ Profile: ${candidateProfile.profile_id} === ${resource.profile_id} ? ${profileMatch ? '✅' : '❌'}`)
-      
-      // Seniority
-      const seniorityMatch = candidateProfile.seniority === resource.seniority
-      console.log(`  ✓ Séniorité: ${candidateProfile.seniority} === ${resource.seniority} ? ${seniorityMatch ? '✅' : '❌'}`)
-      
-      // Language
-      const languageMatch = candidateProfile.language === resource.language
-      console.log(`  ✓ Langue: ${candidateProfile.language} === ${resource.language} ? ${languageMatch ? '✅' : '❌'}`)
-      
-      // Expertise
-      const expertiseMatch = candidateProfile.expertise === resource.expertise
-      console.log(`  ✓ Expertise: ${candidateProfile.expertise} === ${resource.expertise} ? ${expertiseMatch ? '✅' : '❌'}`)
-      
-      // Status
-      const statusValid = candidateProfile.status !== 'qualification'
-      console.log(`  ✓ Status valide: ${candidateProfile.status} !== 'qualification' ? ${statusValid ? '✅' : '❌'}`)
-      
-      const allMatch = profileMatch && seniorityMatch && languageMatch && expertiseMatch && statusValid
-      console.log(`\n📊 Résultat du matching: ${allMatch ? '✅ MATCH COMPLET' : '❌ PAS DE MATCH'}`)
-      
-      if (!allMatch) {
-        console.log('\n⚠️ Problèmes identifiés:')
-        if (!profileMatch) console.log('  - Le métier ne correspond pas')
-        if (!seniorityMatch) console.log('  - La séniorité ne correspond pas')
-        if (!languageMatch) console.log('  - La langue ne correspond pas')
-        if (!expertiseMatch) console.log('  - L\'expertise ne correspond pas')
-        if (!statusValid) console.log('  - Le candidat est en qualification')
-      }
-    }
-    
-    // 6. Vérifier les notifications
-    console.log('\n6️⃣ Vérification des notifications:')
-    const { data: notifications, error: notifError } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', candidateProfile.id)
-      .eq('project_id', project.id)
-      .order('created_at', { ascending: false })
-      .limit(5)
-    
-    if (notifError) {
-      console.error('❌ Erreur notifications:', notifError)
-    } else {
-      console.log(`Notifications trouvées: ${notifications.length}`)
-      notifications.forEach(n => {
-        console.log(`  - ${n.created_at}: ${n.type} - ${n.title}`)
-      })
-    }
-    
-    // 7. Vérifier les formats des données
-    console.log('\n7️⃣ Analyse des formats de données:')
-    console.log('\nTypes de données candidat:')
-    console.log(`  - language: ${typeof candidateProfile.language} = "${candidateProfile.language}"`)
-    console.log(`  - expertise: ${typeof candidateProfile.expertise} = "${candidateProfile.expertise}"`)
-    console.log(`  - profile_id: ${typeof candidateProfile.profile_id} = "${candidateProfile.profile_id}"`)
-    console.log(`  - seniority: ${typeof candidateProfile.seniority} = "${candidateProfile.seniority}"`)
-    
-    console.log('\nTypes de données ressource:')
-    if (resource) {
-      console.log(`  - language: ${typeof resource.language} = "${resource.language}"`)
-      console.log(`  - expertise: ${typeof resource.expertise} = "${resource.expertise}"`)
-      console.log(`  - profile_id: ${typeof resource.profile_id} = "${resource.profile_id}"`)
-      console.log(`  - seniority: ${typeof resource.seniority} = "${resource.seniority}"`)
-    }
-
-  } catch (error) {
-    console.error('Erreur inattendue:', error)
+    assignments.forEach((a, i) => {
+      console.log(`\n--- Assignment ${i+1} ---`);
+      console.log(`Projet: "${a.projects?.title || 'SANS PROJET'}"`);
+      console.log(`Languages dans assignment: ${JSON.stringify(a.languages)}`);
+      console.log(`Expertises dans assignment: ${JSON.stringify(a.expertises)}`);
+      console.log(`Type languages: ${typeof a.languages}`);
+      console.log(`Type expertises: ${typeof a.expertises}`);
+    });
   }
+  
+  // 2. Récupérer les compétences du candidat EXACTEMENT comme le code
+  console.log('\n\n3. COMPÉTENCES DU CANDIDAT (comme dans le code):');
+  
+  // Langues (comme loadCandidateSkills dans CandidateDashboard)
+  const { data: langData } = await supabase
+    .from('candidate_languages')
+    .select(`
+      hr_languages (
+        name
+      )
+    `)
+    .eq('candidate_id', candidateId);
+    
+  const candidateLanguages = langData ? langData.map(cl => cl.hr_languages?.name).filter(Boolean) : [];
+  console.log('Langues du candidat:', candidateLanguages);
+  
+  // Expertises (comme loadCandidateSkills dans CandidateDashboard)
+  const { data: expData } = await supabase
+    .from('candidate_expertises')
+    .select(`
+      hr_expertises (
+        name
+      )
+    `)
+    .eq('candidate_id', candidateId);
+    
+  const candidateExpertises = expData ? expData.map(ce => ce.hr_expertises?.name).filter(Boolean) : [];
+  console.log('Expertises du candidat:', candidateExpertises);
+  
+  // 3. Simuler le matching
+  console.log('\n\n4. SIMULATION DU MATCHING:');
+  
+  if (assignments) {
+    assignments.forEach(assignment => {
+      console.log(`\nProjet: "${assignment.projects?.title}"`);
+      
+      // Test languages
+      const languagesMatch = !assignment.languages?.length || 
+        assignment.languages.every(lang => candidateLanguages.includes(lang));
+      
+      console.log(`Languages match: ${languagesMatch}`);
+      console.log(`  Required: ${JSON.stringify(assignment.languages)}`);
+      console.log(`  Candidate has: ${JSON.stringify(candidateLanguages)}`);
+      
+      if (!languagesMatch && assignment.languages?.length > 0) {
+        console.log('  ❌ PROBLÈME: Le candidat n\'a pas toutes les langues requises');
+        assignment.languages.forEach(lang => {
+          if (!candidateLanguages.includes(lang)) {
+            console.log(`     Manque: "${lang}"`);
+          }
+        });
+      }
+      
+      // Test expertises
+      const expertisesMatch = !assignment.expertises?.length || 
+        assignment.expertises.every(exp => candidateExpertises.includes(exp));
+      
+      console.log(`Expertises match: ${expertisesMatch}`);
+      console.log(`  Required: ${JSON.stringify(assignment.expertises)}`);
+      console.log(`  Candidate has: ${JSON.stringify(candidateExpertises)}`);
+      
+      if (!expertisesMatch && assignment.expertises?.length > 0) {
+        console.log('  ❌ PROBLÈME: Le candidat n\'a pas toutes les expertises requises');
+        assignment.expertises.forEach(exp => {
+          if (!candidateExpertises.includes(exp)) {
+            console.log(`     Manque: "${exp}"`);
+          }
+        });
+      }
+    });
+  }
+  
+  console.log('\n\n=== DIAGNOSTIC ===');
+  console.log('Le problème est que les assignments stockent les NOMS des langues/expertises');
+  console.log('mais le candidat a les NOMS aussi. Il faut vérifier la correspondance exacte.');
+  
+  process.exit(0);
 }
 
-debugMatching()
+debugMatchingIssue().catch(console.error);

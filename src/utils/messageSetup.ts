@@ -37,7 +37,7 @@ export const initializeProjectMessaging = async (projectId: string): Promise<str
       .from('project_bookings')
       .select(`
         candidate_id,
-        profiles:candidate_id (
+        candidate_profiles!inner (
           id,
           email,
           first_name,
@@ -111,12 +111,12 @@ export const initializeProjectMessaging = async (projectId: string): Promise<str
 
     // Ajouter les candidats
     (projectBookings || []).forEach((booking: any) => {
-      if (booking.profiles) {
+      if (booking.candidate_profiles) {
         participants.push({
           thread_id: threadId,
-          user_id: booking.profiles.id,
-          email: booking.profiles.email,
-          name: `${booking.profiles.first_name || ''} ${booking.profiles.last_name || ''}`.trim() || booking.profiles.email,
+          user_id: booking.candidate_profiles.id,
+          email: booking.candidate_profiles.email,
+          name: `${booking.candidate_profiles.first_name || ''} ${booking.candidate_profiles.last_name || ''}`.trim() || booking.candidate_profiles.email,
           role: 'candidate' as const,
           joined_at: new Date().toISOString(),
           is_active: true
@@ -149,7 +149,7 @@ export const sendMessage = async (
   threadId: string,
   content: string,
   attachments: Array<{ name: string; url: string; path: string; size: number; type: string }> = []
-): Promise<void> => {
+): Promise<any> => {
   try {
     // Récupérer l'utilisateur actuel
     const { data: { user } } = await supabase.auth.getUser();
@@ -226,6 +226,9 @@ export const sendMessage = async (
       .eq('id', threadId);
 
     console.log('✅ Message sent successfully');
+    
+    // Return the created message so it can be added immediately to the UI
+    return message;
 
   } catch (error) {
     console.error('❌ Error sending message:', error);

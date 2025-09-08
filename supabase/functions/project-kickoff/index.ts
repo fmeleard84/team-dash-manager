@@ -415,11 +415,20 @@ serve(async (req) => {
     if (teamMembers.length > 0) {
       const attendees = teamMembers.map(member => ({
         event_id: kickoffEvent.id,
-        email: member.email,
+        user_id: member.member_id, // Utiliser l'ID universel
+        role: member.member_type, // 'client' ou 'resource'
         required: true,
         response_status: 'pending'
       }));
 
+      // Approche simple : supprimer puis insérer
+      // 1. Supprimer les participants existants
+      await supabase
+        .from('project_event_attendees')
+        .delete()
+        .eq('event_id', kickoffEvent.id);
+      
+      // 2. Insérer les nouveaux participants
       const { error: attendeesError } = await supabase
         .from('project_event_attendees')
         .insert(attendees);

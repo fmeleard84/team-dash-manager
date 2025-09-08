@@ -280,11 +280,29 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
           .map((e) => e.trim())
           .filter(Boolean);
         if (emails.length) {
-          const rows = emails.map((email) => ({ event_id: eventId, email }));
-          const { error: attErr } = await supabase
-            .from("project_event_attendees")
-            .insert(rows);
-          if (attErr) console.error("attendees insert error", attErr);
+          // 1. D'abord supprimer les participants existants (au cas où)
+          await supabase
+            .from('project_event_attendees')
+            .delete()
+            .eq('event_id', eventId);
+
+          // 2. Insérer les nouveaux participants un par un pour éviter les conflits
+          for (const email of emails) {
+            const attendee = {
+              event_id: eventId,
+              email,
+              required: true,
+              response_status: 'pending'
+            };
+            
+            const { error: attErr } = await supabase
+              .from("project_event_attendees")
+              .insert([attendee]);
+              
+            if (attErr) {
+              console.error(`Erreur insertion participant ${email}:`, attErr);
+            }
+          }
           
           // Send email invitations to attendees
           try {
@@ -414,11 +432,23 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
           .filter(Boolean);
         
         if (emails.length) {
-          const rows = emails.map((email) => ({ event_id: editingEvent.id, email }));
-          const { error: attErr } = await supabase
-            .from("project_event_attendees")
-            .insert(rows);
-          if (attErr) console.error("attendees update error", attErr);
+          // Insérer les participants un par un pour éviter les conflits
+          for (const email of emails) {
+            const attendee = {
+              event_id: editingEvent.id,
+              email,
+              required: true,
+              response_status: 'pending'
+            };
+            
+            const { error: attErr } = await supabase
+              .from("project_event_attendees")
+              .insert([attendee]);
+              
+            if (attErr) {
+              console.error(`Erreur insertion participant ${email}:`, attErr);
+            }
+          }
           
           // Send updated event invitations
           try {
@@ -687,6 +717,8 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                         onChange={(e) => setStartTime(e.target.value)}
                         className="border-purple-200 focus:border-purple-400 bg-white text-sm"
                         placeholder="Début"
+                        step="60"
+                        pattern="[0-9]{2}:[0-9]{2}"
                       />
                     </div>
                     <div>
@@ -696,6 +728,8 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                         onChange={(e) => setEndTime(e.target.value)}
                         className="border-purple-200 focus:border-purple-400 bg-white text-sm"
                         placeholder="Fin"
+                        step="60"
+                        pattern="[0-9]{2}:[0-9]{2}"
                       />
                     </div>
                   </div>
@@ -847,12 +881,24 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Début</label>
-                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <Input 
+                  type="time" 
+                  value={startTime} 
+                  onChange={(e) => setStartTime(e.target.value)}
+                  step="60"
+                  pattern="[0-9]{2}:[0-9]{2}"
+                />
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Fin (optionnel)</label>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+              <Input 
+                type="time" 
+                value={endTime} 
+                onChange={(e) => setEndTime(e.target.value)}
+                step="60"
+                pattern="[0-9]{2}:[0-9]{2}"
+              />
             </div>
 
             <div className="space-y-2">

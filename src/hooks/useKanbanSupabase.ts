@@ -257,12 +257,12 @@ export const useKanbanSupabase = (boardId?: string) => {
         return null;
       }
 
-      // Get real team members from project_bookings with profiles
+      // Get real team members from project_bookings with candidate profiles
       const { data: projectBookings, error: teamError } = await (supabase as any)
         .from('project_bookings')
         .select(`
           candidate_id,
-          profiles:candidate_id (
+          candidate_profiles!inner (
             id,
             email,
             first_name,
@@ -277,11 +277,11 @@ export const useKanbanSupabase = (boardId?: string) => {
       }
 
       const teamMembers = (projectBookings || [])
-        .filter((booking: any) => booking.profiles)
+        .filter((booking: any) => booking.candidate_profiles)
         .map((booking: any) => ({
-          id: booking.profiles.id,
-          name: `${booking.profiles.first_name || ''} ${booking.profiles.last_name || ''}`.trim() || booking.profiles.email,
-          email: booking.profiles.email,
+          id: booking.candidate_profiles.id,
+          name: `${booking.candidate_profiles.first_name || ''} ${booking.candidate_profiles.last_name || ''}`.trim() || booking.candidate_profiles.email,
+          email: booking.candidate_profiles.email,
           role: 'Candidat'
         }));
 

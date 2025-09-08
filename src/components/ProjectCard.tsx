@@ -314,6 +314,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     }
   };
 
+
   const fetchResourceAssignments = async () => {
     console.log('🔎 Fetching resource assignments for project:', project.id);
     console.log('🔎 Project status:', project.status);
@@ -434,7 +435,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       // Mark booking as requested
       setIsBookingRequested(true);
       
-      toast.success(data.message);
+      toast.success(data.message || "Recherche d'équipe lancée");
       // Refresh resource assignments to update status
       await fetchResourceAssignments();
       
@@ -504,8 +505,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   };
 
   // Check if resources exist but no booking has been requested yet (in 'draft' status)
+  // NOUVEAU: Aussi vérifier s'il y a des hr_resources sans assignments
   const hasResourcesInDraft = () => {
-    return resourceAssignments.some(assignment => assignment.booking_status === 'draft');
+    // Vérifier s'il y a des assignments en draft
+    const hasDraftAssignments = resourceAssignments.some(assignment => assignment.booking_status === 'draft');
+    // Ou s'il n'y a aucune assignment (mais il pourrait y avoir des hr_resources)
+    const hasNoAssignments = resourceAssignments.length === 0;
+    return hasDraftAssignments || hasNoAssignments;
   };
 
   const allResourcesBooked = resourceAssignments.every(assignment => 

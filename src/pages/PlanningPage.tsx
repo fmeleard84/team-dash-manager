@@ -31,6 +31,53 @@ const PlanningPage = ({ userType, userEmail, userName, candidateId }: PlanningPa
     loadProjects();
   }, [userType, candidateId]);
 
+  // Realtime pour les événements
+  useEffect(() => {
+    if (!selectedProject) return;
+
+    // Subscription pour les événements
+    const eventChannel = supabase
+      .channel(`project-events-${selectedProject.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_events',
+          filter: `project_id=eq.${selectedProject.id}`
+        },
+        (payload) => {
+          console.log('📡 Événement reçu:', payload);
+          // Recharger les événements
+          selectProject(selectedProject);
+        }
+      )
+      .subscribe();
+
+    // Subscription pour les participants
+    const attendeesChannel = supabase
+      .channel(`event-attendees-${selectedProject.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_event_attendees'
+        },
+        (payload) => {
+          console.log('📡 Participant mis à jour:', payload);
+          // Recharger les événements pour mettre à jour les participants
+          selectProject(selectedProject);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(eventChannel);
+      supabase.removeChannel(attendeesChannel);
+    };
+  }, [selectedProject]);
+
   const loadProjects = async () => {
     let projectsData;
     

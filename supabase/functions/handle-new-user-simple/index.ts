@@ -104,6 +104,33 @@ serve(async (req) => {
       console.log('Candidate profile created successfully');
     }
 
+    // Si client, créer le profil client
+    if (userRole === 'client') {
+      console.log('Creating client profile...');
+      const clientData = {
+        id: record.id,
+        company_name: record.raw_user_meta_data?.company_name || '',
+        email: record.email || '',
+        phone: record.raw_user_meta_data?.phone || '',
+        first_name: record.raw_user_meta_data?.first_name || record.raw_user_meta_data?.firstName || '',
+        last_name: record.raw_user_meta_data?.last_name || record.raw_user_meta_data?.lastName || ''
+      };
+      
+      const { error: clientError } = await supabase
+        .from('client_profiles')
+        .upsert(clientData, { onConflict: 'id' });
+
+      if (clientError) {
+        console.error('Error creating client profile:', clientError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create client profile', details: clientError }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        );
+      }
+      
+      console.log('Client profile created successfully');
+    }
+
     // Succès
     return new Response(
       JSON.stringify({

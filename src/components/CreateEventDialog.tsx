@@ -42,6 +42,22 @@ export function CreateEventDialog({
   const defaultDate = tomorrow.toISOString().slice(0, 10);
   const defaultStartTime = "10:00";
   const defaultEndTime = "11:00";
+  
+  // Fonction pour formater la date en français
+  const formatDateFr = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+  
+  // Fonction pour parser une date française vers ISO
+  const parseDateFr = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return dateStr;
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -131,8 +147,8 @@ export function CreateEventDialog({
       }
 
       setTeamMembers(members);
-      // Sélectionner tous les membres par défaut
-      setSelectedMembers(members.map(m => m.email));
+      // Sélectionner tous les membres par défaut (utiliser les IDs)
+      setSelectedMembers(members.map(m => m.id));
 
     } catch (error) {
       console.error('Erreur chargement équipe:', error);
@@ -141,11 +157,11 @@ export function CreateEventDialog({
     }
   };
 
-  const toggleMember = (email: string) => {
+  const toggleMember = (userId: string) => {
     setSelectedMembers(prev => 
-      prev.includes(email) 
-        ? prev.filter(e => e !== email)
-        : [...prev, email]
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
     );
   };
 
@@ -177,24 +193,59 @@ export function CreateEventDialog({
         .select()
         .single();
 
-      if (eventError) throw eventError;
+      if (eventError) {
+        console.error('❌ Erreur création événement:', eventError);
+        throw eventError;
+      }
+      
+      console.log('✅ Événement créé:', event);
 
       // Ajouter les participants
       if (event && selectedMembers.length > 0) {
-        const attendees = selectedMembers.map(email => ({
-          event_id: event.id,
-          email,
-          required: true,
-          response_status: 'pending'
-        }));
+        // Préparer les participants avec leurs IDs universels
+        const attendees = selectedMembers.map(userId => {
+          // Trouver le membre correspondant
+          const member = teamMembers.find(m => m.id === userId);
+          return {
+            event_id: event.id,
+            user_id: userId, // Utiliser l'ID universel
+            role: member?.role || 'participant', // 'client' ou 'resource'
+            required: true,
+            response_status: 'pending'
+          };
+        });
 
+        console.log('📤 Insertion des participants (sans email):', attendees);
+        
+        // Approche simple : supprimer puis insérer
+        // Évite tous les problèmes de syntaxe UPSERT avec Supabase/PostgREST
+        
+        // 1. Supprimer les participants existants pour cet événement
         await supabase
           .from('project_event_attendees')
-          .insert(attendees);
+          .delete()
+          .eq('event_id', event.id);
+        
+        // 2. Insérer tous les participants en une seule requête
+        if (attendees.length > 0) {
+          const { data, error } = await supabase
+            .from('project_event_attendees')
+            .insert(attendees)
+            .select(); // Ajout du select() pour éviter le paramètre columns dans l'URL
+          
+          if (error) {
+            console.error('❌ Erreur insertion participants:', error);
+            toast.error(`Erreur ajout participants: ${error.message}`);
+            return;
+          }
+        }
+        
+        console.log('✅ Participants ajoutés avec succès !');
+        console.log(`${attendees.length} participants ajoutés`);
 
         // Créer des notifications pour les candidats
         const candidateNotifications = teamMembers
-          .filter(m => m.role === 'resource' && selectedMembers.includes(m.email))
+          .filter(m => m.role === 'resource' && selectedMembers.includes(m.id))
           .map(m => ({
             candidate_id: m.id,
             project_id: projectId,
@@ -329,6 +380,8 @@ export function CreateEventDialog({
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 className="mt-1"
+                step="60"  // Forcer les pas de 1 minute
+                pattern="[0-9]{2}:[0-9]{2}"  // Format 24h
               />
             </div>
             
@@ -342,6 +395,8 @@ export function CreateEventDialog({
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 className="mt-1"
+                step="60"  // Forcer les pas de 1 minute
+                pattern="[0-9]{2}:[0-9]{2}"  // Format 24h
               />
             </div>
           </div>
@@ -409,8 +464,8 @@ export function CreateEventDialog({
                   <div className="flex items-center gap-3">
                     <Checkbox
                       id={`member-${member.id}`}
-                      checked={selectedMembers.includes(member.email)}
-                      onCheckedChange={() => toggleMember(member.email)}
+                      checked={selectedMembers.includes(member.id)}
+                      onCheckedChange={() => toggleMember(member.id)}
                     />
                     <Label
                       htmlFor={`member-${member.id}`}

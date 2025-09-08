@@ -166,16 +166,24 @@ export const useDashboardMetrics = () => {
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
 
-      const { data: weekSessions } = await supabase
+      const { data: weekSessions, error: weekError } = await supabase
         .from('time_tracking_sessions')
         .select(`
           *,
           projects (title),
-          candidate_profiles (first_name, last_name)
+          profiles!candidate_id (
+            first_name
+          )
         `)
         .in('project_id', projectIds)
         .gte('start_time', weekAgo.toISOString())
         .order('start_time', { ascending: false });
+      
+      console.log('Week sessions query result:', { 
+        count: weekSessions?.length || 0, 
+        error: weekError,
+        sessions: weekSessions 
+      });
 
       // Calculate week metrics
       let totalTimeThisWeek = 0;
@@ -193,9 +201,7 @@ export const useDashboardMetrics = () => {
         recentActivities.push({
           id: session.id,
           candidateId: session.candidate_id,
-          candidateName: session.candidate_profiles ? 
-            `${session.candidate_profiles.first_name} ${session.candidate_profiles.last_name}` : 
-            'Candidat',
+          candidateName: session.profiles?.first_name || 'Candidat', // Use first_name from profiles join
           projectId: session.project_id,
           projectName: session.projects?.title || 'Projet',
           activity: session.activity_description,

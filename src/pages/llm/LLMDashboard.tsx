@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, FileText, Users, FolderOpen, GitBranch, Database, AlertCircle, ChevronRight, ChevronDown, Home, Play, Calendar, MessageSquare, Layout, Code, Shield, Server, Zap } from 'lucide-react';
+import { Save, FileText, Users, FolderOpen, GitBranch, Database, AlertCircle, ChevronRight, ChevronDown, Home, Play, Calendar, MessageSquare, Layout, Code, Shield, Server, Zap, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -81,6 +81,20 @@ const LLMDashboard = () => {
         { id: 'corrections-session3', label: '🔧 Session 3 (03/09/2025)' },
         { id: 'corrections-session2', label: '🔧 Session 2 (03/09/2025)' },
         { id: 'corrections-session1', label: '🔧 Session 1 (02/09/2025)' },
+      ]
+    },
+    {
+      id: 'wiki',
+      label: '📚 Wiki Collaboratif',
+      icon: BookOpen,
+      children: [
+        { id: 'wiki-overview', label: '🎯 Vue d\'ensemble' },
+        { id: 'wiki-architecture', label: '🏗️ Architecture technique' },
+        { id: 'wiki-permissions', label: '🔐 Système de permissions' },
+        { id: 'wiki-realtime', label: '⚡ Synchronisation temps réel' },
+        { id: 'wiki-comments', label: '💬 Système de commentaires' },
+        { id: 'wiki-navigation', label: '🧭 Navigation et organisation' },
+        { id: 'wiki-editor', label: '✏️ Éditeur BlockNote' },
       ]
     },
     {
@@ -1755,7 +1769,7 @@ if (project.status === 'play') {
 ## 🆕 Système de Planning Unifié (05/09/2025)
 
 ### Vue d'ensemble
-Le système de planning unifié remplace l'ancienne implémentation Schedule-X et Cal.com par une solution intégrée complète basée sur la table `project_events`.
+Le système de planning unifié remplace l'ancienne implémentation Schedule-X et Cal.com par une solution intégrée complète basée sur la table project_events.
 
 ## Architecture technique
 
@@ -1775,8 +1789,8 @@ interface PlanningPageProps {
 **Caractéristiques:**
 - Page unifiée pour clients et candidats
 - Sélection du projet actif via dropdown
-- Chargement des événements depuis `project_events`
-- Chargement des membres d'équipe depuis `hr_resource_assignments`
+- Chargement des événements depuis project_events
+- Chargement des membres d'équipe depuis hr_resource_assignments
 - Permissions différenciées (clients peuvent éditer/supprimer)
 
 #### 2. SimpleScheduleCalendar
@@ -3495,7 +3509,737 @@ await supabase
 - \`src/components/ui/intro-overlay.tsx\`: Animation intro
 - \`src/components/ui/hero-lyniq-fixed.tsx\`: Hero avec vidéo
 - \`src/components/DeleteProjectDialog.tsx\`: Utilisation FullScreenModal
-- \`src/components/ui/fullscreen-modal.tsx\`: Modal unifié`
+- \`src/components/ui/fullscreen-modal.tsx\`: Modal unifié`,
+
+    'wiki-overview': `# 📚 Wiki Collaboratif - Vue d'ensemble
+
+## 🎯 Objectif
+Le système Wiki a été conçu pour permettre aux équipes projet de créer et partager de la documentation collaborative, avec un système de permissions granulaire et une synchronisation en temps réel.
+
+## ✨ Fonctionnalités principales
+
+### 1. Pages publiques/privées
+- **Pages privées** : Visibles uniquement par leur créateur
+- **Pages publiques** : Visibles par toute l'équipe du projet
+- **Basculement en temps réel** : Les changements de visibilité sont instantanés pour tous
+
+### 2. Organisation par membre
+- Navigation groupée par auteur
+- Avatar et badge "Moi" pour l'utilisateur courant
+- Compteur de pages par auteur
+- Auto-expansion de sa propre section
+
+### 3. Système de commentaires
+- **Uniquement sur pages publiques** : Favorise la collaboration
+- **Commentaires imbriqués** : Support des réponses en cascade
+- **Gestion complète** : Édition, suppression, résolution
+- **Temps réel** : Mise à jour instantanée pour tous
+
+### 4. Éditeur riche BlockNote
+- Formatage WYSIWYG complet
+- Support images et médias
+- Blocs de code avec coloration syntaxique
+- Tableaux, listes, citations
+- Sauvegarde automatique
+
+### 5. Arborescence de pages
+- Support pages parent/enfant
+- Navigation hiérarchique
+- Ordre d'affichage personnalisable
+- Icônes personnalisées par page
+
+## 🔐 Accès et permissions
+
+### Pour les clients
+- Accès complet au wiki du projet
+- Peut créer/éditer/supprimer toutes ses pages
+- Voit toutes les pages publiques de l'équipe
+
+### Pour les candidats
+- Accès au wiki des projets actifs uniquement
+- Peut créer/éditer/supprimer ses propres pages
+- Voit les pages publiques de l'équipe
+
+## 📱 Interface utilisateur
+
+### Mode normal
+- Éditeur intégré dans le dashboard
+- Navigation latérale avec arborescence
+- Panneau de commentaires rétractable
+
+### Mode plein écran
+- Expansion en place (pas de popup)
+- Masquage navigation et header
+- Focus total sur le contenu
+- Retour simple avec Escape`,
+
+    'wiki-architecture': `# 🏗️ Architecture technique du Wiki
+
+## 📊 Structure base de données
+
+### Table wiki_pages
+\`\`\`sql
+CREATE TABLE wiki_pages (
+  id UUID PRIMARY KEY,
+  project_id UUID REFERENCES projects(id),
+  title TEXT NOT NULL,
+  content TEXT,
+  author_id UUID REFERENCES auth.users(id),
+  parent_id UUID REFERENCES wiki_pages(id),
+  is_public BOOLEAN DEFAULT false,
+  display_order INTEGER DEFAULT 0,
+  slug TEXT,
+  icon TEXT DEFAULT 'FileText',
+  version INTEGER DEFAULT 1,
+  original_title TEXT,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+);
+\`\`\`
+
+### Table wiki_comments
+\`\`\`sql
+CREATE TABLE wiki_comments (
+  id UUID PRIMARY KEY,
+  page_id UUID REFERENCES wiki_pages(id),
+  author_id UUID REFERENCES auth.users(id),
+  parent_comment_id UUID REFERENCES wiki_comments(id),
+  content TEXT NOT NULL,
+  is_resolved BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+);
+\`\`\`
+
+## 🧩 Composants React
+
+### WikiView
+**Fichier** : \`src/components/wiki/WikiView.tsx\`
+- Composant principal orchestrateur
+- Gère l'état global du wiki
+- Synchronisation realtime
+- Mode plein écran intégré
+
+### WikiEditor
+**Fichier** : \`src/components/wiki/WikiEditor.tsx\`
+- Wrapper BlockNote editor
+- Gestion sauvegarde automatique
+- Fix du bug useState dispatcher
+- Conversion HTML lossy
+
+### WikiNavigation
+**Fichier** : \`src/components/wiki/WikiNavigation.tsx\`
+- Arborescence des pages
+- Groupement par auteur
+- Indicateurs visuels (public/privé)
+- Gestion expansion/collapse
+
+### WikiComments
+**Fichier** : \`src/components/wiki/WikiComments.tsx\`
+- Système complet de commentaires
+- Réponses imbriquées
+- Actions CRUD complètes
+- Synchronisation realtime
+
+## 🔄 Flux de données
+
+### Chargement initial
+1. Récupération pages du projet
+2. Filtrage selon permissions
+3. Construction arborescence
+4. Chargement profils auteurs
+5. Activation subscriptions realtime
+
+### Création/Édition page
+1. Validation permissions
+2. Sauvegarde Supabase
+3. Broadcast realtime
+4. Mise à jour locale optimiste
+5. Synchronisation autres clients
+
+### Changement visibilité
+1. Toggle is_public
+2. Trigger PostgreSQL
+3. Notification pg_notify
+4. Broadcast WebSocket
+5. Rafraîchissement navigation`,
+
+    'wiki-permissions': `# 🔐 Système de permissions du Wiki
+
+## 🛡️ Row Level Security (RLS)
+
+### Politique de lecture
+\`\`\`sql
+CREATE POLICY "users_view_wiki_pages"
+ON wiki_pages FOR SELECT
+USING (
+  -- Page publique OU auteur
+  (is_public = true OR author_id = auth.uid())
+  AND EXISTS (
+    SELECT 1 FROM projects p
+    WHERE p.id = wiki_pages.project_id
+    AND (
+      -- Client du projet
+      p.owner_id = auth.uid()
+      -- OU candidat accepté
+      OR EXISTS (
+        SELECT 1 FROM hr_resource_assignments
+        WHERE project_id = p.id
+        AND candidate_id = auth.uid()
+        AND booking_status = 'accepted'
+      )
+    )
+  )
+);
+\`\`\`
+
+### Politique de création
+\`\`\`sql
+CREATE POLICY "users_create_wiki_pages"
+ON wiki_pages FOR INSERT
+WITH CHECK (
+  author_id = auth.uid()
+  AND EXISTS (
+    -- Vérification appartenance projet
+    SELECT 1 FROM projects p
+    WHERE p.id = project_id
+    AND (p.owner_id = auth.uid() OR /* candidat accepté */)
+  )
+);
+\`\`\`
+
+### Politique de modification
+\`\`\`sql
+CREATE POLICY "users_update_own_pages"
+ON wiki_pages FOR UPDATE
+USING (author_id = auth.uid())
+WITH CHECK (author_id = auth.uid());
+\`\`\`
+
+## 🔍 Filtrage côté client
+
+### Visibilité des pages
+\`\`\`typescript
+// Dans WikiView.tsx
+const visiblePages = pages.filter(page => {
+  return page.is_public || page.author_id === userId;
+});
+\`\`\`
+
+### Pages par auteur
+\`\`\`typescript
+// Dans WikiNavigation.tsx
+const groupPagesByAuthor = () => {
+  const authorsMap = new Map();
+  pages.forEach(page => {
+    // Groupement avec tri utilisateur actuel en premier
+  });
+  return authorsArray.sort((a, b) => {
+    if (a.is_current_user) return -1;
+    if (b.is_current_user) return 1;
+    return a.name.localeCompare(b.name);
+  });
+};
+\`\`\`
+
+## 🚨 Points d'attention sécurité
+
+### 1. Double vérification
+- RLS côté serveur (source de vérité)
+- Filtrage client (UX uniquement)
+- Jamais de données sensibles côté client
+
+### 2. Permissions commentaires
+- Création uniquement sur pages publiques
+- Modification/suppression par auteur uniquement
+- Pas de commentaires sur pages privées
+
+### 3. Isolation projets
+- Aucune fuite entre projets
+- Vérification systématique project_id
+- Candidats uniquement sur projets acceptés`,
+
+    'wiki-realtime': `# ⚡ Synchronisation temps réel du Wiki
+
+## 🔌 Configuration Supabase Realtime
+
+### Activation tables
+\`\`\`sql
+-- Activer realtime pour les tables
+ALTER PUBLICATION supabase_realtime ADD TABLE wiki_pages;
+ALTER PUBLICATION supabase_realtime ADD TABLE wiki_comments;
+\`\`\`
+
+### Triggers PostgreSQL
+\`\`\`sql
+-- Trigger updated_at
+CREATE TRIGGER update_wiki_pages_updated_at_trigger
+BEFORE UPDATE ON wiki_pages
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at();
+
+-- Trigger notification visibilité
+CREATE TRIGGER wiki_visibility_change_trigger
+AFTER UPDATE ON wiki_pages
+FOR EACH ROW
+WHEN (OLD.is_public IS DISTINCT FROM NEW.is_public)
+EXECUTE FUNCTION notify_wiki_visibility_change();
+\`\`\`
+
+## 📡 Subscriptions WebSocket
+
+### Subscription pages
+\`\`\`typescript
+// Dans WikiView.tsx
+const subscribeToChanges = () => {
+  const channel = supabase
+    .channel(\`wiki-pages-\${projectId}\`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'wiki_pages',
+      filter: \`project_id=eq.\${projectId}\`
+    }, handlePageChange)
+    .subscribe();
+};
+\`\`\`
+
+### Subscription commentaires
+\`\`\`typescript
+// Dans WikiComments.tsx
+const subscribeToComments = () => {
+  const channel = supabase
+    .channel(\`wiki-comments-\${pageId}\`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'wiki_comments',
+      filter: \`page_id=eq.\${pageId}\`
+    }, loadComments)
+    .subscribe();
+};
+\`\`\`
+
+## 🔄 Gestion des événements
+
+### Types d'événements
+- **INSERT** : Nouvelle page/commentaire
+- **UPDATE** : Modification contenu/visibilité
+- **DELETE** : Suppression page/commentaire
+
+### Traitement événements
+\`\`\`typescript
+const handlePageChange = (payload) => {
+  const { eventType, new: newRecord, old: oldRecord } = payload;
+  
+  switch(eventType) {
+    case 'INSERT':
+      // Ajouter nouvelle page si visible
+      if (newRecord.is_public || newRecord.author_id === userId) {
+        addPageToList(newRecord);
+      }
+      break;
+      
+    case 'UPDATE':
+      // Gérer changement visibilité
+      if (oldRecord.is_public !== newRecord.is_public) {
+        if (newRecord.is_public || newRecord.author_id === userId) {
+          updatePageInList(newRecord);
+        } else {
+          removePageFromList(newRecord.id);
+        }
+      }
+      break;
+      
+    case 'DELETE':
+      removePageFromList(oldRecord.id);
+      break;
+  }
+};
+\`\`\`
+
+## 🎯 Optimisations
+
+### Debounce sauvegarde
+\`\`\`typescript
+const debouncedSave = useMemo(
+  () => debounce(async (content) => {
+    await updatePage(content);
+  }, 1000),
+  [pageId]
+);
+\`\`\`
+
+### Mise à jour optimiste
+\`\`\`typescript
+// Mise à jour locale immédiate
+setLocalContent(newContent);
+// Sauvegarde async
+debouncedSave(newContent);
+\`\`\`
+
+### Cleanup subscriptions
+\`\`\`typescript
+useEffect(() => {
+  const channel = subscribeToChanges();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [projectId]);
+\`\`\``,
+
+    'wiki-comments': `# 💬 Système de commentaires du Wiki
+
+## 🎨 Interface utilisateur
+
+### Panneau rétractable
+- Fermé par défaut pour maximiser l'espace
+- Bouton toggle avec compteur de commentaires
+- Animation smooth d'ouverture/fermeture
+- Largeur fixe de 400px en mode ouvert
+
+### Affichage commentaires
+- Avatar avec initiale de l'auteur
+- Nom et temps relatif (ex: "il y a 2 heures")
+- Badge "Résolu" pour commentaires résolus
+- Actions contextuelles (éditer, supprimer, résoudre)
+
+### Réponses imbriquées
+- Indentation visuelle (ml-8)
+- Auto-expansion si réponses présentes
+- Bouton expand/collapse en bas à gauche
+- Compteur de réponses visible
+
+## 🔧 Implémentation technique
+
+### Structure commentaire
+\`\`\`typescript
+interface Comment {
+  id: string;
+  page_id: string;
+  author_id: string;
+  author_name?: string;
+  parent_comment_id: string | null;
+  content: string;
+  is_resolved: boolean;
+  created_at: string;
+  updated_at: string;
+  replies?: Comment[];
+}
+\`\`\`
+
+### Construction arbre commentaires
+\`\`\`typescript
+const loadComments = async () => {
+  // Récupération à plat
+  const { data } = await supabase
+    .from('wiki_comments_with_authors')
+    .select('*')
+    .eq('page_id', pageId);
+    
+  // Construction arbre
+  const commentsMap = new Map();
+  const rootComments = [];
+  
+  data.forEach(comment => {
+    commentsMap.set(comment.id, { ...comment, replies: [] });
+  });
+  
+  data.forEach(comment => {
+    if (comment.parent_comment_id) {
+      const parent = commentsMap.get(comment.parent_comment_id);
+      parent.replies.push(commentsMap.get(comment.id));
+    } else {
+      rootComments.push(commentsMap.get(comment.id));
+    }
+  });
+  
+  setComments(rootComments);
+};
+\`\`\`
+
+### Actions disponibles
+
+#### Création
+\`\`\`typescript
+const addComment = async () => {
+  await supabase
+    .from('wiki_comments')
+    .insert({
+      page_id: pageId,
+      author_id: currentUserId,
+      parent_comment_id: replyTo,
+      content: newComment.trim(),
+    });
+};
+\`\`\`
+
+#### Modification
+\`\`\`typescript
+const updateComment = async (commentId) => {
+  await supabase
+    .from('wiki_comments')
+    .update({ content: editingContent })
+    .eq('id', commentId);
+};
+\`\`\`
+
+#### Résolution
+\`\`\`typescript
+const toggleResolve = async (commentId, currentStatus) => {
+  await supabase
+    .from('wiki_comments')
+    .update({ is_resolved: !currentStatus })
+    .eq('id', commentId);
+};
+\`\`\`
+
+## 📋 Règles métier
+
+### Qui peut commenter ?
+- ✅ Membres de l'équipe projet
+- ✅ Sur pages publiques uniquement
+- ❌ Pas sur pages privées
+- ❌ Pas les externes au projet
+
+### Qui peut modifier ?
+- ✅ Auteur du commentaire uniquement
+- ✅ Édition du contenu
+- ✅ Marquage comme résolu
+- ✅ Suppression
+
+### Notifications
+- Pas de système de notification email
+- Mise à jour temps réel via WebSocket
+- Compteur visible sur bouton toggle`,
+
+    'wiki-navigation': `# 🧭 Navigation et organisation du Wiki
+
+## 📂 Structure hiérarchique
+
+### Organisation par auteur
+- Groupement principal par membre de l'équipe
+- Tri : utilisateur actuel en premier
+- Avatar + nom + compteur de pages
+- Badge "Moi" pour identification rapide
+
+### Arborescence pages
+- Support parent/enfant illimité
+- Icônes personnalisables (Lucide React)
+- Indicateurs visuels :
+  - 🌐 Globe vert = Public
+  - 🔒 Cadenas orange = Privé
+  - 💬 Bulle = Contient commentaires
+- Ordre d'affichage personnalisable
+
+## 🎯 Composant WikiNavigation
+
+### Props interface
+\`\`\`typescript
+interface WikiNavigationProps {
+  pages: WikiPage[];
+  selectedPageId: string | null;
+  currentUserId: string | null;
+  onPageSelect: (page: WikiPage) => void;
+  userProfiles: Map<string, string>;
+}
+\`\`\`
+
+### Algorithme de tri
+\`\`\`typescript
+// Tri des auteurs
+authors.sort((a, b) => {
+  // Utilisateur actuel toujours en premier
+  if (a.is_current_user) return -1;
+  if (b.is_current_user) return 1;
+  // Puis par nom alphabétique
+  return a.name.localeCompare(b.name);
+});
+
+// Tri des pages
+pages.sort((a, b) => {
+  // D'abord par ordre défini
+  if (a.display_order !== undefined && b.display_order !== undefined) {
+    return a.display_order - b.display_order;
+  }
+  // Puis alphabétique
+  return a.title.localeCompare(b.title);
+});
+\`\`\`
+
+### Construction de l'arbre
+\`\`\`typescript
+const buildPageTree = (flatPages) => {
+  const pageMap = new Map();
+  const rootPages = [];
+  
+  // Map toutes les pages
+  flatPages.forEach(page => {
+    pageMap.set(page.id, { ...page, children: [] });
+  });
+  
+  // Construire relations parent/enfant
+  flatPages.forEach(page => {
+    if (page.parent_id && pageMap.has(page.parent_id)) {
+      const parent = pageMap.get(page.parent_id);
+      parent.children.push(pageMap.get(page.id));
+    } else {
+      rootPages.push(pageMap.get(page.id));
+    }
+  });
+  
+  return rootPages;
+};
+\`\`\`
+
+## 🎨 Styles et interactions
+
+### États visuels
+- **Hover** : Background accent léger
+- **Sélectionné** : Background primary + texte blanc
+- **Expandé** : Chevron vers le bas
+- **Collapsed** : Chevron vers la droite
+
+### Animations
+- Transition smooth sur hover (150ms)
+- Expansion/collapse instantané
+- Auto-scroll vers page sélectionnée
+
+### Responsive
+- Largeur fixe sidebar (320px)
+- ScrollArea pour listes longues
+- Truncate pour titres trop longs`,
+
+    'wiki-editor': `# ✏️ Éditeur BlockNote
+
+## 🎯 Intégration BlockNote
+
+### Configuration de base
+\`\`\`typescript
+import { BlockNoteEditor } from "@blocknote/core";
+import { useCreateBlockNote } from "@blocknote/react";
+
+const editor = useCreateBlockNote({
+  initialContent: content ? JSON.parse(content) : undefined,
+});
+\`\`\`
+
+### Fix du bug useState dispatcher
+**Problème** : "can't access property 'useState', dispatcher is null"
+**Cause** : onChange appelé pendant le rendu React
+**Solution** : Isolation dans useEffect
+
+\`\`\`typescript
+// ❌ Ancien code problématique
+editor.onChange(() => {
+  editor.blocksToHTMLLossy(editor.document).then(onChange);
+});
+
+// ✅ Code corrigé
+useEffect(() => {
+  const handleChange = () => {
+    editor.blocksToHTMLLossy(editor.document)
+      .then((html) => onChange(html))
+      .catch((error) => console.error('Erreur conversion:', error));
+  };
+  editor.onChange(handleChange);
+}, [editor, onChange]);
+\`\`\`
+
+## 📝 Fonctionnalités supportées
+
+### Formatage texte
+- **Gras**, *italique*, ~~barré~~
+- Titres H1 → H6
+- Listes à puces et numérotées
+- Citations (blockquote)
+- Code inline et blocs
+
+### Blocs avancés
+- Tables avec édition cellules
+- Images avec upload/URL
+- Vidéos embed
+- Fichiers attachés
+- Séparateurs horizontaux
+
+### Raccourcis clavier
+- **Cmd/Ctrl + B** : Gras
+- **Cmd/Ctrl + I** : Italique
+- **Cmd/Ctrl + Z** : Annuler
+- **/** : Menu slash commands
+- **Tab** : Indenter liste
+- **Shift + Tab** : Désindenter
+
+## 🔄 Sauvegarde automatique
+
+### Debounce strategy
+\`\`\`typescript
+const debouncedSave = useMemo(
+  () => debounce(async (html: string) => {
+    try {
+      await supabase
+        .from('wiki_pages')
+        .update({ content: html })
+        .eq('id', pageId);
+    } catch (error) {
+      toast.error('Erreur sauvegarde');
+    }
+  }, 1000),
+  [pageId]
+);
+\`\`\`
+
+### Indicateur visuel
+- Point vert : Sauvegardé
+- Point orange : Modification en cours
+- Point rouge : Erreur sauvegarde
+
+## 🎨 Personnalisation UI
+
+### Theme BlockNote
+\`\`\`css
+.bn-editor {
+  font-family: Inter, system-ui;
+  min-height: 400px;
+}
+
+.bn-block-content {
+  line-height: 1.6;
+}
+
+.bn-inline-code {
+  background: rgb(243 244 246);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+\`\`\`
+
+### Mode plein écran
+- Hauteur : calc(100vh - header)
+- Largeur : 100% container
+- Focus trap activé
+- Escape pour sortir
+
+## 🚀 Optimisations performances
+
+### Lazy loading
+- Chargement BlockNote uniquement si page sélectionnée
+- Import dynamique des extensions
+
+### Memoization
+- useCallback pour onChange
+- useMemo pour editor instance
+- React.memo sur WikiEditor
+
+### Cleanup
+\`\`\`typescript
+useEffect(() => {
+  return () => {
+    // Cleanup editor subscriptions
+    editor.removeAllListeners();
+  };
+}, [editor]);
+\`\`\``
   });
 
   const getContent = () => {

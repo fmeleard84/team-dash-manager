@@ -104,20 +104,24 @@ export function FullScreenModal({
 
       {/* Content */}
       <div className={cn(
-        "h-[calc(100vh-5rem)] overflow-y-auto",
+        "h-[calc(100vh-4rem)] overflow-y-auto flex flex-col",
         contentClassName
       )}>
-        <div className="max-w-5xl mx-auto px-6 py-6">
+        <div className="max-w-5xl mx-auto px-6 py-6 w-full flex-1 flex flex-col">
           {/* Title and description */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-            {description && (
-              <p className="mt-2 text-base text-gray-600">{description}</p>
-            )}
-          </div>
+          {(title || description) && (
+            <div className="mb-6">
+              {title && <h1 className="text-3xl font-bold text-gray-900">{title}</h1>}
+              {description && (
+                <p className="mt-2 text-base text-gray-600">{description}</p>
+              )}
+            </div>
+          )}
           
           {/* Main content - same alignment as title */}
-          {children}
+          <div className="flex-1 flex flex-col min-h-0">
+            {children}
+          </div>
         </div>
       </div>
     </div>

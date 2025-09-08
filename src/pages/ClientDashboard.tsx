@@ -32,7 +32,8 @@ import {
   Network,
   Users,
   Activity,
-  Archive
+  Archive,
+  BookOpen
 } from "lucide-react";
 import { IallaLogo } from "@/components/IallaLogo";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -53,6 +54,7 @@ import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import ClientMetricsDashboard from "./ClientMetricsDashboard";
 import PlanningPage from "./PlanningPage";
+import WikiView from "@/components/wiki/WikiView";
 
 const ClientDashboard = () => {
 const [searchParams, setSearchParams] = useSearchParams();
@@ -89,6 +91,8 @@ const [isCreating, setIsCreating] = useState(false);
 const [selectedKanbanProjectId, setSelectedKanbanProjectId] = useState<string>("");
 const [selectedMessagesProjectId, setSelectedMessagesProjectId] = useState<string>("");
 const [selectedDriveProjectId, setSelectedDriveProjectId] = useState<string>("");
+const [selectedWikiProjectId, setSelectedWikiProjectId] = useState<string>("");
+const [isWikiFullscreen, setIsWikiFullscreen] = useState(false);
 // Removed: kickoff dialog state - now handled in ProjectCard
 const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -528,12 +532,33 @@ const projetsTermines = classifiedProjects.filter(p => p.category === 'termines'
 
 const hasActiveProjects = projetsEnCours.length > 0;
 
+// Initialize first active project IDs for Wiki/Kanban/Messages/Drive when component mounts or projects change
+useEffect(() => {
+  const activeProjectIds = projetsEnCours.map(p => p.id);
+  
+  if (activeProjectIds.length > 0) {
+    if (!selectedWikiProjectId || !activeProjectIds.includes(selectedWikiProjectId)) {
+      setSelectedWikiProjectId(activeProjectIds[0]);
+    }
+    if (!selectedKanbanProjectId || !activeProjectIds.includes(selectedKanbanProjectId)) {
+      setSelectedKanbanProjectId(activeProjectIds[0]);
+    }
+    if (!selectedMessagesProjectId || !activeProjectIds.includes(selectedMessagesProjectId)) {
+      setSelectedMessagesProjectId(activeProjectIds[0]);
+    }
+    if (!selectedDriveProjectId || !activeProjectIds.includes(selectedDriveProjectId)) {
+      setSelectedDriveProjectId(activeProjectIds[0]);
+    }
+  }
+}, [projetsEnCours]);
+
 const menuItems = [
   { id: 'start', label: 'Commencer', icon: Rocket },
   { id: 'dashboard', label: 'Tableau de bord', icon: Activity },
   { id: 'projects', label: 'Mes projets', icon: FolderOpen },
   { id: 'planning', label: 'Planning', icon: Calendar },
   ...(hasActiveProjects ? [
+    { id: 'wiki', label: 'Wiki', icon: BookOpen },
     { id: 'drive', label: 'Drive', icon: Cloud },
     { id: 'kanban', label: 'Tableau Kanban', icon: Kanban },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
@@ -879,6 +904,56 @@ const menuItems = [
       case 'planning':
         return <PlanningPage userType="client" userEmail={user?.email} userName={user?.user_metadata?.name} />;
 
+      case 'wiki':
+        return (
+          <div className="space-y-4">
+            {projetsEnCours.length > 0 && !isWikiFullscreen && (
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <BookOpen className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-800">Wiki du Projet</h2>
+                      <p className="text-sm text-gray-600">Documentation collaborative de l'équipe</p>
+                    </div>
+                  </div>
+                  
+                  <Select value={selectedWikiProjectId} onValueChange={setSelectedWikiProjectId}>
+                    <SelectTrigger className="w-64 bg-white border-purple-200 focus:border-purple-400">
+                      <SelectValue placeholder="Sélectionner un projet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projetsEnCours.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            
+            {projetsEnCours.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">Wiki non disponible</h3>
+                <p>Démarrez un projet pour accéder à la documentation partagée</p>
+              </div>
+            ) : selectedWikiProjectId && (
+              <div className={isWikiFullscreen ? "fixed inset-0 z-50" : "h-[calc(100vh-16rem)]" }>
+                <WikiView 
+                  projectId={selectedWikiProjectId}
+                  userType="client"
+                  onFullscreenChange={setIsWikiFullscreen}
+                />
+              </div>
+            )}
+          </div>
+        );
+
       case 'drive':
         return (
           <div className="space-y-4">
@@ -1055,7 +1130,7 @@ const menuItems = [
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-[#FCFCFD]">
-        <Sidebar className="w-64 bg-white/95 backdrop-blur-sm border-r border-gray-100" collapsible="icon">
+        <Sidebar className={`w-64 bg-white/95 backdrop-blur-sm border-r border-gray-100 ${isWikiFullscreen && activeSection === 'wiki' ? 'hidden lg:block lg:w-16' : ''}`} collapsible="icon">
           <SidebarContent className="bg-transparent">
             <div className="p-6">
               <div className="group-data-[collapsible=icon]:hidden">
@@ -1119,7 +1194,7 @@ const menuItems = [
         </Sidebar>
 
         <main className="flex-1 bg-gradient-to-br from-white via-gray-50/30 to-white">
-          <header className="h-16 border-b border-gray-100 bg-white/70 backdrop-blur-md flex items-center justify-between px-8">
+          <header className={`h-16 border-b border-gray-100 bg-white/70 backdrop-blur-md flex items-center justify-between px-8 ${isWikiFullscreen && activeSection === 'wiki' ? 'hidden' : ''}`}>
             <div className="flex items-center">
               <SidebarTrigger className="text-gray-600 hover:text-gray-900" />
               <div className="ml-4">
@@ -1129,6 +1204,7 @@ const menuItems = [
                    activeSection === 'projects' ? 'Mes projets' :
                    activeSection === 'calc' ? 'Calendrier Calc' :
                    activeSection === 'planning' ? 'Planning' :
+                   activeSection === 'wiki' ? 'Wiki' :
                    activeSection === 'drive' ? 'Drive' :
                    activeSection === 'kanban' ? 'Kanban' :
                    activeSection === 'messages' ? 'Messages' :
@@ -1150,7 +1226,7 @@ const menuItems = [
             </div>
           </header>
           
-          <div className="p-6">
+          <div className={isWikiFullscreen && activeSection === 'wiki' ? "" : "p-6"}>
             {renderContent()}
           </div>
         </main>

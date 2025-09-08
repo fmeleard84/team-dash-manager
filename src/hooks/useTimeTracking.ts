@@ -40,6 +40,8 @@ export const useTimeTracking = () => {
   const loadCandidateRate = async () => {
     if (!user?.id) return;
 
+    console.log('[TIME TRACKING] Loading candidate rate for user:', user.id);
+
     try {
       // Get candidate profile
       const { data: candidateProfile } = await supabase
@@ -61,22 +63,34 @@ export const useTimeTracking = () => {
         .eq('id', user.id)
         .single();
 
-      if (!candidateProfile) return;
+      console.log('[TIME TRACKING] Candidate profile:', candidateProfile);
+
+      if (!candidateProfile) {
+        console.log('[TIME TRACKING] No candidate profile found');
+        return;
+      }
 
       // Get base rate from HR profile
-      const { data: hrProfile } = await supabase
+      const { data: hrProfile, error: hrError } = await supabase
         .from('hr_profiles')
-        .select('base_rate_per_minute')
+        .select('base_rate_per_minute, name')
         .eq('id', candidateProfile.profile_id)
         .single();
 
+      console.log('[TIME TRACKING] HR Profile data:', hrProfile);
+      if (hrError) {
+        console.error('[TIME TRACKING] Error loading HR profile:', hrError);
+      }
+
       if (!hrProfile?.base_rate_per_minute) {
         // Default rate if not set
+        console.log('[TIME TRACKING] No base_rate_per_minute found, using default 10€/min');
         setCandidateRate(10); // 10€/minute default
         return;
       }
 
       let baseRate = hrProfile.base_rate_per_minute;
+      console.log('[TIME TRACKING] Base rate from HR profile:', baseRate);
 
       // Get rate modifiers
       const { data: modifiers } = await supabase
@@ -84,25 +98,34 @@ export const useTimeTracking = () => {
         .select('*')
         .eq('is_active', true);
 
-      if (modifiers) {
+      console.log('[TIME TRACKING] Rate modifiers:', modifiers);
+
+      if (modifiers && modifiers.length > 0) {
         // Apply language modifiers
         const languages = candidateProfile.candidate_languages?.map(cl => cl.hr_languages.name) || [];
         const languageModifiers = modifiers.filter(m => 
           m.type === 'language' && languages.includes(m.name)
         );
         
+        console.log('[TIME TRACKING] Language modifiers:', languageModifiers);
+        
         // Apply expertise modifiers
         const expertises = candidateProfile.candidate_expertises?.map(ce => ce.hr_expertises.name) || [];
         const expertiseModifiers = modifiers.filter(m => 
           m.type === 'expertise' && expertises.includes(m.name)
         );
+        
+        console.log('[TIME TRACKING] Expertise modifiers:', expertiseModifiers);
 
         // Calculate final rate
         let totalPercentageIncrease = 0;
         languageModifiers.forEach(m => totalPercentageIncrease += m.percentage_increase);
         expertiseModifiers.forEach(m => totalPercentageIncrease += m.percentage_increase);
 
+        console.log('[TIME TRACKING] Total percentage increase:', totalPercentageIncrease);
+
         const finalRate = baseRate * (1 + totalPercentageIncrease / 100);
+        console.log('[TIME TRACKING] Final calculated rate:', finalRate, '(base:', baseRate, '+ increase:', totalPercentageIncrease, '%)');
         setCandidateRate(finalRate);
 
         // Store calculated rate in database
@@ -145,12 +168,33 @@ export const useTimeTracking = () => {
         toast.error('Profil candidat non trouvé');
         return;
       }
+      
+      // Get the assignment with calculated_price for this specific project
+      const { data: assignment } = await supabase
+        .from('hr_resource_assignments')
+        .select('calculated_price')
+        .eq('candidate_id', user.id)
+        .eq('project_id', projectId)
+        .eq('booking_status', 'accepted')
+        .single();
+      
+      console.log('[TIME TRACKING] Assignment with calculated price:', assignment);
+      
+      // Use the calculated_price from the assignment (already includes all modifiers)
+      let sessionRate = candidateRate; // Fallback to global rate
+      
+      if (assignment?.calculated_price) {
+        sessionRate = assignment.calculated_price;
+        console.log('[TIME TRACKING] Using project calculated_price:', sessionRate, '€/min');
+      } else {
+        console.log('[TIME TRACKING] No calculated_price found, using global rate:', sessionRate, '€/min');
+      }
 
       // Check if there's already an active session in database
       const { data: existingActive } = await supabase
         .from('active_time_tracking')
         .select('id, projects(title)')
-        .eq('candidate_id', candidateProfile.id)
+        .eq('candidate_id', user.id)
         .in('status', ['active', 'paused'])
         .single();
 
@@ -164,10 +208,10 @@ export const useTimeTracking = () => {
       const { data: session, error: sessionError } = await supabase
         .from('time_tracking_sessions')
         .insert({
-          candidate_id: candidateProfile.id,
+          candidate_id: user.id,
           project_id: projectId,
           activity_description: activityDescription,
-          hourly_rate: candidateRate,
+          hourly_rate: sessionRate, // Use the session-specific rate
           status: 'active'
         })
         .select()
@@ -179,19 +223,26 @@ export const useTimeTracking = () => {
       const { error: activeError } = await supabase
         .from('active_time_tracking')
         .insert({
-          candidate_id: candidateProfile.id,
+          candidate_id: user.id,
           project_id: projectId,
           session_id: session.id,
           candidate_name: `${candidateProfile.first_name} ${candidateProfile.last_name}`,
           activity_description: activityDescription,
           start_time: session.start_time,
-          hourly_rate: candidateRate,
+          hourly_rate: sessionRate, // Use the session-specific rate
           status: 'active'
         });
 
       if (activeError) throw activeError;
 
       // Set active session in state
+      console.log('[TIME TRACKING] Starting session with rate:', {
+        sessionRate: sessionRate,
+        globalRate: candidateRate,
+        displayedAs: `${sessionRate.toFixed(2)}€/min`,
+        sessionId: session.id
+      });
+      
       setActiveSession({
         sessionId: session.id,
         projectId,
@@ -199,12 +250,12 @@ export const useTimeTracking = () => {
         activityDescription,
         startTime: new Date(session.start_time),
         elapsedSeconds: 0,
-        hourlyRate: candidateRate,
+        hourlyRate: sessionRate, // Use the session-specific rate
         currentCost: 0,
         isPaused: false
       });
 
-      toast.success('Chronomètre démarré');
+      toast.success(`Chronomètre démarré - Taux: ${sessionRate.toFixed(2)}€/min`);
     } catch (error) {
       console.error('Error starting session:', error);
       toast.error('Erreur lors du démarrage du chronomètre');
@@ -247,7 +298,7 @@ export const useTimeTracking = () => {
     setLoading(true);
     try {
       const durationMinutes = Math.ceil(activeSession.elapsedSeconds / 60);
-      const totalCost = durationMinutes * candidateRate;
+      const totalCost = durationMinutes * activeSession.hourlyRate; // Use the session's rate
 
       // Update session in database
       await supabase
@@ -285,15 +336,27 @@ export const useTimeTracking = () => {
           if (!prev) return null;
           
           const newElapsed = prev.elapsedSeconds + 1;
-          const minutes = Math.ceil(newElapsed / 60);
+          const minutes = newElapsed / 60; // Use exact minutes, not rounded
           const newCost = minutes * prev.hourlyRate;
+          
+          // Debug logging every 10 seconds
+          if (newElapsed % 10 === 0) {
+            console.log('[TIME TRACKING] Debug:', {
+              elapsedSeconds: newElapsed,
+              exactMinutes: minutes,
+              hourlyRate: prev.hourlyRate,
+              calculatedCost: newCost,
+              formula: `${minutes} min × ${prev.hourlyRate}€/min = ${newCost}€`
+            });
+          }
 
           // Update database every minute
           if (newElapsed % 60 === 0) {
+            const roundedMinutes = Math.ceil(newElapsed / 60);
             supabase
               .from('active_time_tracking')
               .update({
-                current_duration_minutes: minutes,
+                current_duration_minutes: roundedMinutes,
                 current_cost: newCost,
                 last_update: new Date().toISOString()
               })

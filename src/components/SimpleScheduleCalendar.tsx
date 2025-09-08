@@ -266,9 +266,13 @@ export function SimpleScheduleCalendar({
                       </div>
                       {dayEvents.map((event, idx) => (
                         <div
-                          key={idx}
-                          className="text-xs p-1 mb-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded truncate"
+                          key={event.id || idx}
+                          className="text-xs p-1 mb-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded truncate cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors"
                           title={event.title}
+                          onClick={(e) => {
+                            e.stopPropagation();  // Empêcher le clic sur le jour
+                            onEventClick && onEventClick(event);
+                          }}
                         >
                           {format(new Date(event.start), 'HH:mm')} {event.title}
                         </div>

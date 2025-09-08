@@ -50,9 +50,11 @@ interface EventData {
     title: string;
   };
   project_event_attendees?: Array<{
-    email: string;
+    user_id: string;
+    email?: string;
     response_status: 'accepted' | 'declined' | 'pending';
     required: boolean;
+    role?: string;
   }>;
 }
 
@@ -181,7 +183,7 @@ export function ViewEventDialog({
 
         if (clientProfile) {
           const attendee = eventData?.project_event_attendees?.find(
-            a => a.email === clientProfile.email
+            a => a.user_id === clientProfile.id
           );
           members.push({
             ...clientProfile,
@@ -210,7 +212,7 @@ export function ViewEventDialog({
         assignments.forEach((assignment: any) => {
           if (assignment.candidate_profiles) {
             const attendee = eventData?.project_event_attendees?.find(
-              a => a.email === assignment.candidate_profiles.email
+              a => a.user_id === assignment.candidate_profiles.id
             );
             members.push({
               ...assignment.candidate_profiles,
@@ -225,8 +227,8 @@ export function ViewEventDialog({
       
       // En mode édition, initialiser les membres sélectionnés
       if (isEditMode && eventData?.project_event_attendees) {
-        const selectedEmails = eventData.project_event_attendees.map(a => a.email);
-        setSelectedMembers(selectedEmails);
+        const selectedIds = eventData.project_event_attendees.map(a => a.user_id);
+        setSelectedMembers(selectedIds);
       }
 
     } catch (error) {
@@ -234,11 +236,11 @@ export function ViewEventDialog({
     }
   };
 
-  const toggleMember = (email: string) => {
+  const toggleMember = (userId: string) => {
     setSelectedMembers(prev => 
-      prev.includes(email) 
-        ? prev.filter(e => e !== email)
-        : [...prev, email]
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
     );
   };
 
@@ -278,13 +280,18 @@ export function ViewEventDialog({
 
       // Ajouter les nouveaux
       if (selectedMembers.length > 0) {
-        const attendees = selectedMembers.map(email => ({
-          event_id: eventId,
-          email,
-          required: true,
-          response_status: 'pending'
-        }));
+        const attendees = selectedMembers.map(userId => {
+          const member = teamMembers.find(m => m.id === userId);
+          return {
+            event_id: eventId,
+            user_id: userId,
+            role: member?.role || 'participant',
+            required: true,
+            response_status: 'pending'
+          };
+        });
 
+        // Insert new attendees - duplicates will be handled by unique constraint
         await supabase
           .from('project_event_attendees')
           .insert(attendees);
@@ -475,6 +482,8 @@ export function ViewEventDialog({
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
                   className="mt-1"
+                  step="60"
+                  pattern="[0-9]{2}:[0-9]{2}"
                 />
               </div>
               
@@ -488,6 +497,8 @@ export function ViewEventDialog({
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   className="mt-1"
+                  step="60"
+                  pattern="[0-9]{2}:[0-9]{2}"
                 />
               </div>
             </div>
@@ -550,8 +561,8 @@ export function ViewEventDialog({
                   <div className="flex items-center gap-3">
                     <Checkbox
                       id={`edit-member-${member.id}`}
-                      checked={selectedMembers.includes(member.email)}
-                      onCheckedChange={() => toggleMember(member.email)}
+                      checked={selectedMembers.includes(member.id)}
+                      onCheckedChange={() => toggleMember(member.id)}
                     />
                     <Label
                       htmlFor={`edit-member-${member.id}`}
@@ -684,45 +695,52 @@ export function ViewEventDialog({
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-emerald-600" />
-              Participants ({teamMembers.filter(m => 
-                eventData?.project_event_attendees?.some(a => a.email === m.email)
-              ).length})
+              Participants ({eventData?.project_event_attendees?.length || 0})
             </h3>
             
             <div className="space-y-3">
-              {teamMembers.filter(m => 
-                eventData?.project_event_attendees?.some(a => a.email === m.email)
-              ).map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                      {member.first_name[0]}{member.last_name[0]}
-                    </div>
-                    <div>
-                      <p className="font-medium">
-                        {member.first_name} {member.last_name}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Mail className="w-3 h-3" />
-                        {member.email}
+              {eventData?.project_event_attendees && eventData.project_event_attendees.length > 0 ? (
+                eventData.project_event_attendees.map((attendee: any) => {
+                  // Chercher les infos complètes dans teamMembers si disponible
+                  const member = teamMembers.find(m => m.id === attendee.user_id);
+                  
+                  return (
+                    <div
+                      key={attendee.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                          {member ? (
+                            `${member.first_name[0]}${member.last_name[0]}`
+                          ) : (
+                            'U'
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {member ? `${member.first_name} ${member.last_name}` : 'Participant'}
+                          </p>
+                          {member?.email && (
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <Mail className="w-3 h-3" />
+                              {member.email}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getResponseBadge(attendee.response_status)}
+                        {member && (
+                          <Badge variant={member.role === 'client' ? 'default' : 'secondary'}>
+                            {member.role === 'client' ? 'Client' : 'Ressource'}
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getResponseBadge(member.response_status)}
-                    <Badge variant={member.role === 'client' ? 'default' : 'secondary'}>
-                      {member.role === 'client' ? 'Client' : 'Ressource'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-              
-              {teamMembers.filter(m => 
-                eventData?.project_event_attendees?.some(a => a.email === m.email)
-              ).length === 0 && (
+                  );
+                })
+              ) : (
                 <p className="text-gray-500 text-center py-4">
                   Aucun participant pour cet événement
                 </p>

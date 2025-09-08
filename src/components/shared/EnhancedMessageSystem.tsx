@@ -243,7 +243,20 @@ export const EnhancedMessageSystem = ({ projectId, userType = 'user' }: Enhanced
         messageData.group_name = selectedConversation.name;
       }
 
-      await sendMessage(selectedThread.id, newMessageContent, messageData.files);
+      const sentMessage = await sendMessage(selectedThread.id, newMessageContent, messageData.files);
+      
+      // Add the message immediately to the local state
+      // This ensures the sender sees their message right away
+      if (sentMessage) {
+        setMessages(prev => {
+          // Check if message already exists (from realtime)
+          const exists = prev.some(msg => msg.id === sentMessage.id);
+          if (!exists) {
+            return [...prev, sentMessage];
+          }
+          return prev;
+        });
+      }
       
       setNewMessageContent('');
       setUploadedFiles([]);

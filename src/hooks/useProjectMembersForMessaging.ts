@@ -18,15 +18,36 @@ export const useProjectMembersForMessaging = (projectId: string) => {
   const { user } = useAuth();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  console.log('🚀🚀🚀 [MESSAGING HOOK v2] Called with projectId:', projectId);
+  console.log('🚀🚀🚀 [MESSAGING HOOK v2] User:', user?.id, user?.email);
 
   useEffect(() => {
-    if (!projectId) return;
+    console.log('🔥🔥🔥 [MESSAGING] useEffect START - projectId:', projectId, 'user:', user?.id);
+    
+    if (!projectId) {
+      console.log('❌ [MESSAGING] Missing projectId, returning');
+      setLoading(false);
+      return;
+    }
+    
+    if (!user) {
+      console.log('❌ [MESSAGING] Missing user, returning');
+      setLoading(false);
+      return;
+    }
 
     const loadMembers = async () => {
+      console.log('🏃 [MESSAGING] loadMembers function starting...');
+      console.log('🏃 [MESSAGING] Stack trace:', new Error().stack);
       try {
         setLoading(true);
-        console.log('🔍 Loading members for project:', projectId);
-        console.log('Current user ID:', user?.id);
+        console.log('🔍 [MESSAGING] Loading members for project:', projectId);
+        console.log('[MESSAGING] Current user:', {
+          id: user?.id,
+          email: user?.email,
+          role: user?.user_metadata?.role
+        });
         
         const allMembers: ProjectMember[] = [];
 
@@ -62,82 +83,137 @@ export const useProjectMembersForMessaging = (projectId: string) => {
           }
         }
 
-        // 2. Get candidates from hr_resource_assignments (same as Kanban)
+        // 2. Get candidates from hr_resource_assignments - WITHOUT JOIN
+        console.log('[MESSAGING] Fetching assignments for project:', projectId);
+        
         const { data: assignments, error: assignError } = await supabase
           .from('hr_resource_assignments')
           .select('*')
-          .eq('project_id', projectId);
+          .eq('project_id', projectId)
+          .in('booking_status', ['accepted', 'completed']);
         
-        console.log('Assignments found:', assignments?.length || 0);
+        if (assignError) {
+          console.error('[MESSAGING] ❌ Error fetching assignments:', assignError);
+        }
         
-        if (assignments) {
+        console.log('[MESSAGING] ✅ Assignments query result:', {
+          found: assignments?.length || 0,
+          assignments: assignments
+        });
+        
+        if (assignments && assignments.length > 0) {
+          console.log('[MESSAGING] Processing assignments...');
+          
           for (const assignment of assignments) {
-            // Get candidate profile if candidate_id exists
+            console.log('[MESSAGING] Assignment:', {
+              id: assignment.id,
+              candidate_id: assignment.candidate_id,
+              booking_status: assignment.booking_status
+            });
+            
             if (assignment.candidate_id) {
-              const { data: candidate } = await supabase
-                .from('candidate_profiles')
+              // With unified IDs, candidate_id = profiles.id
+              const { data: userProfile } = await supabase
+                .from('profiles')
                 .select('*')
                 .eq('id', assignment.candidate_id)
                 .single();
               
-              if (candidate) {
-                // Get the user profile for this candidate
-                const { data: userProfile } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('email', candidate.email)
-                  .single();
-                
-                if (userProfile) {
-                  const jobTitle = assignment.job_title || 
-                                   candidate.position || 
-                                   'Assistant comptable';
+              if (userProfile) {
+                // Get the job title from hr_profiles separately
+                let jobTitle = 'Ressource';
+                if (assignment.profile_id) {
+                  console.log('[MESSAGING] Fetching hr_profile for profile_id:', assignment.profile_id);
+                  const { data: hrProfile, error: hrError } = await supabase
+                    .from('hr_profiles')
+                    .select('name')
+                    .eq('id', assignment.profile_id)
+                    .single();
                   
-                  allMembers.push({
-                    id: userProfile.id,
-                    userId: userProfile.user_id || userProfile.id,
-                    email: userProfile.email,
-                    name: userProfile.first_name || candidate.first_name || 'Candidat',
-                    firstName: userProfile.first_name || candidate.first_name,
-                    jobTitle: jobTitle,
-                    role: 'candidate',
-                    isOnline: false
-                  });
-                  console.log('Added candidate:', userProfile.first_name, 'ID:', userProfile.id);
+                  if (hrError) {
+                    console.error('[MESSAGING] Error fetching hr_profile:', hrError);
+                  }
+                  
+                  if (hrProfile) {
+                    console.log('[MESSAGING] Found hr_profile:', hrProfile);
+                    jobTitle = hrProfile.name || 'Ressource';
+                    console.log('[MESSAGING] Job title set to:', jobTitle);
+                  } else {
+                    console.log('[MESSAGING] No hr_profile found for profile_id:', assignment.profile_id);
+                  }
+                } else {
+                  console.log('[MESSAGING] No profile_id in assignment');
                 }
-              }
-            }
-            // Fallback to profile_id (old system)
-            else if (assignment.profile_id) {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', assignment.profile_id)
-                .single();
-              
-              if (profile) {
-                // Get position from candidate_profiles
-                const { data: candidateProfile } = await supabase
-                  .from('candidate_profiles')
-                  .select('position')
-                  .eq('email', profile.email)
-                  .single();
-                
-                const jobTitle = assignment.job_title || 
-                                candidateProfile?.position || 
-                                'Assistant comptable';
                 
                 allMembers.push({
-                  id: profile.id,
-                  userId: profile.user_id || profile.id,
-                  email: profile.email,
-                  name: profile.first_name || 'Candidat',
-                  firstName: profile.first_name,
+                  id: userProfile.id,
+                  userId: userProfile.user_id || userProfile.id,
+                  email: userProfile.email,
+                  name: userProfile.first_name || 'Candidat',
+                  firstName: userProfile.first_name,
                   jobTitle: jobTitle,
                   role: 'candidate',
                   isOnline: false
                 });
-                console.log('Added candidate (from profile_id):', profile.first_name, 'ID:', profile.id);
+                
+                console.log('[MESSAGING] Added candidate:', userProfile.first_name, 'ID:', userProfile.id, 'Job:', jobTitle);
+              } else {
+                console.error('[MESSAGING] Could not find profile for candidate_id:', assignment.candidate_id);
+              }
+            }
+            // Fallback: try to get candidate from profile in assignment
+            else {
+              console.log('No candidate_id, checking for other identifiers...');
+              
+              // Try to find candidate by profile_id and seniority
+              if (assignment.profile_id && assignment.seniority) {
+                console.log('Searching by profile_id:', assignment.profile_id, 'and seniority:', assignment.seniority);
+                
+                const { data: candidates } = await supabase
+                  .from('candidate_profiles')
+                  .select('*')
+                  .eq('profile_id', assignment.profile_id)
+                  .eq('seniority', assignment.seniority);
+                
+                if (candidates && candidates.length > 0) {
+                  const candidate = candidates[0];
+                  console.log('Found candidate by profile/seniority:', candidate.first_name);
+                  
+                  // Get the user profile
+                  const { data: userProfile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', candidate.id) // Using unified ID
+                    .single();
+                  
+                  if (userProfile) {
+                    // Get job title from hr_profiles separately
+                    let jobTitle = candidate.position || 'Ressource';
+                    if (assignment.profile_id) {
+                      const { data: hrProfile } = await supabase
+                        .from('hr_profiles')
+                        .select('name')
+                        .eq('id', assignment.profile_id)
+                        .single();
+                      
+                      if (hrProfile) {
+                        jobTitle = hrProfile.name || jobTitle;
+                      }
+                    }
+                    
+                    allMembers.push({
+                      id: userProfile.id,
+                      userId: userProfile.user_id || userProfile.id,
+                      email: userProfile.email,
+                      name: userProfile.first_name || candidate.first_name || 'Candidat',
+                      firstName: userProfile.first_name || candidate.first_name,
+                      jobTitle: jobTitle,
+                      role: 'candidate',
+                      isOnline: false
+                    });
+                    console.log('Added candidate (fallback):', userProfile.first_name, 'ID:', userProfile.id);
+                  }
+                }
               }
             }
           }
@@ -159,26 +235,19 @@ export const useProjectMembersForMessaging = (projectId: string) => {
               const exists = allMembers.some(m => m.id === booking.candidate_id);
               if (!exists) {
                 const { data: profile } = await supabase
-                  .from('profiles')
+                  .from('candidate_profiles')
                   .select('*')
                   .eq('id', booking.candidate_id)
                   .single();
                 
                 if (profile) {
-                  // Get position from candidate_profiles
-                  const { data: candidateProfile } = await supabase
-                    .from('candidate_profiles')
-                    .select('position')
-                    .eq('email', profile.email)
-                    .single();
-                  
                   allMembers.push({
                     id: profile.id,
-                    userId: profile.user_id || profile.id,
+                    userId: profile.id, // Avec l'ID unifié, c'est le même
                     email: profile.email,
                     name: profile.first_name || 'Candidat',
                     firstName: profile.first_name,
-                    jobTitle: candidateProfile?.position || 'Ressource',
+                    jobTitle: profile.position || 'Ressource',
                     role: 'candidate',
                     isOnline: false
                   });
@@ -189,14 +258,31 @@ export const useProjectMembersForMessaging = (projectId: string) => {
           }
         }
 
-        console.log('📊 Total members found:', allMembers.length);
-        console.log('All member IDs:', allMembers.map(m => m.id));
+        console.log('📊 [MESSAGING] Total members found:', allMembers.length);
+        console.log('[MESSAGING] All member details:', allMembers.map(m => ({
+          id: m.id,
+          name: m.name,
+          role: m.role,
+          jobTitle: m.jobTitle
+        })));
+        console.log('[MESSAGING] Current user ID for filtering:', user?.id);
         
         // Remove current user from the list - filter by ID not email!
-        const filteredMembers = allMembers.filter(m => m.id !== user?.id);
+        // But keep everyone else (including all team members)
+        const filteredMembers = allMembers.filter(m => {
+          const shouldKeep = m.id !== user?.id;
+          if (!shouldKeep) {
+            console.log('[MESSAGING] Filtering out current user:', m.name, 'ID:', m.id, 'Role:', m.role);
+          }
+          return shouldKeep;
+        });
         
-        console.log('📋 Filtered members (without current user):', filteredMembers.length);
-        console.log('Filtered member names:', filteredMembers.map(m => m.name));
+        console.log('📋 [MESSAGING] Final members (without current user):', filteredMembers.length);
+        if (filteredMembers.length > 0) {
+          console.log('[MESSAGING] Members:', filteredMembers.map(m => `${m.name} (${m.jobTitle})`));
+        } else {
+          console.log('[MESSAGING] ⚠️ No members found after filtering!');
+        }
         setMembers(filteredMembers);
       } catch (error) {
         console.error('Error loading project members:', error);
@@ -205,8 +291,17 @@ export const useProjectMembersForMessaging = (projectId: string) => {
       }
     };
 
-    loadMembers();
-  }, [projectId, user]);
+    // Add a small delay to ensure all dependencies are ready
+    const timer = setTimeout(() => {
+      console.log('⏰ [MESSAGING] Timer triggered, calling loadMembers');
+      loadMembers();
+    }, 100);
+    
+    return () => {
+      console.log('🧹 [MESSAGING] Cleanup - clearing timer');
+      clearTimeout(timer);
+    };
+  }, [projectId, user?.id]); // Use user?.id instead of user object
 
   return { members, loading };
 };
