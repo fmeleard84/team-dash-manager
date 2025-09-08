@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ThemeProvider } from "./ui/hooks/useTheme";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AdminRoute from "./components/auth/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -31,6 +32,7 @@ const MessagingDemo = lazy(() => import("./pages/MessagingDemo"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const AuthDebug = lazy(() => import("./pages/AuthDebug"));
 const LLMDashboard = lazy(() => import("./pages/llm/LLMDashboard"));
+const DesignSystem = lazy(() => import("./pages/DesignSystem"));
 
 const queryClient = new QueryClient();
 
@@ -131,6 +133,11 @@ const AppContent = () => {
               </Suspense>
             </AdminRoute>
           } />
+          <Route path="/design-system" element={
+            <Suspense fallback={<PageLoader />}>
+              <DesignSystem />
+            </Suspense>
+          } />
           
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -142,16 +149,18 @@ const AppContent = () => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <AuthProvider>
+                <AppContent />
+              </AuthProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
   );
 }
 

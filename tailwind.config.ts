@@ -28,29 +28,21 @@ export default {
 		},
 		extend: {
 			colors: {
-				// Système de couleurs premium
-				black: '#0D0D0F',
-				'near-black': '#111113',
-				white: '#FFFFFF',
-				gray: {
-					900: '#1B1B1F',
-					800: '#232327',
-					700: '#2B2B30',
-					600: '#3A3A40',
-					500: '#52525B',
-					400: '#8A8A93',
-					300: '#C9C9CF',
-					200: '#E7E7EA',
-					100: '#F3F3F5',
-				},
-				accent: {
-					DEFAULT: '#7C3AED', // Violet premium
-					dark: '#6D28D9',
-					light: '#8B5CF6',
-					ink: '#5B21B6',
-				},
-				// Gardons les anciennes couleurs pour compatibilité
+				// Design System Colors - From CSS Variables
+				brand: 'hsl(var(--brand))',
+				bg: 'hsl(var(--bg))',
+				fg: 'hsl(var(--fg))',
+				muted: 'hsl(var(--muted))',
 				border: 'hsl(var(--border))',
+				card: 'hsl(var(--card))',
+				
+				// Semantic Colors
+				success: 'hsl(var(--success))',
+				warning: 'hsl(var(--warning))',
+				error: 'hsl(var(--error))',
+				info: 'hsl(var(--info))',
+				
+				// Legacy Support (for existing components)
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
@@ -67,21 +59,13 @@ export default {
 					DEFAULT: 'hsl(var(--destructive))',
 					foreground: 'hsl(var(--destructive-foreground))'
 				},
-				success: {
-					DEFAULT: 'hsl(var(--success))',
-					foreground: 'hsl(var(--success-foreground))'
-				},
-				muted: {
-					DEFAULT: 'hsl(var(--muted))',
-					foreground: 'hsl(var(--muted-foreground))'
+				accent: {
+					DEFAULT: 'hsl(var(--accent))',
+					foreground: 'hsl(var(--accent-foreground))'
 				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover))',
 					foreground: 'hsl(var(--popover-foreground))'
-				},
-				card: {
-					DEFAULT: 'hsl(var(--card))',
-					foreground: 'hsl(var(--card-foreground))'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
@@ -116,16 +100,14 @@ export default {
 				'wide-4': '0.04em',
 			},
 			borderRadius: {
-				'md': '12px',
-				'lg': '16px',
-				'xl': '20px',
-				'2xl': '24px',
+				DEFAULT: 'var(--radius)',
+				'xl': 'calc(var(--radius) + 4px)',
+				'2xl': 'calc(var(--radius) + 8px)',
 			},
 			boxShadow: {
-				'card': '0 8px 24px rgba(0,0,0,.06)',
-				'card-hover': '0 12px 32px rgba(0,0,0,.08)',
-				'button': '0 1px 2px rgba(0,0,0,.08)',
-				'focus': '0 0 0 2px rgba(124,58,237,.35)',
+				'sm': 'var(--shadow-sm)',
+				'md': 'var(--shadow-md)',
+				'lg': 'var(--shadow-lg)',
 			},
 			backgroundImage: {
 				'hero-gradient': 'linear-gradient(90deg, #38E1E1 0%, #21A7F0 35%, #FDB952 70%, #F26A4D 100%)',
