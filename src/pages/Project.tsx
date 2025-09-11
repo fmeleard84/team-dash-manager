@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getTeamComposition, clearTeamComposition } from '@/ai-assistant/tools/reactflow-generator';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -114,6 +115,7 @@ const ensureValidPosition = (position?: { x: number; y: number }) => {
 const Project = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   // User auth handled by AuthContext
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
@@ -123,6 +125,36 @@ const Project = () => {
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [isArchived, setIsArchived] = useState(false);
+  const [showReactFlow, setShowReactFlow] = useState(false);
+
+  // Vérifier si on doit ouvrir ReactFlow automatiquement (depuis l'IA)
+  useEffect(() => {
+    const openReactFlow = searchParams.get('openReactFlow') === 'true';
+    const fromAI = searchParams.get('fromAI') === 'true';
+    
+    if (openReactFlow) {
+      setShowReactFlow(true);
+      
+      // Si on vient de l'IA, charger l'équipe générée
+      if (fromAI) {
+        const teamData = getTeamComposition();
+        if (teamData) {
+          const { reactFlowData } = teamData;
+          setNodes(reactFlowData.nodes);
+          setEdges(reactFlowData.edges);
+          
+          // Nettoyer les données après chargement
+          clearTeamComposition();
+          
+          toast({
+            title: 'Équipe chargée',
+            description: 'L\'équipe générée par l\'IA a été chargée dans l\'éditeur',
+            duration: 5000,
+          });
+        }
+      }
+    }
+  }, [searchParams, toast]);
   
   // Supprimé car causait des re-renders infinis
 

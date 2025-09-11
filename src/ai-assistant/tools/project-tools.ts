@@ -20,6 +20,10 @@ export interface CreateMeetingParams {
 export interface CreateTeamParams {
   project_id?: string;
   project_name?: string;
+  project_description?: string;
+  start_date?: string;
+  end_date?: string;
+  budget?: number;
   profiles: Array<{
     profession: string;
     seniority: 'junior' | 'medior' | 'senior' | 'expert';
@@ -127,6 +131,12 @@ export async function createMeeting(params: CreateMeetingParams) {
 // Fonction pour créer une équipe projet
 export async function createTeam(params: CreateTeamParams) {
   try {
+    // Récupérer l'utilisateur actuel
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) {
+      throw new Error('Utilisateur non connecté');
+    }
+
     // Si on a un nom de projet mais pas d'ID, chercher le projet
     let projectId = params.project_id;
     if (!projectId && params.project_name) {
@@ -134,6 +144,7 @@ export async function createTeam(params: CreateTeamParams) {
         .from('projects')
         .select('id')
         .ilike('name', `%${params.project_name}%`)
+        .eq('owner_id', userData.user.id)
         .limit(1);
       
       if (projects && projects.length > 0) {
@@ -141,14 +152,43 @@ export async function createTeam(params: CreateTeamParams) {
       }
     }
 
-    // Si pas de projet, on retourne juste la composition d'équipe pour ReactFlow
+    // Si pas de projet existant, créer un nouveau projet
     if (!projectId) {
-      // Retourner la composition d'équipe pour ReactFlow
+      // Calculer les dates si non fournies
+      const startDate = params.start_date || new Date().toISOString().split('T')[0];
+      const endDate = params.end_date || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // +90 jours par défaut
+      
+      // Créer le projet
+      const { data: newProject, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          name: params.project_name || `Projet ${new Date().toLocaleDateString('fr-FR')}`,
+          description: params.project_description || `Projet créé par l'assistant IA avec ${params.profiles.length} membres d'équipe`,
+          start_date: startDate,
+          end_date: endDate,
+          budget: params.budget,
+          owner_id: userData.user.id,
+          status: 'pause',
+          team_size: params.profiles.length
+        })
+        .select()
+        .single();
+
+      if (projectError) {
+        console.error('Erreur création projet:', projectError);
+        throw new Error('Impossible de créer le projet');
+      }
+
+      projectId = newProject.id;
+      console.log('Nouveau projet créé:', projectId);
+
+      // Retourner les données pour ReactFlow avec l'ID du projet
       return {
         success: true,
-        message: `Équipe de ${params.profiles.length} membres créée avec succès`,
+        message: `Projet "${newProject.name}" créé avec une équipe de ${params.profiles.length} membres`,
         data: {
-          project_name: params.project_name || 'Nouveau Projet',
+          project_id: projectId,
+          project_name: newProject.name,
           profiles: params.profiles
         },
         forReactFlow: true

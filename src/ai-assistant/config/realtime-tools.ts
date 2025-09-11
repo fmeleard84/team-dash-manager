@@ -44,13 +44,29 @@ export const REALTIME_TOOLS = [
   },
   {
     name: 'create_team',
-    description: 'Créer ou composer une équipe pour un projet',
+    description: 'Créer un projet et composer son équipe. IMPORTANT: Toujours demander le délai (durée) du projet. Le budget est optionnel mais aide à déterminer la taille et séniorité de l\'équipe.',
     parameters: {
       type: 'object',
       properties: {
         project_name: {
           type: 'string',
-          description: 'Le nom du projet'
+          description: 'Le nom du projet (requis)'
+        },
+        project_description: {
+          type: 'string',
+          description: 'La description du projet'
+        },
+        start_date: {
+          type: 'string',
+          description: 'Date de début (format YYYY-MM-DD, défaut: aujourd\'hui)'
+        },
+        end_date: {
+          type: 'string',
+          description: 'Date de fin (format YYYY-MM-DD, calculée selon le délai)'
+        },
+        budget: {
+          type: 'number',
+          description: 'Budget total en euros (optionnel mais recommandé)'
         },
         profiles: {
           type: 'array',

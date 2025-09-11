@@ -120,14 +120,18 @@ export function EnhancedVoiceAssistant({
           if (teamData) {
             saveTeamComposition(teamData);
             
+            // Récupérer l'ID du projet créé
+            const projectId = state.lastToolCall.result.data.project_id;
+            
             // Attendre un peu avant de rediriger
             setTimeout(() => {
               setIsCreatingTeam(false);
               onClose();
-              navigate('/template-flow?fromAI=true');
+              // Passer l'ID du projet dans l'URL
+              navigate(`/project/${projectId}?openReactFlow=true&fromAI=true`);
               toast({
-                title: 'Équipe créée avec succès',
-                description: 'Vous allez être redirigé vers l\'éditeur ReactFlow',
+                title: 'Projet et équipe créés avec succès',
+                description: 'Vous allez être redirigé vers l\'éditeur d\'équipe',
               });
             }, 2000);
           }
