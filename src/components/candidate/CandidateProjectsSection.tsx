@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 
 interface CandidateProject {
   id: string;
@@ -730,12 +731,23 @@ export function CandidateProjectsSection({
                         </div>
                         
                         {assignment.booking_status === 'accepted' && assignment.candidate_profiles && (
-                          <div className="mt-2 pt-2 border-t border-gray-200">
-                            <span className="text-sm text-gray-600">
-                              Candidat: <span className="font-medium text-gray-900">
-                                {assignment.candidate_profiles.first_name} {assignment.candidate_profiles.last_name}
-                              </span>
-                            </span>
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <UserAvatarNeon
+                              user={{
+                                id: assignment.candidate_profiles.id,
+                                firstName: assignment.candidate_profiles.first_name,
+                                lastName: assignment.candidate_profiles.last_name,
+                                jobTitle: assignment.hr_profiles?.label || assignment.candidate_profiles.position,
+                                seniority: assignment.seniority,
+                                status: 'online',
+                                isValidated: true
+                              }}
+                              size="sm"
+                              variant="list"
+                              showStatus={true}
+                              showBadges={true}
+                              className="bg-white/50 rounded-lg px-2"
+                            />
                           </div>
                         )}
                       </div>

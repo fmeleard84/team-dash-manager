@@ -50,6 +50,7 @@ import { uploadMultipleFiles, syncMessageFilesToDrive, UploadedFile } from '@/ut
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 
 interface EnhancedMessageSystemProps {
   projectId: string;
@@ -362,22 +363,18 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                         : "bg-white/5 hover:bg-white/10 border border-transparent hover:border-purple-500/30"
                     )}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <Avatar className="h-8 w-8 border-2 border-purple-500/50">
-                          <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-xs">
-                            {member.name.substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isUserOnline(member.id) && (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-[#0f172a] animate-pulse" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{member.name}</p>
-                        <p className="text-xs text-gray-400 truncate">{member.role}</p>
-                      </div>
-                    </div>
+                    <UserAvatarNeon
+                      user={{
+                        id: member.id,
+                        name: member.name,
+                        role: member.role,
+                        status: isUserOnline(member.id) ? 'online' : 'offline'
+                      }}
+                      size="sm"
+                      variant="list"
+                      showStatus={true}
+                      className="flex-1"
+                    />
                   </motion.div>
                 ))}
               </div>
@@ -492,11 +489,16 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                       )}
                     >
                       {!isOwnMessage && (
-                        <Avatar className="h-10 w-10 border-2 border-purple-500/50 shadow-lg shadow-purple-500/20">
-                          <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
-                            {sender?.name.substring(0, 2).toUpperCase() || '??'}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatarNeon
+                          user={{
+                            id: sender?.id || message.sender_id,
+                            name: sender?.name || 'Inconnu',
+                            role: sender?.role
+                          }}
+                          size="md"
+                          variant="compact"
+                          className="shadow-lg shadow-purple-500/20"
+                        />
                       )}
                       
                       <div className={cn(
