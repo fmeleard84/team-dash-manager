@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactFlow, {
@@ -15,11 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/ui/components/Card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Download, Upload, Copy, Euro, Users, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Download, Upload, Copy, Euro, Users, FileText, Sparkles } from 'lucide-react';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
 import { PageHeaderNeon } from '@/components/ui/page-header-neon';
+import { getTeamComposition, clearTeamComposition } from '@/ai-assistant/tools/reactflow-generator';
 
 interface HRProfile {
   id: string;
@@ -53,11 +54,44 @@ const TemplateFlowSimple = () => {
   const [searchParams] = useSearchParams();
   const templateId = searchParams.get('templateId');
   const templateName = searchParams.get('name') || 'Template';
+  const fromAI = searchParams.get('fromAI') === 'true';
 
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [hrResources, setHrResources] = useState<Map<string, HRResource>>(new Map());
   const [selectedResource, setSelectedResource] = useState<HRResource | null>(null);
+  const [aiTeamName, setAiTeamName] = useState<string>('');
+
+  // Charger l'équipe générée par l'IA
+  useEffect(() => {
+    if (fromAI) {
+      const teamData = getTeamComposition();
+      if (teamData) {
+        const { reactFlowData, team } = teamData;
+        setNodes(reactFlowData.nodes);
+        setEdges(reactFlowData.edges);
+        setAiTeamName(team.projectName);
+        
+        // Construire la map des ressources
+        const resourcesMap = new Map<string, HRResource>();
+        reactFlowData.nodes.forEach((node: Node) => {
+          if (node.type === 'hrResource' && node.data.resource) {
+            resourcesMap.set(node.id, node.data.resource);
+          }
+        });
+        setHrResources(resourcesMap);
+        
+        // Nettoyer les données après chargement
+        clearTeamComposition();
+        
+        toast({
+          title: 'Équipe chargée',
+          description: `L'équipe "${team.projectName}" a été chargée avec succès`,
+          duration: 5000,
+        });
+      }
+    }
+  }, [fromAI, toast]);
   
   // Calculer le prix total par minute de toutes les ressources
   const calculateTotalPrice = () => {
@@ -203,6 +237,48 @@ const TemplateFlowSimple = () => {
     });
   }, [nodes, edges, hrResources, templateId, toast]);
 
+  const importFromJSON = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        if (data.nodes && data.edges) {
+          setNodes(data.nodes);
+          setEdges(data.edges);
+          
+          // Reconstruire la map des ressources
+          const resourcesMap = new Map<string, HRResource>();
+          data.nodes.forEach((node: Node) => {
+            if (node.data?.resource) {
+              resourcesMap.set(node.id, node.data.resource);
+            }
+          });
+          setHrResources(resourcesMap);
+          
+          toast({
+            title: "Importé avec succès",
+            description: "Le template a été importé depuis le fichier JSON",
+          });
+        } else {
+          throw new Error("Format de fichier invalide");
+        }
+      } catch (error) {
+        toast({
+          title: "Erreur d'importation",
+          description: "Le fichier JSON n'est pas valide",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input value to allow re-importing the same file
+    event.target.value = '';
+  }, [toast]);
+
   const copyToClipboard = useCallback(() => {
     const flowData = {
       nodes: nodes.map(node => ({
@@ -279,7 +355,7 @@ const TemplateFlowSimple = () => {
         <PageHeaderNeon
           icon={FileText}
           title="Éditeur de Template"
-          subtitle={templateName}
+          subtitle={aiTeamName || templateName}
           showProjectSelector={false}
         >
           <div className="flex items-center gap-4">
@@ -291,6 +367,14 @@ const TemplateFlowSimple = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Retour
             </Button>
+            
+            {/* Badge pour équipe créée par IA */}
+            {fromAI && (
+              <Badge variant="secondary" className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-300">
+                <Sparkles className="w-3 h-3 mr-1" />
+                Créée par IA
+              </Badge>
+            )}
             
             {/* Prix total avec design moderne */}
             {hrResources.size > 0 && (

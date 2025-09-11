@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, MicOff, X, Volume2, Loader2, Send, Settings, 
   Bot, Sparkles, Info, ChevronRight, MessageSquare,
-  Wand2, Users, Calendar, CheckSquare, Map
+  Wand2, Users, Calendar, CheckSquare, Map, Phone
 } from 'lucide-react';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
@@ -19,6 +19,9 @@ import { Separator } from '@/components/ui/separator';
 import { useRealtimeAssistant } from '@/ai-assistant/hooks/useRealtimeAssistant';
 import { KNOWLEDGE_CATEGORIES } from '@/ai-assistant/config/knowledge-base';
 import { toast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import { saveTeamComposition, parseTeamFromAI } from '@/ai-assistant/tools/reactflow-generator';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface EnhancedVoiceAssistantProps {
   isOpen: boolean;
@@ -42,11 +45,13 @@ export function EnhancedVoiceAssistant({
   onClose, 
   context = 'general' 
 }: EnhancedVoiceAssistantProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'voice' | 'text' | 'help'>('voice');
   const [textInput, setTextInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedContext, setSelectedContext] = useState(context);
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -92,18 +97,43 @@ export function EnhancedVoiceAssistant({
   useEffect(() => {
     if (state.transcript) {
       addMessage('user', state.transcript);
+      // Détecter si l'utilisateur demande de créer une équipe
+      if (state.transcript.toLowerCase().includes('équipe') || 
+          state.transcript.toLowerCase().includes('team')) {
+        setIsCreatingTeam(true);
+      }
     }
   }, [state.transcript]);
 
   useEffect(() => {
     if (state.response) {
       addMessage('assistant', state.response, state.lastToolCall);
+      
+      // Vérifier si l'équipe a été créée
+      if (state.lastToolCall?.name === 'create_team' && state.lastToolCall?.result) {
+        const teamData = parseTeamFromAI(state.lastToolCall.result);
+        if (teamData) {
+          saveTeamComposition(teamData);
+          
+          // Attendre un peu avant de rediriger
+          setTimeout(() => {
+            setIsCreatingTeam(false);
+            onClose();
+            navigate('/template-flow?fromAI=true');
+            toast({
+              title: 'Équipe créée avec succès',
+              description: 'Vous allez être redirigé vers l\'éditeur ReactFlow',
+            });
+          }, 2000);
+        }
+      }
     }
-  }, [state.response]);
+  }, [state.response, state.lastToolCall, navigate, onClose]);
 
   useEffect(() => {
     if (state.error) {
       addMessage('system', `Erreur: ${state.error}`);
+      setIsCreatingTeam(false);
     }
   }, [state.error]);
 
@@ -172,6 +202,147 @@ export function EnhancedVoiceAssistant({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      {/* Indicateur "Allo" pour conversation active */}
+      <AnimatePresence>
+        {state.isConnected && state.isListening && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ zIndex: 100 }}
+          >
+            <div className="relative">
+              {/* Cercle principal avec animation de pulsation */}
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="w-64 h-64 rounded-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 backdrop-blur-md border-4 border-white/20 shadow-2xl flex items-center justify-center"
+              >
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{ 
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  className="w-48 h-48 rounded-full bg-gradient-to-br from-purple-600/40 to-pink-600/40 backdrop-blur-sm flex items-center justify-center"
+                >
+                  <motion.div
+                    animate={{ 
+                      rotate: 360
+                    }}
+                    transition={{ 
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "linear"
+                    }}
+                    className="w-32 h-32 rounded-full bg-white/90 shadow-xl flex items-center justify-center"
+                  >
+                    <Phone className="w-16 h-16 text-purple-600" />
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+              
+              {/* Ondes sonores animées */}
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.5, 2],
+                  opacity: [0.6, 0.3, 0]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeOut"
+                }}
+                className="absolute inset-0 rounded-full border-4 border-purple-400"
+              />
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.5, 2],
+                  opacity: [0.6, 0.3, 0]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeOut",
+                  delay: 0.5
+                }}
+                className="absolute inset-0 rounded-full border-4 border-pink-400"
+              />
+              
+              {/* Texte "En conversation" */}
+              <motion.div
+                animate={{ 
+                  opacity: [0.5, 1, 0.5]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap"
+              >
+                <p className="text-2xl font-bold text-white drop-shadow-lg">
+                  En conversation...
+                </p>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+        
+        {/* Indicateur de création d'équipe */}
+        {isCreatingTeam && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ zIndex: 101 }}
+          >
+            <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl p-8 flex flex-col items-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mb-4"
+              >
+                <Users className="w-10 h-10 text-white" />
+              </motion.div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Création de l'équipe en cours
+              </h3>
+              <div className="flex items-center gap-1">
+                <motion.div
+                  animate={{ opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+                  className="w-2 h-2 bg-purple-500 rounded-full"
+                />
+                <motion.div
+                  animate={{ opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }}
+                  className="w-2 h-2 bg-purple-500 rounded-full"
+                />
+                <motion.div
+                  animate={{ opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: 1 }}
+                  className="w-2 h-2 bg-purple-500 rounded-full"
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
       <Card className="w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-brand/10 to-transparent">
