@@ -487,7 +487,7 @@ const renderKanbanContent = () => {
             </div>
             
             <ProjectSelectorNeon
-              projects={kanbanProjects.map(p => ({ ...p, created_at: p.project_date }))}
+              projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
               selectedProjectId={selectedKanbanProjectId}
               onProjectChange={setSelectedKanbanProjectId}
               placeholder="Sélectionner un projet"
@@ -554,7 +554,7 @@ const renderMessagesContent = () => {
                 
                 {/* Sélecteur de projet sur la même ligne */}
                 <ProjectSelectorNeon
-                  projects={messagesProjects.map(p => ({ ...p, created_at: p.project_date }))}
+                  projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
                   selectedProjectId={selectedMessagesProjectId}
                   onProjectChange={setSelectedMessagesProjectId}
                   placeholder="Sélectionner un projet"
@@ -611,7 +611,7 @@ const renderDriveContent = () => {
             </div>
             
             <ProjectSelectorNeon
-              projects={driveProjects.map(p => ({ ...p, created_at: p.project_date }))}
+              projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
               selectedProjectId={selectedDriveProjectId}
               onProjectChange={setSelectedDriveProjectId}
               placeholder="Sélectionner un projet"
@@ -879,7 +879,7 @@ const renderWikiContent = () => {
             
             <div className="flex items-center gap-2">
               <ProjectSelectorNeon
-                projects={wikiProjects.map(p => ({ ...p, created_at: p.project_date }))}
+                projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
                 selectedProjectId={selectedWikiProjectId}
                 onProjectChange={setSelectedWikiProjectId}
                 placeholder="Sélectionner un projet"
