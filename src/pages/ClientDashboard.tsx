@@ -77,6 +77,8 @@ import { useProjectSelector } from "@/hooks/useProjectSelector";
 import ClientMetricsDashboard from "./ClientMetricsDashboard";
 import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
+import { AnimatedBackground } from "@/components/ui/animated-background";
+import { PageHeaderNeon } from "@/components/ui/page-header-neon";
 
 const ClientDashboard = () => {
 const [searchParams, setSearchParams] = useSearchParams();
@@ -383,9 +385,11 @@ const handleProjectDelete = async (project: DbProject) => {
 
 const renderStartContent = () => {
   return (
-    <div className="space-y-8">
-      {/* KPIs Section */}
-      <PageSection title="Vue d'ensemble">
+    <div className="relative">
+      <AnimatedBackground variant="subtle" speed="slow" className="fixed inset-0" />
+      <div className="relative z-10 space-y-8">
+        {/* KPIs Section */}
+        <PageSection title="Vue d'ensemble">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <KPI 
             label="Projets actifs" 
@@ -453,6 +457,7 @@ const renderStartContent = () => {
           </div>
         </PageSection>
       )}
+      </div>
     </div>
   );
 };
@@ -472,33 +477,22 @@ const renderKanbanContent = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header unifié */}
-      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                <Kanban className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-primary-foreground">Tableau Kanban</h2>
-                <p className="text-sm text-primary-foreground/80">Gérez vos tâches et suivez l'avancement du projet</p>
-              </div>
-            </div>
-            
-            <ProjectSelectorNeon
-              projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
-              selectedProjectId={selectedKanbanProjectId}
-              onProjectChange={setSelectedKanbanProjectId}
-              placeholder="Sélectionner un projet"
-              className="w-[280px]"
-              showStatus={true}
-              showDates={false}
-              showTeamProgress={false}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header unifié avec design néon */}
+      <PageHeaderNeon
+        icon={Kanban}
+        title="Tableau Kanban"
+        subtitle="Gérez vos tâches et suivez l'avancement du projet"
+        projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
+        selectedProjectId={selectedKanbanProjectId}
+        onProjectChange={setSelectedKanbanProjectId}
+        projectSelectorConfig={{
+          placeholder: "Sélectionner un projet",
+          showStatus: true,
+          showDates: false,
+          showTeamProgress: false,
+          className: "w-[280px]"
+        }}
+      />
       
       {selectedKanbanProjectId && (
         <ClientKanbanView projectId={selectedKanbanProjectId} />
@@ -524,50 +518,23 @@ const renderMessagesContent = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header moderne avec dégradé néon */}
-      <Card className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
-        <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between gap-4">
-              {/* Section gauche avec icône et titre */}
-              <div className="flex items-center gap-6">
-                {/* Icône animée avec effet néon */}
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
-                  <div className="relative w-14 h-14 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
-                    <MessageSquare className="w-7 h-7 text-white" />
-                  </div>
-                </div>
-                
-                {/* Titre et sous-titre */}
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold text-white">
-                      Messagerie
-                    </h2>
-                    <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs px-2 py-0.5 animate-pulse">
-                      En ligne
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-400 mt-1">Communication en temps réel avec votre équipe</p>
-                </div>
-                
-                {/* Sélecteur de projet sur la même ligne */}
-                <ProjectSelectorNeon
-                  projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
-                  selectedProjectId={selectedMessagesProjectId}
-                  onProjectChange={setSelectedMessagesProjectId}
-                  placeholder="Sélectionner un projet"
-                  className="w-[280px]"
-                  showStatus={true}
-                  showDates={true}
-                  showTeamProgress={false}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </div>
-      </Card>
+      {/* Header unifié avec design néon */}
+      <PageHeaderNeon
+        icon={MessageSquare}
+        title="Messagerie"
+        subtitle="Communication en temps réel avec votre équipe"
+        badge={{ text: "En ligne", animate: true }}
+        projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
+        selectedProjectId={selectedMessagesProjectId}
+        onProjectChange={setSelectedMessagesProjectId}
+        projectSelectorConfig={{
+          placeholder: "Sélectionner un projet",
+          showStatus: true,
+          showDates: true,
+          showTeamProgress: false,
+          className: "w-[280px]"
+        }}
+      />
       
       {/* Zone de messagerie */}
       {selectedMessagesProjectId && (
@@ -596,33 +563,22 @@ const renderDriveContent = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header unifié */}
-      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                <Cloud className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-primary-foreground">Drive partagé</h2>
-                <p className="text-sm text-primary-foreground/80">Stockage et partage de fichiers du projet</p>
-              </div>
-            </div>
-            
-            <ProjectSelectorNeon
-              projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
-              selectedProjectId={selectedDriveProjectId}
-              onProjectChange={setSelectedDriveProjectId}
-              placeholder="Sélectionner un projet"
-              className="w-[280px]"
-              showStatus={true}
-              showDates={false}
-              showTeamProgress={false}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header unifié avec design néon */}
+      <PageHeaderNeon
+        icon={Cloud}
+        title="Drive partagé"
+        subtitle="Stockage et partage de fichiers du projet"
+        projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
+        selectedProjectId={selectedDriveProjectId}
+        onProjectChange={setSelectedDriveProjectId}
+        projectSelectorConfig={{
+          placeholder: "Sélectionner un projet",
+          showStatus: true,
+          showDates: false,
+          showTeamProgress: false,
+          className: "w-[280px]"
+        }}
+      />
       
       {selectedDriveProjectId && (
         <Card noPadding>
@@ -637,22 +593,13 @@ const renderTemplatesContent = () => {
   if (!categories || categories.length === 0) {
     return (
       <div className="space-y-6">
-        {/* Header moderne avec gradient */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 p-8 text-white">
-          <div className="absolute inset-0 bg-black/10" />
-          <div className="relative z-10">
-            <h1 className="text-4xl font-bold mb-3 flex items-center gap-3">
-              <Rocket className="h-10 w-10" />
-              Bibliothèque de Templates
-            </h1>
-            <p className="text-lg opacity-90">
-              Démarrez rapidement avec nos modèles de projets préconfigurés
-            </p>
-          </div>
-          {/* Motif décoratif */}
-          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-          <div className="absolute -left-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-        </div>
+        {/* Header avec design Neon cohérent */}
+        <PageHeaderNeon
+          icon={Rocket}
+          title="Bibliothèque de Templates"
+          subtitle="Démarrez rapidement avec nos modèles de projets préconfigurés"
+          showProjectSelector={false}
+        />
 
         <Card className="border-0 shadow-lg">
           <CardContent className="p-12 text-center">
@@ -707,22 +654,13 @@ const renderTemplatesContent = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header moderne avec gradient */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 p-8 text-white">
-        <div className="absolute inset-0 bg-black/10" />
-        <div className="relative z-10">
-          <h1 className="text-4xl font-bold mb-3 flex items-center gap-3">
-            <Rocket className="h-10 w-10" />
-            Bibliothèque de Templates
-          </h1>
-          <p className="text-lg opacity-90">
-            {templates.length} modèles disponibles dans {categories.length} catégories
-          </p>
-        </div>
-        {/* Motif décoratif */}
-        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute -left-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-      </div>
+      {/* Header avec design Neon cohérent */}
+      <PageHeaderNeon
+        icon={Rocket}
+        title="Bibliothèque de Templates"
+        subtitle={`${templates.length} modèles disponibles dans ${categories.length} catégories`}
+        showProjectSelector={false}
+      />
 
       {/* Catégories et templates */}
       <div className="space-y-10">
@@ -735,7 +673,7 @@ const renderTemplatesContent = () => {
               {/* Header de catégorie moderne avec gradient dynamique */}
               <div className="flex items-center gap-4">
                 <div 
-                  className="p-3 rounded-xl shadow-lg text-white"
+                  className="p-3 rounded-xl shadow-md text-white"
                   style={{ 
                     background: category.color || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   }}
@@ -758,7 +696,7 @@ const renderTemplatesContent = () => {
                 {categoryTemplates.map((template) => (
                   <Card 
                     key={template.id} 
-                    className="group relative overflow-hidden border-border hover:border-purple-500/50 dark:hover:border-purple-400/50 transition-all duration-300 hover:shadow-xl cursor-pointer"
+                    className="group relative overflow-hidden border-border hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-300 hover:shadow-lg cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/project/template-preview?template=${template.id}`);
@@ -863,45 +801,34 @@ const renderWikiContent = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header unifié */}
-      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-primary-foreground">Wiki collaboratif</h2>
-                <p className="text-sm text-primary-foreground/80">Documentation et base de connaissances du projet</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <ProjectSelectorNeon
-                projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
-                selectedProjectId={selectedWikiProjectId}
-                onProjectChange={setSelectedWikiProjectId}
-                placeholder="Sélectionner un projet"
-                className="w-[280px]"
-                showStatus={true}
-                showDates={false}
-                showTeamProgress={false}
-              />
-              
-              {selectedWikiProjectId && (
-                <Button
+      {/* Header unifié avec design néon */}
+      <PageHeaderNeon
+        icon={BookOpen}
+        title="Wiki collaboratif"
+        subtitle="Documentation et base de connaissances du projet"
+        projects={playProjects.map(p => ({ ...p, created_at: p.project_date }))}
+        selectedProjectId={selectedWikiProjectId}
+        onProjectChange={setSelectedWikiProjectId}
+        projectSelectorConfig={{
+          placeholder: "Sélectionner un projet",
+          showStatus: true,
+          showDates: false,
+          showTeamProgress: false,
+          className: "w-[280px]"
+        }}
+      >
+        {selectedWikiProjectId && (
+          <div className="flex items-center gap-2">
+            <Button
                   variant="secondary"
                   className="bg-background/20 hover:bg-background/30 text-primary-foreground border-0"
                   onClick={() => setIsWikiFullscreen(!isWikiFullscreen)}
                 >
                   {isWikiFullscreen ? 'Réduire' : 'Plein écran'}
                 </Button>
-              )}
-            </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </PageHeaderNeon>
       
       {selectedWikiProjectId && (
         <div className={isWikiFullscreen ? 'fixed inset-0 bg-background z-50 p-4' : ''}>

@@ -601,7 +601,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   return (
     <>
-      <Card className="group relative bg-white border border-[#ECEEF1] rounded-2xl p-6 shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
+      <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-purple-600/10 via-pink-600/10 to-blue-600/10 dark:from-purple-600/20 dark:via-pink-600/20 dark:to-blue-600/20 p-[1px] rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/25 hover:scale-[1.02]">
+        <div className="relative bg-white dark:bg-gradient-to-br dark:from-[#0f172a] dark:via-[#1e1b4b] dark:to-[#312e81] rounded-2xl p-6">
         
         <div className="space-y-4">
           {/* Header */}
@@ -609,20 +610,20 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             <div className="flex-1 min-w-0">
               {(project.status === 'pause' || project.status === 'nouveaux') && (
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge className="bg-[#F1F3F5] text-[#6B7280] text-xs font-medium px-2 py-1 rounded">
+                  <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium px-2 py-1 rounded shadow-md shadow-purple-500/30">
                     New
                   </Badge>
                 </div>
               )}
-              <h3 className="text-xl font-bold text-[#0E0F12] line-clamp-1">{project.title}</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-1">{project.title}</h3>
               {project.description && (
-                <p className="text-sm text-[#6B7280] line-clamp-1 mt-1">{project.description}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1 mt-1">{project.description}</p>
               )}
             </div>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-[#6B7280] hover:text-[#0E0F12] hover:bg-[#F7F8FA] rounded">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded">
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -723,28 +724,28 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           {/* Meta pills with price */}
           <div className="flex flex-wrap gap-3">
             {/* Budget */}
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
-              <Euro className="h-4 w-4 text-[#7B3EF4]" />
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20 border border-purple-500/20">
+              <Euro className="h-4 w-4 text-purple-600 dark:text-purple-400" />
               <div className="flex items-center gap-1">
-                <span className="text-xs text-[#6B7280] uppercase">Budget</span>
-                <span className="text-sm font-medium text-[#0E0F12]">{formatCurrency(project.clientBudget)}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400 uppercase">Budget</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(project.clientBudget)}</span>
               </div>
             </div>
             
             {/* Date */}
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
-              <Calendar className="h-4 w-4 text-[#7B3EF4]" />
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500/10 to-cyan-500/10 dark:from-blue-500/20 dark:to-cyan-500/20 border border-blue-500/20">
+              <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <div className="flex items-center gap-1">
-                <span className="text-xs text-[#6B7280] uppercase">Début</span>
-                <span className="text-sm font-medium text-[#0E0F12]">{formatDate(project.date)}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400 uppercase">Début</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(project.date)}</span>
               </div>
             </div>
 
             {/* Prix total par minute */}
             {resourceAssignments.length > 0 && (
-              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
-                <Euro className="h-4 w-4 text-[#7B3EF4]" />
-                <span className="text-sm font-medium text-[#0E0F12]">
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20 border border-green-500/20">
+                <Euro className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {calculateTotalPricePerMinute().toFixed(2)}€/min
                 </span>
               </div>
@@ -752,9 +753,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
             {/* Fichiers attachés */}
             {projectFiles.length > 0 && (
-              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F8FA] border border-[#ECEEF1]">
-                <Paperclip className="h-4 w-4 text-[#7B3EF4]" />
-                <span className="text-sm font-medium text-[#0E0F12]">
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/20 border border-orange-500/20">
+                <Paperclip className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {projectFiles.length} fichier{projectFiles.length > 1 ? 's' : ''} attaché{projectFiles.length > 1 ? 's' : ''}
                 </span>
               </div>
@@ -765,12 +766,12 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           {resourceAssignments.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6B7280]">{bookingProgress.text}</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">{bookingProgress.text}</span>
               </div>
               
-              <div className="w-full bg-[#E7EAF0] rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
                 <div 
-                  className="h-1.5 bg-[#7B3EF4] transition-all duration-300"
+                  className="h-1.5 bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
                   style={{ width: `${bookingProgress.percentage}%` }}
                 />
               </div>
@@ -840,7 +841,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                       <Button
                         onClick={handleBookingTeam}
                         disabled={isBookingTeam || isBookingRequested}
-                        className="h-11 px-5 bg-[#7B3EF4] hover:bg-[#6A35D3] text-white rounded-full shadow-[0_6px_20px_rgba(123,62,244,0.18)] transition-all duration-200 font-medium"
+                        className="h-11 px-5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-full shadow-lg shadow-purple-500/30 transition-all duration-200 font-medium"
                       >
                         {isBookingTeam ? (
                           <>
@@ -865,7 +866,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                       <Button
                         onClick={handleStatusToggle}
                         disabled={isSyncing}
-                        className="h-11 px-5 bg-[#7B3EF4] hover:bg-[#6A35D3] text-white rounded-full shadow-[0_6px_20px_rgba(123,62,244,0.18)] transition-all duration-200 font-medium"
+                        className="h-11 px-5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-full shadow-lg shadow-purple-500/30 transition-all duration-200 font-medium"
                       >
                         {isSyncing ? (
                           <>
@@ -899,7 +900,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               <Button
                 onClick={handleStatusToggle}
                 disabled={isSyncing}
-                className="h-11 px-5 bg-[#7B3EF4] hover:bg-[#6A35D3] text-white rounded-full shadow-[0_6px_20px_rgba(123,62,244,0.18)] transition-all duration-200 font-medium"
+                className="h-11 px-5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-full shadow-lg shadow-purple-500/30 transition-all duration-200 font-medium"
               >
                 {isSyncing ? (
                   <>
@@ -914,6 +915,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               </Button>
             )}
           </div>
+        </div>
         </div>
       </Card>
 

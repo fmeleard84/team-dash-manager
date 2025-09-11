@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
 import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { UserSelectNeon } from '@/components/ui/user-select-neon';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 import {
   AreaChart,
   Area,
@@ -168,76 +169,57 @@ const ClientMetricsDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters - Design system cohérent */}
-      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-primary-foreground">Métriques en temps réel</h2>
-                  <p className="text-sm text-primary-foreground/80">Suivi des coûts et de l'activité</p>
-                </div>
-              </div>
-              
-              {/* Filters */}
-              <div className="flex flex-wrap items-center gap-2">
-                <ProjectSelectorNeon
-                  projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...sortedProjects.map(p => ({ ...p, created_at: p.created_at }))]}
-                  selectedProjectId={selectedProjectId}
-                  onProjectChange={setSelectedProjectId}
-                  placeholder="Tous les projets"
-                  className="w-[280px]"
-                  showStatus={false}
-                  showDates={true}
-                  showTeamProgress={false}
-                />
-                
-                <UserSelectNeon
-                  users={uniqueCandidates.map(candidate => ({
-                    id: candidate.id,
-                    name: candidate.name,
-                    role: 'Candidat'
-                  }))}
-                  selectedUserId={selectedCandidateId}
-                  onUserChange={setSelectedCandidateId}
-                  placeholder="Toute l'équipe"
-                  showAll={true}
-                  allLabel="Toute l'équipe"
-                  className="w-[220px]"
-                  disabled={uniqueCandidates.length === 0}
-                />
+      {/* Header unifié avec design néon */}
+      <PageHeaderNeon
+        icon={Activity}
+        title="Métriques en temps réel"
+        subtitle="Suivi des coûts et de l'activité"
+        badge={{ text: "Temps réel", animate: true }}
+        showProjectSelector={false}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <ProjectSelectorNeon
+            projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...sortedProjects.map(p => ({ ...p, created_at: p.created_at }))]}
+            selectedProjectId={selectedProjectId}
+            onProjectChange={setSelectedProjectId}
+            placeholder="Tous les projets"
+            className="w-[280px]"
+            showStatus={false}
+            showDates={true}
+            showTeamProgress={false}
+          />
+          
+          <UserSelectNeon
+            users={uniqueCandidates.map(candidate => ({
+              id: candidate.id,
+              name: candidate.name,
+              role: 'Candidat'
+            }))}
+            selectedUserId={selectedCandidateId}
+            onUserChange={setSelectedCandidateId}
+            placeholder="Toute l'équipe"
+            showAll={true}
+            allLabel="Toute l'équipe"
+            className="w-[220px]"
+            disabled={uniqueCandidates.length === 0}
+          />
 
-                {(selectedProjectId !== 'all' || selectedCandidateId !== 'all') && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="bg-background/20 hover:bg-background/30 text-primary-foreground border-0"
-                    onClick={() => {
-                      setSelectedProjectId('all');
-                      setSelectedCandidateId('all');
-                    }}
-                  >
-                    <Filter className="w-3 h-3 mr-1" />
-                    Réinitialiser
-                  </Button>
-                )}
-              </div>
-            </div>
-            
-            <Badge 
-              variant="secondary"
-              className="self-start bg-background/20 text-primary-foreground border-background/20"
+          {(selectedProjectId !== 'all' || selectedCandidateId !== 'all') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="bg-white/10 hover:bg-white/20 text-white border border-purple-500/30"
+              onClick={() => {
+                setSelectedProjectId('all');
+                setSelectedCandidateId('all');
+              }}
             >
-              <div className="w-2 h-2 bg-primary-foreground rounded-full mr-2 animate-pulse"></div>
-              Temps réel
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
+              <Filter className="w-3 h-3 mr-1" />
+              Réinitialiser
+            </Button>
+          )}
+        </div>
+      </PageHeaderNeon>
 
       {/* Main Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

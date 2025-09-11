@@ -74,6 +74,7 @@ import { TimeTrackerSimple } from "@/components/time-tracking/TimeTrackerSimple"
 import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
 import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
+import { AnimatedBackground } from "@/components/ui/animated-background";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
@@ -226,7 +227,9 @@ const CandidateDashboard = () => {
 
   const renderProjectsContent = () => {
     return (
-      <div className="space-y-8">
+      <div className="relative">
+        <AnimatedBackground variant="subtle" speed="slow" className="fixed inset-0" />
+        <div className="relative z-10 space-y-8">
         {/* KPIs avec design néon */}
         <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
           <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
@@ -332,6 +335,7 @@ const CandidateDashboard = () => {
               onAssignmentUpdate={() => setAssignmentTrigger(prev => prev + 1)}
             />
           </div>
+        </div>
         </div>
       </div>
     );

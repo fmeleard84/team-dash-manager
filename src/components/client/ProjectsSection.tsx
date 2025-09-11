@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadixProjectCard } from '@/components/RadixProjectCard';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 import { 
   Plus, 
   Rocket, 
@@ -161,55 +162,46 @@ export function ProjectsSection({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="mt-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="flex items-center gap-3 text-4xl font-extrabold text-foreground">
-              <FolderOpen className="h-9 w-9 text-purple-600 dark:text-purple-400 fill-current" />
-              Mes projets
-            </h1>
-            <p className="mt-2 text-lg text-muted-foreground">
-              {filteredProjects.length} projet{filteredProjects.length > 1 ? 's' : ''} 
-              {selectedFilters.length > 0 && ` • Filtré${filteredProjects.length > 1 ? 's' : ''}`}
-            </p>
-          </div>
+      {/* Header avec design Neon cohérent */}
+      <PageHeaderNeon
+        icon={FolderOpen}
+        title="Mes projets"
+        subtitle={`${filteredProjects.length} projet${filteredProjects.length > 1 ? 's' : ''}${selectedFilters.length > 0 ? ` • Filtré${filteredProjects.length > 1 ? 's' : ''}` : ''}`}
+        showProjectSelector={false}
+      >
+        <div className="flex gap-3">
+          <Button 
+            variant="outline"
+            className="border-gray-300 dark:border-gray-600"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Filtres
+            {selectedFilters.length > 0 && (
+              <Badge className="ml-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                {selectedFilters.length}
+              </Badge>
+            )}
+          </Button>
           
-          {/* Actions */}
-          <div className="flex gap-3">
-            <Button 
-              variant="outline"
-              className="h-11 px-4"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Filtres
-              {selectedFilters.length > 0 && (
-                <Badge className="ml-2 bg-purple-600 text-white">
-                  {selectedFilters.length}
-                </Badge>
-              )}
-            </Button>
-            
-            <Button 
-              className="h-11 px-6 text-sm font-semibold bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
-              onClick={onCreateProject}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Créer un projet
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="h-11 px-6 text-sm font-semibold border-2 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 hover:border-purple-300 dark:hover:border-purple-700 rounded-full transform hover:-translate-y-0.5 transition-all duration-200"
-              onClick={onViewTemplates}
-            >
-              <Rocket className="w-4 h-4 mr-2" />
-              Explorer les templates
-            </Button>
-          </div>
+          <Button 
+            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium shadow-lg"
+            onClick={onCreateProject}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Créer un projet
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            className="border-gray-300 dark:border-gray-600"
+            onClick={onViewTemplates}
+          >
+            <Rocket className="w-4 h-4 mr-2" />
+            Explorer les templates
+          </Button>
         </div>
-      </div>
+      </PageHeaderNeon>
 
       {/* Barre de filtres */}
       {showFilters && (

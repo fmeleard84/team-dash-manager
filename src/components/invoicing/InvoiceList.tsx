@@ -49,6 +49,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
 import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 
 interface InvoiceListProps {
   projectId?: string;
@@ -304,53 +305,43 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters - Design system cohérent */}
-      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                <Receipt className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-primary-foreground">Gestion des factures</h2>
-                <p className="text-sm text-primary-foreground/80">Suivi et paiement des prestations</p>
-              </div>
-            </div>
-            
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2">
-                <DatePicker
-                  value={startDate}
-                  onChange={setStartDate}
-                  placeholder="Date début"
-                  className="w-[200px] bg-background/95 border-background/20"
-                />
-                <span className="text-primary-foreground/60">-</span>
-                <DatePicker
-                  value={endDate}
-                  onChange={setEndDate}
-                  placeholder="Date fin"
-                  className="w-[200px] bg-background/95 border-background/20"
-                />
-              </div>
-              
-              {/* Project filter with universal selector */}
-              <ProjectSelectorNeon
-                projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...projects.map(p => ({ ...p, created_at: p.project_date }))]}
-                selectedProjectId={selectedProject}
-                onProjectChange={setSelectedProject}
-                placeholder="Tous les projets"
-                className="w-[280px]"
-                showStatus={false}
-                showDates={true}
-                showTeamProgress={false}
-              />
-            </div>
+      {/* Header unifié avec design néon */}
+      <PageHeaderNeon
+        icon={Receipt}
+        title="Gestion des factures"
+        subtitle="Suivi et paiement des prestations"
+        showProjectSelector={false}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <DatePicker
+              value={startDate}
+              onChange={setStartDate}
+              placeholder="Date début"
+              className="w-[200px] bg-white/10 dark:bg-black/20 backdrop-blur-sm border-purple-500/30 text-white"
+            />
+            <span className="text-gray-400">-</span>
+            <DatePicker
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="Date fin"
+              className="w-[200px] bg-white/10 dark:bg-black/20 backdrop-blur-sm border-purple-500/30 text-white"
+            />
           </div>
-        </CardContent>
-      </Card>
+          
+          {/* Project filter with universal selector */}
+          <ProjectSelectorNeon
+            projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...projects.map(p => ({ ...p, created_at: p.project_date }))]}
+            selectedProjectId={selectedProject}
+            onProjectChange={setSelectedProject}
+            placeholder="Tous les projets"
+            className="w-[280px]"
+            showStatus={false}
+            showDates={true}
+            showTeamProgress={false}
+          />
+        </div>
+      </PageHeaderNeon>
 
       {/* Summary card - only show if there are records */}
       {trackingRecords.length > 0 && (

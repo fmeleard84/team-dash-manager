@@ -15,10 +15,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/ui/components/Card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Download, Upload, Copy, Euro, Users } from 'lucide-react';
+import { ArrowLeft, Save, Download, Upload, Copy, Euro, Users, FileText } from 'lucide-react';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 
 interface HRProfile {
   id: string;
@@ -273,78 +274,93 @@ const TemplateFlowSimple = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header Material Design avec gradient */}
-      <div className="relative bg-gradient-to-r from-purple-600 to-purple-500 shadow-lg">
-        <div className="flex items-center justify-between p-6">
+      {/* Header avec design Neon cohérent */}
+      <div className="p-6">
+        <PageHeaderNeon
+          icon={FileText}
+          title="Éditeur de Template"
+          subtitle={templateName}
+          showProjectSelector={false}
+        >
           <div className="flex items-center gap-4">
             <Button
-              variant="ghost"
-              className="text-white hover:bg-white/20 border-white/30"
+              variant="outline"
               onClick={() => navigate('/admin/resources')}
+              className="border-gray-300 dark:border-gray-600"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Retour
             </Button>
-            <div className="text-white">
-              <h1 className="text-2xl font-bold">Éditeur de Template</h1>
-              <p className="text-purple-100">
-                {templateName}
-              </p>
+            
+            {/* Prix total avec design moderne */}
+            {hrResources.size > 0 && (
+              <Card className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-700">
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500/20 dark:bg-purple-500/30 rounded-lg">
+                      <Euro className="w-5 h-5 text-purple-700 dark:text-purple-300" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {calculateTotalPrice().toFixed(2)}€/min
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {hrResources.size} membre{hrResources.size > 1 ? 's' : ''} d'équipe
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={injectToParent}
+                disabled={nodes.length === 0}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium shadow-lg"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Sauvegarder
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={copyToClipboard}
+                disabled={nodes.length === 0}
+                className="border-gray-300 dark:border-gray-600"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copier
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={exportToJSON}
+                disabled={nodes.length === 0}
+                className="border-gray-300 dark:border-gray-600"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exporter
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById('import-file')?.click()}
+                className="border-gray-300 dark:border-gray-600"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Importer
+              </Button>
+              <input
+                id="import-file"
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={importFromJSON}
+              />
             </div>
           </div>
-        
-          {/* Prix total avec design moderne */}
-          {hrResources.size > 0 && (
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
-              <CardContent className="py-3 px-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <Euro className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {calculateTotalPrice().toFixed(2)}€/min
-                    </p>
-                    <p className="text-sm opacity-90">
-                      {hrResources.size} membre{hrResources.size > 1 ? 's' : ''} d'équipe
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={injectToParent}
-              disabled={nodes.length === 0}
-              className="bg-white text-purple-600 hover:bg-purple-50 font-medium shadow-lg"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Sauvegarder
-            </Button>
-
-            <Button
-              variant="ghost"
-              className="text-white hover:bg-white/20 border-white/30"
-              onClick={copyToClipboard}
-              disabled={nodes.length === 0}
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Copier
-            </Button>
-            
-            <Button
-              variant="ghost"
-              className="text-white hover:bg-white/20 border-white/30"
-              onClick={exportToJSON}
-              disabled={nodes.length === 0}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Exporter
-            </Button>
-          </div>
-        </div>
+        </PageHeaderNeon>
       </div>
 
       {/* Main Content - 3 panels avec Material Design */}

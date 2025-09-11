@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,7 @@ const CreateProjectModal = ({
   onProjectCreated,
 }: CreateProjectModalProps) => {
   console.log('CreateProjectModal rendered with isOpen:', isOpen);
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   // Get today's date for minimum date validation
@@ -132,6 +134,9 @@ const CreateProjectModal = ({
       
       onClose();
       onProjectCreated?.(project.id);
+      
+      // Naviguer vers la page ReactFlow du projet
+      navigate(`/project/${project.id}`);
 
     } catch (error) {
       console.error("Erreur inattendue:", error);

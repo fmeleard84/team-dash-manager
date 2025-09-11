@@ -453,180 +453,169 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
   }
 
   return (
-    <div className="w-80 bg-card border-l overflow-y-auto">
-      <Card className="rounded-none border-0">
-        <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-500 text-white">
-          <CardTitle className="text-lg">Configuration</CardTitle>
-          {/* Prix calculé */}
-          <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Euro className="w-5 h-5" />
-                <span className="text-sm">Tarif calculé</span>
-              </div>
-              <div className="text-2xl font-bold">
-                {calculatedPrice.toFixed(2)}€/min
+    <div className="w-96 bg-card border-l overflow-y-auto">
+      <div className="bg-gradient-to-br from-purple-200 via-pink-200 to-blue-200 dark:from-purple-600 dark:via-pink-600 dark:to-blue-600 p-[1px]">
+        <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-[#0f172a] dark:via-[#1e1b4b] dark:to-[#312e81]">
+          <div className="p-4">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Configuration</h3>
+            {/* Prix calculé avec design néon */}
+            <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400 dark:from-purple-500 dark:via-pink-500 dark:to-blue-500 rounded-lg flex items-center justify-center">
+                    <Euro className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tarif calculé</span>
+                </div>
+                <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  {calculatedPrice.toFixed(2)}€/min
+                </div>
               </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-6 space-y-6">
+        </div>
+      </div>
+      
+      <div className="p-6 space-y-6">
 
       {/* Options pour les ressources humaines seulement */}
       {!selectedResource?.is_ai && (
         <>
           {/* Séniorité */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                Séniorité
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={seniority} onValueChange={handleSeniorityChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="junior">Junior</SelectItem>
-                  <SelectItem value="intermediate">Intermédiaire</SelectItem>
-                  <SelectItem value="senior">Senior</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
+              <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              Séniorité
+            </Label>
+            <Select value={seniority} onValueChange={handleSeniorityChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="junior">Junior</SelectItem>
+                <SelectItem value="intermediate">Intermédiaire</SelectItem>
+                <SelectItem value="senior">Senior</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Langues */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                Langues
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Select key={`lang-${selectedResource?.id}`} value="" onValueChange={addLanguage}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Ajouter une langue" />
-                </SelectTrigger>
-                <SelectContent>
-                  {languages
-                    .filter(lang => !selectedLanguages.includes(lang.id))
-                    .map(language => (
-                      <SelectItem key={language.id} value={language.id}>
-                        {language.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <div className="flex flex-wrap gap-2">
-                {selectedLanguages.map(langId => {
-                  const language = languages.find(l => l.id === langId);
-                  return language ? (
-                    <Badge key={langId} className="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 flex items-center gap-1">
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
+              <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              Langues
+            </Label>
+            <Select key={`lang-${selectedResource?.id}`} value="" onValueChange={addLanguage}>
+              <SelectTrigger>
+                <SelectValue placeholder="Ajouter une langue" />
+              </SelectTrigger>
+              <SelectContent>
+                {languages
+                  .filter(lang => !selectedLanguages.includes(lang.id))
+                  .map(language => (
+                    <SelectItem key={language.id} value={language.id}>
                       {language.name}
-                      <button
-                        className="ml-1 hover:text-purple-900 dark:hover:text-purple-100"
-                        onClick={() => removeLanguage(langId)}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ) : null;
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <div className="flex flex-wrap gap-2">
+              {selectedLanguages.map(langId => {
+                const language = languages.find(l => l.id === langId);
+                return language ? (
+                  <Badge key={langId} className="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 flex items-center gap-1">
+                    {language.name}
+                    <button
+                      className="ml-1 hover:text-purple-900 dark:hover:text-purple-100"
+                      onClick={() => removeLanguage(langId)}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ) : null;
+              })}
+            </div>
+          </div>
 
           {/* Expertises */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Code className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                Expertises
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Select key={`exp-${selectedResource?.id}`} value="" onValueChange={addExpertise}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Ajouter une expertise" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expertises
-                    .filter(exp => !selectedExpertises.includes(exp.id))
-                    .map(expertise => (
-                      <SelectItem key={expertise.id} value={expertise.id}>
-                        {expertise.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <div className="flex flex-wrap gap-2">
-                {selectedExpertises.map(expId => {
-                  const expertise = expertises.find(e => e.id === expId);
-                  return expertise ? (
-                    <Badge key={expId} variant="outline" className="border-purple-300 dark:border-purple-700 flex items-center gap-1">
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
+              <Code className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              Expertises
+            </Label>
+            <Select key={`exp-${selectedResource?.id}`} value="" onValueChange={addExpertise}>
+              <SelectTrigger>
+                <SelectValue placeholder="Ajouter une expertise" />
+              </SelectTrigger>
+              <SelectContent>
+                {expertises
+                  .filter(exp => !selectedExpertises.includes(exp.id))
+                  .map(expertise => (
+                    <SelectItem key={expertise.id} value={expertise.id}>
                       {expertise.name}
-                      <button
-                        className="ml-1 hover:text-destructive"
-                        onClick={() => removeExpertise(expId)}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ) : null;
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <div className="flex flex-wrap gap-2">
+              {selectedExpertises.map(expId => {
+                const expertise = expertises.find(e => e.id === expId);
+                return expertise ? (
+                  <Badge key={expId} variant="outline" className="border-purple-300 dark:border-purple-700 flex items-center gap-1">
+                    {expertise.name}
+                    <button
+                      className="ml-1 hover:text-destructive"
+                      onClick={() => removeExpertise(expId)}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ) : null;
+              })}
+            </div>
+          </div>
 
           {/* Bloc d'information sur la séniorité */}
-          <Card className="bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800">
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-3">
-                <Info className="w-5 h-5 text-purple-600 dark:text-purple-400 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-foreground mb-2">Information Séniorité</p>
-                  {seniority === 'junior' && (
-                    <p className="text-xs text-muted-foreground">
-                      Un profil <span className="font-semibold text-foreground">junior</span> a entre 1 et 3 ans d'expérience en moyenne.
-                    </p>
-                  )}
-                  {seniority === 'intermediate' && (
-                    <p className="text-xs text-muted-foreground">
-                      Un profil <span className="font-semibold text-foreground">intermédiaire</span> est autonome avec 3-5 ans d'expérience et peut encadrer de petites équipes.
-                    </p>
-                  )}
-                  {seniority === 'senior' && (
-                    <p className="text-xs text-muted-foreground">
-                      Un profil <span className="font-semibold text-foreground">senior</span> est autonome avec 5+ ans d'expérience et peut encadrer des équipes importantes.
-                    </p>
-                  )}
-                </div>
+          <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Information Séniorité</p>
+                {seniority === 'junior' && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Un profil <span className="font-semibold">junior</span> a entre 1 et 3 ans d'expérience en moyenne.
+                  </p>
+                )}
+                {seniority === 'intermediate' && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Un profil <span className="font-semibold">intermédiaire</span> est autonome avec 3-5 ans d'expérience et peut encadrer de petites équipes.
+                  </p>
+                )}
+                {seniority === 'senior' && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Un profil <span className="font-semibold">senior</span> est autonome avec 5+ ans d'expérience et peut encadrer des équipes importantes.
+                  </p>
+                )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </>
       )}
 
       {/* Message pour les ressources IA */}
       {selectedResource?.is_ai && (
-        <Card className="bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800">
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-foreground">
-                  Une ressource IA doit toujours être connectée à une ressource humaine qui la supervise.
-                </p>
-              </div>
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Une ressource IA doit toujours être connectée à une ressource humaine qui la supervise.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 };

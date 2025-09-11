@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { DatePicker } from '@/components/ui/date-picker';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 
 interface PlanningPageProps {
   projects: ProjectWithDate[];
@@ -250,40 +251,28 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Header unifié */}
-      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-primary-foreground">Planning & Calendrier</h2>
-                <p className="text-sm text-primary-foreground/80">Gérez vos rendez-vous et événements projet</p>
-              </div>
-            </div>
-            
-            {/* Sélecteur de projet unifié */}
-            <ProjectSelectorNeon
-              projects={projects.map(p => ({ ...p, created_at: p.project_date }))}
-              selectedProjectId={selectedProject?.id || ''}
-              onProjectChange={(value) => {
-                const project = projects.find(p => p.id === value);
-                if (project) {
-                  console.log('Sélection du projet:', project.title, project.id);
-                  selectProject(project);
-                }
-              }}
-              placeholder="Sélectionner un projet"
-              className="w-[280px]"
-              showStatus={true}
-              showDates={true}
-              showTeamProgress={false}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header unifié avec design néon */}
+      <PageHeaderNeon
+        icon={Calendar}
+        title="Planning & Calendrier"
+        subtitle="Gérez vos rendez-vous et événements projet"
+        projects={projects.map(p => ({ ...p, created_at: p.project_date }))}
+        selectedProjectId={selectedProject?.id || ''}
+        onProjectChange={(value) => {
+          const project = projects.find(p => p.id === value);
+          if (project) {
+            console.log('Sélection du projet:', project.title, project.id);
+            selectProject(project);
+          }
+        }}
+        projectSelectorConfig={{
+          placeholder: "Sélectionner un projet",
+          showStatus: true,
+          showDates: true,
+          showTeamProgress: false,
+          className: "w-[280px]"
+        }}
+      />
 
       {/* Contenu principal */}
       {selectedProject ? (

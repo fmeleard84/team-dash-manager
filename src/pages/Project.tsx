@@ -30,6 +30,7 @@ import HRResourceNode from '@/components/hr/HRResourceNode';
 import ClientNode from '@/components/hr/ClientNode';
 import SimpleXyflowEdge from '@/components/hr/SimpleXyflowEdge';
 import { EdgeDetails } from '@/components/hr/EdgeDetails';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 
 interface Project {
   id: string;
@@ -1758,109 +1759,100 @@ const Project = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      {/* Header Material Design avec gradient */}
-      <header className="bg-gradient-to-r from-purple-600 to-purple-500 shadow-lg">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Left section */}
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  if (id === 'template-preview') {
-                    if (window.opener) {
-                      window.close();
-                      return;
-                    }
-                    navigate('/client-dashboard?section=templates');
-                  } else {
-                    navigate('/client-dashboard?section=projects');
-                  }
-                }}
-                className="text-white hover:bg-white/20"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {id === 'template-preview' ? 'Fermer' : 'Retour'}
-              </Button>
-              
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                  <Network className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-white">
-                  <h1 className="text-2xl font-bold">
-                    {id === 'template-preview' ? 'Construisez votre équipe idéale' : project.title}
-                  </h1>
-                  <p className="text-purple-100">
-                    {id === 'template-preview' ? 'Personnalisez ce template selon vos besoins' : 
-                     isArchived ? '🔒 Projet archivé - Lecture seule' : 'Gestion des ressources humaines'}
-                  </p>
-                </div>
-                {isArchived && (
-                  <Badge className="ml-4 bg-orange-500 text-white border-0">
-                    Archivé
-                  </Badge>
-                )}
-              </div>
-            </div>
-            
-            {/* Prix total avec Material Design */}
-            {hrResources.size > 0 && (
-              <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
-                <CardContent className="py-3 px-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/20 rounded-lg">
-                      <Euro className="w-5 h-5" />
+      {/* Header simplifié avec hauteur réduite */}
+      <div className="p-3">
+        <div className="bg-gradient-to-br from-purple-200 via-pink-200 to-blue-200 dark:from-purple-600 dark:via-pink-600 dark:to-blue-600 p-[1px] rounded-xl shadow-lg">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-[#0f172a] dark:via-[#1e1b4b] dark:to-[#312e81] rounded-xl">
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between">
+                {/* Gauche: Bouton retour et titre */}
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (id === 'template-preview') {
+                        if (window.opener) {
+                          window.close();
+                          return;
+                        }
+                        navigate('/client-dashboard?section=templates');
+                      } else {
+                        navigate('/client-dashboard?section=projects');
+                      }
+                    }}
+                    className="hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400 dark:from-purple-500 dark:via-pink-500 dark:to-blue-500 rounded-lg flex items-center justify-center">
+                      <Network className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">
-                        {calculateTotalPrice().toFixed(2)}€/min
-                      </p>
-                      <p className="text-sm opacity-90">
-                        {hrResources.size} ressource{hrResources.size > 1 ? 's' : ''}
-                      </p>
+                      <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+                        {id === 'template-preview' ? 'Construisez votre équipe' : project.title}
+                      </h1>
                     </div>
+                    {isArchived && (
+                      <Badge className="bg-orange-500 text-white text-xs">Archivé</Badge>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-            
-            {/* Right section */}
-            <div className="flex items-center gap-3">
-              {isAdmin && (
-                <>
-                  <Button 
-                    variant="ghost" 
-                    onClick={importJSON}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Importer
-                  </Button>
-                  <Button 
-                    variant="ghost"
-                    onClick={exportJSON}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Exporter
-                  </Button>
-                </>
-              )}
-              {!isArchived && (
-                <Button 
-                  onClick={saveFlow} 
-                  disabled={isSaving || isArchived}
-                  className="bg-white text-purple-600 hover:bg-purple-50 font-medium shadow-lg"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
-                </Button>
-              )}
+                </div>
+                
+                {/* Centre: Prix total */}
+                {hrResources.size > 0 && (
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 px-4 py-1.5 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <Euro className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                      {calculateTotalPrice().toFixed(2)}€/min
+                    </span>
+                    <span className="text-sm text-purple-600 dark:text-purple-400">
+                      • {hrResources.size} ressource{hrResources.size > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Droite: Actions */}
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={importJSON}
+                        className="hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                      >
+                        <Upload className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={exportJSON}
+                        className="hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                  {!isArchived && (
+                    <Button 
+                      size="sm"
+                      onClick={saveFlow} 
+                      disabled={isSaving || isArchived}
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium"
+                    >
+                      <Save className="w-3 h-3 mr-1" />
+                      {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main Content - 3 panels */}
       <div className="flex-1 flex">
@@ -1899,8 +1891,28 @@ const Project = () => {
               maxZoom={2} // Limiter le zoom max
               defaultViewport={{ x: 0, y: 0, zoom: 1 }} // Vue par défaut
             >
-              <Controls />
-              <MiniMap />
+              <Controls 
+                style={{
+                  background: 'rgba(15, 23, 42, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  borderRadius: '12px',
+                  padding: '4px'
+                }}
+                showInteractive={false}
+              />
+              <MiniMap 
+                style={{
+                  background: 'rgba(15, 23, 42, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  borderRadius: '12px'
+                }}
+                maskColor="rgba(139, 92, 246, 0.2)"
+                nodeColor="#8b5cf6"
+                pannable
+                zoomable
+              />
               <Background gap={12} size={1} />
             </ReactFlow>
           </ReactFlowProvider>

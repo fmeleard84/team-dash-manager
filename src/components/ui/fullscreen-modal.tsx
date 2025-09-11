@@ -58,15 +58,17 @@ export function FullScreenModal({
   const modalContent = (
     <div className={cn(
       "fixed inset-0 z-50",
-      "bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81]",
+      "bg-gradient-to-br",
+      "dark:from-[#0f172a] dark:via-[#1e1b4b] dark:to-[#312e81]",
+      "from-gray-50 via-white to-gray-100",
       "animate-in fade-in-0 slide-in-from-bottom-4",
       className
     )}>
       {/* Glassmorphism overlay */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-xl" />
+      <div className="absolute inset-0 dark:bg-black/40 bg-white/60 backdrop-blur-xl" />
       
       {/* Header with neon design */}
-      <div className="relative sticky top-0 z-10 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/20 to-pink-900/20 backdrop-blur-sm">
+      <div className="relative sticky top-0 z-10 border-b dark:border-purple-500/20 border-gray-200 bg-gradient-to-r dark:from-purple-900/20 dark:to-pink-900/20 from-white/80 to-gray-50/80 backdrop-blur-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left side - Back button */}
@@ -77,7 +79,7 @@ export function FullScreenModal({
                   size="sm"
                   onClick={onClose}
                   disabled={preventClose}
-                  className="flex items-center gap-2 text-white hover:bg-white/10 hover:text-white border-purple-500/30"
+                  className="flex items-center gap-2 dark:text-white text-gray-700 dark:hover:bg-white/10 hover:bg-gray-100 dark:hover:text-white hover:text-gray-900 dark:border-purple-500/30 border-gray-200"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   {backButtonText}
@@ -89,7 +91,7 @@ export function FullScreenModal({
                   size="icon"
                   onClick={onClose}
                   disabled={preventClose}
-                  className="text-white hover:bg-white/10 hover:text-white"
+                  className="dark:text-white text-gray-700 dark:hover:bg-white/10 hover:bg-gray-100 dark:hover:text-white hover:text-gray-900"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -116,12 +118,12 @@ export function FullScreenModal({
           {(title || description) && (
             <div className="mb-6">
               {title && (
-                <h1 className="text-3xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold dark:text-white text-gray-900 bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
                   {title}
                 </h1>
               )}
               {description && (
-                <p className="mt-2 text-base text-gray-300">
+                <p className="mt-2 text-base dark:text-gray-300 text-gray-600">
                   {description}
                 </p>
               )}
@@ -130,7 +132,7 @@ export function FullScreenModal({
           
           {/* Main content with glassmorphism container */}
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 shadow-2xl shadow-purple-500/10">
+            <div className="dark:bg-black/20 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border dark:border-purple-500/20 border-gray-200 dark:shadow-2xl dark:shadow-purple-500/10 shadow-lg">
               {children}
             </div>
           </div>
