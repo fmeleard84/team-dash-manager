@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
 import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { useProjectSelector } from '@/hooks/useProjectSelector';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FullScreenModal, ModalActions, useFullScreenModal } from '@/components/ui/fullscreen-modal';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
