@@ -6,6 +6,7 @@ import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, E
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 import { useAuth } from "@/contexts/AuthContext";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { buildFunctionHeaders } from "@/lib/functionAuth";
@@ -1020,12 +1021,24 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   
                   {assignment.booking_status === 'accepted' && assignment.candidate_profiles && (
                     <div className="mt-3 pt-3 border-t">
-                      <div className="text-sm">
-                        <span className="text-gray-500">Candidat assigné: </span>
-                        <span className="font-medium text-gray-900">
-                          {assignment.candidate_profiles.first_name} {assignment.candidate_profiles.last_name}
-                        </span>
-                      </div>
+                      <UserAvatarNeon
+                        user={{
+                          id: assignment.candidate_profiles.id,
+                          firstName: assignment.candidate_profiles.first_name,
+                          lastName: assignment.candidate_profiles.last_name,
+                          jobTitle: profileNames[assignment.profile_id] || assignment.candidate_profiles.position,
+                          seniority: assignment.seniority,
+                          status: 'online',
+                          isValidated: true,
+                          hourlyRate: assignment.calculated_price ? assignment.calculated_price * 60 : undefined
+                        }}
+                        size="sm"
+                        variant="detailed"
+                        showStatus={true}
+                        showRate={true}
+                        showBadges={true}
+                        className="bg-gray-50"
+                      />
                     </div>
                   )}
                   

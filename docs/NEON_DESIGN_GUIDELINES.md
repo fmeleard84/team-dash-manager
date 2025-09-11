@@ -167,3 +167,82 @@ import { motion } from 'framer-motion';
   @apply border border-purple-500/30;
 }
 ```
+
+## 👥 Composants Utilisateur
+
+### UserAvatarNeon
+Composant universel pour l'affichage des utilisateurs avec design néon.
+
+#### Variantes
+- `compact` : Avatar seul
+- `default` : Avatar + nom inline
+- `list` : Format liste horizontal
+- `card` : Format carte vertical
+- `detailed` : Format détaillé avec toutes les infos
+
+#### Utilisation
+```tsx
+import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
+
+// Avatar simple
+<UserAvatarNeon
+  user={{
+    id: '1',
+    firstName: 'Jean',
+    lastName: 'Dupont',
+    role: 'Développeur',
+    seniority: 'senior',
+    status: 'online'
+  }}
+  size="md"
+  variant="list"
+  showStatus={true}
+  showRate={true}
+/>
+```
+
+#### Props
+- `user`: UserData - Données de l'utilisateur
+- `size`: 'xs' | 'sm' | 'md' | 'lg' | 'xl' - Taille de l'avatar
+- `variant`: Type d'affichage
+- `showName`: Afficher le nom
+- `showRole`: Afficher le rôle
+- `showStatus`: Afficher le statut en ligne
+- `showRate`: Afficher le taux horaire/journalier
+- `showBadges`: Afficher les badges (validé, team lead)
+
+### UserSelectNeon
+Sélecteur d'utilisateurs avec design néon pour filtres et assignations.
+
+#### Utilisation
+```tsx
+import { UserSelectNeon } from '@/components/ui/user-select-neon';
+
+<UserSelectNeon
+  users={teamMembers}
+  selectedUserId={selectedUser}
+  onUserChange={setSelectedUser}
+  placeholder="Sélectionner un utilisateur"
+  showAll={true}
+  allLabel="Tous les utilisateurs"
+/>
+```
+
+#### Intégrations
+- **Messagerie** : Liste des membres et avatars dans les messages
+- **Cards de projet** : Section "Constitution de l'équipe"
+- **Planning** : Liste des participants aux événements
+- **Kanban** : Filtre par utilisateur assigné
+- **Modal Voir l'équipe** : Affichage détaillé des membres
+
+### Caractéristiques du design
+- **Gradients automatiques** basés sur la séniorité
+  - Junior : vert à émeraude
+  - Confirmé : bleu à cyan
+  - Senior : purple à pink
+  - Expert : orange à rouge
+  - Lead : jaune à ambre
+- **Statut en ligne** avec indicateur animé pulse
+- **Badges** pour validation et team lead
+- **Effet glassmorphism** sur les containers
+- **Bordures néon** purple/pink avec glow

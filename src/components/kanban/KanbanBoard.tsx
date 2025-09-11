@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { UserSelectNeon } from '@/components/ui/user-select-neon';
+import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 
 interface KanbanBoardProps {
   board: KanbanBoardType;
@@ -192,23 +194,18 @@ export const KanbanBoard = ({
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 <span>Assigné à:</span>
-                <Select
-                  value={userFilter || ''}
-                  onValueChange={(value) => onUserFilterChange?.(value)}
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Tous" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les utilisateurs</SelectItem>
-                    {/* Use project members instead of board members */}
-                    {projectMembers.filter(member => member && member.trim() !== '').map((member) => (
-                      <SelectItem key={member} value={member}>
-                        {member}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <UserSelectNeon
+                  users={projectMembers.filter(member => member && member.trim() !== '').map(member => ({
+                    id: member,
+                    name: member
+                  }))}
+                  selectedUserId={userFilter}
+                  onUserChange={(value) => onUserFilterChange?.(value)}
+                  placeholder="Tous"
+                  showAll={true}
+                  allLabel="Tous les utilisateurs"
+                  className="w-48"
+                />
               </div>
               
               <div className="flex items-center gap-2">

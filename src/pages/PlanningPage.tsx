@@ -13,6 +13,7 @@ import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
 import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { useProjectSelector } from '@/hooks/useProjectSelector';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 import { FullScreenModal, ModalActions, useFullScreenModal } from '@/components/ui/fullscreen-modal';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -692,13 +693,17 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
                             }}
                             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                           />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{member.name}</p>
-                            <p className="text-xs text-muted-foreground">{member.email}</p>
-                          </div>
-                          <Badge variant="outline" className="text-xs">
-                            {member.role === 'client' ? 'Client' : 'Équipe'}
-                          </Badge>
+                          <UserAvatarNeon
+                            user={{
+                              id: member.id,
+                              name: member.name,
+                              email: member.email,
+                              role: member.role === 'client' ? 'Client' : 'Équipe'
+                            }}
+                            size="sm"
+                            variant="list"
+                            className="flex-1"
+                          />
                         </label>
                       ))}
                     </div>
