@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
+import { UserSelectNeon } from "@/components/ui/user-select-neon";
+import { UserAvatarNeon } from "@/components/ui/user-avatar-neon";
 import { FileText, Flag, Users, X, CalendarDays, Paperclip, Eye, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { CardComments } from "../CardComments";
@@ -199,11 +201,21 @@ export function CardEditDialog({
                     })}
                   </div>
                 )}
-                {/* Sélecteur de membres avec avatars - caché en mode read-only */}
+                {/* Sélecteur de membres avec design néon - caché en mode read-only */}
                 {!isReadOnlyMode && (
-                  <Select
-                    value=""
-                    onValueChange={(value) => {
+                  <UserSelectNeon
+                    users={projectMembers.filter(m => !card.assignedTo?.includes(m)).map((member) => {
+                      const parts = member.split(' - ');
+                      const name = parts[0];
+                      const role = parts[1] || '';
+                      return {
+                        id: member,
+                        name: name,
+                        role: role
+                      };
+                    })}
+                    selectedUserId=""
+                    onUserChange={(value) => {
                       if (value && !card.assignedTo?.includes(value)) {
                         onCardChange({
                           ...card,
@@ -211,38 +223,9 @@ export function CardEditDialog({
                         });
                       }
                     }}
-                  >
-                    <SelectTrigger className="h-9 border-gray-200">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-gray-400" />
-                        <SelectValue placeholder="Ajouter un membre" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="shadow-lg">
-                      {projectMembers.filter(m => !card.assignedTo?.includes(m)).map((member) => {
-                        const parts = member.split(' - ');
-                        const name = parts[0];
-                        const role = parts[1] || '';
-                        const firstName = name.split(' ')[0] || name.split('(')[0] || name;
-                        const initials = firstName.substring(0, 2).toUpperCase();
-                        return (
-                          <SelectItem key={member} value={member}>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="w-6 h-6">
-                                <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-500 text-white">
-                                  {initials}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium">{name}</span>
-                                {role && <span className="text-xs text-gray-500">{role}</span>}
-                              </div>
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Ajouter un membre"
+                    className="w-full"
+                  />
                 )}
               </div>
             </div>

@@ -26,6 +26,7 @@ import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { cn } from '@/lib/utils';
 import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
 import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
+import { UserSelectNeon } from '@/components/ui/user-select-neon';
 import {
   AreaChart,
   Area,
@@ -195,23 +196,20 @@ const ClientMetricsDashboard = () => {
                   showTeamProgress={false}
                 />
                 
-                <Select 
-                  value={selectedCandidateId} 
-                  onValueChange={setSelectedCandidateId}
+                <UserSelectNeon
+                  users={uniqueCandidates.map(candidate => ({
+                    id: candidate.id,
+                    name: candidate.name,
+                    role: 'Candidat'
+                  }))}
+                  selectedUserId={selectedCandidateId}
+                  onUserChange={setSelectedCandidateId}
+                  placeholder="Toute l'équipe"
+                  showAll={true}
+                  allLabel="Toute l'équipe"
+                  className="w-[220px]"
                   disabled={uniqueCandidates.length === 0}
-                >
-                  <SelectTrigger className="w-[200px] bg-background/95 border-background/20">
-                    <SelectValue placeholder="Toute l'équipe" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Toute l'équipe</SelectItem>
-                    {uniqueCandidates.map(candidate => (
-                      <SelectItem key={candidate.id} value={candidate.id}>
-                        {candidate.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
 
                 {(selectedProjectId !== 'all' || selectedCandidateId !== 'all') && (
                   <Button

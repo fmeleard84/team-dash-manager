@@ -325,14 +325,14 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
                   value={startDate}
                   onChange={setStartDate}
                   placeholder="Date début"
-                  className="w-[160px] bg-background/95 border-background/20"
+                  className="w-[200px] bg-background/95 border-background/20"
                 />
                 <span className="text-primary-foreground/60">-</span>
                 <DatePicker
                   value={endDate}
                   onChange={setEndDate}
                   placeholder="Date fin"
-                  className="w-[160px] bg-background/95 border-background/20"
+                  className="w-[200px] bg-background/95 border-background/20"
                 />
               </div>
               
