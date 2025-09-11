@@ -1,6 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
-// @ts-ignore - The package types might not be perfect
-import { RealtimeAgent, RealtimeSession } from '@openai/agents-realtime';
+// Types temporaires pour Realtime API
+interface RealtimeAgent {
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  sendAudio: (audio: ArrayBuffer) => void;
+  mute: () => void;
+  unmute: () => void;
+}
+
+interface RealtimeSession {
+  onMessage: (callback: (message: any) => void) => void;
+  onError: (callback: (error: any) => void) => void;
+  close: () => void;
+}
 import { Button } from "@/ui/components/Button";
 import { Card } from "@/ui/components/Card";
 import { Bot, X, Phone, PhoneOff, Settings, Sparkles, Loader2, AlertCircle, Mic, MicOff } from "lucide-react";

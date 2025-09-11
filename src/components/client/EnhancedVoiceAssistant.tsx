@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, MicOff, X, Volume2, Loader2, Send, Settings, 
-  Bot, Sparkles, Info, ChevronRight, Messagesquare,
+  Bot, Sparkles, Info, ChevronRight, MessageSquare,
   Wand2, Users, Calendar, CheckSquare, Map
 } from 'lucide-react';
 import { Button } from '@/ui/components/Button';
@@ -44,11 +44,11 @@ export function EnhancedVoiceAssistant({
 }: EnhancedVoiceAssistantProps) {
   const [activeTab, setActiveTab] = useState<'voice' | 'text' | 'help'>('voice');
   const [textInput, setTextInput] = useState('');
-  const [Messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedContext, setSelectedContext] = useState(context);
   
-  const MessagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const {
     state,
@@ -275,9 +275,9 @@ export function EnhancedVoiceAssistant({
                     <Mic className="w-12 h-12 text-brand" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold mb-2">Mode Vocal</h3>
+                    <h3 className="text-xl font-semibold mb-2">Mode Vocal (Démo)</h3>
                     <p className="text-muted-foreground max-w-md mx-auto">
-                      Speakingz naturellement avec l'assistant. Il comprend vos demandes et peut effectuer des actions pour vous.
+                      Version de démonstration. Pour une intégration complète avec l'API OpenAI Realtime, configurez un serveur backend pour générer des clés éphémères.
                     </p>
                   </div>
                   <Button
@@ -491,7 +491,7 @@ function MessagesList({ messages }: { messages: Message[] }) {
           <p className="text-sm mt-2">Commencez une conversation avec l'assistant</p>
         </div>
       ) : (
-        Messages.map(message => (
+        messages.map(message => (
           <div
             key={message.id}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}

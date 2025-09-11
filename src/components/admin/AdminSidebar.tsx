@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
   FolderOpen, Users, Globe, Code, FileText, Book,
-  Briefcase, Languages, Lightbulb, Layout
+  Briefcase, Languages, Lightbulb, Layout, Brain
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -115,6 +115,44 @@ export function AdminSidebar({ activeTab, onTabChange, counts }: AdminSidebarPro
 
         {/* Divider */}
         <div className="my-4 border-t border-gray-200" />
+
+        {/* Section Gestion IA */}
+        <div className="px-4 py-2">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Gestion IA
+          </h3>
+        </div>
+
+        {/* Link to AI Assistant Manager */}
+        <Link
+          to="/admin/assistant"
+          className={cn(
+            "w-full flex items-start gap-3 px-4 py-3 rounded-lg transition-all",
+            "hover:bg-purple-50 text-left group",
+            location.pathname === '/admin/assistant' && "bg-purple-50 hover:bg-purple-50"
+          )}
+        >
+          <Brain className={cn(
+            "w-5 h-5 mt-0.5 transition-colors",
+            location.pathname === '/admin/assistant' 
+              ? "text-purple-600" 
+              : "text-purple-400 group-hover:text-purple-600"
+          )} />
+          <div className="flex-1">
+            <span className={cn(
+              "font-medium transition-colors",
+              location.pathname === '/admin/assistant' ? "text-purple-900" : "text-gray-900"
+            )}>
+              Assistant Vocal IA
+            </span>
+            <p className={cn(
+              "text-xs mt-0.5 transition-colors",
+              location.pathname === '/admin/assistant' ? "text-purple-600" : "text-gray-500"
+            )}>
+              FAQ, Prompts et Historique
+            </p>
+          </div>
+        </Link>
 
         {/* Link to LLM Documentation */}
         <Link

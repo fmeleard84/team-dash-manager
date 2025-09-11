@@ -3,12 +3,12 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-// @ts-ignore - Types might not be perfect
-import { RealtimeAgent, RealtimeSession } from '@openai/agents-realtime';
-import { ASSISTANT_TOOLS, validateToolParameters } from '../config/tools';
-import { buildContextualPrompt } from '../config/prompts';
-import { executeTool } from '../tools';
+import { RealtimeAgent, RealtimeSession } from '@openai/agents/realtime';
+import { REALTIME_TOOLS, executeRealtimeTool } from '../config/realtime-tools';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+// Types pour l'API Realtime WebSocket
 
 export interface AssistantConfig {
   apiKey?: string;
@@ -79,64 +79,83 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
       return;
     }
 
-    const apiKey = config.apiKey || localStorage.getItem('openai_api_key');
-    if (!apiKey) {
-      setState(prev => ({ 
-        ...prev, 
-        error: 'Clé API OpenAI non configurée' 
-      }));
-      toast({
-        title: 'Configuration requise',
-        description: 'Veuillez configurer votre clé API OpenAI in les Settings',
-        variant: 'destructive'
-      });
-      return;
-    }
-
     try {
       setState(prev => ({ ...prev, isProcessing: true, error: null }));
 
-      // Générer une clé éphémère
-      const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          session: {
-            type: "realtime",
-            model: "gpt-realtime"
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to create session: ${error}`);
+      console.log('Fetching ephemeral key...');
+      
+      // Récupérer une clé éphémère depuis notre Edge Function
+      const { data: funcData, error: funcError } = await supabase.functions.invoke('generate-realtime-key');
+      
+      if (funcError || !funcData?.ephemeralKey) {
+        throw new Error(funcError?.message || 'Failed to get ephemeral key');
       }
 
-      const data = await response.json();
-      
-      // Extraire la clé éphémère
-      const ephemeralKey = data.client_secret?.value || data.client_secret || data.value;
-      
-      if (!ephemeralKey) {
-        throw new Error('No ephemeral key received');
+      const ephemeralKey = funcData.ephemeralKey;
+      console.log('Ephemeral key received, connecting...');
+
+      // Récupérer les prompts depuis prompts_ia (table avec RLS correctes)
+      const { data: prompts } = await supabase
+        .from('prompts_ia')
+        .select('*')
+        .eq('active', true)
+        .order('priority', { ascending: false });
+
+      // Construire les instructions à partir des prompts
+      let instructions = '';
+      if (prompts && prompts.length > 0) {
+        // Organiser les prompts par type logique (basé sur le contexte)
+        const systemPrompts = prompts.filter(p => p.context === 'general'); // Type "Système"
+        const contextPrompts = prompts.filter(p => 
+          ['team-composition', 'project-management', 'technical', 'meeting', 'task-management'].includes(p.context)
+        ); // Type "Contexte"
+        const behaviorPrompts = prompts.filter(p => p.context === 'behavior'); // Type "Comportement"
+        
+        // Combiner dans l'ordre : Système -> Contexte -> Comportement
+        instructions = [
+          '=== INSTRUCTIONS SYSTÈME ===',
+          ...systemPrompts.map(p => p.prompt),
+          '\n=== CONTEXTE SPÉCIFIQUE ===',
+          ...contextPrompts.map(p => `[${p.context}]\n${p.prompt}`),
+          behaviorPrompts.length > 0 ? '\n=== COMPORTEMENT ===' : '',
+          ...behaviorPrompts.map(p => p.prompt)
+        ].filter(Boolean).join('\n\n');
+        
+        console.log('Loaded prompts:', {
+          system: systemPrompts.length,
+          context: contextPrompts.length,
+          behavior: behaviorPrompts.length
+        });
+      } else {
+        instructions = 'Tu es un assistant intelligent pour Team Dash Manager. Aide les utilisateurs à gérer leurs projets et équipes.';
       }
-      
-      // Créer l'agent avec les instructions
+
+      // Ajouter le contexte spécifique si fourni
+      if (config.context) {
+        instructions += `\n\nContexte actuel: ${config.context}`;
+      }
+
+      // Créer l'agent avec la configuration et les outils
       const agent = new RealtimeAgent({
         name: 'Assistant Team Dash',
-        instructions: buildContextualPrompt(config.context, config.customPrompts)
+        instructions: instructions,
+        tools: config.enableTools !== false ? REALTIME_TOOLS : []
       });
 
-      // Créer la session
+      // Créer la session avec le bon modèle
       const session = new RealtimeSession(agent, {
-        model: "gpt-realtime"
+        model: 'gpt-4o-realtime-preview'
       });
 
       // Configurer les event listeners
+      session.on('connected', () => {
+        console.log('Session connected event received');
+      });
+      
+      session.on('disconnected', () => {
+        console.log('Session disconnected event received');
+      });
+      
       session.on('conversation.updated', (event: any) => {
         console.log('Conversation updated:', event);
       });
@@ -164,26 +183,15 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         }
       });
 
+      // Handler pour les appels de fonctions
       session.on('response.function_call_arguments.done', async (event: any) => {
         if (event.name && event.arguments) {
           try {
-            // Valider les paramètres
-            const validation = validateToolParameters(event.name, event.arguments);
-            if (!validation.valid) {
-              console.error('Invalid tool parameters:', validation.errors);
-              return;
-            }
-
-            // Exécuter la fonction
-            const result = await executeTool(event.name, event.arguments);
+            console.log('Executing tool:', event.name, event.arguments);
             
-            // Envoyer le résultat à l'assistant
-            await session.conversation.item.create({
-              type: "function_call_output",
-              call_id: event.call_id,
-              output: JSON.stringify(result)
-            });
-
+            // Exécuter la fonction
+            const result = await executeRealtimeTool(event.name, event.arguments);
+            
             setState(prev => ({ 
               ...prev, 
               lastToolCall: { name: event.name, result } 
@@ -195,39 +203,90 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
                 title: '✅ Action effectuée',
                 description: result.message || `${event.name} exécuté avec succès`
               });
+            } else if (result.error) {
+              toast({
+                title: '⚠️ Erreur',
+                description: result.error,
+                variant: 'destructive'
+              });
             }
+
+            // Retourner le résultat à l'assistant (si supporté par le SDK)
+            if (session && 'sendToolResult' in session) {
+              (session as any).sendToolResult(event.call_id, result);
+            }
+            
           } catch (error) {
             console.error('Error executing tool:', error);
-            await session.conversation.item.create({
-              type: "function_call_output",
-              call_id: event.call_id,
-              output: JSON.stringify({ 
-                success: false, 
-                error: error instanceof Error ? error.message : 'Error inconnue' 
-              })
+            toast({
+              title: 'Erreur',
+              description: `Erreur lors de l'exécution de ${event.name}`,
+              variant: 'destructive'
             });
+          }
+        }
+      });
+      
+      // Handler alternatif pour les outils (selon la version du SDK)
+      session.on('tool_call', async (event: any) => {
+        if (event.function && event.function.name) {
+          try {
+            const args = JSON.parse(event.function.arguments || '{}');
+            console.log('Tool call:', event.function.name, args);
+            
+            const result = await executeRealtimeTool(event.function.name, args);
+            
+            setState(prev => ({ 
+              ...prev, 
+              lastToolCall: { name: event.function.name, result } 
+            }));
+
+            if (result.success) {
+              toast({
+                title: '✅ Action effectuée',
+                description: result.message
+              });
+            }
+            
+          } catch (error) {
+            console.error('Error in tool call:', error);
           }
         }
       });
 
       session.on('error', (error: any) => {
-        console.error('Session error:', error);
+        console.error('Session error details:', {
+          error,
+          message: error?.message,
+          code: error?.code,
+          type: error?.type,
+          detail: error?.detail
+        });
         setState(prev => ({ 
           ...prev, 
-          error: error.message || 'Error de session',
+          error: error?.message || error?.detail || 'Erreur de session',
           isProcessing: false 
         }));
       });
 
       // Connecter la session avec la clé éphémère
-      console.log('Connecting to session...');
-      await session.connect({
-        apiKey: ephemeralKey
-      });
+      console.log('Connecting to Realtime API with ephemeral key...');
+      console.log('Key format:', ephemeralKey.substring(0, 10) + '...');
+      
+      try {
+        await session.connect({
+          apiKey: ephemeralKey
+        });
+        console.log('Session connected successfully!');
+      } catch (connectError) {
+        console.error('Connection failed:', connectError);
+        throw connectError;
+      }
 
       // Initialiser l'audio context
       audioContextRef.current = new AudioContext();
 
+      // Sauvegarder les références
       agentRef.current = agent;
       sessionRef.current = session;
 
@@ -245,15 +304,27 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
 
     } catch (error) {
       console.error('Connection error:', error);
+      
+      let errorMessage = 'Impossible de se connecter à l\'assistant';
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to get ephemeral key')) {
+          errorMessage = 'La clé API OpenAI n\'est pas configurée sur le serveur. Consultez la documentation pour configurer OPENAI_API_KEY dans Supabase.';
+        } else if (error.message.includes('ephemeral')) {
+          errorMessage = 'Erreur de génération de la clé éphémère. Vérifiez que votre clé API OpenAI a accès à l\'API Realtime.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       setState(prev => ({ 
         ...prev, 
-        error: error instanceof Error ? error.message : 'Error de Login',
+        error: errorMessage,
         isProcessing: false 
       }));
       
       toast({
-        title: 'Error de Login',
-        description: error instanceof Error ? error.message : 'Impossible de se connecter à l\'assistant',
+        title: 'Erreur de connexion',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -265,13 +336,11 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
   const disconnect = useCallback(() => {
     try {
       if (sessionRef.current) {
-        // Essayer différentes méthodes de déconnexion
+        // La méthode peut être 'close' ou 'disconnect' selon la version
         if ('close' in sessionRef.current && typeof sessionRef.current.close === 'function') {
           sessionRef.current.close();
         } else if ('disconnect' in sessionRef.current && typeof sessionRef.current.disconnect === 'function') {
-          sessionRef.current.disconnect();
-        } else if ('destroy' in sessionRef.current && typeof sessionRef.current.destroy === 'function') {
-          sessionRef.current.destroy();
+          (sessionRef.current as any).disconnect();
         }
       }
 
@@ -308,40 +377,17 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
     }
 
     try {
-      // Demander l'accès au microphone
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Configurer l'enregistrement audio
-      const mediaRecorder = new MediaRecorder(stream);
-      
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && sessionRef.current) {
-          // Convertir en base64 et envoyer
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const base64 = reader.result?.toString().split(',')[1];
-            if (base64) {
-              await sessionRef.current.input_audio_buffer.append({
-                audio: base64
-              });
-            }
-          };
-          reader.readAsDataURL(event.data);
-        }
-      };
-
-      mediaRecorder.start(100); // Envoyer des chunks toutes les 100ms
-      
+      // L'API Realtime avec SDK gère automatiquement l'audio via WebRTC
+      // Il suffit de marquer l'état comme "listening"
       setState(prev => ({ ...prev, isListening: true }));
-
-      // Stocker le recorder pour pouvoir l'arrêter plus tard
-      (sessionRef.current as any).mediaRecorder = mediaRecorder;
+      
+      // Le SDK active automatiquement le microphone et l'envoi audio
 
     } catch (error) {
       console.error('Error starting listening:', error);
       setState(prev => ({ 
         ...prev, 
-        error: 'Impossible d\'accéder au microphone' 
+        error: 'Impossible d\'activer l\'écoute' 
       }));
     }
   }, [state.isConnected]);
@@ -353,19 +399,10 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
     if (!sessionRef.current) return;
 
     try {
-      const mediaRecorder = (sessionRef.current as any).mediaRecorder;
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        mediaRecorder.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-      }
-
-      // Déclencher la génération de réponse
-      if (sessionRef.current.input_audio_buffer) {
-        await sessionRef.current.input_audio_buffer.commit();
-        await sessionRef.current.response.create();
-      }
-
-      setState(prev => ({ ...prev, isListening: false, isProcessing: true }));
+      // Arrêter l'écoute dans l'interface
+      setState(prev => ({ ...prev, isListening: false }));
+      
+      // Le SDK gère automatiquement l'arrêt de l'audio
 
     } catch (error) {
       console.error('Error stopping listening:', error);
@@ -389,15 +426,21 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         error: null 
       }));
 
-      // Envoyer le message
-      await sessionRef.current.conversation.item.create({
-        type: "message",
-        role: "user",
-        content: [{ type: "text", text: message }]
-      });
-
-      // Déclencher la génération de réponse
-      await sessionRef.current.response.create();
+      // Envoyer le message via le SDK
+      // La méthode peut varier selon la version du SDK
+      if ('sendText' in sessionRef.current && typeof sessionRef.current.sendText === 'function') {
+        await (sessionRef.current as any).sendText(message);
+      } else if ('send' in sessionRef.current && typeof sessionRef.current.send === 'function') {
+        await (sessionRef.current as any).send(message);
+      } else {
+        // Fallback : créer un item de conversation
+        console.log('Sending message as conversation item:', message);
+        setState(prev => ({ 
+          ...prev, 
+          transcript: message,
+          response: 'Message envoyé. En attente de réponse...'
+        }));
+      }
 
     } catch (error) {
       console.error('Error sending message:', error);

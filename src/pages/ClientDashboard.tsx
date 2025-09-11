@@ -44,7 +44,9 @@ import {
   Zap,
   Heart,
   ShoppingCart,
-  Smartphone
+  Smartphone,
+  Mic,
+  Bot
 } from "lucide-react";
 
 // Design System Components
@@ -79,6 +81,7 @@ import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { PageHeaderNeon } from "@/components/ui/page-header-neon";
+import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
 
 const ClientDashboard = () => {
 const [searchParams, setSearchParams] = useSearchParams();
@@ -106,6 +109,7 @@ const [resourceAssignments, setResourceAssignments] = useState<any[]>([]);
 const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 const [projectToDelete, setProjectToDelete] = useState<DbProject | null>(null);
+const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
 
 // Debug useEffect
 useEffect(() => {
@@ -1012,6 +1016,20 @@ const headerContent = (
       <h1 className="text-xl font-semibold">Dashboard Client</h1>
     </div>
     <div className="flex items-center gap-4">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setIsVoiceAssistantOpen(true)}
+        className="relative group"
+        title="Assistant Vocal IA"
+      >
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur-md opacity-0 group-hover:opacity-70 transition-opacity" />
+          <div className="relative w-9 h-9 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-lg flex items-center justify-center">
+            <Mic className="w-4 h-4 text-white" />
+          </div>
+        </div>
+      </Button>
       <NotificationBell />
       <ThemeToggle />
     </div>
@@ -1056,6 +1074,13 @@ return (
         }}
       />
     )}
+    
+    {/* Assistant Vocal IA */}
+    <EnhancedVoiceAssistant
+      isOpen={isVoiceAssistantOpen}
+      onClose={() => setIsVoiceAssistantOpen(false)}
+      context="client-dashboard"
+    />
   </SidebarProvider>
 );
 };

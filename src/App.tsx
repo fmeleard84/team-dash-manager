@@ -33,6 +33,7 @@ const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const AuthDebug = lazy(() => import("./pages/AuthDebug"));
 const LLMDashboard = lazy(() => import("./pages/llm/LLMDashboard"));
 const DesignSystem = lazy(() => import("./pages/DesignSystem"));
+const AdminAssistant = lazy(() => import("./pages/AdminAssistant"));
 
 const queryClient = new QueryClient();
 
@@ -137,6 +138,13 @@ const AppContent = () => {
             <Suspense fallback={<PageLoader />}>
               <DesignSystem />
             </Suspense>
+          } />
+          <Route path="/admin/assistant" element={
+            <AdminRoute>
+              <Suspense fallback={<PageLoader />}>
+                <AdminAssistant />
+              </Suspense>
+            </AdminRoute>
           } />
           
           <Route path="*" element={<NotFound />} />

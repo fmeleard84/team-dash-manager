@@ -70,7 +70,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
       )}
 
       {/* CSS styles */}
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes moveGradient {
           0% {
             background-position: 0% 0%;
@@ -229,7 +229,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
               linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
           }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 };
