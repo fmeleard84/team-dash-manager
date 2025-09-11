@@ -130,12 +130,15 @@ export async function createMeeting(params: CreateMeetingParams) {
 
 // Fonction pour créer une équipe projet
 export async function createTeam(params: CreateTeamParams) {
+  console.log('🚀 createTeam appelé avec:', params);
   try {
     // Récupérer l'utilisateur actuel
     const { data: userData } = await supabase.auth.getUser();
     if (!userData?.user) {
+      console.error('❌ Utilisateur non connecté');
       throw new Error('Utilisateur non connecté');
     }
+    console.log('👤 Utilisateur:', userData.user.id);
 
     // Si on a un nom de projet mais pas d'ID, chercher le projet
     let projectId = params.project_id;

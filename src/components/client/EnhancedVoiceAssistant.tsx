@@ -71,6 +71,17 @@ export function EnhancedVoiceAssistant({
     autoConnect: false
   });
 
+  // Debug: Log l'état en temps réel
+  useEffect(() => {
+    console.log('📊 État actuel:', {
+      isConnected: state.isConnected,
+      isListening: state.isListening,
+      isSpeaking: state.isSpeaking,
+      isProcessing: state.isProcessing,
+      error: state.error
+    });
+  }, [state]);
+
   // Contextes disponibles
   const contexts = [
     { id: 'general', label: 'Général', icon: Bot },
@@ -96,11 +107,13 @@ export function EnhancedVoiceAssistant({
   // Ajouter les messages de l'assistant
   useEffect(() => {
     if (state.transcript && state.transcript !== messages[messages.length - 1]?.content) {
+      console.log('📝 Nouveau transcript:', state.transcript);
       addMessage('user', state.transcript);
       // Détecter si l'utilisateur demande de créer une équipe
       if (state.transcript.toLowerCase().includes('équipe') || 
           state.transcript.toLowerCase().includes('team') ||
           state.transcript.toLowerCase().includes('compose')) {
+        console.log('🎯 Détection création équipe dans le transcript');
         setIsCreatingTeam(true);
       }
     }
@@ -108,23 +121,28 @@ export function EnhancedVoiceAssistant({
 
   useEffect(() => {
     if (state.response && state.response !== messages[messages.length - 1]?.content) {
+      console.log('🤖 Nouvelle réponse:', state.response);
       addMessage('assistant', state.response, state.lastToolCall);
       
       // Vérifier si l'équipe a été créée
       if (state.lastToolCall?.name === 'create_team' && state.lastToolCall?.result) {
-        console.log('Team creation result:', state.lastToolCall.result);
+        console.log('🚀 Team creation result:', state.lastToolCall.result);
         
         // Si c'est pour ReactFlow
         if (state.lastToolCall.result.forReactFlow && state.lastToolCall.result.data) {
+          console.log('✅ Données pour ReactFlow détectées:', state.lastToolCall.result.data);
           const teamData = parseTeamFromAI(state.lastToolCall.result.data);
           if (teamData) {
+            console.log('💾 Sauvegarde de la composition:', teamData);
             saveTeamComposition(teamData);
             
             // Récupérer l'ID du projet créé
             const projectId = state.lastToolCall.result.data.project_id;
+            console.log('🆔 ID du projet créé:', projectId);
             
             // Attendre un peu avant de rediriger
             setTimeout(() => {
+              console.log('🔄 Redirection vers le projet...');
               setIsCreatingTeam(false);
               onClose();
               // Passer l'ID du projet dans l'URL
@@ -134,7 +152,11 @@ export function EnhancedVoiceAssistant({
                 description: 'Vous allez être redirigé vers l\'éditeur d\'équipe',
               });
             }, 2000);
+          } else {
+            console.error('❌ Impossible de parser les données de l\'équipe');
           }
+        } else {
+          console.log('⚠️ Pas de données ReactFlow dans la réponse');
         }
       }
     }
@@ -189,6 +211,7 @@ export function EnhancedVoiceAssistant({
   };
 
   const handleConnect = async () => {
+    console.log('🔌 Tentative de connexion...');
     // Vérifier la clé API
     const apiKey = localStorage.getItem('openai_api_key');
     if (!apiKey) {
@@ -206,6 +229,7 @@ export function EnhancedVoiceAssistant({
     }
     
     await connect();
+    console.log('✅ Connexion lancée, état actuel:', state);
   };
 
   if (!isOpen) return null;
@@ -214,7 +238,7 @@ export function EnhancedVoiceAssistant({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       {/* Indicateur "Allo" pour conversation active */}
       <AnimatePresence>
-        {state.isConnected && state.isListening && (
+        {state.isConnected && (
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -290,7 +314,7 @@ export function EnhancedVoiceAssistant({
                 className="absolute inset-0 rounded-full border-4 border-pink-400"
               />
               
-              {/* Texte "En conversation" */}
+              {/* Texte "Connecté" */}
               <motion.div
                 animate={{ 
                   opacity: [0.5, 1, 0.5]
@@ -300,10 +324,10 @@ export function EnhancedVoiceAssistant({
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
-                className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap"
+                className="absolute -bottom-16 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white/90 px-6 py-3 rounded-full shadow-2xl"
               >
-                <p className="text-2xl font-bold text-white drop-shadow-lg">
-                  En conversation...
+                <p className="text-2xl font-bold text-purple-600">
+                  {state.isListening ? '🎤 Écoute active...' : state.isSpeaking ? '🔊 En train de parler...' : '✨ Connecté'}
                 </p>
               </motion.div>
             </div>

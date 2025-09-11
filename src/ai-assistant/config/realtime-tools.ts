@@ -197,17 +197,21 @@ export const TOOL_FUNCTIONS: Record<string, Function> = {
 
 // Fonction pour exécuter un outil
 export async function executeRealtimeTool(name: string, parameters: any) {
+  console.log('🔨 executeRealtimeTool appelé:', { name, parameters });
   const toolFunction = TOOL_FUNCTIONS[name];
   
   if (!toolFunction) {
+    console.error('❌ Outil inconnu:', name, 'Outils disponibles:', Object.keys(TOOL_FUNCTIONS));
     throw new Error(`Outil inconnu: ${name}`);
   }
 
   try {
+    console.log('▶️ Exécution de la fonction:', name);
     const result = await toolFunction(parameters);
+    console.log('✅ Résultat:', result);
     return result;
   } catch (error) {
-    console.error(`Erreur lors de l'exécution de l'outil ${name}:`, error);
+    console.error(`❌ Erreur lors de l'exécution de l'outil ${name}:`, error);
     throw error;
   }
 }

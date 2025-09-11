@@ -264,9 +264,10 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
 
       // Handler pour les appels de fonctions
       session.on('response.function_call_arguments.done', async (event: any) => {
+        console.log('🔧 Function call event received:', event);
         if (event.name && event.arguments) {
           try {
-            console.log('Executing tool:', event.name, event.arguments);
+            console.log('🎯 Executing tool:', event.name, event.arguments);
             
             // Exécuter la fonction
             const result = await executeRealtimeTool(event.name, event.arguments);
