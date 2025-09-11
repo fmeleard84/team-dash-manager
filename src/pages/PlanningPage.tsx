@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { SimpleScheduleCalendar } from '@/components/SimpleScheduleCalendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
-import { ProjectSelectItem } from '@/components/ui/project-select-item';
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
+import { useProjectSelector } from '@/hooks/useProjectSelector';
 import { FullScreenModal, ModalActions, useFullScreenModal } from '@/components/ui/fullscreen-modal';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -263,33 +263,22 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
             </div>
             
             {/* Sélecteur de projet unifié */}
-            <Select 
-              value={selectedProject?.id || ''}
-              onValueChange={(value) => {
+            <ProjectSelectorNeon
+              projects={projects.map(p => ({ ...p, created_at: p.project_date }))}
+              selectedProjectId={selectedProject?.id || ''}
+              onProjectChange={(value) => {
                 const project = projects.find(p => p.id === value);
                 if (project) {
                   console.log('Sélection du projet:', project.title, project.id);
                   selectProject(project);
                 }
               }}
-            >
-              <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
-                <SelectValue placeholder="Sélectionner un projet" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortedProjects.length === 0 && (
-                  <SelectItem value="none" disabled>Aucun projet actif</SelectItem>
-                )}
-                {sortedProjects.map(project => (
-                  <ProjectSelectItem 
-                    key={project.id} 
-                    value={project.id}
-                    title={project.title}
-                    date={project.formattedDate}
-                  />
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Sélectionner un projet"
+              className="w-[280px]"
+              showStatus={true}
+              showDates={true}
+              showTeamProgress={false}
+            />
           </div>
         </CardContent>
       </Card>
@@ -760,16 +749,16 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
         >
           <div className="space-y-6">
             <div>
-              <Label>Description</Label>
-              <p className="mt-2 text-muted-foreground">
+              <Label className="text-white">Description</Label>
+              <p className="mt-2 text-gray-300">
                 {selectedEvent.description || 'Aucune description'}
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Date et heure</Label>
-                <p className="mt-2 text-muted-foreground">
+                <Label className="text-white">Date et heure</Label>
+                <p className="mt-2 text-gray-300">
                   {selectedEvent.start && !isNaN(new Date(selectedEvent.start).getTime())
                     ? new Date(selectedEvent.start).toLocaleDateString('fr-FR', {
                         weekday: 'long',
@@ -785,20 +774,20 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
 
               {selectedEvent.location && (
                 <div>
-                  <Label>Lieu</Label>
-                  <p className="mt-2 text-muted-foreground">{selectedEvent.location}</p>
+                  <Label className="text-white">Lieu</Label>
+                  <p className="mt-2 text-gray-300">{selectedEvent.location}</p>
                 </div>
               )}
             </div>
 
             {selectedEvent.location && (
               <div>
-                <Label>Lien de réunion</Label>
+                <Label className="text-white">Lien de réunion</Label>
                 <a
                   href={selectedEvent.location}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 text-primary hover:underline block"
+                  className="mt-2 text-purple-400 hover:text-purple-300 hover:underline block"
                 >
                   {selectedEvent.location}
                 </a>

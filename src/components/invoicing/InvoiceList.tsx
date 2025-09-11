@@ -48,7 +48,7 @@ import { StripePayment } from './StripePayment';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
-import { ProjectSelectItem } from '@/components/ui/project-select-item';
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 
 interface InvoiceListProps {
   projectId?: string;
@@ -337,22 +337,16 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
               </div>
               
               {/* Project filter with universal selector */}
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
-                  <SelectValue placeholder="Tous les projets" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les projets</SelectItem>
-                  {sortedProjects.map((project) => (
-                    <ProjectSelectItem
-                      key={project.id}
-                      value={project.id}
-                      title={project.title}
-                      date={project.formattedDate}
-                    />
-                  ))}
-                </SelectContent>
-              </Select>
+              <ProjectSelectorNeon
+                projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...projects.map(p => ({ ...p, created_at: p.project_date }))]}
+                selectedProjectId={selectedProject}
+                onProjectChange={setSelectedProject}
+                placeholder="Tous les projets"
+                className="w-[280px]"
+                showStatus={false}
+                showDates={true}
+                showTeamProgress={false}
+              />
             </div>
           </div>
         </CardContent>

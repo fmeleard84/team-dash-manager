@@ -1,6 +1,6 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -115,11 +115,11 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Partager le fichier</DialogTitle>
-        </DialogHeader>
+    <FullScreenModal isOpen={isOpen} onClose={() => onClose(false)} title="" description="">
+      <div className="space-y-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Partager le fichier</h2>
+        </div>
 
         <div className="space-y-5">
           <div className="space-y-2">
@@ -179,8 +179,8 @@ export default function FileShareModal({ isOpen, onClose, projectId, path }: Fil
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 }
 

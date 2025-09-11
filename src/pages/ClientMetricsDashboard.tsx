@@ -25,7 +25,7 @@ import {
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { cn } from '@/lib/utils';
 import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
-import { ProjectSelectItem } from '@/components/ui/project-select-item';
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import {
   AreaChart,
   Area,
@@ -184,22 +184,16 @@ const ClientMetricsDashboard = () => {
               
               {/* Filters */}
               <div className="flex flex-wrap items-center gap-2">
-                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                  <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
-                    <SelectValue placeholder="Tous les projets" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les projets</SelectItem>
-                    {sortedProjects.map(project => (
-                      <ProjectSelectItem
-                        key={project.id}
-                        value={project.id}
-                        title={project.title}
-                        date={project.formattedDate}
-                      />
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ProjectSelectorNeon
+                  projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...sortedProjects.map(p => ({ ...p, created_at: p.created_at }))]}
+                  selectedProjectId={selectedProjectId}
+                  onProjectChange={setSelectedProjectId}
+                  placeholder="Tous les projets"
+                  className="w-[280px]"
+                  showStatus={false}
+                  showDates={true}
+                  showTeamProgress={false}
+                />
                 
                 <Select 
                   value={selectedCandidateId} 

@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -34,15 +34,22 @@ export function CardCreateDialog({
   uploadProgress
 }: CardCreateDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl shadow-xl max-h-[85vh] overflow-y-auto bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-purple-200">
-        <DialogHeader className="bg-gradient-to-r from-blue-500 to-purple-500 -m-6 mb-4 p-4 rounded-t-lg">
-          <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
-            <Plus className="w-5 h-5" />
-            Nouvelle tâche
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 pt-3">
+    <FullScreenModal
+      isOpen={open}
+      onClose={() => onOpenChange(false)}
+      title="Nouvelle tâche"
+      description="Créer une nouvelle tâche pour votre projet"
+      actions={
+        <ModalActions
+          onCancel={() => onOpenChange(false)}
+          onSave={onSave}
+          cancelText="Annuler"
+          saveText="Créer la tâche"
+          isSaving={isSaving}
+        />
+      }
+    >
+      <div className="space-y-6">
           {/* Titre sur toute la largeur */}
           <div className="relative">
             <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -260,32 +267,8 @@ export function CardCreateDialog({
             </div>
           </div>
 
-          {/* Boutons d'action */}
-          <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 sticky bottom-0 bg-white pb-2">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                onOpenChange(false);
-                onUploadedFilesChange([]);
-              }}
-              className="min-w-[100px] border-gray-200 hover:bg-gray-50"
-            >
-              Annuler
-            </Button>
-            <Button 
-              onClick={onSave} 
-              disabled={!cardData.title.trim() || isSaving}
-              className="min-w-[120px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all"
-            >
-              {isSaving ? (
-                uploadProgress.total > 0 ? 
-                  `Upload ${uploadProgress.uploaded}/${uploadProgress.total}...` : 
-                  'Création...'
-              ) : 'Créer la tâche'}
-            </Button>
-          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -121,11 +121,11 @@ export function EditExpertisesModal({ isOpen, onClose, currentCandidateId, curre
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Modifier vos expertises</DialogTitle>
-        </DialogHeader>
+    <FullScreenModal isOpen={isOpen} onClose={() => onClose(false)} title="" description="">
+      <div className="space-y-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Modifier vos expertises</h2>
+        </div>
         <div className="space-y-4">
           <div>
             <Label>Compétences</Label>
@@ -166,7 +166,7 @@ export function EditExpertisesModal({ isOpen, onClose, currentCandidateId, curre
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 }

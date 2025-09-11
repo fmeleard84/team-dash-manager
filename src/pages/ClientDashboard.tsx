@@ -64,7 +64,6 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectsSection } from '@/components/client/ProjectsSection';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ClientKanbanView from "@/components/client/ClientKanbanView";
 import { EnhancedMessageSystem } from "@/components/shared/EnhancedMessageSystem";
 import { EnhancedMessageSystemNeon } from "@/components/shared/EnhancedMessageSystemNeon";
@@ -73,7 +72,8 @@ import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { useProjectSort, type ProjectWithDate } from "@/hooks/useProjectSort";
-import { ProjectSelectItem } from "@/components/ui/project-select-item";
+import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
+import { useProjectSelector } from "@/hooks/useProjectSelector";
 import ClientMetricsDashboard from "./ClientMetricsDashboard";
 import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
@@ -460,15 +460,13 @@ const renderStartContent = () => {
 const renderKanbanContent = () => {
   if (sortedKanbanProjects.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <Kanban className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-          <p className="text-sm text-muted-foreground">
-            Démarrez un projet pour accéder au tableau Kanban
-          </p>
-        </CardContent>
-      </Card>
+      <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-purple-500/30">
+        <Kanban className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+        <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+        <p className="text-sm text-gray-300">
+          Démarrez un projet pour accéder au tableau Kanban
+        </p>
+      </div>
     );
   }
 
@@ -488,21 +486,16 @@ const renderKanbanContent = () => {
               </div>
             </div>
             
-            <Select value={selectedKanbanProjectId} onValueChange={setSelectedKanbanProjectId}>
-              <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
-                <SelectValue placeholder="Sélectionner un projet" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortedKanbanProjects?.map(project => (
-                  <ProjectSelectItem
-                    key={project.id}
-                    value={project.id}
-                    title={project.title}
-                    date={project.formattedDate}
-                  />
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectSelectorNeon
+              projects={kanbanProjects.map(p => ({ ...p, created_at: p.project_date }))}
+              selectedProjectId={selectedKanbanProjectId}
+              onProjectChange={setSelectedKanbanProjectId}
+              placeholder="Sélectionner un projet"
+              className="w-[280px]"
+              showStatus={true}
+              showDates={false}
+              showTeamProgress={false}
+            />
           </div>
         </CardContent>
       </Card>
@@ -560,25 +553,16 @@ const renderMessagesContent = () => {
                 </div>
                 
                 {/* Sélecteur de projet sur la même ligne */}
-                <Select value={selectedMessagesProjectId} onValueChange={setSelectedMessagesProjectId}>
-                  <SelectTrigger className="w-[280px] bg-white/10 border-purple-500/30 text-white hover:bg-white/20 transition-all duration-200 shadow-lg">
-                    <SelectValue placeholder="Sélectionner un projet" />
-                  </SelectTrigger>
-                <SelectContent className="bg-[#1e1b4b] border-purple-500/30">
-                  {sortedMessagesProjects?.map(project => (
-                    <SelectItem 
-                      key={project.id} 
-                      value={project.id}
-                      className="text-white hover:bg-purple-500/20 focus:bg-purple-500/30"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>{project.title}</span>
-                        <span className="text-xs text-gray-400 ml-2">{project.formattedDate}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-                </Select>
+                <ProjectSelectorNeon
+                  projects={messagesProjects.map(p => ({ ...p, created_at: p.project_date }))}
+                  selectedProjectId={selectedMessagesProjectId}
+                  onProjectChange={setSelectedMessagesProjectId}
+                  placeholder="Sélectionner un projet"
+                  className="w-[280px]"
+                  showStatus={true}
+                  showDates={true}
+                  showTeamProgress={false}
+                />
               </div>
             </div>
           </CardContent>
@@ -626,21 +610,16 @@ const renderDriveContent = () => {
               </div>
             </div>
             
-            <Select value={selectedDriveProjectId} onValueChange={setSelectedDriveProjectId}>
-              <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
-                <SelectValue placeholder="Sélectionner un projet" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortedDriveProjects?.map(project => (
-                  <ProjectSelectItem
-                    key={project.id}
-                    value={project.id}
-                    title={project.title}
-                    date={project.formattedDate}
-                  />
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectSelectorNeon
+              projects={driveProjects.map(p => ({ ...p, created_at: p.project_date }))}
+              selectedProjectId={selectedDriveProjectId}
+              onProjectChange={setSelectedDriveProjectId}
+              placeholder="Sélectionner un projet"
+              className="w-[280px]"
+              showStatus={true}
+              showDates={false}
+              showTeamProgress={false}
+            />
           </div>
         </CardContent>
       </Card>
@@ -899,21 +878,16 @@ const renderWikiContent = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <Select value={selectedWikiProjectId} onValueChange={setSelectedWikiProjectId}>
-                <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
-                  <SelectValue placeholder="Sélectionner un projet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortedWikiProjects?.map(project => (
-                    <ProjectSelectItem
-                      key={project.id}
-                      value={project.id}
-                      title={project.title}
-                      date={project.formattedDate}
-                    />
-                  ))}
-                </SelectContent>
-              </Select>
+              <ProjectSelectorNeon
+                projects={wikiProjects.map(p => ({ ...p, created_at: p.project_date }))}
+                selectedProjectId={selectedWikiProjectId}
+                onProjectChange={setSelectedWikiProjectId}
+                placeholder="Sélectionner un projet"
+                className="w-[280px]"
+                showStatus={true}
+                showDates={false}
+                showTeamProgress={false}
+              />
               
               {selectedWikiProjectId && (
                 <Button

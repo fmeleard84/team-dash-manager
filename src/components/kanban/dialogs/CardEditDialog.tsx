@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -81,14 +81,14 @@ export function CardEditDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl shadow-xl max-h-[85vh] overflow-y-auto bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-purple-200">
-        <DialogHeader className="bg-gradient-to-r from-blue-500 to-purple-500 -m-6 mb-4 p-4 rounded-t-lg">
+    <FullScreenModal isOpen={open} onClose={() => onOpenChange(false)} title="" description="">
+      <div className="space-y-6">
+        <div className="mb-6">
           <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
             <FileText className="w-5 h-5" />
             {isReadOnlyMode ? 'Consulter la tâche' : 'Modifier la tâche'}
           </DialogTitle>
-        </DialogHeader>
+        </div>
         <div className="space-y-3 pt-3">
           {/* Titre sur toute la largeur */}
           <div className="relative">
@@ -401,7 +401,7 @@ export function CardEditDialog({
             )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 }

@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Separator } from "@/components/ui/separator";
 import { Award, Building, Calendar, Check, CheckCircle, DollarSign, Info, Languages, Loader2, Timer, X } from "lucide-react";
 
@@ -115,11 +115,11 @@ export function CandidateMissionCard({
                   <Info className="w-4 h-4 text-blue-600" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>{request.project_title}</DialogTitle>
-                  <DialogDescription>{request.category_name}</DialogDescription>
-                </DialogHeader>
+              <div className="space-y-6">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{request.project_title}</h2>
+                  <p className="text-gray-300">{request.category_name}</p>
+                </div>
                 <div className="space-y-4">
                   <div>
                     <h4 className="font-medium mb-2">Description du projet</h4>
@@ -145,8 +145,8 @@ export function CandidateMissionCard({
                     </div>
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
+              </div>
+            </FullScreenModal>
           </div>
           
           <div className="flex items-center gap-2">

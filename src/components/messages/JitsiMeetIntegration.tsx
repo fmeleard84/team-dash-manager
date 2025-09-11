@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -211,31 +211,31 @@ export const JitsiMeetIntegration = ({ roomName, displayName, onClose, participa
 
   if (isLoading) {
     return (
-      <Dialog open={true} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl h-[600px]">
-          <DialogHeader>
+      <FullScreenModal isOpen={true} onClose={() => onClose(false)} title="" description="">
+        <div className="space-y-6">
+          <div className="mb-6">
             <DialogTitle className="flex items-center gap-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
               Connexion à la visio-conférence...
             </DialogTitle>
-            <DialogDescription>
+            <p className="text-gray-300">
               Chargement de Jitsi Meet pour la room: {roomName}
-            </DialogDescription>
-          </DialogHeader>
+            </p>
+          </div>
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-pulse bg-muted rounded-lg w-full h-64 mb-4"></div>
               <p className="text-muted-foreground">Initialisation en cours...</p>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </FullScreenModal>
     );
   }
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className={`${isFullscreen ? 'max-w-full h-screen m-0 rounded-none' : 'max-w-5xl h-[700px]'} p-0`}>
+    <FullScreenModal isOpen={true} onClose={() => onClose(false)} title="" description="">
+      <div className="space-y-6">
         <div className="flex flex-col h-full">
           {/* Header avec contrôles */}
           <div className="flex items-center justify-between p-4 border-b bg-background">
@@ -372,7 +372,7 @@ export const JitsiMeetIntegration = ({ roomName, displayName, onClose, participa
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 };

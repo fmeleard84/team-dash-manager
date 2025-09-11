@@ -44,8 +44,9 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
+import { useProjectSelector } from "@/hooks/useProjectSelector";
 
 // Business Logic Components (unchanged)
 import { IallaLogo } from "@/components/IallaLogo";
@@ -226,53 +227,112 @@ const CandidateDashboard = () => {
   const renderProjectsContent = () => {
     return (
       <div className="space-y-8">
-        {/* KPIs */}
-        <PageSection title="Vue d'ensemble">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <KPI 
-              label="Projets actifs" 
-              value={metrics.activeProjects}
-              icon={<Briefcase className="w-5 h-5" />}
-            />
-            <KPI 
-              label="Demandes en attente" 
-              value={metrics.pendingRequests}
-              icon={<Users className="w-5 h-5" />}
-            />
-            <KPI 
-              label="Heures hebdo" 
-              value={`${metrics.totalHours}h`}
-              icon={<Clock className="w-5 h-5" />}
-            />
-            <KPI 
-              label="TJM moyen" 
-              value={`${Math.round(metrics.avgRate)}€`}
-              delta={{ value: "+5%", trend: "up" }}
-              icon={<DollarSign className="w-5 h-5" />}
-            />
+        {/* KPIs avec design néon */}
+        <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+          <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+                <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                  <TrendingUp className="w-5 h-5 text-white" />
+                </div>
+              </div>
+              Vue d'ensemble
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Projets actifs</p>
+                    <p className="text-2xl font-bold text-white">{metrics.activeProjects}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                    <Briefcase className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Demandes en attente</p>
+                    <p className="text-2xl font-bold text-white">{metrics.pendingRequests}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Heures hebdo</p>
+                    <p className="text-2xl font-bold text-white">{metrics.totalHours}h</p>
+                  </div>
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">TJM moyen</p>
+                    <p className="text-2xl font-bold text-white">{Math.round(metrics.avgRate)}€</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-green-400">+5%</span>
+                    </div>
+                  </div>
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+                    <DollarSign className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </PageSection>
+        </div>
 
         {/* Projects Section */}
-        <PageSection title="Mes projets">
-          <CandidateProjectsSection 
-            candidateProjects={candidateProjects}
-            resourceAssignments={resourceAssignments}
-            onAssignmentUpdate={() => setAssignmentTrigger(prev => prev + 1)}
-          />
-        </PageSection>
+        <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+          <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+                <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                  <Briefcase className="w-5 h-5 text-white" />
+                </div>
+              </div>
+              Mes projets
+            </h2>
+            <CandidateProjectsSection 
+              candidateProjects={candidateProjects}
+              resourceAssignments={resourceAssignments}
+              onAssignmentUpdate={() => setAssignmentTrigger(prev => prev + 1)}
+            />
+          </div>
+        </div>
 
         {/* Mission Requests */}
-        <PageSection title="Demandes de mission">
-          <CandidateMissionRequests 
-            profileId={profileId}
-            seniority={seniority}
-            candidateLanguages={candidateLanguages}
-            candidateExpertises={candidateExpertises}
-            assignmentTrigger={assignmentTrigger}
-            onAssignmentUpdate={() => setAssignmentTrigger(prev => prev + 1)}
-          />
-        </PageSection>
+        <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+          <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+                <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                  <Users className="w-5 h-5 text-white" />
+                </div>
+              </div>
+              Demandes de mission
+            </h2>
+            <CandidateMissionRequests 
+              profileId={profileId}
+              seniority={seniority}
+              candidateLanguages={candidateLanguages}
+              candidateExpertises={candidateExpertises}
+              assignmentTrigger={assignmentTrigger}
+              onAssignmentUpdate={() => setAssignmentTrigger(prev => prev + 1)}
+            />
+          </div>
+        </div>
       </div>
     );
   };
@@ -280,42 +340,49 @@ const CandidateDashboard = () => {
   const renderKanbanContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent>
-            <EmptyState
-              icon={<Trello className="w-8 h-8" />}
-              title="Aucun projet actif"
-              description="Acceptez une mission pour accéder au tableau Kanban"
-            />
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-purple-500/30">
+          <Trello className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder au tableau Kanban
+          </p>
+        </div>
       );
     }
 
     return (
-      <PageSection title="Tableau Kanban">
-        {activeProjects?.map(project => (
-          <div key={project.id} className="mb-8">
-            <h3 className="text-lg font-semibold mb-4">{project.title}</h3>
-            <CandidateKanbanView projectId={project.id} />
-          </div>
-        ))}
-      </PageSection>
+      <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+              <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                <Trello className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            Tableau Kanban
+          </h2>
+          {activeProjects?.map(project => (
+            <div key={project.id} className="mb-8">
+              <h3 className="text-lg font-semibold mb-4 text-white">{project.title}</h3>
+              <CandidateKanbanView projectId={project.id} />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   };
 
   const renderPlanningContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent>
-            <EmptyState
-              icon={<Calendar className="w-8 h-8" />}
-              title="Aucun projet actif"
-              description="Acceptez une mission pour accéder au planning"
-            />
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-purple-500/30">
+          <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder au planning
+          </p>
+        </div>
       );
     }
 
@@ -325,125 +392,148 @@ const CandidateDashboard = () => {
   const renderMessagesContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent>
-            <EmptyState
-              icon={<MessageSquare className="w-8 h-8" />}
-              title="Aucun projet actif"
-              description="Acceptez une mission pour accéder à la messagerie"
-            />
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-purple-500/30">
+          <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder à la messagerie
+          </p>
+        </div>
       );
     }
 
     return (
-      <PageSection title="Messages">
-        <CandidateMessagesView projects={activeProjects} />
-      </PageSection>
+      <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+              <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                <MessageSquare className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            Messages
+          </h2>
+          <CandidateMessagesView projects={activeProjects} />
+        </div>
+      </div>
     );
   };
 
   const renderDriveContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent>
-            <EmptyState
-              icon={<Cloud className="w-8 h-8" />}
-              title="Aucun projet actif"
-              description="Acceptez une mission pour accéder au Drive"
-            />
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-purple-500/30">
+          <Cloud className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder au Drive
+          </p>
+        </div>
       );
     }
 
     return (
-      <PageSection title="Drive">
-        <div className="mb-4">
-          <Select value={selectedDriveProjectId} onValueChange={setSelectedDriveProjectId}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Sélectionner un projet" />
-            </SelectTrigger>
-            <SelectContent>
-              {activeProjects?.map(project => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+              <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                <Cloud className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            Drive
+          </h2>
+          <div className="mb-4">
+            <ProjectSelectorNeon
+              projects={activeProjects || []}
+              selectedProjectId={selectedDriveProjectId}
+              onProjectChange={setSelectedDriveProjectId}
+              placeholder="Sélectionner un projet"
+              className="w-64"
+              showStatus={true}
+              showDates={false}
+              showTeamProgress={false}
+            />
+          </div>
+          
+          {selectedDriveProjectId && (
+            <div className="bg-black/40 backdrop-blur-xl rounded-2xl border border-purple-500/30 overflow-hidden">
+              <SimpleDriveView projectId={selectedDriveProjectId} />
+            </div>
+          )}
         </div>
-        
-        {selectedDriveProjectId && (
-          <Card noPadding>
-            <SimpleDriveView projectId={selectedDriveProjectId} />
-          </Card>
-        )}
-      </PageSection>
+      </div>
     );
   };
 
   const renderWikiContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent>
-            <EmptyState
-              icon={<BookOpen className="w-8 h-8" />}
-              title="Aucun projet actif"
-              description="Acceptez une mission pour accéder au Wiki"
-            />
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-purple-500/30">
+          <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder au Wiki
+          </p>
+        </div>
       );
     }
 
     return (
-      <PageSection title="Wiki">
-        <div className="mb-4 flex gap-4">
-          <Select value={selectedWikiProjectId} onValueChange={setSelectedWikiProjectId}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Sélectionner un projet" />
-            </SelectTrigger>
-            <SelectContent>
-              {activeProjects?.map(project => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+              <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                <BookOpen className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            Wiki
+          </h2>
+          <div className="mb-4 flex gap-4">
+            <ProjectSelectorNeon
+              projects={activeProjects || []}
+              selectedProjectId={selectedWikiProjectId}
+              onProjectChange={setSelectedWikiProjectId}
+              placeholder="Sélectionner un projet"
+              className="w-64"
+              showStatus={true}
+              showDates={false}
+              showTeamProgress={false}
+            />
+            
+            {selectedWikiProjectId && (
+              <button
+                className="bg-white/10 hover:bg-white/20 border border-purple-500/30 text-white backdrop-blur-sm px-4 py-2 rounded-lg"
+                onClick={() => setIsWikiFullscreen(!isWikiFullscreen)}
+              >
+                {isWikiFullscreen ? 'Réduire' : 'Plein écran'}
+              </button>
+            )}
+          </div>
           
           {selectedWikiProjectId && (
-            <Button
-              variant="outline"
-              onClick={() => setIsWikiFullscreen(!isWikiFullscreen)}
-            >
-              {isWikiFullscreen ? 'Réduire' : 'Plein écran'}
-            </Button>
+            <div className={isWikiFullscreen ? 'fixed inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] z-50 p-4' : ''}>
+              {isWikiFullscreen && (
+                <div className="mb-4 flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-white">
+                    Wiki - {activeProjects.find(p => p.id === selectedWikiProjectId)?.title}
+                  </h2>
+                  <button className="bg-white/10 hover:bg-white/20 border border-purple-500/30 text-white backdrop-blur-sm px-4 py-2 rounded-lg" onClick={() => setIsWikiFullscreen(false)}>
+                    Fermer
+                  </button>
+                </div>
+              )}
+              <div className={`bg-black/40 backdrop-blur-xl rounded-2xl border border-purple-500/30 overflow-hidden ${isWikiFullscreen ? 'h-[calc(100vh-120px)]' : ''}`}>
+                <WikiView projectId={selectedWikiProjectId} />
+              </div>
+            </div>
           )}
         </div>
-        
-        {selectedWikiProjectId && (
-          <div className={isWikiFullscreen ? 'fixed inset-0 bg-background z-50 p-4' : ''}>
-            {isWikiFullscreen && (
-              <div className="mb-4 flex justify-between items-center">
-                <h2 className="text-2xl font-bold">
-                  Wiki - {activeProjects.find(p => p.id === selectedWikiProjectId)?.title}
-                </h2>
-                <Button variant="ghost" onClick={() => setIsWikiFullscreen(false)}>
-                  Fermer
-                </Button>
-              </div>
-            )}
-            <Card noPadding className={isWikiFullscreen ? 'h-[calc(100vh-120px)]' : ''}>
-              <WikiView projectId={selectedWikiProjectId} />
-            </Card>
-          </div>
-        )}
-      </PageSection>
+      </div>
     );
   };
 
@@ -451,14 +541,12 @@ const CandidateDashboard = () => {
     // Show onboarding if needed
     if (needsOnboarding) {
       return (
-        <Card>
-          <CardContent>
-            <CandidateOnboarding onComplete={() => {
-              completeOnboarding();
-              refetchProfile();
-            }} />
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl border border-purple-500/30 p-6">
+          <CandidateOnboarding onComplete={() => {
+            completeOnboarding();
+            refetchProfile();
+          }} />
+        </div>
       );
     }
 
@@ -477,15 +565,37 @@ const CandidateDashboard = () => {
         return renderWikiContent();
       case 'time':
         return (
-          <PageSection title="Suivi du temps">
-            <TimeTrackerSimple projects={activeProjects || []} />
-          </PageSection>
+          <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+            <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+                  <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                    <Activity className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                Suivi du temps
+              </h2>
+              <TimeTrackerSimple projects={activeProjects || []} />
+            </div>
+          </div>
         );
       case 'invoices':
         return (
-          <PageSection title="Paiements">
-            <CandidatePayments />
-          </PageSection>
+          <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+            <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+                  <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                Paiements
+              </h2>
+              <CandidatePayments />
+            </div>
+          </div>
         );
       case 'ratings':
         return <CandidateRatings />;
@@ -493,15 +603,37 @@ const CandidateDashboard = () => {
         return <CandidateActivities />;
       case 'notes':
         return (
-          <PageSection title="Notes">
-            <CandidateNotes />
-          </PageSection>
+          <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+            <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+                  <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                Notes
+              </h2>
+              <CandidateNotes />
+            </div>
+          </div>
         );
       case 'settings':
         return (
-          <PageSection title="Paramètres">
-            <CandidateSettings />
-          </PageSection>
+          <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
+            <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
+                  <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                    <Settings className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                Paramètres
+              </h2>
+              <CandidateSettings />
+            </div>
+          </div>
         );
       default:
         return renderProjectsContent();
@@ -510,18 +642,18 @@ const CandidateDashboard = () => {
 
   const sidebarContent = (
     <Sidebar>
-      <SidebarContent className="bg-card">
-        <div className="p-4 border-b border-border">
+      <SidebarContent className="bg-black/40 backdrop-blur-xl border-r border-purple-500/20">
+        <div className="p-4 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/20 to-pink-900/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <IallaLogo className="h-8 w-8" />
-              <span className="font-semibold text-lg">Candidat</span>
+              <span className="font-semibold text-lg text-white">Candidat</span>
             </div>
           </div>
           
           {/* Availability Toggle */}
           <div className="mt-4 flex items-center justify-between">
-            <Label htmlFor="availability" className="text-sm">
+            <Label htmlFor="availability" className="text-sm text-white">
               Disponible
             </Label>
             <Switch
@@ -533,13 +665,14 @@ const CandidateDashboard = () => {
         </div>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-gray-300">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('projects')}
                   isActive={activeSection === 'projects'}
+                  className={activeSection === 'projects' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <FolderOpen className="h-4 w-4" />
                   <span>Projets</span>
@@ -550,6 +683,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('kanban')}
                   isActive={activeSection === 'kanban'}
+                  className={activeSection === 'kanban' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <Trello className="h-4 w-4" />
                   <span>Kanban</span>
@@ -560,6 +694,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('planning')}
                   isActive={activeSection === 'planning'}
+                  className={activeSection === 'planning' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <Calendar className="h-4 w-4" />
                   <span>Planning</span>
@@ -570,6 +705,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('messages')}
                   isActive={activeSection === 'messages'}
+                  className={activeSection === 'messages' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <MessageSquare className="h-4 w-4" />
                   <span>Messages</span>
@@ -580,6 +716,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('drive')}
                   isActive={activeSection === 'drive'}
+                  className={activeSection === 'drive' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <Cloud className="h-4 w-4" />
                   <span>Drive</span>
@@ -590,6 +727,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('wiki')}
                   isActive={activeSection === 'wiki'}
+                  className={activeSection === 'wiki' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <BookOpen className="h-4 w-4" />
                   <span>Wiki</span>
@@ -600,6 +738,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('time')}
                   isActive={activeSection === 'time'}
+                  className={activeSection === 'time' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <Activity className="h-4 w-4" />
                   <span>Temps</span>
@@ -610,13 +749,14 @@ const CandidateDashboard = () => {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Gestion</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-gray-300">Gestion</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('invoices')}
                   isActive={activeSection === 'invoices'}
+                  className={activeSection === 'invoices' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <FileText className="h-4 w-4" />
                   <span>Paiements</span>
@@ -627,6 +767,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('ratings')}
                   isActive={activeSection === 'ratings'}
+                  className={activeSection === 'ratings' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <Star className="h-4 w-4" />
                   <span>Évaluations</span>
@@ -637,6 +778,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('activities')}
                   isActive={activeSection === 'activities'}
+                  className={activeSection === 'activities' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <Layout className="h-4 w-4" />
                   <span>Activités</span>
@@ -647,6 +789,7 @@ const CandidateDashboard = () => {
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('notes')}
                   isActive={activeSection === 'notes'}
+                  className={activeSection === 'notes' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <FileText className="h-4 w-4" />
                   <span>Notes</span>
@@ -657,13 +800,14 @@ const CandidateDashboard = () => {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Compte</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-gray-300">Compte</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={() => setActiveSection('settings')}
                   isActive={activeSection === 'settings'}
+                  className={activeSection === 'settings' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
                 >
                   <Settings className="h-4 w-4" />
                   <span>Paramètres</span>
@@ -671,7 +815,7 @@ const CandidateDashboard = () => {
               </SidebarMenuItem>
               
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleLogout}>
+                <SidebarMenuButton onClick={handleLogout} className="text-white hover:bg-white/10">
                   <LogOut className="h-4 w-4" />
                   <span>Déconnexion</span>
                 </SidebarMenuButton>
@@ -684,38 +828,43 @@ const CandidateDashboard = () => {
   );
 
   const headerContent = (
-    <div className="h-16 px-6 flex items-center justify-between bg-card/80 backdrop-blur-md">
+    <header className="h-16 px-6 flex items-center justify-between bg-black/40 backdrop-blur-xl border-b border-purple-500/20 sticky top-0 z-40">
       <div className="flex items-center gap-4">
-        <SidebarTrigger />
-        <h1 className="text-xl font-semibold">Dashboard Candidat</h1>
+        <SidebarTrigger className="text-white hover:bg-white/10" />
+        <h1 className="text-xl font-semibold text-white">Dashboard Candidat</h1>
       </div>
       <div className="flex items-center gap-4">
-        <Badge variant={isAvailable ? "default" : "secondary"}>
+        <div className={`px-3 py-1 rounded-full text-xs font-medium ${isAvailable ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' : 'bg-gray-500 text-white'}`}>
           {isAvailable ? "Disponible" : "Indisponible"}
-        </Badge>
+        </div>
         <CandidateEventNotifications />
         <NotificationBell />
         <ThemeToggle />
       </div>
-    </div>
+    </header>
   );
 
   return (
     <SidebarProvider>
-      <AppShell 
-        sidebar={sidebarContent}
-        header={headerContent}
-      >
-        <Container size="xl">
-          {candidateProfile?.qualification_status === 'pending' && (
-            <div className="mb-6">
-              <ValidationPromoBanner status={candidateProfile.qualification_status} />
-            </div>
-          )}
+      <div className="flex h-screen w-full bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81]">
+        {sidebarContent}
+        
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {headerContent}
           
-          {renderContent()}
-        </Container>
-      </AppShell>
+          <main className="flex-1 overflow-auto">
+            <div className="w-full p-6 lg:p-8">
+              {candidateProfile?.qualification_status === 'pending' && (
+                <div className="mb-6">
+                  <ValidationPromoBanner status={candidateProfile.qualification_status} />
+                </div>
+              )}
+              
+              {renderContent()}
+            </div>
+          </main>
+        </div>
+      </div>
     </SidebarProvider>
   );
 };

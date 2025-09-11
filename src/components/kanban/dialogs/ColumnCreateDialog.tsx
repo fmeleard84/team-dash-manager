@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,17 +21,17 @@ export function ColumnCreateDialog({
   onSave
 }: ColumnCreateDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-purple-200">
-        <DialogHeader className="bg-gradient-to-r from-blue-500 to-purple-500 -m-6 mb-4 p-4 rounded-t-lg">
+    <FullScreenModal isOpen={open} onClose={() => onOpenChange(false)} title="" description="">
+      <div className="space-y-6">
+        <div className="mb-6">
           <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
             <Columns className="w-5 h-5" />
             Nouvelle colonne
           </DialogTitle>
-          <DialogDescription className="text-blue-100 mt-1 text-sm">
+          <p className="text-gray-300">
             Ajoutez une étape à votre flux de travail
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
         <div className="space-y-6 pt-6">
           <div className="space-y-2">
             <Label htmlFor="column-title" className="text-sm font-medium">Nom de la colonne</Label>
@@ -115,7 +115,7 @@ export function ColumnCreateDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 }

@@ -57,12 +57,16 @@ export function FullScreenModal({
 
   const modalContent = (
     <div className={cn(
-      "fixed inset-0 z-50 bg-background",
+      "fixed inset-0 z-50",
+      "bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81]",
       "animate-in fade-in-0 slide-in-from-bottom-4",
       className
     )}>
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
+      {/* Glassmorphism overlay */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xl" />
+      
+      {/* Header with neon design */}
+      <div className="relative sticky top-0 z-10 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/20 to-pink-900/20 backdrop-blur-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left side - Back button */}
@@ -73,7 +77,7 @@ export function FullScreenModal({
                   size="sm"
                   onClick={onClose}
                   disabled={preventClose}
-                  className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
+                  className="flex items-center gap-2 text-white hover:bg-white/10 hover:text-white border-purple-500/30"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   {backButtonText}
@@ -85,7 +89,7 @@ export function FullScreenModal({
                   size="icon"
                   onClick={onClose}
                   disabled={preventClose}
-                  className="hover:bg-accent hover:text-accent-foreground"
+                  className="text-white hover:bg-white/10 hover:text-white"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -102,25 +106,33 @@ export function FullScreenModal({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content with glassmorphism */}
       <div className={cn(
-        "h-[calc(100vh-4rem)] overflow-y-auto flex flex-col",
+        "relative h-[calc(100vh-4rem)] overflow-y-auto flex flex-col",
         contentClassName
       )}>
         <div className="max-w-5xl mx-auto px-6 py-6 w-full flex-1 flex flex-col">
-          {/* Title and description */}
+          {/* Title and description with neon styling */}
           {(title || description) && (
             <div className="mb-6">
-              {title && <h1 className="text-3xl font-bold text-foreground">{title}</h1>}
+              {title && (
+                <h1 className="text-3xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  {title}
+                </h1>
+              )}
               {description && (
-                <p className="mt-2 text-base text-muted-foreground">{description}</p>
+                <p className="mt-2 text-base text-gray-300">
+                  {description}
+                </p>
               )}
             </div>
           )}
           
-          {/* Main content - same alignment as title */}
+          {/* Main content with glassmorphism container */}
           <div className="flex-1 flex flex-col min-h-0">
-            {children}
+            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 shadow-2xl shadow-purple-500/10">
+              {children}
+            </div>
           </div>
         </div>
       </div>
@@ -162,7 +174,8 @@ export function ModalActions({
   deleteDisabled = false,
   isLoading = false,
   customActions,
-}: ModalActionsProps) {
+  isSaving = false,
+}: ModalActionsProps & { isSaving?: boolean }) {
   return (
     <div className="flex items-center gap-2">
       {customActions}
@@ -173,6 +186,7 @@ export function ModalActions({
           size="sm"
           onClick={onCancel}
           disabled={isLoading}
+          className="bg-white/10 hover:bg-white/20 border-purple-500/30 text-white backdrop-blur-sm"
         >
           {cancelText}
         </Button>
@@ -184,7 +198,7 @@ export function ModalActions({
           size="sm"
           onClick={onDelete}
           disabled={deleteDisabled || isLoading}
-          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800"
+          className="bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 hover:text-red-300 backdrop-blur-sm"
         >
           {deleteText}
         </Button>
@@ -196,6 +210,7 @@ export function ModalActions({
           size="sm"
           onClick={onEdit}
           disabled={editDisabled || isLoading}
+          className="bg-white/10 hover:bg-white/20 border-purple-500/30 text-white backdrop-blur-sm"
         >
           {editText}
         </Button>
@@ -205,10 +220,10 @@ export function ModalActions({
         <Button
           size="sm"
           onClick={onSave}
-          disabled={saveDisabled || isLoading}
-          className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+          disabled={saveDisabled || isLoading || isSaving}
+          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/40 transition-all duration-200 border-0"
         >
-          {isLoading ? "Enregistrement..." : saveText}
+          {isLoading || isSaving ? "Enregistrement..." : saveText}
         </Button>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Star } from "lucide-react";
@@ -179,12 +179,12 @@ export function TaskRatingDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md shadow-xl">
-        <DialogHeader className="space-y-3 pb-4 border-b border-gray-100">
-          <DialogTitle className="text-2xl font-light">
+    <FullScreenModal isOpen={open} onClose={() => onOpenChange(false)} title="" description="">
+      <div className="space-y-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
             {existingRating ? 'Modifier la notation' : 'Noter le livrable'}
-          </DialogTitle>
+          </h2>
           <DialogDescription className="text-muted-foreground">
             Évaluez la qualité de : <span className="font-medium">{taskTitle}</span>
             {existingRating && (
@@ -193,7 +193,7 @@ export function TaskRatingDialog({
               </div>
             )}
           </DialogDescription>
-        </DialogHeader>
+        </div>
 
         <div className="space-y-6 pt-6">
           {/* Étoiles de notation */}
@@ -262,7 +262,7 @@ export function TaskRatingDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FullScreenModal>
   );
 }
