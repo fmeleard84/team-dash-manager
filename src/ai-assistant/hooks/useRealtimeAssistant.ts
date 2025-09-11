@@ -142,10 +142,22 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         tools: config.enableTools !== false ? REALTIME_TOOLS : []
       });
 
-      // Créer la session avec le bon modèle
+      // Créer la session avec le bon modèle et vitesse de parole augmentée
       const session = new RealtimeSession(agent, {
-        model: 'gpt-4o-realtime-preview'
-      });
+        model: 'gpt-4o-realtime-preview',
+        voice: 'alloy', // Voix plus rapide et claire
+        instructions: instructions,
+        input_audio_format: 'pcm16',
+        output_audio_format: 'pcm16',
+        turn_detection: {
+          type: 'server_vad',
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 500 // Réduire le silence pour des réponses plus rapides
+        },
+        modalities: ['text', 'audio'],
+        temperature: 0.8
+      } as any);
 
       // Configurer les event listeners
       session.on('connected', () => {
@@ -160,24 +172,91 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         console.log('Conversation updated:', event);
       });
 
+      // Gérer les différents formats d'événements possibles
       session.on('conversation.item.appended', (event: any) => {
         console.log('Item appended:', event);
-        if (event.item?.formatted?.transcript) {
+        const content = event.item?.formatted?.transcript || 
+                       event.item?.content?.[0]?.text || 
+                       event.item?.content || 
+                       event.item?.text;
+        
+        if (content) {
           setState(prev => ({ 
             ...prev, 
-            transcript: event.item.role === 'user' ? event.item.formatted.transcript : prev.transcript,
-            response: event.item.role === 'assistant' ? event.item.formatted.transcript : prev.response,
-            isProcessing: false 
+            transcript: event.item.role === 'user' ? content : prev.transcript,
+            response: event.item.role === 'assistant' ? content : prev.response,
+            isProcessing: event.item.role === 'user',
+            isSpeaking: event.item.role === 'assistant'
           }));
         }
       });
 
       session.on('conversation.item.completed', (event: any) => {
         console.log('Item completed:', event);
-        if (event.item?.formatted?.transcript) {
+        const content = event.item?.formatted?.transcript || 
+                       event.item?.content?.[0]?.text || 
+                       event.item?.content || 
+                       event.item?.text;
+        
+        if (content) {
           setState(prev => ({ 
             ...prev, 
-            response: event.item.formatted.transcript,
+            response: content,
+            isProcessing: false,
+            isSpeaking: false
+          }));
+        }
+      });
+      
+      // Gérer les événements audio
+      session.on('input_audio_buffer.speech_started', () => {
+        console.log('Speech started');
+        setState(prev => ({ ...prev, isListening: true }));
+      });
+      
+      session.on('input_audio_buffer.speech_stopped', () => {
+        console.log('Speech stopped');
+        setState(prev => ({ ...prev, isListening: false, isProcessing: true }));
+      });
+      
+      // Gérer les événements de transcription
+      session.on('conversation.item.input_audio_transcription.completed', (event: any) => {
+        console.log('Transcription completed:', event);
+        if (event.transcript) {
+          setState(prev => ({ 
+            ...prev, 
+            transcript: event.transcript,
+            isProcessing: true 
+          }));
+        }
+      });
+      
+      // Gérer la réponse audio
+      session.on('response.audio.delta', () => {
+        setState(prev => ({ ...prev, isSpeaking: true }));
+      });
+      
+      session.on('response.audio.done', () => {
+        setState(prev => ({ ...prev, isSpeaking: false }));
+      });
+      
+      // Gérer le texte de la réponse
+      session.on('response.text.delta', (event: any) => {
+        if (event.delta) {
+          setState(prev => ({ 
+            ...prev, 
+            response: prev.response + event.delta,
+            isProcessing: false 
+          }));
+        }
+      });
+      
+      session.on('response.text.done', (event: any) => {
+        console.log('Response text done:', event);
+        if (event.text) {
+          setState(prev => ({ 
+            ...prev, 
+            response: event.text,
             isProcessing: false 
           }));
         }
@@ -457,12 +536,7 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
    */
   const executeFunction = useCallback(async (name: string, args: any) => {
     try {
-      const validation = validateToolParameters(name, args);
-      if (!validation.valid) {
-        throw new Error(`Invalid parameters: ${validation.errors?.join(', ')}`);
-      }
-
-      const result = await executeTool(name, args);
+      const result = await executeRealtimeTool(name, args);
       
       setState(prev => ({ 
         ...prev, 

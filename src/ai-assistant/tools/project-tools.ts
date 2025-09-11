@@ -141,8 +141,18 @@ export async function createTeam(params: CreateTeamParams) {
       }
     }
 
+    // Si pas de projet, on retourne juste la composition d'équipe pour ReactFlow
     if (!projectId) {
-      throw new Error('Projet non trouvé. Veuillez spécifier un projet valide.');
+      // Retourner la composition d'équipe pour ReactFlow
+      return {
+        success: true,
+        message: `Équipe de ${params.profiles.length} membres créée avec succès`,
+        data: {
+          project_name: params.project_name || 'Nouveau Projet',
+          profiles: params.profiles
+        },
+        forReactFlow: true
+      };
     }
 
     // Créer les ressources HR pour l'équipe

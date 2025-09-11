@@ -95,40 +95,46 @@ export function EnhancedVoiceAssistant({
 
   // Ajouter les messages de l'assistant
   useEffect(() => {
-    if (state.transcript) {
+    if (state.transcript && state.transcript !== messages[messages.length - 1]?.content) {
       addMessage('user', state.transcript);
       // Détecter si l'utilisateur demande de créer une équipe
       if (state.transcript.toLowerCase().includes('équipe') || 
-          state.transcript.toLowerCase().includes('team')) {
+          state.transcript.toLowerCase().includes('team') ||
+          state.transcript.toLowerCase().includes('compose')) {
         setIsCreatingTeam(true);
       }
     }
-  }, [state.transcript]);
+  }, [state.transcript, messages]);
 
   useEffect(() => {
-    if (state.response) {
+    if (state.response && state.response !== messages[messages.length - 1]?.content) {
       addMessage('assistant', state.response, state.lastToolCall);
       
       // Vérifier si l'équipe a été créée
       if (state.lastToolCall?.name === 'create_team' && state.lastToolCall?.result) {
-        const teamData = parseTeamFromAI(state.lastToolCall.result);
-        if (teamData) {
-          saveTeamComposition(teamData);
-          
-          // Attendre un peu avant de rediriger
-          setTimeout(() => {
-            setIsCreatingTeam(false);
-            onClose();
-            navigate('/template-flow?fromAI=true');
-            toast({
-              title: 'Équipe créée avec succès',
-              description: 'Vous allez être redirigé vers l\'éditeur ReactFlow',
-            });
-          }, 2000);
+        console.log('Team creation result:', state.lastToolCall.result);
+        
+        // Si c'est pour ReactFlow
+        if (state.lastToolCall.result.forReactFlow && state.lastToolCall.result.data) {
+          const teamData = parseTeamFromAI(state.lastToolCall.result.data);
+          if (teamData) {
+            saveTeamComposition(teamData);
+            
+            // Attendre un peu avant de rediriger
+            setTimeout(() => {
+              setIsCreatingTeam(false);
+              onClose();
+              navigate('/template-flow?fromAI=true');
+              toast({
+                title: 'Équipe créée avec succès',
+                description: 'Vous allez être redirigé vers l\'éditeur ReactFlow',
+              });
+            }, 2000);
+          }
         }
       }
     }
-  }, [state.response, state.lastToolCall, navigate, onClose]);
+  }, [state.response, state.lastToolCall, messages, navigate, onClose]);
 
   useEffect(() => {
     if (state.error) {
@@ -508,6 +514,32 @@ export function EnhancedVoiceAssistant({
                 
                 <ScrollArea className="flex-1">
                   <MessagesList messages={messages} />
+                  {/* Afficher la transcription en temps réel */}
+                  {state.isProcessing && state.transcript && (
+                    <div className="px-4 py-2">
+                      <div className="flex justify-end">
+                        <div className="max-w-[70%] rounded-xl px-4 py-2 bg-brand/20 border border-brand">
+                          <p className="text-sm italic">En cours de traitement...</p>
+                          <p className="text-sm">{state.transcript}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* Afficher la réponse en cours de génération */}
+                  {state.isSpeaking && state.response && (
+                    <div className="px-4 py-2">
+                      <div className="flex justify-start">
+                        <div className="max-w-[70%] rounded-xl px-4 py-2 bg-card border border-border">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Volume2 className="w-3 h-3 text-brand animate-pulse" />
+                            <span className="text-xs text-muted-foreground">En train de parler...</span>
+                          </div>
+                          <p className="text-sm">{state.response}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
                 </ScrollArea>
               </div>
             )}
@@ -561,6 +593,20 @@ export function EnhancedVoiceAssistant({
                 
                 <ScrollArea className="flex-1">
                   <MessagesList messages={messages} />
+                  {/* Afficher la réponse en cours de génération */}
+                  {state.isProcessing && (
+                    <div className="px-4 py-2">
+                      <div className="flex justify-start">
+                        <div className="max-w-[70%] rounded-xl px-4 py-2 bg-card border border-border">
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span className="text-xs text-muted-foreground">L'assistant réfléchit...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
                 </ScrollArea>
                 
                 <div className="mt-4 flex gap-2">
