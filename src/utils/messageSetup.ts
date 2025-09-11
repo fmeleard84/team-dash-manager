@@ -164,20 +164,19 @@ export const sendMessage = async (
 
     if (profileError) throw profileError;
     
-    // Get job title/position from candidate_profiles
+    // Get job title/position from candidate_profiles (only for candidates)
     let jobTitle = '';
+    // Utiliser l'ID universel au lieu de l'email
     const { data: candidateProfile } = await supabase
       .from('candidate_profiles')
       .select('position')
-      .eq('email', profile.email)
-      .single();
+      .eq('id', user.id)
+      .maybeSingle(); // Utiliser maybeSingle car un client n'aura pas de profil candidat
     
     if (candidateProfile?.position) {
       jobTitle = candidateProfile.position;
-    } else {
-      // Check if client (they don't have position)
-      jobTitle = ''; // Clients don't have a job title
     }
+    // Les clients n'ont pas de position/métier
 
     // Use only first name for sender_name (job title will be shown separately in UI)
     const senderName = profile.first_name || profile.email.split('@')[0];

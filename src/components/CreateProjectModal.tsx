@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
+import { DatePicker } from "@/components/ui/date-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -217,15 +218,12 @@ const handleClose = () => {
                   <Calendar className="w-4 h-4" />
                   Date de début
                 </Label>
-                <Input
-                  id="project_date"
-                  type="date"
+                <DatePicker
                   value={projectDate}
-                  onChange={(e) => setProjectDate(e.target.value)}
-                  min={today}
-                  required
+                  onChange={setProjectDate}
+                  placeholder="Sélectionner la date de début"
+                  minDate={today}
                   disabled={isCreating}
-                  className="h-12"
                 />
               </div>
 
@@ -234,14 +232,12 @@ const handleClose = () => {
                   <Calendar className="w-4 h-4" />
                   Date de fin souhaitée
                 </Label>
-                <Input
-                  id="due_date"
-                  type="date"
+                <DatePicker
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  min={projectDate || today}
+                  onChange={setDueDate}
+                  placeholder="Sélectionner la date de fin"
+                  minDate={projectDate || today}
                   disabled={isCreating}
-                  className="h-12"
                 />
               </div>
 

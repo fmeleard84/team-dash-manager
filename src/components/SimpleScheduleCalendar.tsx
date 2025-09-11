@@ -30,7 +30,7 @@ interface SimpleScheduleCalendarProps {
   }>;
   calendarConfig?: any;
   onEventClick?: (event: CalendarEvent) => void;
-  onAddEvent?: () => void;
+  onAddEvent?: (date?: Date) => void;
 }
 
 export function SimpleScheduleCalendar({
@@ -44,6 +44,9 @@ export function SimpleScheduleCalendar({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [view, setView] = useState<'month' | 'list'>('month');
+  
+  // Debug: afficher les événements reçus
+  console.log('SimpleScheduleCalendar - events reçus:', events);
 
   // Obtenir les jours du mois avec padding des semaines
   const monthDays = useMemo(() => {
@@ -55,7 +58,9 @@ export function SimpleScheduleCalendar({
   // Filtrer les événements du mois en cours
   const monthEvents = useMemo(() => {
     return events.filter(event => {
+      if (!event.start) return false;
       const eventDate = new Date(event.start);
+      if (isNaN(eventDate.getTime())) return false;
       return eventDate.getMonth() === currentDate.getMonth() && 
              eventDate.getFullYear() === currentDate.getFullYear();
     });
@@ -63,10 +68,25 @@ export function SimpleScheduleCalendar({
 
   // Obtenir les événements d'un jour spécifique
   const getEventsForDay = (date: Date) => {
-    return events.filter(event => {
+    const dayEvents = events.filter(event => {
+      // Vérifier que event.start existe et est valide
+      if (!event.start) {
+        console.log('Event sans start:', event);
+        return false;
+      }
       const eventDate = new Date(event.start);
-      return isSameDay(eventDate, date);
+      // Vérifier que la date est valide
+      if (isNaN(eventDate.getTime())) {
+        console.log('Event avec date invalide:', event.start, event);
+        return false;
+      }
+      const isSame = isSameDay(eventDate, date);
+      if (isSame) {
+        console.log('Event trouvé pour', format(date, 'dd/MM/yyyy'), ':', event.title);
+      }
+      return isSame;
     });
+    return dayEvents;
   };
 
   // Navigation du calendrier
@@ -75,52 +95,19 @@ export function SimpleScheduleCalendar({
   const goToToday = () => setCurrentDate(new Date());
 
   // Trouver le prochain événement kickoff
-  const nextKickoffEvent = events.find(e => 
-    e.title.toLowerCase().includes('kickoff') && 
-    new Date(e.start) > new Date()
-  );
+  const nextKickoffEvent = events.find(e => {
+    if (!e.start || !e.title) return false;
+    const eventDate = new Date(e.start);
+    if (isNaN(eventDate.getTime())) return false;
+    return e.title.toLowerCase().includes('kickoff') && eventDate > new Date();
+  });
 
   return (
     <div className="space-y-4">
-      {/* Header avec infos projet */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-emerald-600" />
-              <CardTitle>Calendrier du projet {projectName}</CardTitle>
-            </div>
-            <div className="flex items-center gap-2">
-              {teamMembers.length > 0 && (
-                <Badge variant="secondary">
-                  <Users className="h-3 w-3 mr-1" />
-                  {teamMembers.length} membres
-                </Badge>
-              )}
-              <Button
-                size="sm"
-                variant={view === 'month' ? 'default' : 'outline'}
-                onClick={() => setView('month')}
-              >
-                Mois
-              </Button>
-              <Button
-                size="sm"
-                variant={view === 'list' ? 'default' : 'outline'}
-                onClick={() => setView('list')}
-              >
-                Liste
-              </Button>
-            </div>
-          </div>
-          <CardDescription>
-            Planning partagé avec l'équipe du projet
-          </CardDescription>
-        </CardHeader>
-
-        {/* Prochain kickoff */}
-        {nextKickoffEvent && (
-          <CardContent>
+      {/* Prochain kickoff */}
+      {nextKickoffEvent && (
+        <Card>
+          <CardContent className="pt-6">
             <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800">
               <div className="flex items-start gap-3">
                 <div className="bg-emerald-100 dark:bg-emerald-900 rounded-full p-2">
@@ -129,7 +116,9 @@ export function SimpleScheduleCalendar({
                 <div className="flex-1">
                   <h4 className="font-medium text-sm mb-1">Prochaine réunion kickoff</h4>
                   <p className="text-sm text-muted-foreground mb-2">
-                    {format(new Date(nextKickoffEvent.start), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                    {nextKickoffEvent.start && !isNaN(new Date(nextKickoffEvent.start).getTime())
+                      ? format(new Date(nextKickoffEvent.start), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })
+                      : 'Date non définie'}
                   </p>
                   {nextKickoffEvent.location && (
                     <a
@@ -146,8 +135,8 @@ export function SimpleScheduleCalendar({
               </div>
             </div>
           </CardContent>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Équipe du projet */}
       {teamMembers.length > 0 && (
@@ -212,15 +201,6 @@ export function SimpleScheduleCalendar({
               >
                 Aujourd'hui
               </Button>
-              {onAddEvent && (
-                <Button
-                  size="sm"
-                  onClick={onAddEvent}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Ajouter
-                </Button>
-              )}
             </div>
           </div>
         </CardHeader>
@@ -256,8 +236,9 @@ export function SimpleScheduleCalendar({
                       `}
                       onClick={() => {
                         setSelectedDate(day);
-                        if (dayEvents.length > 0 && onEventClick) {
-                          onEventClick(dayEvents[0]);
+                        if (dayEvents.length === 0 && onAddEvent) {
+                          // Si pas d'événement ce jour-là, créer un nouvel événement
+                          onAddEvent(day);
                         }
                       }}
                     >
@@ -274,7 +255,9 @@ export function SimpleScheduleCalendar({
                             onEventClick && onEventClick(event);
                           }}
                         >
-                          {format(new Date(event.start), 'HH:mm')} {event.title}
+                          {event.start && !isNaN(new Date(event.start).getTime()) 
+                            ? format(new Date(event.start), 'HH:mm') 
+                            : ''} {event.title}
                         </div>
                       ))}
                     </div>
@@ -300,17 +283,25 @@ export function SimpleScheduleCalendar({
                     >
                       <div className="text-center min-w-[60px]">
                         <div className="text-2xl font-bold text-emerald-600">
-                          {format(new Date(event.start), 'd')}
+                          {event.start && !isNaN(new Date(event.start).getTime())
+                            ? format(new Date(event.start), 'd')
+                            : '?'}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {format(new Date(event.start), 'MMM', { locale: fr })}
+                          {event.start && !isNaN(new Date(event.start).getTime())
+                            ? format(new Date(event.start), 'MMM', { locale: fr })
+                            : ''}
                         </div>
                       </div>
                       <div className="flex-1">
                         <h4 className="font-medium">{event.title}</h4>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {format(new Date(event.start), 'HH:mm')} - {format(new Date(event.end), 'HH:mm')}
+                          {event.start && !isNaN(new Date(event.start).getTime())
+                            ? format(new Date(event.start), 'HH:mm')
+                            : '??:??'} - {event.end && !isNaN(new Date(event.end).getTime())
+                            ? format(new Date(event.end), 'HH:mm')
+                            : '??:??'}
                         </div>
                         {event.location && (
                           <div className="flex items-center gap-1 mt-1">

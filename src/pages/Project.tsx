@@ -19,6 +19,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/ui/components/Card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Download, Upload, Users, Network, Euro } from 'lucide-react';
 import AIGraphGenerator from '@/components/AIGraphGenerator';
@@ -1756,113 +1758,112 @@ const Project = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      {/* Header avec design Ialla */}
-      <header className="h-20 border-b bg-white/80 backdrop-blur-sm shadow-sm">
-        <div className="relative overflow-hidden h-full">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-white to-purple-50/50" />
-          <div className="relative h-full flex items-center justify-between px-6">
+      {/* Header Material Design avec gradient */}
+      <header className="bg-gradient-to-r from-purple-600 to-purple-500 shadow-lg">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
             {/* Left section */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
-                  // If this is a template preview, try to go back to templates section
                   if (id === 'template-preview') {
-                    // Check if opened in new tab - if so, close it
                     if (window.opener) {
                       window.close();
                       return;
                     }
-                    // Otherwise navigate to templates
                     navigate('/client-dashboard?section=templates');
                   } else {
                     navigate('/client-dashboard?section=projects');
                   }
                 }}
-                className="bg-white/80 backdrop-blur-sm border-gray-200 hover:bg-white"
+                className="text-white hover:bg-white/20"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 {id === 'template-preview' ? 'Fermer' : 'Retour'}
               </Button>
               
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
                   <Network className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                <div className="text-white">
+                  <h1 className="text-2xl font-bold">
                     {id === 'template-preview' ? 'Construisez votre équipe idéale' : project.title}
                   </h1>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-purple-100">
                     {id === 'template-preview' ? 'Personnalisez ce template selon vos besoins' : 
                      isArchived ? '🔒 Projet archivé - Lecture seule' : 'Gestion des ressources humaines'}
                   </p>
                 </div>
                 {isArchived && (
-                  <div className="ml-4 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
+                  <Badge className="ml-4 bg-orange-500 text-white border-0">
                     Archivé
-                  </div>
+                  </Badge>
                 )}
               </div>
             </div>
             
-            {/* Prix total au centre */}
+            {/* Prix total avec Material Design */}
             {hrResources.size > 0 && (
-              <div className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg shadow-lg">
-                <div className="flex items-center gap-2">
-                  <Euro className="w-5 h-5" />
-                  <span className="text-lg font-bold">
-                    {calculateTotalPrice().toFixed(2)}€/min
-                  </span>
-                </div>
-                <p className="text-xs text-center opacity-90">
-                  Total de {hrResources.size} ressource{hrResources.size > 1 ? 's' : ''}
-                </p>
-              </div>
+              <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <Euro className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">
+                        {calculateTotalPrice().toFixed(2)}€/min
+                      </p>
+                      <p className="text-sm opacity-90">
+                        {hrResources.size} ressource{hrResources.size > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
             
             {/* Right section */}
-            <div className="flex items-center gap-4">
-              {/* Action buttons */}
-              <div className="flex items-center gap-3">
-                {isAdmin && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      onClick={importJSON}
-                      className="flex items-center gap-2 bg-white/80 backdrop-blur-sm"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Import JSON
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={exportJSON}
-                      className="flex items-center gap-2 bg-white/80 backdrop-blur-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Export JSON
-                    </Button>
-                  </>
-                )}
-                {!isArchived && (
+            <div className="flex items-center gap-3">
+              {isAdmin && (
+                <>
                   <Button 
-                    onClick={saveFlow} 
-                    disabled={isSaving || isArchived}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
+                    variant="ghost" 
+                    onClick={importJSON}
+                    className="text-white hover:bg-white/20"
                   >
-                    <Save className="w-4 h-4 mr-2" />
-                    {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                    <Upload className="w-4 h-4 mr-2" />
+                    Importer
                   </Button>
-                )}
-              </div>
+                  <Button 
+                    variant="ghost"
+                    onClick={exportJSON}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Exporter
+                  </Button>
+                </>
+              )}
+              {!isArchived && (
+                <Button 
+                  onClick={saveFlow} 
+                  disabled={isSaving || isArchived}
+                  className="bg-white text-purple-600 hover:bg-purple-50 font-medium shadow-lg"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content - 3 panels with footer space */}
-      <div className="flex-1 flex" style={{ height: 'calc(100vh - 80px - 70px)' }}>
+      {/* Main Content - 3 panels */}
+      <div className="flex-1 flex">
         {/* Panel gauche - Catégories HR */}
         <HRCategoriesPanel onProfileSelect={handleProfileSelect} />
         

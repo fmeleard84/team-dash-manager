@@ -139,7 +139,7 @@ export const useInvoices = (projectId?: string) => {
       // This ensures we only show projects that belong to this specific client
       const { data, error } = await supabase
         .from('projects')
-        .select('id, title, status, owner_id')
+        .select('id, title, status, owner_id, created_at')
         .eq('owner_id', user.id)  // Only projects owned by this client
         .order('created_at', { ascending: false });
       

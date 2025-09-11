@@ -1,35 +1,58 @@
 import { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Calendar, Clock, Video, Users, Server, Settings, Plus } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, Clock, Video, Users, Server, Settings, Plus, ChevronDown, Zap, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { SimpleScheduleCalendar } from '@/components/SimpleScheduleCalendar';
-import { CreateEventDialog } from '@/components/CreateEventDialog';
-import { ViewEventDialog } from '@/components/ViewEventDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
+import { ProjectSelectItem } from '@/components/ui/project-select-item';
+import { FullScreenModal, ModalActions, useFullScreenModal } from '@/components/ui/fullscreen-modal';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface PlanningPageProps {
-  userType: 'client' | 'candidate';
-  userEmail?: string;
-  userName?: string;
-  candidateId?: string;
+  projects: ProjectWithDate[];
 }
 
-const PlanningPage = ({ userType, userEmail, userName, candidateId }: PlanningPageProps) => {
+const PlanningPage = ({ projects }: PlanningPageProps) => {
   const { toast } = useToast();
   const [events, setEvents] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  const [selectedProject, setSelectedProject] = useState<any>(null);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [showCreateEvent, setShowCreateEvent] = useState(false);
-  const [showViewEvent, setShowViewEvent] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<ProjectWithDate | null>(null);
+  const createEventModal = useFullScreenModal();
+  const viewEventModal = useFullScreenModal();
   const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [newEventData, setNewEventData] = useState({
+    title: '',
+    description: '',
+    start_time: new Date(),
+    end_time: new Date(Date.now() + 3600000), // Par défaut 1h après
+    location: ''
+  });
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState<'calendar' | 'list'>('calendar');
+  
+  // Trier les projets par date de création (plus récent en premier)
+  const sortedProjects = useProjectSort(projects);
 
-  // Charger les projets et événements
+  // Sélectionner le premier projet au chargement
   useEffect(() => {
-    loadProjects();
-  }, [userType, candidateId]);
+    if (sortedProjects.length > 0 && !selectedProject) {
+      const firstProject = projects.find(p => p.id === sortedProjects[0].id);
+      if (firstProject) {
+        selectProject(firstProject);
+      }
+    }
+  }, [sortedProjects, selectedProject, projects]);
 
   // Realtime pour les événements
   useEffect(() => {
@@ -78,425 +101,711 @@ const PlanningPage = ({ userType, userEmail, userName, candidateId }: PlanningPa
     };
   }, [selectedProject]);
 
-  const loadProjects = async () => {
-    let projectsData;
-    
-    if (userType === 'client') {
-      // Client: ses projets actifs
-      const { data } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('status', 'play')
-        .order('created_at', { ascending: false });
-      projectsData = data;
-    } else {
-      // Candidat: projets où il est accepté
-      const { data } = await supabase
-        .from('projects')
-        .select(`
-          *,
-          hr_resource_assignments!inner(
-            candidate_id,
-            booking_status
-          )
-        `)
-        .eq('status', 'play')
-        .eq('hr_resource_assignments.candidate_id', candidateId)
-        .eq('hr_resource_assignments.booking_status', 'accepted')
-        .order('created_at', { ascending: false });
-      projectsData = data;
-    }
-    
-    if (projectsData) {
-      setProjects(projectsData);
-      if (projectsData.length > 0) {
-        selectProject(projectsData[0]);
-      }
-    }
-  };
 
   const selectProject = async (project: any) => {
+    console.log('selectProject appelé avec:', project);
     setSelectedProject(project);
     
     // Charger les événements du projet
-    const { data: eventsData } = await supabase
+    const { data: eventsData, error: eventsError } = await supabase
       .from('project_events')
       .select('*')
-      .eq('project_id', project.id)
-      .order('start_at', { ascending: true });
+      .eq('project_id', project.id);
     
-    if (eventsData) {
-      const formattedEvents = eventsData.map(event => ({
-        id: event.id,
-        title: event.title,
-        start: event.start_at,
-        end: event.end_at,
-        description: event.description,
-        location: event.video_url
-      }));
-      setEvents(formattedEvents);
-    }
-    
-    // Charger les membres de l'équipe depuis la base de données
-    const members: any[] = [];
-    
-    // Récupérer le client (owner)
-    const { data: projectData } = await supabase
-      .from('projects')
-      .select('owner_id')
-      .eq('id', project.id)
-      .single();
-    
-    if (projectData?.owner_id) {
-      const { data: clientProfile } = await supabase
-        .from('client_profiles')
-        .select('id, email, first_name, last_name, company_name')
-        .eq('id', projectData.owner_id)
-        .single();
+    if (eventsError) {
+      console.error('Erreur chargement événements:', eventsError);
+      setEvents([]);
+    } else if (eventsData) {
+      console.log('Evénements chargés:', eventsData.length);
+      console.log('Premier événement brut complet:', JSON.stringify(eventsData[0], null, 2)); // Debug complet
       
-      if (clientProfile) {
-        members.push({
-          email: clientProfile.email,
-          name: `${clientProfile.first_name} ${clientProfile.last_name}`,
-          role: 'client'
-        });
+      // Vérifier quels champs existent vraiment
+      if (eventsData.length > 0) {
+        const firstEvent = eventsData[0];
+        console.log('Champs disponibles:', Object.keys(firstEvent));
+        console.log('start_at:', firstEvent.start_at);
+        console.log('end_at:', firstEvent.end_at);
+        console.log('video_url:', firstEvent.video_url);
       }
+      
+      // Trier les événements par date de début
+      const sortedEvents = eventsData.sort((a, b) => {
+        const aTime = (a.start_at || a.start_time) ? new Date(a.start_at || a.start_time).getTime() : 0;
+        const bTime = (b.start_at || b.start_time) ? new Date(b.start_at || b.start_time).getTime() : 0;
+        return aTime - bTime;
+      });
+      
+      // Transform events pour SimpleScheduleCalendar
+      // IMPORTANT: La DB utilise start_at et end_at, PAS start_time et end_time !
+      const transformedEvents = sortedEvents.map(event => ({
+        id: event.id,
+        title: event.title || 'Sans titre',
+        start: event.start_at || event.start_time || null,  // Priorité à start_at (colonne DB)
+        end: event.end_at || event.end_time || null,        // Priorité à end_at (colonne DB)
+        description: event.description || '',
+        location: event.video_url || event.meeting_link || event.location || '', 
+        attendees: []
+      }));
+      console.log('Événements transformés pour le calendrier:', transformedEvents);
+      setEvents(transformedEvents);
+    } else {
+      console.log('Aucun événement trouvé');
+      setEvents([]);
     }
     
-    // Récupérer les candidats acceptés (mais pas celui qui consulte si c'est un candidat)
-    const { data: assignments } = await supabase
+    // Charger les membres de l'équipe
+    const { data: assignmentsData } = await supabase
       .from('hr_resource_assignments')
       .select(`
-        candidate_id,
-        booking_status,
-        candidate_profiles (
+        id,
+        candidate:candidate_profiles!candidate_id (
           id,
-          email,
           first_name,
-          last_name
+          last_name,
+          email
         )
       `)
       .eq('project_id', project.id)
       .eq('booking_status', 'accepted');
     
-    if (assignments) {
-      assignments.forEach((assignment: any) => {
-        if (assignment.candidate_profiles) {
-          // Pour un candidat, ne pas s'afficher soi-même
-          if (userType === 'candidate' && assignment.candidate_id === candidateId) {
-            return;
-          }
-          members.push({
-            email: assignment.candidate_profiles.email,
-            name: `${assignment.candidate_profiles.first_name} ${assignment.candidate_profiles.last_name}`,
-            role: 'resource'
-          });
-        }
-      });
+    if (assignmentsData) {
+      const members = assignmentsData
+        .filter(a => a.candidate)
+        .map(a => ({
+          id: a.candidate.id,
+          name: `${a.candidate.first_name || ''} ${a.candidate.last_name || ''}`.trim() || a.candidate.email?.split('@')[0] || 'Candidat',
+          email: a.candidate.email,
+          role: 'resource' // Rôle pour le composant SimpleScheduleCalendar
+        }));
+      console.log('Membres de l\'équipe chargés:', members);
+      setTeamMembers(members);
     }
-    
-    setTeamMembers(members);
   };
 
-  // Fonction pour créer un événement kickoff de test (client uniquement)
-  const createTestKickoffEvent = async () => {
-    if (userType !== 'client') {
+  const checkAndCreateKickoff = async () => {
+    if (!selectedProject) return;
+    
+    // Vérifier s'il existe déjà un kickoff
+    const { data: existingKickoff } = await supabase
+      .from('project_events')
+      .select('*')
+      .eq('project_id', selectedProject.id)
+      .eq('event_type', 'kickoff')
+      .single();
+    
+    if (existingKickoff) {
       toast({
-        title: "Action non autorisée",
-        description: "Seul le client peut créer un kickoff de test.",
-        variant: "destructive"
+        title: "Kickoff existant",
+        description: `Un kickoff est déjà planifié pour ce projet`,
+        variant: "default",
       });
       return;
     }
     
-    if (!selectedProject) {
-      toast({
-        title: "Sélectionnez un projet",
-        description: "Veuillez d'abord sélectionner un projet actif.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    // Créer un événement kickoff par défaut
     const kickoffDate = new Date();
-    kickoffDate.setDate(kickoffDate.getDate() + 1);
-    kickoffDate.setHours(14, 0, 0, 0);
+    kickoffDate.setDate(kickoffDate.getDate() + 7); // Dans 7 jours
+    kickoffDate.setHours(10, 0, 0, 0); // À 10h00
     
-    const { data, error } = await supabase.functions.invoke('project-kickoff', {
-      body: {
-        projectId: selectedProject.id,
-        kickoffDate: kickoffDate.toISOString()
-      }
-    });
+    const endDate = new Date(kickoffDate);
+    endDate.setHours(11, 0, 0, 0); // Durée d'1 heure
+    
+    // Récupérer l'utilisateur actuel
+    const { data: userData } = await supabase.auth.getUser();
+    
+    const { error } = await supabase
+      .from('project_events')
+      .insert({
+        project_id: selectedProject.id,
+        title: `Kickoff - ${selectedProject.title}`,
+        description: 'Réunion de lancement du projet avec toute l\'équipe',
+        start_at: kickoffDate.toISOString(),    
+        end_at: endDate.toISOString(),          
+        location: 'Visioconférence',
+        video_url: `https://meet.jit.si/kickoff-${selectedProject.title}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 50),
+        created_by: userData?.user?.id,  // ID de l'utilisateur créateur
+        metadata: {
+          is_mandatory: true,
+          created_by_system: true
+        }
+      });
     
     if (error) {
+      console.error('Erreur création kickoff:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de créer le kickoff. Vérifiez la configuration.",
-        variant: "destructive"
+        description: "Impossible de créer le kickoff",
+        variant: "destructive",
       });
     } else {
       toast({
         title: "Kickoff créé !",
         description: `Un événement kickoff a été créé pour ${selectedProject.title}`,
       });
-      selectProject(selectedProject); // Recharger les données
+      selectProject(selectedProject);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-            <Calendar className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Planning & Calendrier</h1>
-            <p className="text-gray-600">
-              {userType === 'client' 
-                ? 'Gérez vos rendez-vous et événements projet'
-                : 'Consultez le planning partagé de vos projets'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Actions rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-gray-100">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Video className="w-5 h-5 text-blue-600" />
+    <div className="space-y-6">
+      {/* Header unifié */}
+      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-primary-foreground">Planning & Calendrier</h2>
+                <p className="text-sm text-primary-foreground/80">Gérez vos rendez-vous et événements projet</p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">Réunion Kickoff</h3>
-              <p className="text-sm text-gray-600">Planifier le lancement</p>
-            </div>
-          </div>
-          {userType === 'client' && (
-            <Button 
-              onClick={createTestKickoffEvent}
-              className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
+            
+            {/* Sélecteur de projet unifié */}
+            <Select 
+              value={selectedProject?.id || ''}
+              onValueChange={(value) => {
+                const project = projects.find(p => p.id === value);
+                if (project) {
+                  console.log('Sélection du projet:', project.title, project.id);
+                  selectProject(project);
+                }
+              }}
             >
-              Créer un kickoff test
-            </Button>
-          )}
-        </Card>
-
-        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-gray-100">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">Point d'équipe</h3>
-              <p className="text-sm text-gray-600">Réunion hebdomadaire</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-gray-100">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-purple-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">{userType === 'client' ? 'Entretien' : 'Rendez-vous'}</h3>
-              <p className="text-sm text-gray-600">{userType === 'client' ? 'Rencontrer un candidat' : 'Rendez-vous avec un membre'}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Status de Schedule-X */}
-      <Alert className="mb-6 border-emerald-200 bg-emerald-50">
-        <Calendar className="h-4 w-4 text-emerald-600" />
-        <AlertTitle className="text-emerald-900">Planning Partagé du Projet</AlertTitle>
-        <AlertDescription className="text-emerald-700">
-          <div className="space-y-2 mt-2">
-            <p>
-              {userType === 'client' 
-                ? 'Gérez les événements et réunions de vos projets actifs.'
-                : 'Consultez les événements et réunions des projets auxquels vous participez.'}
-            </p>
-            <div className="flex items-center gap-2 mt-3">
-              <span className="text-sm font-medium">
-                {userType === 'client' ? 'Vos projets actifs :' : 'Vos projets :'}
-              </span>
-              <select 
-                className="px-3 py-1 rounded-md border border-emerald-300 bg-white text-sm"
-                value={selectedProject?.id || ''}
-                onChange={(e) => {
-                  const project = projects.find(p => p.id === e.target.value);
-                  if (project) selectProject(project);
-                }}
-              >
-                {projects.length === 0 && <option>Aucun projet actif</option>}
-                {projects.map(project => (
-                  <option key={project.id} value={project.id}>
-                    {project.title}
-                  </option>
+              <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
+                <SelectValue placeholder="Sélectionner un projet" />
+              </SelectTrigger>
+              <SelectContent>
+                {sortedProjects.length === 0 && (
+                  <SelectItem value="none" disabled>Aucun projet actif</SelectItem>
+                )}
+                {sortedProjects.map(project => (
+                  <ProjectSelectItem 
+                    key={project.id} 
+                    value={project.id}
+                    title={project.title}
+                    date={project.formattedDate}
+                  />
                 ))}
-              </select>
-            </div>
+              </SelectContent>
+            </Select>
           </div>
-        </AlertDescription>
-      </Alert>
+        </CardContent>
+      </Card>
 
-      {/* Calendrier Schedule-X intégré */}
+      {/* Contenu principal */}
       {selectedProject ? (
-        <SimpleScheduleCalendar
-          projectName={selectedProject.title}
-          events={events}
-          teamMembers={teamMembers}
-          calendarConfig={selectedProject.metadata?.scheduleX?.calendar_config}
-          onEventClick={(event) => {
-            setSelectedEventId(event.id);
-            setShowViewEvent(true);
-          }}
-          onAddEvent={() => setShowCreateEvent(true)}
-        />
+        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'calendar' | 'list')} className="space-y-0">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Calendrier du projet {selectedProject.title}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      {events.length} événement{events.length > 1 ? 's' : ''}
+                    </Badge>
+                    <Badge variant="secondary">
+                      <Users className="w-3 h-3 mr-1" />
+                      {teamMembers.length} membre{teamMembers.length > 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TabsList>
+                    <TabsTrigger value="calendar">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Calendrier
+                    </TabsTrigger>
+                    <TabsTrigger value="list">
+                      <Clock className="w-4 h-4 mr-2" />
+                      Liste
+                    </TabsTrigger>
+                  </TabsList>
+                  <Button onClick={() => {
+                    setNewEventData({
+                      title: '',
+                      description: '',
+                      start_time: new Date(),
+                      end_time: new Date(Date.now() + 3600000),
+                      location: ''
+                    });
+                    setSelectedParticipants([]); // Réinitialiser la sélection
+                    createEventModal.open();
+                  }} size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nouvel événement
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <TabsContent value="calendar" className="mt-0 border-0">
+              <CardContent>
+                {/* Debug: Afficher le nombre d'événements */}
+                {events.length > 0 && (
+                  <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-sm">
+                    📅 {events.length} événement(s) chargé(s) pour ce projet
+                  </div>
+                )}
+                <SimpleScheduleCalendar
+                  projectName={selectedProject.title}
+                  events={events}
+                  teamMembers={teamMembers}
+                  calendarConfig={selectedProject.metadata?.scheduleX?.calendar_config}
+                  onEventClick={(event) => {
+                    setSelectedEventId(event.id);
+                    setSelectedEvent(event);
+                    viewEventModal.open();
+                  }}
+                  onAddEvent={(date) => {
+                    const startDate = date || new Date();
+                    const endDate = new Date(startDate.getTime() + 3600000);
+                    setNewEventData({
+                      title: '',
+                      description: '',
+                      start_time: startDate,
+                      end_time: endDate,
+                      location: ''
+                    });
+                    setSelectedParticipants([]); // Réinitialiser la sélection
+                    createEventModal.open();
+                  }}
+                />
+              </CardContent>
+            </TabsContent>
+            
+            <TabsContent value="list" className="mt-0 border-0">
+              <CardContent className="space-y-4">
+                {events.length > 0 ? (
+                  events.map((event) => (
+                    <div 
+                      key={event.id} 
+                      className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer" 
+                      onClick={() => {
+                        setSelectedEventId(event.id);
+                        setSelectedEvent(event);
+                        viewEventModal.open();
+                      }}
+                    >
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-semibold">
+                        {event.start && !isNaN(new Date(event.start).getTime()) 
+                          ? new Date(event.start).getDate()
+                          : '?'}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold">{event.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {event.start && !isNaN(new Date(event.start).getTime())
+                            ? `${new Date(event.start).toLocaleDateString('fr-FR', { 
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })} • ${new Date(event.start).toLocaleTimeString('fr-FR', { 
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}`
+                            : 'Date non définie'}
+                        </p>
+                        {event.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {event.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {event.location && (
+                          <Badge variant="outline" className="text-xs">
+                            <Video className="w-3 h-3 mr-1" />
+                            Visio
+                          </Badge>
+                        )}
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <Clock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <h3 className="font-medium mb-2">Aucun événement planifié</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Créez votre premier événement pour commencer à organiser votre projet
+                    </p>
+                    <Button onClick={() => {
+                      setNewEventData({
+                        title: '',
+                        description: '',
+                        start_time: new Date(),
+                        end_time: new Date(Date.now() + 3600000),
+                        location: '',
+                        meeting_link: ''
+                      });
+                      createEventModal.open();
+                    }} size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Créer un événement
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </TabsContent>
+          </Card>
+        </Tabs>
       ) : (
-        <Card className="p-6 bg-white shadow-sm">
-          <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
+        <Card>
+          <CardContent className="py-16">
             <div className="text-center">
-              <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-gray-600 mb-4">Aucun projet actif sélectionné</p>
-              <p className="text-sm text-gray-500">Créez ou démarrez un projet pour voir le calendrier</p>
+              <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Calendar className="w-10 h-10 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Aucun projet sélectionné</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Sélectionnez un projet actif pour afficher son calendrier et gérer ses événements
+              </p>
             </div>
-          </div>
+          </CardContent>
         </Card>
       )}
 
-      {/* Dialog de création d'événement */}
-      {selectedProject && (
-        <CreateEventDialog
-          open={showCreateEvent}
-          projectId={selectedProject.id}
-          projectTitle={selectedProject.title}
-          userType={userType}
-          onClose={() => setShowCreateEvent(false)}
-          onEventCreated={() => {
-            selectProject(selectedProject); // Recharger les événements
-            toast({
-              title: "Événement créé",
-              description: "L'événement a été ajouté au calendrier du projet",
-            });
-          }}
-        />
-      )}
+      {/* Modal fullscreen pour créer un événement */}
+      <FullScreenModal
+        isOpen={createEventModal.isOpen}
+        onClose={createEventModal.close}
+        title="Nouvel événement"
+        description={selectedProject ? `Projet : ${selectedProject.title}` : ''}
+        actions={
+          <ModalActions
+            onSave={async () => {
+              if (newEventData.title && selectedProject) {
+                try {
+                  // Générer automatiquement le lien Jitsi
+                  const roomName = `${selectedProject.title}-${newEventData.title}-${Date.now()}`
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, '-')
+                    .slice(0, 50);
+                  const videoUrl = `https://meet.jit.si/${roomName}`;
+                  
+                  // Récupérer l'utilisateur actuel
+                  const { data: userData } = await supabase.auth.getUser();
+                  
+                  const { data: eventData, error } = await supabase
+                    .from('project_events')
+                    .insert({
+                      project_id: selectedProject.id,
+                      title: newEventData.title,
+                      description: newEventData.description,
+                      start_at: newEventData.start_time.toISOString(),  
+                      end_at: newEventData.end_time.toISOString(),      
+                      location: newEventData.location || 'Visioconférence',
+                      video_url: videoUrl,  // Lien généré automatiquement
+                      created_by: userData?.user?.id  // ID de l'utilisateur créateur
+                    })
+                    .select()
+                    .single();
 
-      {/* Dialog de visualisation/édition d'événement */}
-      {selectedEventId && (
-        <ViewEventDialog
-          open={showViewEvent}
-          eventId={selectedEventId}
-          projectTitle={selectedProject?.title}
-          onClose={() => {
-            setShowViewEvent(false);
-            setSelectedEventId('');
-          }}
-          onEventUpdated={() => {
-            selectProject(selectedProject); // Recharger les événements
-            toast({
-              title: "Événement modifié",
-              description: "L'événement a été mis à jour avec succès",
-            });
-          }}
-          onEventDeleted={() => {
-            selectProject(selectedProject); // Recharger les événements
-            toast({
-              title: "Événement supprimé",
-              description: "L'événement a été supprimé du calendrier",
-            });
-          }}
-          canEdit={userType === 'client'}
-        />
-      )}
+                  if (error) throw error;
 
-      {/* Section événements à venir avec kickoff de test (client uniquement) */}
-      {userType === 'client' && (
-        <Card className="mt-6 p-6 bg-white shadow-sm">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900">Événements Kickoff de Test</h2>
-          
-          {/* Bouton pour créer un kickoff de test */}
-          <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-            <h3 className="font-medium text-purple-900 mb-2">🚀 Tester un Kickoff de Projet</h3>
-            <p className="text-sm text-purple-700 mb-3">
-              Créez un événement kickoff de test pour vérifier que l'intégration Schedule-X fonctionne correctement.
-            </p>
-            <Button 
-              onClick={createTestKickoffEvent}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-            >
-              <Video className="w-4 h-4 mr-2" />
-              Créer un Kickoff de Test
-            </Button>
-          </div>
-        
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
-                <Video className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Kickoff Test - Nouveau Projet</h4>
-                <p className="text-sm text-gray-600">Date à définir • Durée: 1 heure</p>
-                <p className="text-xs text-gray-500 mt-1">Lien visio: meet.jit.si/test-kickoff</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.open('https://meet.jit.si/test-kickoff', '_blank')}
-              >
-                Tester Visio
-              </Button>
-              <Button 
-                variant="default" 
-                size="sm"
-                className="bg-purple-600 hover:bg-purple-700"
-              >
-                Planifier
-              </Button>
-            </div>
-          </div>
+                  // Ajouter uniquement les participants sélectionnés
+                  if (eventData && selectedParticipants.length > 0) {
+                    const selectedMembers = teamMembers.filter(m => selectedParticipants.includes(m.id));
+                    const attendees = selectedMembers.map(member => ({
+                      event_id: eventData.id,
+                      user_id: member.id,
+                      email: member.email,
+                      name: member.name,
+                      role: member.role || 'participant'
+                    }));
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-semibold">
-                15
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Kickoff Projet Alpha</h4>
-                <p className="text-sm text-gray-600">15 Sept 2025 • 14:00 - 15:00</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm">
-              Rejoindre
-            </Button>
+                    const { error: attendeesError } = await supabase
+                      .from('project_event_attendees')
+                      .insert(attendees);
+
+                    if (attendeesError) {
+                      console.error('Erreur ajout participants:', attendeesError);
+                    } else {
+                      console.log(`${attendees.length} participants ajoutés à l'événement`);
+                    }
+                  }
+
+                  selectProject(selectedProject);
+                  createEventModal.close();
+                  toast({
+                    title: "Événement créé",
+                    description: "L'événement a été ajouté au calendrier du projet",
+                  });
+                } catch (error) {
+                  console.error('Erreur création événement:', error);
+                  toast({
+                    title: "Erreur",
+                    description: "Impossible de créer l'événement",
+                    variant: "destructive",
+                  });
+                }
+              }
+            }}
+            onCancel={createEventModal.close}
+            saveDisabled={!newEventData.title}
+            saveText="Créer l'événement"
+          />
+        }
+      >
+        <div className="space-y-6">
+          <div>
+            <Label htmlFor="event-title">Titre *</Label>
+            <Input
+              id="event-title"
+              value={newEventData.title}
+              onChange={(e) => setNewEventData({ ...newEventData, title: e.target.value })}
+              placeholder="Titre de l'événement"
+              className="mt-2"
+              autoFocus
+            />
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white font-semibold">
-                16
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Point d'équipe hebdo</h4>
-                <p className="text-sm text-gray-600">16 Sept 2025 • 10:00 - 10:30</p>
+          <div>
+            <Label htmlFor="event-description">Description</Label>
+            <Textarea
+              id="event-description"
+              value={newEventData.description}
+              onChange={(e) => setNewEventData({ ...newEventData, description: e.target.value })}
+              placeholder="Description de l'événement"
+              className="mt-2 min-h-[120px]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="event-start">Date et heure de début *</Label>
+              <div className="mt-2 space-y-2">
+                <DatePicker
+                  date={newEventData.start_time}
+                  onSelect={(date) => {
+                    if (date) {
+                      const newDate = new Date(date);
+                      newDate.setHours(newEventData.start_time.getHours());
+                      newDate.setMinutes(newEventData.start_time.getMinutes());
+                      setNewEventData({ ...newEventData, start_time: newDate });
+                    }
+                  }}
+                />
+                <Input
+                  type="time"
+                  value={`${String(newEventData.start_time.getHours()).padStart(2, '0')}:${String(newEventData.start_time.getMinutes()).padStart(2, '0')}`}
+                  onChange={(e) => {
+                    const [hours, minutes] = e.target.value.split(':');
+                    const newDate = new Date(newEventData.start_time);
+                    newDate.setHours(parseInt(hours));
+                    newDate.setMinutes(parseInt(minutes));
+                    setNewEventData({ ...newEventData, start_time: newDate });
+                  }}
+                  className="h-12 text-base"
+                />
               </div>
             </div>
-            <Button variant="outline" size="sm">
-              Rejoindre
-            </Button>
+
+            <div>
+              <Label htmlFor="event-duration">Durée de la réunion *</Label>
+              <div className="mt-2">
+                <Select
+                  value={`${Math.round((newEventData.end_time.getTime() - newEventData.start_time.getTime()) / 60000)}`}
+                  onValueChange={(value) => {
+                    const minutes = parseInt(value);
+                    const endTime = new Date(newEventData.start_time.getTime() + minutes * 60000);
+                    setNewEventData({ ...newEventData, end_time: endTime });
+                  }}
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Sélectionner la durée" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30 minutes</SelectItem>
+                    <SelectItem value="60">1 heure</SelectItem>
+                    <SelectItem value="90">1h30</SelectItem>
+                    <SelectItem value="120">2 heures</SelectItem>
+                    <SelectItem value="180">3 heures</SelectItem>
+                    <SelectItem value="240">4 heures</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="event-location">Lieu</Label>
+            <Input
+              id="event-location"
+              value={newEventData.location}
+              onChange={(e) => setNewEventData({ ...newEventData, location: e.target.value })}
+              placeholder="Lieu de l'événement (par défaut : Visioconférence)"
+              className="mt-2 h-12"
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-3">
+                <Video className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Lien de visioconférence
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    Un lien Jitsi Meet sera généré automatiquement lors de la création de l'événement.
+                    Les participants recevront le lien par email.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {teamMembers.length > 0 && (
+              <div>
+                <Label>Participants à inviter</Label>
+                <div className="mt-2 p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border border-gray-200 dark:border-gray-800">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Sélectionner les participants ({selectedParticipants.length}/{teamMembers.length})
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedParticipants.length === teamMembers.length) {
+                            setSelectedParticipants([]);
+                          } else {
+                            setSelectedParticipants(teamMembers.map(m => m.id));
+                          }
+                        }}
+                      >
+                        {selectedParticipants.length === teamMembers.length ? 'Désélectionner tout' : 'Sélectionner tout'}
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {teamMembers.map((member) => (
+                        <label
+                          key={member.id}
+                          className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedParticipants.includes(member.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedParticipants([...selectedParticipants, member.id]);
+                              } else {
+                                setSelectedParticipants(selectedParticipants.filter(id => id !== member.id));
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{member.name}</p>
+                            <p className="text-xs text-muted-foreground">{member.email}</p>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {member.role === 'client' ? 'Client' : 'Équipe'}
+                          </Badge>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </Card>
+      </FullScreenModal>
+
+      {/* Modal fullscreen pour voir/modifier un événement */}
+      {selectedEvent && (
+        <FullScreenModal
+          isOpen={viewEventModal.isOpen}
+          onClose={viewEventModal.close}
+          title={selectedEvent.title}
+          description={selectedProject?.title}
+          actions={
+            <ModalActions
+              onDelete={async () => {
+                if (confirm('Êtes-vous sûr de vouloir supprimer cet événement ?')) {
+                  try {
+                    const { error } = await supabase
+                      .from('project_events')
+                      .delete()
+                      .eq('id', selectedEventId);
+
+                    if (error) throw error;
+
+                    selectProject(selectedProject);
+                    viewEventModal.close();
+                    toast({
+                      title: "Événement supprimé",
+                      description: "L'événement a été supprimé du calendrier",
+                    });
+                  } catch (error) {
+                    console.error('Erreur suppression:', error);
+                    toast({
+                      title: "Erreur",
+                      description: "Impossible de supprimer l'événement",
+                      variant: "destructive",
+                    });
+                  }
+                }
+              }}
+            />
+          }
+        >
+          <div className="space-y-6">
+            <div>
+              <Label>Description</Label>
+              <p className="mt-2 text-muted-foreground">
+                {selectedEvent.description || 'Aucune description'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Date et heure</Label>
+                <p className="mt-2 text-muted-foreground">
+                  {selectedEvent.start && !isNaN(new Date(selectedEvent.start).getTime())
+                    ? new Date(selectedEvent.start).toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : 'Date non définie'}
+                </p>
+              </div>
+
+              {selectedEvent.location && (
+                <div>
+                  <Label>Lieu</Label>
+                  <p className="mt-2 text-muted-foreground">{selectedEvent.location}</p>
+                </div>
+              )}
+            </div>
+
+            {selectedEvent.location && (
+              <div>
+                <Label>Lien de réunion</Label>
+                <a
+                  href={selectedEvent.location}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 text-primary hover:underline block"
+                >
+                  {selectedEvent.location}
+                </a>
+              </div>
+            )}
+          </div>
+        </FullScreenModal>
       )}
     </div>
   );

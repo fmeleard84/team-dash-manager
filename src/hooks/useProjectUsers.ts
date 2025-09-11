@@ -39,22 +39,13 @@ export const useProjectUsers = (projectId: string | null) => {
       setError(null);
 
       try {
-        // UNE SEULE REQUÊTE SIMPLE ! 
-        // Note: Cette requête génère une erreur 404 normale si project_members n'existe pas
-        const { data, error: fetchError } = await supabase
-          .from('project_members')
-          .select('*')
-          .eq('project_id', projectId)
-          .in('status', ['active', 'pending']); // On inclut pending pour voir tous les membres
-
-        if (fetchError) {
-          // C'est normal si la table n'existe pas encore, on utilise le fallback
-          // console.log('📌 Table project_members not found, using fallback');
-          
-          // FALLBACK vers l'ancienne méthode si la table n'existe pas encore
-          await loadUsersOldWay();
-          return;
-        }
+        // Vérifier d'abord si la table existe pour éviter l'erreur 404
+        // Pour l'instant, on utilise directement le fallback car la table n'existe pas
+        // TODO: Activer quand la table project_members sera créée
+        
+        // FALLBACK vers l'ancienne méthode
+        await loadUsersOldWay();
+        return;
 
         // Transformer en format ProjectUser
         const usersList: ProjectUser[] = (data || []).map(member => ({

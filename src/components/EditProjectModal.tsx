@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { IallaLogo } from "./IallaLogo";
@@ -115,17 +116,24 @@ const EditProjectModal = ({
       console.log("📅 project_date:", updateData.project_date);
       console.log("📅 due_date:", updateData.due_date);
       console.log("💰 client_budget:", updateData.client_budget);
+      console.log("🔍 Types - dueDate:", typeof dueDate, "value:", dueDate);
+      console.log("🔍 Types - clientBudget:", typeof clientBudget, "value:", clientBudget);
 
-      const { error } = await supabase
+      const { data: updatedProject, error } = await supabase
         .from("projects")
         .update(updateData)
-        .eq("id", project.id);
+        .eq("id", project.id)
+        .select()
+        .single();
 
       if (error) {
         console.error("Erreur mise à jour projet:", error);
         toast.error("Erreur lors de la mise à jour du projet");
         return;
       }
+      
+      console.log("✅ Projet mis à jour avec succès:", updatedProject);
+      console.log("✅ Valeurs enregistrées - due_date:", updatedProject?.due_date, "client_budget:", updatedProject?.client_budget);
 
       // Handle file upload if new file is provided
       if (file) {
@@ -256,15 +264,12 @@ const EditProjectModal = ({
                     <Calendar className="w-4 h-4" />
                     Date de début
                   </Label>
-                  <Input
-                    id="edit-project_date"
-                    type="date"
+                  <DatePicker
                     value={projectDate}
-                    onChange={(e) => setProjectDate(e.target.value)}
-                    min={today}
-                    required
+                    onChange={setProjectDate}
+                    placeholder="Sélectionner la date de début"
+                    minDate={today}
                     disabled={isUpdating}
-                    className="h-12"
                   />
                 </div>
 
@@ -273,14 +278,12 @@ const EditProjectModal = ({
                     <Calendar className="w-4 h-4" />
                     Date de fin souhaitée
                   </Label>
-                  <Input
-                    id="edit-due_date"
-                    type="date"
+                  <DatePicker
                     value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    min={projectDate || today}
+                    onChange={setDueDate}
+                    placeholder="Sélectionner la date de fin"
+                    minDate={projectDate || today}
                     disabled={isUpdating}
-                    className="h-12"
                   />
                 </div>
 

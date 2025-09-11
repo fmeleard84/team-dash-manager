@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/select';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { cn } from '@/lib/utils';
+import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
+import { ProjectSelectItem } from '@/components/ui/project-select-item';
 import {
   AreaChart,
   Area,
@@ -89,16 +91,27 @@ const ClientMetricsDashboard = () => {
     const projects = new Map();
     metrics.activeCandidates.forEach(c => {
       if (!projects.has(c.projectId)) {
-        projects.set(c.projectId, c.projectName);
+        projects.set(c.projectId, {
+          id: c.projectId,
+          title: c.projectName,
+          created_at: c.projectCreatedAt || new Date().toISOString()
+        });
       }
     });
     metrics.recentActivities.forEach(a => {
       if (a.projectId && !projects.has(a.projectId)) {
-        projects.set(a.projectId, a.projectName);
+        projects.set(a.projectId, {
+          id: a.projectId,
+          title: a.projectName,
+          created_at: a.projectCreatedAt || new Date().toISOString()
+        });
       }
     });
-    return Array.from(projects, ([id, name]) => ({ id, name }));
+    return Array.from(projects.values()) as ProjectWithDate[];
   }, [metrics]);
+  
+  // Sort projects using the universal hook
+  const sortedProjects = useProjectSort(uniqueProjects);
   
   const uniqueCandidates = useMemo(() => {
     const candidates = new Map();
@@ -154,28 +167,36 @@ const ClientMetricsDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters - Style unifié avec le planning */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Activity className="w-6 h-6 text-white" />
+      {/* Header with filters - Design system cohérent */}
+      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-primary-foreground">Métriques en temps réel</h2>
+                  <p className="text-sm text-primary-foreground/80">Suivi des coûts et de l'activité</p>
+                </div>
               </div>
               
-              {/* Filters integrated in header */}
-              <div className="flex items-center gap-3">
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2">
                 <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                  <SelectTrigger className="w-56 bg-white/90 backdrop-blur-sm border-white/20">
+                  <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
                     <SelectValue placeholder="Tous les projets" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tous les projets</SelectItem>
-                    {uniqueProjects.map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
+                    {sortedProjects.map(project => (
+                      <ProjectSelectItem
+                        key={project.id}
+                        value={project.id}
+                        title={project.title}
+                        date={project.formattedDate}
+                      />
                     ))}
                   </SelectContent>
                 </Select>
@@ -185,7 +206,7 @@ const ClientMetricsDashboard = () => {
                   onValueChange={setSelectedCandidateId}
                   disabled={uniqueCandidates.length === 0}
                 >
-                  <SelectTrigger className="w-56 bg-white/90 backdrop-blur-sm border-white/20">
+                  <SelectTrigger className="w-[200px] bg-background/95 border-background/20">
                     <SelectValue placeholder="Toute l'équipe" />
                   </SelectTrigger>
                   <SelectContent>
@@ -200,9 +221,9 @@ const ClientMetricsDashboard = () => {
 
                 {(selectedProjectId !== 'all' || selectedCandidateId !== 'all') && (
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
-                    className="bg-white/20 hover:bg-white/30 text-white"
+                    className="bg-background/20 hover:bg-background/30 text-primary-foreground border-0"
                     onClick={() => {
                       setSelectedProjectId('all');
                       setSelectedCandidateId('all');
@@ -217,32 +238,30 @@ const ClientMetricsDashboard = () => {
             
             <Badge 
               variant="secondary"
-              className="px-3 py-1 bg-white/20 backdrop-blur-sm text-white border-white/20"
+              className="self-start bg-background/20 text-primary-foreground border-background/20"
             >
-              <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+              <div className="w-2 h-2 bg-primary-foreground rounded-full mr-2 animate-pulse"></div>
               Temps réel
             </Badge>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Main Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Cost per minute card */}
-        <Card className="relative overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 border-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-purple-500/10"></div>
+        <Card className="relative overflow-hidden transition-all hover:shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>
           <CardHeader className="relative pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <DollarSign className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent font-semibold">
-                Coût / minute
-              </span>
+              <span className="text-foreground">Coût / minute</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="relative">
-            <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <div className="text-3xl font-bold text-foreground">
               {filteredMetrics.currentCostPerMinute.toFixed(2)}€
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -250,34 +269,30 @@ const ClientMetricsDashboard = () => {
             </p>
             {filteredMetrics.currentCostPerMinute > 0 && (
               <div className="mt-3">
-                <div className="w-full h-1.5 bg-gray-200/50 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse rounded-full"></div>
-                </div>
+                <Progress value={100} className="h-1.5 animate-pulse" />
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Active teams card */}
-        <Card className="relative overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 border-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-green-500/5 to-teal-500/10"></div>
+        <Card className="relative overflow-hidden transition-all hover:shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-emerald-500/10"></div>
           <CardHeader className="relative pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
                 <Users className="w-4 h-4 text-white" />
               </div>
-              <span className="bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent font-semibold">
-                Équipes actives
-              </span>
+              <span className="text-foreground">Équipes actives</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="relative">
             <div className="flex items-baseline gap-3">
-              <div className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
+              <div className="text-3xl font-bold text-foreground">
                 {filteredMetrics.activeCandidatesCount}
               </div>
               {filteredMetrics.pausedCandidatesCount > 0 && (
-                <div className="flex items-center gap-1 text-sm text-orange-600">
+                <div className="flex items-center gap-1 text-sm text-orange-500">
                   <Pause className="w-3 h-3" />
                   {filteredMetrics.pausedCandidatesCount}
                 </div>
@@ -290,20 +305,18 @@ const ClientMetricsDashboard = () => {
         </Card>
 
         {/* Total cost today */}
-        <Card className="relative overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 border-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-blue-500/10"></div>
+        <Card className="relative overflow-hidden transition-all hover:shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-500/10"></div>
           <CardHeader className="relative pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-4 h-4 text-white" />
               </div>
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent font-semibold">
-                Coût total actuel
-              </span>
+              <span className="text-foreground">Coût total actuel</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="relative">
-            <div className="text-3xl font-bold tabular-nums bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <div className="text-3xl font-bold tabular-nums text-foreground">
               {animatedCost.toFixed(2)}€
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -313,20 +326,18 @@ const ClientMetricsDashboard = () => {
         </Card>
 
         {/* Weekly stats */}
-        <Card className="relative overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 border-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-amber-500/5 to-orange-500/10"></div>
+        <Card className="relative overflow-hidden transition-all hover:shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-orange-500/10"></div>
           <CardHeader className="relative pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
                 <Clock className="w-4 h-4 text-white" />
               </div>
-              <span className="bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent font-semibold">
-                Cette semaine
-              </span>
+              <span className="text-foreground">Cette semaine</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="relative">
-            <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+            <div className="text-3xl font-bold text-foreground">
               {metrics.totalCostThisWeek.toFixed(2)}€
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -339,15 +350,13 @@ const ClientMetricsDashboard = () => {
       {/* Charts and Activity Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Real-time cost chart */}
-        <Card className="lg:col-span-2 shadow-lg border-0">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <Activity className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <Activity className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent font-semibold">
-                Évolution du coût en temps réel
-              </span>
+              <span className="text-foreground">Évolution du coût en temps réel</span>
             </CardTitle>
             <CardDescription>
               Coût par minute sur la dernière heure
@@ -397,19 +406,17 @@ const ClientMetricsDashboard = () => {
         </Card>
 
         {/* Active candidates list */}
-        <Card className="shadow-lg border-0">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-500 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
                   <Users className="w-4 h-4 text-white" />
                 </div>
-                <span className="bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent font-semibold">
-                  Équipes actives
-                </span>
+                <span className="text-foreground">Équipes actives</span>
               </span>
               {filteredMetrics.activeCandidates.length > 0 && (
-                <Badge variant="secondary" className="bg-gradient-to-r from-emerald-500/10 to-green-500/10">
+                <Badge variant="secondary">
                   {filteredMetrics.activeCandidates.filter(c => c.status === 'active').length} actif(s)
                 </Badge>
               )}
@@ -430,8 +437,8 @@ const ClientMetricsDashboard = () => {
                       className={cn(
                         "p-3 rounded-lg border transition-all",
                         candidate.status === 'active' 
-                          ? "bg-green-50 border-green-200 animate-pulse" 
-                          : "bg-orange-50 border-orange-200"
+                          ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" 
+                          : "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
                       )}
                     >
                       <div className="flex items-start justify-between mb-1">
@@ -441,8 +448,8 @@ const ClientMetricsDashboard = () => {
                           className={cn(
                             "text-xs",
                             candidate.status === 'active' 
-                              ? "bg-green-500" 
-                              : "bg-orange-500"
+                              ? "bg-emerald-500 hover:bg-emerald-600" 
+                              : "bg-orange-500 hover:bg-orange-600"
                           )}
                         >
                           {candidate.status === 'active' ? <Play className="w-3 h-3 mr-1" /> : <Pause className="w-3 h-3 mr-1" />}
@@ -455,7 +462,7 @@ const ClientMetricsDashboard = () => {
                         <span className="text-xs text-muted-foreground">
                           {Math.floor(candidate.currentDuration / 60)}h {candidate.currentDuration % 60}min
                         </span>
-                        <span className="text-sm font-semibold text-purple-600">
+                        <span className="text-sm font-semibold text-primary">
                           {candidate.currentCost.toFixed(2)}€
                         </span>
                       </div>
@@ -471,17 +478,15 @@ const ClientMetricsDashboard = () => {
       {/* Project costs and recent activities */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Project costs breakdown */}
-        <Card className="shadow-lg border-0">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-violet-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-violet-500 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-4 h-4 text-white" />
               </div>
-              <span className="bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent font-semibold">
-                Répartition par projet
-              </span>
+              <span className="text-foreground">Répartition par projet</span>
             </CardTitle>
-            <CardDescription className="ml-12">
+            <CardDescription>
               Coûts de la semaine par projet
             </CardDescription>
           </CardHeader>
@@ -496,8 +501,8 @@ const ClientMetricsDashboard = () => {
                 {metrics.projectCosts.slice(0, 5).map((project, index) => (
                   <div key={project.projectId} className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{project.projectName}</span>
-                      <span className="text-sm font-semibold">{project.totalCost.toFixed(2)}€</span>
+                      <span className="text-sm font-medium truncate flex-1 mr-2">{project.projectName}</span>
+                      <span className="text-sm font-semibold tabular-nums">{project.totalCost.toFixed(2)}€</span>
                     </div>
                     <Progress 
                       value={project.percentage} 
@@ -518,17 +523,15 @@ const ClientMetricsDashboard = () => {
         </Card>
 
         {/* Recent activities timeline */}
-        <Card className="shadow-lg border-0">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
                 <Clock className="w-4 h-4 text-white" />
               </div>
-              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent font-semibold">
-                Activités récentes
-              </span>
+              <span className="text-foreground">Activités récentes</span>
             </CardTitle>
-            <CardDescription className="ml-12">
+            <CardDescription>
               Dernières sessions de travail
             </CardDescription>
           </CardHeader>
@@ -545,15 +548,15 @@ const ClientMetricsDashboard = () => {
                     <div key={activity.id} className="flex gap-3">
                       <div className={cn(
                         "w-2 h-2 rounded-full mt-2",
-                        activity.status === 'active' ? "bg-green-500 animate-pulse" :
+                        activity.status === 'active' ? "bg-emerald-500 animate-pulse" :
                         activity.status === 'paused' ? "bg-orange-500" :
-                        "bg-gray-400"
+                        "bg-muted-foreground"
                       )}></div>
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium">{activity.candidateName}</p>
                           {activity.cost && (
-                            <span className="text-sm font-semibold text-purple-600">
+                            <span className="text-sm font-semibold text-primary">
                               {activity.cost.toFixed(2)}€
                             </span>
                           )}
@@ -572,9 +575,9 @@ const ClientMetricsDashboard = () => {
                             variant="outline" 
                             className={cn(
                               "text-xs scale-90",
-                              activity.status === 'active' ? "border-green-500 text-green-600" :
+                              activity.status === 'active' ? "border-emerald-500 text-emerald-600" :
                               activity.status === 'paused' ? "border-orange-500 text-orange-600" :
-                              "border-gray-400 text-gray-600"
+                              "border-muted text-muted-foreground"
                             )}
                           >
                             {activity.status === 'active' ? 'En cours' :

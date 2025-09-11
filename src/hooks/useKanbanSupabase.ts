@@ -96,7 +96,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       setIsLoading(true);
 
       // Fetch board
-      const { data: boardData, error: boardError } = await (supabase as any)
+      const { data: boardData, error: boardError } = await supabase
         .from('kanban_boards')
         .select('*')
         .eq('id', id)
@@ -105,7 +105,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (boardError) throw boardError;
 
       // Fetch columns
-      const { data: columnsData, error: columnsError } = await (supabase as any)
+      const { data: columnsData, error: columnsError } = await supabase
         .from('kanban_columns')
         .select('*')
         .eq('board_id', id)
@@ -114,7 +114,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (columnsError) throw columnsError;
 
       // Fetch cards
-      const { data: cardsData, error: cardsError } = await (supabase as any)
+      const { data: cardsData, error: cardsError } = await supabase
         .from('kanban_cards')
         .select('*')
         .eq('board_id', id)
@@ -258,7 +258,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       }
 
       // Get real team members from project_bookings with candidate profiles
-      const { data: projectBookings, error: teamError } = await (supabase as any)
+      const { data: projectBookings, error: teamError } = await supabase
         .from('project_bookings')
         .select(`
           candidate_id,
@@ -285,7 +285,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           role: 'Candidat'
         }));
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('kanban_boards')
         .insert({
           title,
@@ -316,7 +316,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         color: col.color
       }));
 
-      const { data: createdColumns, error: columnsError } = await (supabase as any)
+      const { data: createdColumns, error: columnsError } = await supabase
         .from('kanban_columns')
         .insert(columnsData)
         .select();
@@ -327,7 +327,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       }
 
       // Get project details to create the initial project card
-      const { data: projectData, error: projectError } = await (supabase as any)
+      const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select('title, description, deadline, budget, created_at')
         .eq('id', projectId)
@@ -338,7 +338,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       }
 
       // Get project files to include in the project card description
-      const { data: projectFiles, error: filesError } = await (supabase as any)
+      const { data: projectFiles, error: filesError } = await supabase
         .from('project_files')
         .select('file_name, file_path')
         .eq('project_id', projectId);
@@ -372,7 +372,7 @@ export const useKanbanSupabase = (boardId?: string) => {
             });
           }
 
-          const { data: projectCard, error: cardError } = await (supabase as any)
+          const { data: projectCard, error: cardError } = await supabase
             .from('kanban_cards')
             .insert({
               board_id: data.id,
@@ -397,7 +397,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       // Create notifications for team members
       if (projectId) {
         try {
-          await (supabase as any).rpc('create_kanban_notifications_for_team', {
+          await supabase.rpc('create_kanban_notifications_for_team', {
             p_project_id: projectId,
             p_kanban_board_id: data.id,
             p_notification_type: 'kanban_new_project',
@@ -431,7 +431,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     if (!board) return;
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('kanban_columns')
         .insert({
           board_id: board.id,
@@ -476,7 +476,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     if (!board) return;
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('kanban_columns')
         .update({
           title: input.title,
@@ -519,13 +519,13 @@ export const useKanbanSupabase = (boardId?: string) => {
 
     try {
       // First, delete all cards in the column
-      await (supabase as any)
+      await supabase
         .from('kanban_cards')
         .delete()
         .eq('column_id', columnId);
 
       // Then delete the column
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('kanban_columns')
         .delete()
         .eq('id', columnId);
@@ -578,7 +578,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       // Derive status from column title
       const derivedStatus = column ? getStatusFromColumnTitle(column.title) : 'todo';
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('kanban_cards')
         .insert({
           board_id: board.id,
@@ -607,7 +607,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (board.projectId) {
         const columnTitle = column?.title || 'Colonne inconnue';
         try {
-          await (supabase as any).rpc('create_kanban_notifications_for_team', {
+          await supabase.rpc('create_kanban_notifications_for_team', {
             p_project_id: board.projectId,
             p_kanban_board_id: board.id,
             p_notification_type: 'kanban_card_created',
@@ -705,7 +705,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       if (input.progress !== undefined) updateData.progress = input.progress;
       if (input.files !== undefined) updateData.files = input.files;
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('kanban_cards')
         .update(updateData)
         .eq('id', input.id)
@@ -719,7 +719,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         const existingCard = board.cards[input.id];
         const cardTitle = input.title || existingCard?.title || 'Carte';
         try {
-          await (supabase as any).rpc('create_kanban_notifications_for_team', {
+          await supabase.rpc('create_kanban_notifications_for_team', {
             p_project_id: board.projectId,
             p_kanban_board_id: board.id,
             p_notification_type: 'kanban_card_updated',
@@ -787,7 +787,7 @@ export const useKanbanSupabase = (boardId?: string) => {
     if (!board) return;
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('kanban_cards')
         .delete()
         .eq('id', cardId);
@@ -852,7 +852,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         }));
 
         for (const update of updates) {
-          await (supabase as any)
+          await supabase
             .from('kanban_cards')
             .update({ position: update.position })
             .eq('id', update.id);
@@ -869,7 +869,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         const newStatus = getStatusFromColumnTitle(destColumn.title);
 
         // Update card's column and status
-         await (supabase as any)
+         await supabase
           .from('kanban_cards')
           .update({ 
             column_id: destination.droppableId,
@@ -886,7 +886,7 @@ export const useKanbanSupabase = (boardId?: string) => {
           const { data: { user } } = await supabase.auth.getUser();
           
           // Get project details to find client
-          const { data: project } = await (supabase as any)
+          const { data: project } = await supabase
             .from('projects')
             .select('created_by,title')
             .eq('id', board.projectId)
@@ -894,7 +894,7 @@ export const useKanbanSupabase = (boardId?: string) => {
             
           if (project && user && project.created_by !== user.id) {
             // Create notification for project owner (client)
-            await (supabase as any)
+            await supabase
               .from('notifications')
               .insert({
                 user_id: project.created_by,
@@ -922,7 +922,7 @@ export const useKanbanSupabase = (boardId?: string) => {
         sourceCardIds.splice(source.index, 1);
         
         for (let i = 0; i < sourceCardIds.length; i++) {
-           await (supabase as any)
+           await supabase
             .from('kanban_cards')
             .update({ position: i })
             .eq('id', sourceCardIds[i]);
@@ -934,7 +934,7 @@ export const useKanbanSupabase = (boardId?: string) => {
 
         for (let i = 0; i < destCardIds.length; i++) {
           if (destCardIds[i] !== draggableId) {
-             await (supabase as any)
+             await supabase
               .from('kanban_cards')
               .update({ position: i })
               .eq('id', destCardIds[i]);
@@ -1032,7 +1032,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       const importedBoard: KanbanBoard = JSON.parse(jsonString);
       
       // Create board in database
-      const { data: newBoardData, error: boardError } = await (supabase as any)
+      const { data: newBoardData, error: boardError } = await supabase
         .from('kanban_boards')
         .insert({
           title: `${importedBoard.title} (Importé)`,
@@ -1049,7 +1049,7 @@ export const useKanbanSupabase = (boardId?: string) => {
 
       // Create columns
       const columnsPromises = importedBoard.columns.map(column =>
-        (supabase as any).from('kanban_columns').insert({
+        supabase.from('kanban_columns').insert({
           id: column.id, // Keep original ID to maintain card relationships
           board_id: newBoardData.id,
           title: column.title,
@@ -1064,7 +1064,7 @@ export const useKanbanSupabase = (boardId?: string) => {
       // Create cards
       // NOTE: We keep original IDs but you must ensure column_id mapping matches the imported structure.
       const cardsPromises = Object.values(importedBoard.cards).map((card, index) =>
-        (supabase as any).from('kanban_cards').insert({
+        supabase.from('kanban_cards').insert({
           id: card.id,
           board_id: newBoardData.id,
           // WARNING: column_id must be set to the actual column containing the card.

@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Table,
   TableBody,
@@ -48,6 +47,8 @@ import InvoiceDetail from './InvoiceDetail';
 import { StripePayment } from './StripePayment';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
+import { ProjectSelectItem } from '@/components/ui/project-select-item';
 
 interface InvoiceListProps {
   projectId?: string;
@@ -80,6 +81,9 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [paidInvoices, setPaidInvoices] = useState<Set<string>>(new Set());
 
+  // Sort projects using the universal hook
+  const sortedProjects = useProjectSort(projects as ProjectWithDate[]);
+
   // Determine period status based on dates
   const getPeriodStatus = (startDate: string, endDate: string, projectId: string) => {
     const today = new Date();
@@ -93,18 +97,18 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
     
     // Check if week is current
     if (today >= weekStart && today <= weekEnd) {
-      return { status: 'en_cours', label: 'En cours', color: 'bg-blue-100 text-blue-700' };
+      return { status: 'en_cours', label: 'En cours', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' };
     }
     
     // Check if week is past
     if (today > weekEnd) {
       // TODO: Check Stripe payment status here
       // For now, assume unpaid if past
-      return { status: 'a_regler', label: 'À régler', color: 'bg-red-100 text-red-700' };
+      return { status: 'a_regler', label: 'À régler', color: 'bg-destructive/10 text-destructive' };
     }
     
     // Future week
-    return { status: 'future', label: 'À venir', color: 'bg-gray-100 text-gray-700' };
+    return { status: 'future', label: 'À venir', color: 'bg-muted text-muted-foreground' };
   };
 
   // Load tracking records for the selected period
@@ -300,67 +304,81 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters - Exact Planning style */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
-            <Receipt className="w-6 h-6 text-white" />
+      {/* Header with filters - Design system cohérent */}
+      <Card className="border-0 bg-gradient-to-br from-primary to-primary/80">
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-background/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                <Receipt className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-primary-foreground">Gestion des factures</h2>
+                <p className="text-sm text-primary-foreground/80">Suivi et paiement des prestations</p>
+              </div>
+            </div>
+            
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <DatePicker
+                  value={startDate}
+                  onChange={setStartDate}
+                  placeholder="Date début"
+                  className="w-[160px] bg-background/95 border-background/20"
+                />
+                <span className="text-primary-foreground/60">-</span>
+                <DatePicker
+                  value={endDate}
+                  onChange={setEndDate}
+                  placeholder="Date fin"
+                  className="w-[160px] bg-background/95 border-background/20"
+                />
+              </div>
+              
+              {/* Project filter with universal selector */}
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger className="w-[280px] bg-background/95 border-background/20">
+                  <SelectValue placeholder="Tous les projets" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les projets</SelectItem>
+                  {sortedProjects.map((project) => (
+                    <ProjectSelectItem
+                      key={project.id}
+                      value={project.id}
+                      title={project.title}
+                      date={project.formattedDate}
+                    />
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
-          {/* Date filters */}
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-40 bg-white border-purple-200 focus:border-purple-400"
-            />
-            <span className="text-gray-500">-</span>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-40 bg-white border-purple-200 focus:border-purple-400"
-            />
-          </div>
-          
-          {/* Project filter */}
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-64 bg-white border-purple-200 focus:border-purple-400">
-              <SelectValue placeholder="Tous les projets" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les projets</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Summary card - only show if there are records */}
       {trackingRecords.length > 0 && (
-        <Card className="bg-gradient-to-r from-blue-50 to-purple-50">
-          <CardContent className="pt-6">
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>
+          <CardContent className="relative pt-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center">
-                <p className="text-sm text-gray-600">Période</p>
-                <p className="font-semibold">
+                <p className="text-sm text-muted-foreground">Période</p>
+                <p className="font-semibold text-foreground">
                   {format(new Date(startDate), 'dd/MM', { locale: fr })} - {format(new Date(endDate), 'dd/MM', { locale: fr })}
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-600">Temps total</p>
-                <p className="font-semibold text-blue-600">
+                <p className="text-sm text-muted-foreground">Temps total</p>
+                <p className="font-semibold text-primary">
                   {formatMinutesToHours(trackingRecords.reduce((sum, r) => sum + (r.duration_minutes || 0), 0))}
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-600">Montant TTC</p>
-                <p className="font-semibold text-purple-600">
+                <p className="text-sm text-muted-foreground">Montant TTC</p>
+                <p className="font-semibold text-primary">
                   {formatCurrency(
                     trackingRecords.reduce((sum, r) => sum + ((r.duration_minutes || 0) * 0.75 * 1.20 * 100), 0)
                   )}
@@ -377,16 +395,16 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
           <CardContent className="flex items-center justify-center h-48">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-gray-600">Chargement des données...</p>
+              <p className="text-muted-foreground">Chargement des données...</p>
             </div>
           </CardContent>
         </Card>
       ) : Object.keys(recordsByProject).length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
-            <Clock className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-600 mb-2">Aucun temps tracké pour cette période</p>
-            <p className="text-sm text-gray-500">
+            <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+            <p className="text-muted-foreground mb-2">Aucun temps tracké pour cette période</p>
+            <p className="text-sm text-muted-foreground/80">
               Sélectionnez une autre période ou un autre projet
             </p>
           </CardContent>
@@ -427,7 +445,7 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
             // Update invoice status based on payment
             let invoiceStatus = getPeriodStatus(startDate, endDate, projectId);
             if (isPaid) {
-              invoiceStatus = { status: 'paye', label: 'Payé', color: 'bg-green-100 text-green-700' };
+              invoiceStatus = { status: 'paye', label: 'Payé', color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' };
             }
             
             // Check if payment is needed (not paid and not future)
@@ -438,27 +456,27 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
             return (
               <Card key={projectId} className="overflow-hidden">
                 <Collapsible open={isExpanded} onOpenChange={() => toggleProjectExpanded(projectId)}>
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 transition-colors">
+                  <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/15 transition-colors">
                     <div className="flex items-center justify-between">
                       <CollapsibleTrigger className="flex items-center gap-3 flex-1 text-left cursor-pointer">
-                        {isExpanded ? <ChevronDown className="w-5 h-5 text-gray-600" /> : <ChevronRight className="w-5 h-5 text-gray-600" />}
-                        <Briefcase className="w-5 h-5 text-blue-600" />
+                        {isExpanded ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
+                        <Briefcase className="w-5 h-5 text-primary" />
                         <CardTitle className="text-left">{projectInfo.title}</CardTitle>
                         <Badge className={invoiceStatus.color}>
                           {invoiceStatus.label}
                         </Badge>
                       </CollapsibleTrigger>
                       <div className="flex items-center gap-4">
-                        <Badge className="bg-blue-100 text-blue-700">
+                        <Badge variant="secondary">
                           {formatMinutesToHours(totalMinutes)}
                         </Badge>
-                        <Badge className="bg-purple-100 text-purple-700 font-bold">
+                        <Badge className="bg-primary/10 text-primary font-bold">
                           {formatCurrency(total * 100)} TTC
                         </Badge>
                         {needsPayment && (
                           <Button
                             size="sm"
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                            variant="default"
                             onClick={(e) => {
                               e.stopPropagation();
                               handlePayInvoice({
@@ -480,21 +498,21 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
                   <CollapsibleContent>
                     <CardContent className="pt-6">
                       {/* Compact summary */}
-                      <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                      <div className="bg-muted/50 rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                           <div>
-                            <span className="text-gray-500">Période:</span>
-                            <p className="font-medium">
+                            <span className="text-muted-foreground">Période:</span>
+                            <p className="font-medium text-foreground">
                               {format(new Date(startDate), 'dd/MM', { locale: fr })} - {format(new Date(endDate), 'dd/MM/yyyy', { locale: fr })}
                             </p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Candidats:</span>
-                            <p className="font-medium">{Object.keys(recordsByCandidate).length} ressource(s)</p>
+                            <span className="text-muted-foreground">Candidats:</span>
+                            <p className="font-medium text-foreground">{Object.keys(recordsByCandidate).length} ressource(s)</p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Sessions:</span>
-                            <p className="font-medium">{projectRecords.length} enregistrement(s)</p>
+                            <span className="text-muted-foreground">Sessions:</span>
+                            <p className="font-medium text-foreground">{projectRecords.length} enregistrement(s)</p>
                           </div>
                         </div>
                       </div>
@@ -509,30 +527,30 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
                         
                         return (
                           <div key={candidateId} className="mb-6 last:mb-0">
-                            <div className="flex items-center justify-between mb-3 px-2 py-1 bg-blue-50 rounded">
+                            <div className="flex items-center justify-between mb-3 px-2 py-1 bg-primary/5 rounded">
                               <div className="flex items-center gap-2">
-                                <User className="w-4 h-4 text-gray-500" />
-                                <h4 className="font-semibold">
+                                <User className="w-4 h-4 text-muted-foreground" />
+                                <h4 className="font-semibold text-foreground">
                                   {candidateInfo.first_name} {candidateInfo.last_name}
                                 </h4>
                               </div>
-                              <span className="text-sm font-medium text-blue-700">
+                              <span className="text-sm font-medium text-primary">
                                 {formatMinutesToHours(candidateTotalMinutes)} - {formatCurrency(candidateTotalMinutes * hourlyRate * 100)}
                               </span>
                             </div>
                             
                             <div className="space-y-1 ml-6">
                               {candidateRecords.map((record: any) => (
-                                <div key={record.id} className="flex justify-between items-start py-2 px-2 hover:bg-gray-50 rounded">
+                                <div key={record.id} className="flex justify-between items-start py-2 px-2 hover:bg-muted/50 rounded transition-colors">
                                   <div className="flex-1">
-                                    <p className="text-sm font-medium">{record.activity_description || 'Développement'}</p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-sm font-medium text-foreground">{record.activity_description || 'Développement'}</p>
+                                    <p className="text-xs text-muted-foreground">
                                       {format(new Date(record.start_time), 'dd/MM/yyyy HH:mm', { locale: fr })}
                                     </p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-sm font-medium">{record.duration_minutes || 0} min</p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-sm font-medium text-foreground">{record.duration_minutes || 0} min</p>
+                                    <p className="text-xs text-muted-foreground">
                                       {formatCurrency((record.duration_minutes || 0) * hourlyRate * 100)}
                                     </p>
                                   </div>
@@ -544,27 +562,27 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
                       })}
                       
                       {/* Totals for this project */}
-                      <div className="mt-6 pt-6 border-t bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4">
+                      <div className="mt-6 pt-6 border-t bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4">
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span>Sous-total HT</span>
-                            <span className="font-medium">{formatCurrency(subtotal * 100)}</span>
+                            <span className="text-muted-foreground">Sous-total HT</span>
+                            <span className="font-medium text-foreground">{formatCurrency(subtotal * 100)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span>TVA (20%)</span>
-                            <span className="font-medium">{formatCurrency(vat * 100)}</span>
+                            <span className="text-muted-foreground">TVA (20%)</span>
+                            <span className="font-medium text-foreground">{formatCurrency(vat * 100)}</span>
                           </div>
-                          <div className="flex justify-between font-bold text-lg pt-2 border-t border-purple-200">
-                            <span>Total TTC</span>
-                            <span className="text-purple-600">{formatCurrency(total * 100)}</span>
+                          <div className="flex justify-between font-bold text-lg pt-2 border-t border-border">
+                            <span className="text-foreground">Total TTC</span>
+                            <span className="text-primary">{formatCurrency(total * 100)}</span>
                           </div>
                         </div>
                         
                         {/* Payment button for expanded view if needed */}
                         {needsPayment && (
-                          <div className="mt-4 pt-4 border-t border-purple-200">
+                          <div className="mt-4 pt-4 border-t border-border">
                             <Button
-                              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                              className="w-full"
                               onClick={() => handlePayInvoice({
                                 project_id: projectId,
                                 total_cents: total * 100,
@@ -587,17 +605,18 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
           
           {/* Grand total for all projects */}
           {Object.keys(recordsByProject).length > 1 && (
-            <Card className="bg-gradient-to-r from-purple-50 to-pink-50">
-              <CardContent className="pt-6">
+            <Card className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>
+              <CardContent className="relative pt-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="font-semibold text-lg">Total général</h3>
-                    <p className="text-sm text-gray-600">
+                    <h3 className="font-semibold text-lg text-foreground">Total général</h3>
+                    <p className="text-sm text-muted-foreground">
                       {Object.keys(recordsByProject).length} projets
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-purple-600">
+                    <p className="text-2xl font-bold text-primary">
                       {formatCurrency(
                         Object.values(recordsByProject).reduce((sum: number, projectData: any) => {
                           const minutes = projectData.records.reduce((s: number, r: any) => 
@@ -607,7 +626,7 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
                         }, 0)
                       )}
                     </p>
-                    <p className="text-sm text-gray-600">TTC</p>
+                    <p className="text-sm text-muted-foreground">TTC</p>
                   </div>
                 </div>
               </CardContent>

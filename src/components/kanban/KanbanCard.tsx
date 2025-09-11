@@ -131,25 +131,25 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`mb-3 group ${snapshot.isDragging ? 'rotate-1' : ''}`}
+          className={`mb-3 group relative ${snapshot.isDragging ? 'rotate-1' : ''}`}
         >
           <Card 
-            className={`cursor-pointer transition-all duration-200 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 border bg-white ${
+            className={`cursor-pointer transition-all duration-300 bg-card rounded-xl relative overflow-hidden ${
               snapshot.isDragging 
-                ? 'shadow-2xl ring-2 ring-purple-400 ring-opacity-50 scale-105 rotate-1' 
-                : 'border-gray-200 hover:border-purple-300'
-            }`}
+                ? 'shadow-2xl ring-2 ring-primary scale-105 bg-gradient-to-br from-primary/10 to-primary/5' 
+                : 'border border-border hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-1 hover:bg-gradient-to-br hover:from-card hover:to-primary/5'
+            } before:absolute before:inset-0 before:rounded-xl before:p-[1px] before:bg-gradient-to-br before:from-transparent before:via-primary/0 before:to-transparent hover:before:from-primary/50 hover:before:via-primary/30 hover:before:to-primary/50 before:transition-all before:duration-500 before:-z-10 before:opacity-0 hover:before:opacity-100 after:absolute after:inset-0 after:rounded-xl after:bg-card after:-z-10`}
             onClick={onClick}
           >
-            <CardHeader className="p-4 pb-2">
+            <CardHeader className="p-4 pb-2 relative z-10">
               <div className="flex items-start justify-between gap-2">
-                <h4 className="font-medium text-sm text-gray-900 line-clamp-2 flex-1">
+                <h4 className="font-medium text-sm text-card-foreground line-clamp-2 flex-1">
                   {card.title}
                 </h4>
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-purple-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-accent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                       <MoreHorizontal className="w-3 h-3 text-gray-500" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -206,10 +206,10 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
               </div>
             </CardHeader>
 
-            <CardContent className="p-4 pt-2 space-y-3">
+            <CardContent className="p-4 pt-2 space-y-3 relative z-10">
               {/* Description preview */}
               {card.description && (
-                <p className="text-xs text-gray-600 line-clamp-2">
+                <p className="text-xs text-muted-foreground line-clamp-2">
                   {card.description}
                 </p>
               )}
@@ -217,13 +217,13 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
               {/* Progress bar */}
               {card.progress > 0 && (
                 <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Progression</span>
                     <span className="font-medium">{card.progress}%</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-accent rounded-full h-2 overflow-hidden shadow-inner">
                     <div 
-                      className="h-full bg-gradient-to-r from-purple-400 to-pink-400 rounded-full transition-all duration-300"
+                      className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full transition-all duration-500 shadow-lg relative after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent after:animate-pulse"
                       style={{ width: `${card.progress}%` }}
                     />
                   </div>
@@ -236,15 +236,15 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
                   {/* Assignment indicator */}
                   {hasAssignedUsers() && (
                     <div className="flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center">
-                        <User className="w-3 h-3 text-purple-600" />
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="w-3.5 h-3.5 text-primary" />
                       </div>
                     </div>
                   )}
                   
                   {/* Files indicator */}
                   {fileCount > 0 && (
-                    <div className="flex items-center gap-1 text-gray-500">
+                    <div className="flex items-center gap-1 text-muted-foreground">
                       <Paperclip className="w-3 h-3" />
                       <span className="text-xs">{fileCount}</span>
                     </div>
@@ -253,7 +253,7 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
               </div>
 
               {/* Bottom row with info */}
-              <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+              <div className="flex items-center justify-between pt-2 border-t border-border/30">
                 <div className="flex items-center gap-2">
                   {/* Priority indicator */}
                   {card.priority && (
@@ -266,7 +266,7 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
 
                   {/* Comments count */}
                   {card.comments.length > 0 && (
-                    <div className="flex items-center gap-1 text-gray-500">
+                    <div className="flex items-center gap-1 text-muted-foreground">
                       <MessageSquare className="w-3 h-3" />
                       <span className="text-xs">{card.comments.length}</span>
                     </div>
@@ -279,8 +279,8 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
                   {card.dueDate && (
                     <div className={`flex items-center gap-1 text-xs ${
                       isOverdue 
-                        ? 'text-red-600 font-medium' 
-                        : 'text-gray-500'
+                        ? 'text-destructive font-medium' 
+                        : 'text-muted-foreground'
                     }`}>
                       <CalendarDays className="w-3 h-3" />
                       <span>
@@ -291,9 +291,9 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
 
                   {/* Assigned user */}
                   {card.assignedToName && (
-                    <Avatar className="w-5 h-5 ring-2 ring-white" title={`Assigné à ${card.assignedToName}`}>
+                    <Avatar className="w-6 h-6 ring-2 ring-white shadow-sm" title={`Assigné à ${card.assignedToName}`}>
                       <AvatarImage src={card.assignedToAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${card.assignedToName}`} />
-                      <AvatarFallback className="text-[10px] bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+                      <AvatarFallback className="text-[10px] bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
                         {card.assignedToName.split(' ').map(n => n[0]).join('').toUpperCase()}
                       </AvatarFallback>
                     </Avatar>

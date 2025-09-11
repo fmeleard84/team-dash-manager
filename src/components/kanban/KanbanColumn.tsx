@@ -36,9 +36,9 @@ export const KanbanColumn = ({
   const isOverLimit = column.limit && cards.length > column.limit;
 
   return (
-    <div className="flex flex-col w-80 min-h-[600px] bg-gradient-to-b from-white to-purple-50/30 rounded-xl shadow-sm border border-purple-100 p-4 flex-shrink-0">
+    <div className="flex flex-col w-80 min-h-[600px] bg-card rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-border/50 backdrop-blur-sm p-4 flex-shrink-0 hover:border-primary/30 group">
       {/* Column Header */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-purple-100">
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-border">
         <div className="flex items-center gap-3">
           {column.color && (
             <div 
@@ -46,11 +46,11 @@ export const KanbanColumn = ({
               style={{ backgroundColor: column.color }}
             />
           )}
-          <h3 className="font-medium text-gray-900 tracking-tight">{column.title}</h3>
-          <span className={`inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full ${
+          <h3 className="font-semibold text-card-foreground tracking-tight">{column.title}</h3>
+          <span className={`inline-flex items-center justify-center px-2.5 py-1 text-xs font-semibold rounded-full ${
             isOverLimit 
               ? 'bg-red-100 text-red-700' 
-              : 'bg-purple-100 text-purple-700'
+              : 'bg-primary/10 text-primary'
           }`}>
             {cards.length}
             {column.limit && `/${column.limit}`}
@@ -62,15 +62,15 @@ export const KanbanColumn = ({
             variant="ghost"
             size="sm"
             onClick={onAddCard}
-            className="h-7 w-7 p-0 hover:bg-purple-100 transition-colors"
+            className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-colors"
           >
-            <Plus className="w-4 h-4 text-purple-600" />
+            <Plus className="w-4 h-4 text-primary" />
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-purple-100 transition-colors">
-                <MoreHorizontal className="w-4 h-4 text-gray-500" />
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100 rounded-lg transition-colors">
+                <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
@@ -94,10 +94,10 @@ export const KanbanColumn = ({
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-1 min-h-[200px] rounded-lg transition-all p-1 ${
+            className={`flex-1 min-h-[200px] rounded-xl transition-all duration-300 p-2 ${
               snapshot.isDraggingOver 
-                ? 'bg-gradient-to-b from-blue-50 to-purple-50 border-2 border-purple-300 border-dashed shadow-inner' 
-                : 'bg-transparent'
+                ? 'bg-primary/10 border-2 border-primary/50 border-dashed shadow-inner ring-2 ring-primary/20' 
+                : 'bg-accent/30'
             }`}
           >
             {cards.map((card, index) => (
@@ -116,17 +116,17 @@ export const KanbanColumn = ({
             {/* Empty state */}
             {cards.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center mb-3">
-                  <Plus className="w-6 h-6 text-purple-600" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center mb-3">
+                  <Plus className="w-6 h-6 text-primary" />
                 </div>
-                <p className="text-sm text-center text-gray-500 mb-3">
+                <p className="text-sm text-center text-muted-foreground mb-3">
                   Aucune tâche dans cette étape
                 </p>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onAddCard}
-                  className="text-xs hover:bg-purple-100 text-purple-600"
+                  className="text-xs hover:bg-primary/10 text-primary rounded-lg"
                 >
                   <Plus className="w-3 h-3 mr-1" />
                   Créer une tâche
@@ -143,7 +143,7 @@ export const KanbanColumn = ({
           variant="ghost"
           size="sm"
           onClick={onAddCard}
-          className="mt-3 text-purple-600 hover:text-purple-700 hover:bg-purple-50 justify-start transition-colors"
+          className="mt-3 text-primary hover:text-primary/90 hover:bg-primary/10 justify-start rounded-lg transition-colors"
         >
           <Plus className="w-3 h-3 mr-2" />
           Ajouter une tâche

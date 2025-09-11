@@ -8,18 +8,17 @@ import { useProjectUsers } from "@/hooks/useProjectUsers";
 import { Plus, Paperclip, Eye, Download, Trash2, Columns, Layout, User, Users, X, CalendarDays, FileText, Flag } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TaskRatingDialog } from "@/components/kanban/TaskRatingDialog";
-import { CardEditDialog } from "@/components/kanban/dialogs/CardEditDialog";
-import { CardCreateDialog } from "@/components/kanban/dialogs/CardCreateDialog";
-import { ColumnCreateDialog } from "@/components/kanban/dialogs/ColumnCreateDialog";
+import { FullScreenModal, ModalActions, useFullScreenModal } from "@/components/ui/fullscreen-modal";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
+import { useToast } from '@/hooks/use-toast';
 import { uploadMultipleFiles, syncKanbanFilesToDrive, UploadedFile } from "@/utils/fileUpload";
 
 interface Project {
@@ -30,23 +29,17 @@ interface Project {
 }
 
 interface ClientKanbanViewProps {
-  availableProjects?: Project[];
-  selectedProjectId?: string;
-  onProjectChange?: (projectId: string) => void;
+  projectId?: string;
 }
 
-export default function ClientKanbanView({ 
-  availableProjects = [],
-  selectedProjectId: propSelectedProjectId,
-  onProjectChange 
-}: ClientKanbanViewProps) {
+export default function ClientKanbanView({ projectId: propProjectId }: ClientKanbanViewProps) {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [boardId, setBoardId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<any>(null);
-  const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
+  const cardModal = useFullScreenModal();
   const [newCardData, setNewCardData] = useState({ 
     title: '', 
     description: '', 
@@ -55,10 +48,10 @@ export default function ClientKanbanView({
     priority: 'medium',
     assignedTo: []
   });
-  const [isNewCardDialogOpen, setIsNewCardDialogOpen] = useState(false);
+  const newCardModal = useFullScreenModal();
   const [userFilter, setUserFilter] = useState('all');
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+  const columnModal = useFullScreenModal();
   const [newColumnData, setNewColumnData] = useState({ title: '', color: '#3b82f6' });
   const [isSavingCard, setIsSavingCard] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ uploaded: 0, total: 0 });
@@ -81,73 +74,109 @@ export default function ClientKanbanView({
     deleteColumn
   } = useKanbanSupabase(boardId || undefined);
 
-  // Use projects from props or load them
+  // Load projects
   useEffect(() => {
-    if (availableProjects.length > 0) {
-      setProjects(availableProjects);
-      setLoading(false);
-    } else {
-      const loadProjects = async () => {
-        if (!user) return;
-        
-        try {
-          const { data, error } = await supabase
-            .from('projects')
-            .select('id, title, status, owner_id')
-            .eq('status', 'play') // Only active projects have Kanban
-            .order('created_at', { ascending: false });
+    const loadProjects = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('id, title, status, owner_id')
+          .eq('status', 'play') // Only active projects have Kanban
+          .order('created_at', { ascending: false });
 
-          if (error) throw error;
-          setProjects(data || []);
-        } catch (error) {
-          console.error('Erreur chargement projets:', error);
-        } finally {
-          setLoading(false);
-        }
-      };
+        if (error) throw error;
+        setProjects(data || []);
+      } catch (error) {
+        console.error('Erreur chargement projets:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      loadProjects();
-    }
-  }, [user, availableProjects]);
+    loadProjects();
+  }, [user]);
 
-  // Sync selectedProjectId with prop
+  // Set selected project from prop
   useEffect(() => {
-    if (propSelectedProjectId) {
-      setSelectedProjectId(propSelectedProjectId);
-    } else if (!propSelectedProjectId && projects.length === 1) {
-      const projectId = projects[0].id;
-      setSelectedProjectId(projectId);
-      onProjectChange?.(projectId);
+    if (propProjectId) {
+      console.log('Setting selected project from prop:', propProjectId);
+      setSelectedProjectId(propProjectId);
+    } else if (projects.length === 1 && !selectedProjectId) {
+      console.log('Auto-selecting single project:', projects[0].id);
+      setSelectedProjectId(projects[0].id);
     }
-  }, [propSelectedProjectId, projects, onProjectChange]);
+  }, [propProjectId, projects, selectedProjectId]);
 
   // Load board when project is selected
   useEffect(() => {
-    const loadBoard = async () => {
-      if (!selectedProjectId) return;
+    const loadOrCreateBoard = async () => {
+      if (!selectedProjectId || !user) return;
       
       try {
-        const { data: existingBoard, error } = await supabase
+        // First, try to get existing board
+        const { data: existingBoard, error: fetchError } = await supabase
           .from('kanban_boards')
           .select('id')
           .eq('project_id', selectedProjectId)
           .maybeSingle();
 
-        if (error) {
-          console.error('Erreur chargement board:', error);
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Erreur chargement board:', fetchError);
           return;
         }
 
         if (existingBoard) {
           setBoardId(existingBoard.id);
+        } else {
+          // Create a new board if it doesn't exist
+          console.log('Création d\'un nouveau board pour le projet:', selectedProjectId);
+          
+          const { data: newBoard, error: createError } = await supabase
+            .from('kanban_boards')
+            .insert({
+              project_id: selectedProjectId,
+              title: 'Tableau Kanban',
+              description: 'Tableau de gestion des tâches',
+              created_by: user.id
+            })
+            .select('id')
+            .single();
+
+          if (createError) {
+            console.error('Erreur création board:', createError);
+            return;
+          }
+
+          if (newBoard) {
+            // Create default columns
+            const defaultColumns = [
+              { board_id: newBoard.id, title: 'À faire', position: 0, color: '#94a3b8' },
+              { board_id: newBoard.id, title: 'En cours', position: 1, color: '#60a5fa' },
+              { board_id: newBoard.id, title: 'En revue', position: 2, color: '#fbbf24' },
+              { board_id: newBoard.id, title: 'Terminé', position: 3, color: '#34d399' }
+            ];
+
+            const { error: columnsError } = await supabase
+              .from('kanban_columns')
+              .insert(defaultColumns);
+
+            if (columnsError) {
+              console.error('Erreur création colonnes:', columnsError);
+            }
+
+            setBoardId(newBoard.id);
+            toast.success('Tableau Kanban créé avec succès');
+          }
         }
       } catch (error) {
         console.error('Erreur:', error);
       }
     };
 
-    loadBoard();
-  }, [selectedProjectId]);
+    loadOrCreateBoard();
+  }, [selectedProjectId, user]);
 
   // Load project members when project is selected (adapted from candidate version)
   // DEPRECATED: Ce code est maintenant remplacé par useProjectUsers
@@ -232,8 +261,8 @@ export default function ClientKanbanView({
 
   if (projects.length === 0) {
     return (
-      <Card className="p-8 text-center">
-        <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
+      <Card className="p-8 text-center bg-card">
+        <h3 className="text-lg font-semibold mb-2 text-card-foreground">Aucun projet actif</h3>
         <p className="text-muted-foreground">
           Vous n'avez aucun projet en cours avec un tableau Kanban.
         </p>
@@ -249,41 +278,24 @@ export default function ClientKanbanView({
 
   if (!selectedProjectId) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">Kanban - Sélectionner un projet</h2>
-        </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Choisir un projet</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sélectionner un projet..." />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
+      <div className="flex items-center justify-center h-96">
+        <Card className="p-8 text-center bg-card border-border">
+          <h3 className="text-lg font-semibold mb-2 text-card-foreground">Sélection d'un projet</h3>
+          <p className="text-muted-foreground">
+            Veuillez sélectionner un projet dans la barre de navigation pour afficher le tableau Kanban.
+          </p>
         </Card>
       </div>
     );
   }
 
-  if (!boardId) {
+  if (!boardId && selectedProjectId) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="text-muted-foreground mb-4">Aucun tableau Kanban trouvé</div>
+          <div className="text-muted-foreground mb-4">Initialisation du tableau Kanban...</div>
           <p className="text-sm text-muted-foreground">
-            Le tableau sera créé automatiquement lors du démarrage du projet.
+            Le tableau est en cours de création.
           </p>
         </div>
       </div>
@@ -357,7 +369,7 @@ export default function ClientKanbanView({
       
       setSelectedCard(formattedCard);
       setUploadedFiles([]);
-      setIsCardDialogOpen(true);
+      cardModal.open();
     };
     
     // If finalized and client, check if already rated
@@ -422,7 +434,7 @@ export default function ClientKanbanView({
       priority: 'medium',
       assignedTo: []
     });
-    setIsNewCardDialogOpen(true);
+    newCardModal.open();
   };
 
   // Handler pour sauvegarder une nouvelle carte (copied from candidate version)
@@ -477,7 +489,7 @@ export default function ClientKanbanView({
           }
         }
         
-        setIsNewCardDialogOpen(false);
+        newCardModal.close();
         setUploadedFiles([]);
         setUploadProgress({ uploaded: 0, total: 0 });
         setNewCardData({ 
@@ -502,7 +514,7 @@ export default function ClientKanbanView({
   // Handler pour ajouter une colonne
   const handleAddColumn = () => {
     setNewColumnData({ title: '', color: '#3b82f6' });
-    setIsColumnDialogOpen(true);
+    columnModal.open();
   };
 
   // Handler pour sauvegarder une nouvelle colonne
@@ -514,7 +526,7 @@ export default function ClientKanbanView({
         color: newColumnData.color
       };
       addColumn(newColumn);
-      setIsColumnDialogOpen(false);
+      columnModal.close();
       setNewColumnData({ title: '', color: '#3b82f6' });
     }
   };
@@ -596,7 +608,7 @@ export default function ClientKanbanView({
           }
         }
         
-        setIsCardDialogOpen(false);
+        cardModal.close();
         setUploadedFiles([]);
         setUploadProgress({ uploaded: 0, total: 0 });
         
@@ -639,48 +651,6 @@ export default function ClientKanbanView({
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden max-w-full">
-      {/* Header avec design Ialla - Fixed width */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 mb-4 border border-purple-200/50 flex-shrink-0 overflow-hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Layout className="w-6 h-6 text-white" />
-            </div>
-            
-            <Select 
-              value={selectedProjectId} 
-              onValueChange={(value) => {
-                setSelectedProjectId(value);
-                onProjectChange?.(value);
-              }}
-            >
-              <SelectTrigger className="w-64 bg-white border-purple-200 focus:border-purple-400">
-                <SelectValue placeholder="Sélectionner un projet..." />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {selectedProject && (
-            <div className="flex items-center gap-2">
-              <Button 
-                onClick={handleAddColumn}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                size="sm"
-              >
-                <Columns className="w-4 h-4 mr-2" />
-                Nouvelle colonne
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Kanban Board - Scrollable container */}
       {board ? (
@@ -717,42 +687,303 @@ export default function ClientKanbanView({
         </div>
       )}
 
-      {/* Dialog pour voir/éditer une carte */}
-      <CardEditDialog
-        open={isCardDialogOpen}
-        onOpenChange={setIsCardDialogOpen}
-        card={selectedCard}
-        onCardChange={setSelectedCard}
-        projectMembers={projectMembers}
-        uploadedFiles={uploadedFiles}
-        onUploadedFilesChange={setUploadedFiles}
-        onSave={handleSaveCard}
-        isSaving={isSavingCard}
-        uploadProgress={uploadProgress}
-      />
+      {/* Modal fullscreen pour voir/éditer une carte */}
+      <FullScreenModal
+        isOpen={cardModal.isOpen}
+        onClose={cardModal.close}
+        title={selectedCard ? "Modifier la carte" : ""}
+        description={selectedCard?.columnTitle || ""}
+        actions={
+          <ModalActions
+            onSave={handleSaveCard}
+            onDelete={() => {
+              if (confirm('Êtes-vous sûr de vouloir supprimer cette carte ?')) {
+                deleteCard(selectedCard.id);
+                cardModal.close();
+              }
+            }}
+            saveDisabled={!selectedCard?.title}
+            isLoading={isSavingCard}
+          />
+        }
+      >
+        {selectedCard && (
+          <div className="space-y-6">
+            <div>
+              <Label htmlFor="title">Titre</Label>
+              <Input
+                id="title"
+                value={selectedCard.title}
+                onChange={(e) => setSelectedCard({ ...selectedCard, title: e.target.value })}
+                placeholder="Titre de la carte"
+                className="mt-2"
+              />
+            </div>
 
-      {/* Dialog pour créer une nouvelle carte */}
-      <CardCreateDialog
-        open={isNewCardDialogOpen}
-        onOpenChange={setIsNewCardDialogOpen}
-        cardData={newCardData}
-        onCardDataChange={setNewCardData}
-        projectMembers={projectMembers}
-        uploadedFiles={uploadedFiles}
-        onUploadedFilesChange={setUploadedFiles}
-        onSave={handleSaveNewCard}
-        isSaving={isSavingCard}
-        uploadProgress={uploadProgress}
-      />
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={selectedCard.description || ''}
+                onChange={(e) => setSelectedCard({ ...selectedCard, description: e.target.value })}
+                placeholder="Description de la carte"
+                className="mt-2 min-h-[120px]"
+              />
+            </div>
 
-      {/* Dialog pour créer une nouvelle colonne */}
-      <ColumnCreateDialog
-        open={isColumnDialogOpen}
-        onOpenChange={setIsColumnDialogOpen}
-        columnData={newColumnData}
-        onColumnDataChange={setNewColumnData}
-        onSave={handleSaveColumn}
-      />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="assignedTo">Assigné à</Label>
+                <Select 
+                  value={selectedCard.assignedTo?.[0] || 'unassigned'}
+                  onValueChange={(value) => setSelectedCard({ ...selectedCard, assignedTo: value === 'unassigned' ? [] : [value] })}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Sélectionner un membre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Non assigné</SelectItem>
+                    {projectMembers.map((member) => (
+                      <SelectItem key={member} value={member}>
+                        {member}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="dueDate">Date d'échéance</Label>
+                <div className="mt-2">
+                  <DatePicker
+                    date={selectedCard.dueDate ? new Date(selectedCard.dueDate) : undefined}
+                    onSelect={(date) => setSelectedCard({ ...selectedCard, dueDate: date ? date.toISOString().split('T')[0] : '' })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="priority">Priorité</Label>
+              <Select 
+                value={selectedCard.priority || 'medium'}
+                onValueChange={(value) => setSelectedCard({ ...selectedCard, priority: value })}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Basse</SelectItem>
+                  <SelectItem value="medium">Moyenne</SelectItem>
+                  <SelectItem value="high">Haute</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Fichiers attachés</Label>
+              <div className="mt-2 space-y-2">
+                {selectedCard.files?.map((file: any, index: number) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <Paperclip className="w-4 h-4" />
+                    <span className="text-sm flex-1">{file.name || file}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const newFiles = selectedCard.files.filter((_: any, i: number) => i !== index);
+                        setSelectedCard({ ...selectedCard, files: newFiles });
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Input
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setUploadedFiles(Array.from(e.target.files));
+                    }
+                  }}
+                  className="mt-2"
+                />
+                {uploadProgress.total > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    Upload: {uploadProgress.uploaded}/{uploadProgress.total}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </FullScreenModal>
+
+      {/* Modal fullscreen pour créer une nouvelle carte */}
+      <FullScreenModal
+        isOpen={newCardModal.isOpen}
+        onClose={newCardModal.close}
+        title="Nouvelle carte"
+        actions={
+          <ModalActions
+            onSave={handleSaveNewCard}
+            onCancel={newCardModal.close}
+            saveDisabled={!newCardData.title.trim()}
+            isLoading={isSavingCard}
+            saveText="Créer"
+          />
+        }
+      >
+        <div className="space-y-6">
+          <div>
+            <Label htmlFor="new-title">Titre *</Label>
+            <Input
+              id="new-title"
+              value={newCardData.title}
+              onChange={(e) => setNewCardData({ ...newCardData, title: e.target.value })}
+              placeholder="Titre de la carte"
+              className="mt-2"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="new-description">Description</Label>
+            <Textarea
+              id="new-description"
+              value={newCardData.description}
+              onChange={(e) => setNewCardData({ ...newCardData, description: e.target.value })}
+              placeholder="Description de la carte"
+              className="mt-2 min-h-[120px]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="new-assignedTo">Assigné à</Label>
+              <Select 
+                value={newCardData.assignedTo?.[0] || 'unassigned'}
+                onValueChange={(value) => setNewCardData({ ...newCardData, assignedTo: value === 'unassigned' ? [] : [value] })}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Sélectionner un membre" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Non assigné</SelectItem>
+                  {projectMembers.map((member) => (
+                    <SelectItem key={member} value={member}>
+                      {member}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="new-dueDate">Date d'échéance</Label>
+              <div className="mt-2">
+                <DatePicker
+                  date={newCardData.dueDate ? new Date(newCardData.dueDate) : undefined}
+                  onSelect={(date) => setNewCardData({ ...newCardData, dueDate: date ? date.toISOString().split('T')[0] : '' })}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="new-priority">Priorité</Label>
+            <Select 
+              value={newCardData.priority}
+              onValueChange={(value) => setNewCardData({ ...newCardData, priority: value })}
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Basse</SelectItem>
+                <SelectItem value="medium">Moyenne</SelectItem>
+                <SelectItem value="high">Haute</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="new-files">Fichiers attachés</Label>
+            <Input
+              id="new-files"
+              type="file"
+              multiple
+              onChange={(e) => {
+                if (e.target.files) {
+                  setUploadedFiles(Array.from(e.target.files));
+                }
+              }}
+              className="mt-2"
+            />
+            {uploadedFiles.length > 0 && (
+              <div className="mt-2 text-sm text-muted-foreground">
+                {uploadedFiles.length} fichier(s) sélectionné(s)
+              </div>
+            )}
+            {uploadProgress.total > 0 && (
+              <div className="text-sm text-muted-foreground">
+                Upload: {uploadProgress.uploaded}/{uploadProgress.total}
+              </div>
+            )}
+          </div>
+        </div>
+      </FullScreenModal>
+
+      {/* Modal fullscreen pour créer une nouvelle colonne */}
+      <FullScreenModal
+        isOpen={columnModal.isOpen}
+        onClose={columnModal.close}
+        title="Nouvelle colonne"
+        actions={
+          <ModalActions
+            onSave={handleSaveColumn}
+            onCancel={columnModal.close}
+            saveDisabled={!newColumnData.title.trim()}
+            saveText="Créer la colonne"
+          />
+        }
+      >
+        <div className="space-y-6">
+          <div>
+            <Label htmlFor="column-title">Nom de la colonne *</Label>
+            <Input
+              id="column-title"
+              value={newColumnData.title}
+              onChange={(e) => setNewColumnData({ ...newColumnData, title: e.target.value })}
+              placeholder="Ex: À faire, En cours, Terminé"
+              className="mt-2"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="column-color">Couleur de la colonne</Label>
+            <div className="mt-2 flex items-center gap-3">
+              <Input
+                id="column-color"
+                type="color"
+                value={newColumnData.color}
+                onChange={(e) => setNewColumnData({ ...newColumnData, color: e.target.value })}
+                className="w-20 h-10"
+              />
+              <span className="text-sm text-muted-foreground">{newColumnData.color}</span>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              <strong>Aperçu :</strong> La colonne "{newColumnData.title || 'Nouvelle colonne'}" sera ajoutée 
+              avec la couleur sélectionnée. Vous pourrez la renommer ou la supprimer plus tard.
+            </p>
+          </div>
+        </div>
+      </FullScreenModal>
 
 
       {/* Dialog de notation des tâches finalisées */}

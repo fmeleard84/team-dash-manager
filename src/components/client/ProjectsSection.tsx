@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ProjectCard } from '@/components/ProjectCard';
+import { RadixProjectCard } from '@/components/RadixProjectCard';
 import { 
   Plus, 
   Rocket, 
@@ -41,6 +41,7 @@ interface ProjectsSectionProps {
   onUnarchiveProject?: (id: string) => void;
   onCreateProject?: () => void;
   onViewTemplates?: () => void;
+  onProjectEdited?: () => void;
   refreshTrigger?: number;
 }
 
@@ -96,6 +97,7 @@ export function ProjectsSection({
   onUnarchiveProject = () => {},
   onCreateProject = () => {},
   onViewTemplates = () => {},
+  onProjectEdited = () => {},
   refreshTrigger = 0,
 }: ProjectsSectionProps) {
   // État pour les filtres
@@ -156,24 +158,6 @@ export function ProjectsSection({
     setSelectedFilters([]);
   };
 
-  // Fonction pour obtenir les props de badge selon le statut
-  const getProjectBadge = (project: any) => {
-    const config = statusConfig[project.category as keyof typeof statusConfig];
-    if (!config) return null;
-
-    return (
-      <Badge 
-        variant="outline" 
-        className={cn(
-          "flex items-center gap-1.5 px-2.5 py-1",
-          config.color
-        )}
-      >
-        <span className={cn("w-2 h-2 rounded-full", config.dotColor)} />
-        {config.label}
-      </Badge>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -181,11 +165,11 @@ export function ProjectsSection({
       <div className="mt-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="flex items-center gap-3 text-4xl font-extrabold text-[#0E0F12]">
-              <FolderOpen className="h-9 w-9 text-[#7B3EF4] fill-current" />
+            <h1 className="flex items-center gap-3 text-4xl font-extrabold text-foreground">
+              <FolderOpen className="h-9 w-9 text-purple-600 dark:text-purple-400 fill-current" />
               Mes projets
             </h1>
-            <p className="mt-2 text-lg text-[#6B7280]">
+            <p className="mt-2 text-lg text-muted-foreground">
               {filteredProjects.length} projet{filteredProjects.length > 1 ? 's' : ''} 
               {selectedFilters.length > 0 && ` • Filtré${filteredProjects.length > 1 ? 's' : ''}`}
             </p>
@@ -217,7 +201,7 @@ export function ProjectsSection({
             
             <Button 
               variant="outline" 
-              className="h-11 px-6 text-sm font-semibold border-2 border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300 rounded-full transform hover:-translate-y-0.5 transition-all duration-200"
+              className="h-11 px-6 text-sm font-semibold border-2 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 hover:border-purple-300 dark:hover:border-purple-700 rounded-full transform hover:-translate-y-0.5 transition-all duration-200"
               onClick={onViewTemplates}
             >
               <Rocket className="w-4 h-4 mr-2" />
@@ -229,9 +213,9 @@ export function ProjectsSection({
 
       {/* Barre de filtres */}
       {showFilters && (
-        <div className="bg-gray-50 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
+        <div className="bg-muted/50 dark:bg-muted/20 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Filtrer par statut</span>
+            <span className="text-sm font-medium text-foreground">Filtrer par statut</span>
             <div className="flex gap-2">
               <Button 
                 variant="ghost" 
@@ -264,19 +248,21 @@ export function ProjectsSection({
                   className={cn(
                     "flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 transition-all",
                     isSelected 
-                      ? "border-purple-500 bg-purple-50" 
-                      : "border-gray-200 bg-white hover:border-gray-300"
+                      ? "border-purple-500 dark:border-purple-400 bg-purple-50 dark:bg-purple-950/30" 
+                      : "border-border bg-background hover:border-purple-300 dark:hover:border-purple-600"
                   )}
                 >
                   <span className={cn("w-2 h-2 rounded-full", config.dotColor)} />
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium text-foreground">
                     {config.label}
                   </span>
                   <Badge 
                     variant="secondary" 
                     className={cn(
                       "text-xs px-1.5 py-0",
-                      isSelected ? "bg-purple-200 text-purple-700" : "bg-gray-100"
+                      isSelected 
+                        ? "bg-purple-200 dark:bg-purple-800/50 text-purple-700 dark:text-purple-300" 
+                        : "bg-muted text-muted-foreground"
                     )}
                   >
                     {count}
@@ -291,14 +277,14 @@ export function ProjectsSection({
       {/* Liste des projets */}
       <div className="space-y-4">
         {filteredProjects.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FolderOpen className="w-8 h-8 text-gray-400" />
+          <div className="text-center py-12 bg-muted/30 dark:bg-muted/10 rounded-xl">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <FolderOpen className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-foreground mb-2">
               Aucun projet trouvé
             </h3>
-            <p className="text-gray-500 mb-4">
+            <p className="text-muted-foreground mb-4">
               {selectedFilters.length > 0 
                 ? "Aucun projet ne correspond aux filtres sélectionnés"
                 : "Vous n'avez pas encore de projet"}
@@ -318,26 +304,29 @@ export function ProjectsSection({
             )}
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="space-y-4">
             {filteredProjects.map((project) => (
-              <div key={project.id} className="relative">
-                {/* Badge de statut positionné en haut à droite de la carte */}
-                <div className="absolute -top-2 right-4 z-10">
-                  {getProjectBadge(project)}
-                </div>
-                
-                <ProjectCard
-                  project={project}
-                  isArchived={project.category === 'archived'}
-                  onView={() => onViewProject(project.id)}
-                  onStatusToggle={(id, _) => onToggleStatus(id, project.status)}
-                  onStart={(projectWithKickoff) => onStartProject(projectWithKickoff)}
-                  onDelete={() => onDeleteRequest(project)}
-                  onArchive={() => onArchiveProject(project.id)}
-                  onUnarchive={() => onUnarchiveProject(project.id)}
-                  resourceAssignments={resourceAssignments}
-                />
-              </div>
+              <RadixProjectCard
+                key={project.id}
+                project={{
+                  id: project.id,
+                  title: project.title,
+                  description: project.description,
+                  date: project.project_date || new Date().toISOString(),
+                  status: project.status,
+                  clientBudget: project.client_budget,
+                  dueDate: project.due_date,
+                }}
+                isArchived={project.category === 'archived'}
+                onView={() => onViewProject(project.id)}
+                onStatusToggle={(id, _) => onToggleStatus(id, project.status)}
+                onStart={(projectWithKickoff) => onStartProject(projectWithKickoff)}
+                onDelete={() => onDeleteRequest(project)}
+                onArchive={() => onArchiveProject(project.id)}
+                onUnarchive={() => onUnarchiveProject(project.id)}
+                onEdit={onProjectEdited}
+                refreshTrigger={refreshTrigger}
+              />
             ))}
           </div>
         )}

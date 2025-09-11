@@ -104,9 +104,9 @@ export const KanbanBoard = ({
     ?.cardIds.length || 0;
 
   return (
-    <div className="flex flex-col h-full bg-white max-w-full">
+    <div className="flex flex-col h-full bg-background max-w-full">
       {/* Board Header - Fixed width */}
-      <div className="border-b bg-white p-4 space-y-4 flex-shrink-0 overflow-hidden">
+      <div className="border-b border-border bg-card/50 backdrop-blur-sm p-4 space-y-4 flex-shrink-0 overflow-hidden">
         {!hideTitle && (
           <div className="flex items-center justify-between">
             <div>
@@ -187,7 +187,7 @@ export const KanbanBoard = ({
 
         {/* Filters Panel (collapsible) */}
         {showFilters && (
-          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+          <div className="bg-accent/50 backdrop-blur-sm p-3 rounded-lg space-y-2 border border-border">
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
@@ -234,9 +234,9 @@ export const KanbanBoard = ({
       </div>
 
       {/* Board Content - Scrollable area */}
-      <div className="flex-1 overflow-x-auto overflow-y-visible max-w-full">
+      <div className="flex-1 overflow-x-auto overflow-y-visible max-w-full bg-gradient-to-br from-background via-background to-accent/20">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-4 p-4 min-h-full w-max">
+          <div className="flex gap-4 p-4 min-h-full w-max relative">
             {board.columns
               .sort((a, b) => a.position - b.position)
               .map((column) => (
@@ -255,7 +255,7 @@ export const KanbanBoard = ({
             }
 
             {/* Add Column Button */}
-            <div className="flex items-center justify-center w-80 min-h-[600px] bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 transition-colors flex-shrink-0">
+            <div className="flex items-center justify-center w-80 min-h-[600px] bg-card/30 backdrop-blur-sm rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-card/50 transition-all duration-300 flex-shrink-0 group">
               <Button
                 variant="ghost"
                 onClick={onAddColumn}

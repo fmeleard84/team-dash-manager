@@ -12,8 +12,10 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/ui/components/Card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Download, Upload, Copy, Euro } from 'lucide-react';
+import { ArrowLeft, Save, Download, Upload, Copy, Euro, Users } from 'lucide-react';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
@@ -271,84 +273,99 @@ const TemplateFlowSimple = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <div className="relative flex items-center justify-between p-4 border-b bg-white/80 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/admin/resources')}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour aux Templates
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold">Éditeur de Template ReactFlow</h1>
-            <p className="text-sm text-muted-foreground">
-              Composez l'équipe pour : <span className="font-medium">{templateName}</span>
-            </p>
-          </div>
-        </div>
-        
-        {/* Prix total au centre */}
-        {hrResources.size > 0 && (
-          <div className="absolute left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg shadow-lg">
-            <div className="flex items-center gap-2">
-              <Euro className="w-5 h-5" />
-              <span className="text-lg font-bold">
-                {calculateTotalPrice().toFixed(2)}€/min
-              </span>
+      {/* Header Material Design avec gradient */}
+      <div className="relative bg-gradient-to-r from-purple-600 to-purple-500 shadow-lg">
+        <div className="flex items-center justify-between p-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              className="text-white hover:bg-white/20 border-white/30"
+              onClick={() => navigate('/admin/resources')}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour
+            </Button>
+            <div className="text-white">
+              <h1 className="text-2xl font-bold">Éditeur de Template</h1>
+              <p className="text-purple-100">
+                {templateName}
+              </p>
             </div>
-            <p className="text-xs text-center opacity-90">
-              Total de {hrResources.size} ressource{hrResources.size > 1 ? 's' : ''}
-            </p>
           </div>
-        )}
+        
+          {/* Prix total avec design moderne */}
+          {hrResources.size > 0 && (
+            <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
+              <CardContent className="py-3 px-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Euro className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">
+                      {calculateTotalPrice().toFixed(2)}€/min
+                    </p>
+                    <p className="text-sm opacity-90">
+                      {hrResources.size} membre{hrResources.size > 1 ? 's' : ''} d'équipe
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={injectToParent}
-            disabled={nodes.length === 0}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Injecter dans le Template
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={injectToParent}
+              disabled={nodes.length === 0}
+              className="bg-white text-purple-600 hover:bg-purple-50 font-medium shadow-lg"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Sauvegarder
+            </Button>
 
-          <Button
-            variant="outline"
-            onClick={copyToClipboard}
-            disabled={nodes.length === 0}
-          >
-            <Copy className="w-4 h-4 mr-2" />
-            Copier JSON
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={exportToJSON}
-            disabled={nodes.length === 0}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Exporter
-          </Button>
+            <Button
+              variant="ghost"
+              className="text-white hover:bg-white/20 border-white/30"
+              onClick={copyToClipboard}
+              disabled={nodes.length === 0}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copier
+            </Button>
+            
+            <Button
+              variant="ghost"
+              className="text-white hover:bg-white/20 border-white/30"
+              onClick={exportToJSON}
+              disabled={nodes.length === 0}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Exporter
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Main Content - 3 panels */}
+      {/* Main Content - 3 panels avec Material Design */}
       <div className="flex-1 flex">
-        {/* Panel gauche - Catégories HR */}
-        <div className="w-80 border-r bg-white/50 backdrop-blur-sm">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold">Ressources Disponibles</h2>
-            <p className="text-sm text-muted-foreground">
-              Cliquez sur les profils pour les ajouter
-            </p>
+        {/* Panel gauche - Catégories HR avec Card */}
+        <div className="w-80 border-r bg-card">
+          <Card className="rounded-none border-0 border-b">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Ressources Disponibles</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Cliquez pour ajouter à l'équipe
+              </p>
+            </CardHeader>
+          </Card>
+          <div className="overflow-y-auto h-full">
+            <HRCategoriesPanel onProfileSelect={handleProfileSelect} />
           </div>
-          <HRCategoriesPanel onProfileSelect={handleProfileSelect} />
         </div>
         
-        {/* Panel central - ReactFlow Canvas */}
-        <div className="flex-1 relative">
+        {/* Panel central - ReactFlow Canvas avec styles améliorés */}
+        <div className="flex-1 relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -357,26 +374,30 @@ const TemplateFlowSimple = () => {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
-            className="bg-gray-50"
+            className="bg-transparent"
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             minZoom={0.2}
             maxZoom={2}
             attributionPosition="bottom-left"
           >
-            <Controls />
-            <MiniMap />
-            <Background variant="dots" gap={12} size={1} />
+            <Controls className="!bg-card !border-border !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button:hover]:!bg-accent" />
+            <MiniMap className="!bg-card !border-border !shadow-lg" nodeColor="#9333ea" />
+            <Background variant="dots" gap={20} size={1} color="#9333ea" />
           </ReactFlow>
 
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center text-muted-foreground">
-                <h3 className="text-lg font-medium mb-2">Commencez par ajouter des ressources</h3>
-                <p className="text-sm">
-                  Utilisez le panneau de gauche pour cliquer sur les profils HR<br />
-                  et créer votre composition d'équipe pour ce template.
-                </p>
-              </div>
+              <Card className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-xl max-w-md">
+                <CardContent className="py-8 text-center">
+                  <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">Composez votre équipe</h3>
+                  <p className="text-muted-foreground">
+                    Sélectionnez les profils dans le panneau de gauche pour construire l'équipe idéale pour ce template.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>

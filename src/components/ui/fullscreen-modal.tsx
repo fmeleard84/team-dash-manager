@@ -57,12 +57,12 @@ export function FullScreenModal({
 
   const modalContent = (
     <div className={cn(
-      "fixed inset-0 z-50 bg-white",
+      "fixed inset-0 z-50 bg-background",
       "animate-in fade-in-0 slide-in-from-bottom-4",
       className
     )}>
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left side - Back button */}
@@ -73,7 +73,7 @@ export function FullScreenModal({
                   size="sm"
                   onClick={onClose}
                   disabled={preventClose}
-                  className="flex items-center gap-2 hover:bg-gray-100"
+                  className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   {backButtonText}
@@ -85,7 +85,7 @@ export function FullScreenModal({
                   size="icon"
                   onClick={onClose}
                   disabled={preventClose}
-                  className="hover:bg-gray-100"
+                  className="hover:bg-accent hover:text-accent-foreground"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -111,9 +111,9 @@ export function FullScreenModal({
           {/* Title and description */}
           {(title || description) && (
             <div className="mb-6">
-              {title && <h1 className="text-3xl font-bold text-gray-900">{title}</h1>}
+              {title && <h1 className="text-3xl font-bold text-foreground">{title}</h1>}
               {description && (
-                <p className="mt-2 text-base text-gray-600">{description}</p>
+                <p className="mt-2 text-base text-muted-foreground">{description}</p>
               )}
             </div>
           )}
@@ -184,7 +184,7 @@ export function ModalActions({
           size="sm"
           onClick={onDelete}
           disabled={deleteDisabled || isLoading}
-          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800"
         >
           {deleteText}
         </Button>
@@ -206,7 +206,7 @@ export function ModalActions({
           size="sm"
           onClick={onSave}
           disabled={saveDisabled || isLoading}
-          className="bg-purple-600 hover:bg-purple-700 text-white"
+          className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
         >
           {isLoading ? "Enregistrement..." : saveText}
         </Button>
