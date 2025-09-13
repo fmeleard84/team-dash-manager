@@ -19,6 +19,19 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    include: [
+      '@openai/agents-realtime',
+      '@openai/agents-core',
+      '@openai/agents-core/_shims'
+    ],
+    esbuildOptions: {
+      target: 'es2020'
+    }
+  },
+  build: {
+    target: 'es2020'
+  },
   test: {
     globals: true,
     environment: 'jsdom',

@@ -261,7 +261,7 @@ ${companyInfo.address || ''}`;
     navigator.clipboard.writeText(text);
     toast({
       title: "Informations copiées",
-      description: "Les informations de l'Company ont été copiées',
+      description: "Les informations de l'entreprise ont été copiées",
     });
   };
 
@@ -269,8 +269,8 @@ ${companyInfo.address || ''}`;
     <div className="space-y-6">
       <PageHeader
         icon={Settings}
-        title="Settings"
-        subtitle="Gérez vos Informations personnelles et de l"entreprise"
+        title="Paramètres"
+        subtitle="Gérez vos informations personnelles et de l'entreprise"
       />
       
       {/* Informations personnelles */}
@@ -282,7 +282,7 @@ ${companyInfo.address || ''}`;
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
+              <Label htmlFor="firstName">Prénom</Label>
               <Input
                 id="firstName"
                 value={firstName}
@@ -291,7 +291,7 @@ ${companyInfo.address || ''}`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Name</Label>
+              <Label htmlFor="lastName">Nom</Label>
               <Input
                 id="lastName"
                 value={lastName}
@@ -300,7 +300,7 @@ ${companyInfo.address || ''}`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">EMayl</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 value={user?.email || ''}
@@ -309,7 +309,7 @@ ${companyInfo.address || ''}`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">Téléphone</Label>
               <Input
                 id="phone"
                 value={phone}
@@ -324,12 +324,12 @@ ${companyInfo.address || ''}`;
       {/* Informations entreprise */}
       <Card>
         <CardHeader>
-          <CardTitle>Informations de l'Company</CardTitle>
+          <CardTitle>Informations de l'entreprise</CardTitle>
           <CardDescription>Gérez les Informations de votre société</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="companyName">Name de l'Company</Label>
+            <Label htmlFor="companyName">Nom de l'entreprise</Label>
             <Input
               id="companyName"
               value={companyName}
@@ -339,7 +339,7 @@ ${companyInfo.address || ''}`;
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="siret">SIRET number / SIREN</Label>
+            <Label htmlFor="siret">Numéro SIRET / SIREN</Label>
             <div className="flex gap-2">
               <Input
                 id="siret"
@@ -423,7 +423,7 @@ ${companyInfo.address || ''}`;
                 )}
                 {companyInfo.address && (
                   <div className="md:col-span-2">
-                    <span className="text-muted-foreground">Address:</span>{' '}
+                    <span className="text-muted-foreground">Adresse:</span>{' '}
                     <span>{companyInfo.address}</span>
                   </div>
                 )}
@@ -439,12 +439,12 @@ ${companyInfo.address || ''}`;
             {saving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saving...
+                Enregistrement...
               </>
             ) : (
               <>
                 <Save className="w-4 h-4 mr-2" />
-                Save les modifications
+                Enregistrer les modifications
               </>
             )}
           </Button>
@@ -454,13 +454,13 @@ ${companyInfo.address || ''}`;
       {/* Préférences d'affichage */}
       <Card>
         <CardHeader>
-          <CardTitle>Preferences d'affichage</CardTitle>
+          <CardTitle>Préférences d'affichage</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Theme de l'application</p>
-              <p className="text-sm text-muted-foreground">Choisissez entre le Light mode et sombre</p>
+              <p className="font-medium">Thème de l'application</p>
+              <p className="text-sm text-muted-foreground">Choisissez entre le mode clair et sombre</p>
             </div>
             <ThemeToggle />
           </div>
@@ -481,7 +481,7 @@ ${companyInfo.address || ''}`;
             </div>
             <Button variant="destructive" onClick={logout}>
               <LogOut className="w-4 h-4 mr-2" />
-              Logout
+              Déconnexion
             </Button>
           </div>
         </CardContent>

@@ -16,7 +16,10 @@ import { toast } from 'sonner';
 
 // Replace with your Stripe publishable key
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51P94oUGMzVpQMQaDPvS7LMpnCbli48UhUR8FXuvi79EszEya3sFL1VZltarPRPPIUybgWIfw6OMjct5pztmEVra400a1PUL1cI';
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+// Disable Stripe in development to avoid HTTPS requirement
+const stripePromise = window.location.protocol === 'https:' 
+  ? loadStripe(STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 interface StripePaymentProps {
   invoice?: Invoice;

@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { expertiseProvider } from './expertise-provider';
-import { validateProfile, normalizeProfile } from './validation-helper';
 
 /**
  * Outils pour la gestion des projets via l'assistant vocal
@@ -28,7 +27,7 @@ export interface CreateTeamParams {
   budget?: number;
   profiles: Array<{
     profession: string;
-    seniority: 'junior' | 'intermediate' | 'senior';
+    seniority: 'junior' | 'medior' | 'senior' | 'expert';
     skills?: string[];
     languages?: string[];
   }>;
@@ -251,86 +250,109 @@ export async function createTeam(params: CreateTeamParams) {
         const x = 400 + radius * Math.cos(angle);
         const y = 300 + radius * Math.sin(angle);
         
-        // NOUVEAU: Valider le profil avec validation-helper
-        console.log(`🔍 Validation du profil ${i + 1}: ${profile.profession}`);
-        const validationResult = await validateProfile({
-          profession: profile.profession,
-          seniority: profile.seniority || 'medior',
-          skills: profile.skills,
-          languages: profile.languages
-        });
+        // 1. Vérifier que le métier existe dans hr_profiles
+        console.log(`🔍 Recherche du métier: ${profile.profession}`);
+        const { data: hrProfiles } = await supabase
+          .from('hr_profiles')
+          .select('*')
+          .ilike('name', `%${profile.profession}%`)
+          .limit(1);
         
-        if (!validationResult.isValid) {
-          console.error(`❌ Profil invalide:`, validationResult.errors);
-          
-          // Afficher les erreurs à l'utilisateur
+        let finalProfiles = hrProfiles;
+        
+        // Si le métier n'existe pas, l'ignorer avec un avertissement
+        if (!finalProfiles || finalProfiles.length === 0) {
+          console.warn(`⚠️ Métier non trouvé dans hr_profiles: ${profile.profession}`);
           toast({
-            title: `❌ Profil ${i + 1} invalide`,
-            description: validationResult.errors.join('\n'),
-            variant: "destructive",
-            duration: 10000
+            title: "Métier non disponible",
+            description: `Le métier "${profile.profession}" n'est pas disponible dans notre système. Il sera ignoré.`,
+            variant: "destructive"
           });
+          continue;
+        }
+        
+        // 2. Vérifier les langues si fournies
+        let validLanguages = [];
+        if (profile.languages && profile.languages.length > 0) {
+          console.log(`🔍 Vérification des langues: ${profile.languages.join(', ')}`);
           
-          // Si des suggestions sont disponibles, les afficher
-          if (validationResult.suggestions) {
-            let suggestionText = '';
-            if (validationResult.suggestions.profession) {
-              suggestionText += `\n💡 Métier suggéré: ${validationResult.suggestions.profession}`;
+          // Normaliser les noms de langues (première lettre en majuscule)
+          const normalizedLanguages = profile.languages.map(lang => 
+            lang.charAt(0).toUpperCase() + lang.slice(1).toLowerCase()
+          );
+          
+          const { data: languages } = await supabase
+            .from('hr_languages')
+            .select('id, name')
+            .in('name', normalizedLanguages);
+          
+          if (languages && languages.length > 0) {
+            validLanguages = languages.map(l => l.name);
+            const invalidLanguages = normalizedLanguages.filter(l => !languages.some(lang => lang.name === l));
+            if (invalidLanguages.length > 0) {
+              console.warn(`⚠️ Langues non trouvées: ${invalidLanguages.join(', ')}`);
             }
-            if (validationResult.suggestions.expertises) {
-              suggestionText += `\n💡 Expertises suggérées: ${validationResult.suggestions.expertises.join(', ')}`;
-            }
-            if (validationResult.suggestions.languages) {
-              suggestionText += `\n💡 Langues disponibles: ${validationResult.suggestions.languages.join(', ')}`;
+          } else {
+            console.warn(`⚠️ Aucune langue valide trouvée parmi: ${normalizedLanguages.join(', ')}`);
+            validLanguages = ['Français']; // Langue par défaut
+          }
+        } else {
+          validLanguages = ['Français']; // Langue par défaut si aucune spécifiée
+        }
+        
+        // 3. Récupérer TOUTES les expertises du métier depuis la base
+        const hrProfile = finalProfiles[0];
+        // Récupérer toutes les expertises disponibles pour ce métier
+        const { data: availableExpertises } = await supabase
+          .from('hr_expertises')
+          .select('name')
+          .eq('profile_id', hrProfile.id);
+        console.log(`📚 Expertises disponibles pour ${hrProfile.name}:`, availableExpertises);
+        
+        // Si l'utilisateur a demandé des compétences spécifiques, les valider
+        let validExpertises = [];
+        if (availableExpertises && availableExpertises.length > 0) {
+          if (profile.skills && profile.skills.length > 0) {
+            console.log(`🔍 Compétences demandées: ${profile.skills.join(', ')}`);
+            
+            // Valider les compétences demandées contre celles disponibles
+            validExpertises = profile.skills.filter(skill => 
+              availableExpertises.some(exp => 
+                exp.name.toLowerCase().includes(skill.toLowerCase()) || 
+                skill.toLowerCase().includes(exp.name.toLowerCase())
+              )
+            );
+            
+            const invalidSkills = profile.skills.filter(s => !validExpertises.includes(s));
+            if (invalidSkills.length > 0) {
+              console.warn(`⚠️ Compétences non disponibles: ${invalidSkills.join(', ')}`);
+              console.warn(`  Expertises disponibles: ${availableExpertises.map(e => e.name).join(', ')}`);
             }
             
-            if (suggestionText) {
-              toast({
-                title: "💡 Suggestions",
-                description: suggestionText,
-                duration: 10000
-              });
+            // Si aucune compétence valide n'a été trouvée, utiliser toutes les expertises
+            if (validExpertises.length === 0) {
+              console.log(`✨ Aucune correspondance trouvée, utilisation de toutes les expertises du métier`);
+              validExpertises = availableExpertises.map(e => e.name);
             }
+          } else {
+            // Si aucune compétence demandée, utiliser toutes celles du métier
+            validExpertises = availableExpertises.map(e => e.name);
+            console.log(`✨ Utilisation de toutes les expertises du métier: ${validExpertises.join(', ')}`);
           }
-          
-          continue; // Passer au profil suivant
+        } else {
+          console.warn(`⚠️ Aucune expertise trouvée pour le métier ${hrProfile.label}`);
+          validExpertises = [];
         }
-        
-        // Normaliser le profil avec les valeurs correctes
-        const normalizedProfile = await normalizeProfile({
-          profession: profile.profession,
-          seniority: profile.seniority || 'medior',
-          skills: profile.skills,
-          languages: profile.languages
-        });
-        
-        if (!normalizedProfile) {
-          console.error(`❌ Impossible de normaliser le profil`);
-          continue;
-        }
-        
-        // Récupérer le métier validé
-        const hrProfile = expertiseProvider.findProfile(normalizedProfile.profession);
-        if (!hrProfile) {
-          console.error(`❌ Métier introuvable après normalisation: ${normalizedProfile.profession}`);
-          continue;
-        }
-        
-        console.log(`✅ Profil validé et normalisé: ${hrProfile.name}`);
-        
-        // Les langues et expertises sont déjà validées et normalisées
-        const validLanguages = normalizedProfile.languages || ['Français'];
-        const validExpertises = normalizedProfile.skills || [];
-        
-        // Utiliser la séniorité normalisée
-        const normalizedSeniority = expertiseProvider.normalizeSeniority(normalizedProfile.seniority);
         
         const resourceId = crypto.randomUUID();
         
         console.log(`✅ Création de la ressource pour ${hrProfile.name} avec:`);
-        console.log(`   - Séniorité: ${normalizedSeniority}`);
-        console.log(`   - Langues: ${validLanguages.join(', ')}`);
-        console.log(`   - Expertises: ${validExpertises.join(', ')}`);
+        console.log(`   - Langues validées: ${validLanguages.join(', ')}`);
+        console.log(`   - Expertises validées: ${validExpertises.join(', ')}`);
+        
+        // Normaliser la séniorité avec expertise provider
+        const normalizedSeniority = expertiseProvider.normalizeSeniority(profile.seniority || 'intermediate');
+        console.log(`🎯 Séniorité normalisée: ${profile.seniority} → ${normalizedSeniority}`);
         
         // Créer le node pour ReactFlow
         const resourceNode = {
@@ -339,7 +361,7 @@ export async function createTeam(params: CreateTeamParams) {
           position: { x, y },
           data: {
             id: resourceId,
-            profileName: hrProfile.name,
+            profileName: hrProfile.label || hrProfile.name,
             seniority: normalizedSeniority,
             languages: [],
             expertises: [],

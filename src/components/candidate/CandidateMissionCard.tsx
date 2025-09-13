@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Separator } from "@/components/ui/separator";
 import { Award, Building, Calendar, Check, CheckCircle, DollarSign, Info, Languages, Loader2, Timer, X } from "lucide-react";
@@ -146,7 +147,7 @@ export function CandidateMissionCard({
                   </div>
                 </div>
               </div>
-            </FullScreenModal>
+            </Dialog>
           </div>
           
           <div className="flex items-center gap-2">

@@ -249,9 +249,7 @@ export function CardCreateDialog({
               </div>
             </div>
           </div>
-
         </div>
-      </div>
     </FullScreenModal>
   );
 }

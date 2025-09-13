@@ -82,6 +82,7 @@ import WikiView from "@/components/wiki/WikiView";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { PageHeaderNeon } from "@/components/ui/page-header-neon";
 import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
+import { ClientSettings } from '@/components/client/ClientSettings';
 
 const ClientDashboard = () => {
 const [searchParams, setSearchParams] = useSearchParams();
@@ -873,6 +874,8 @@ const renderContent = () => {
       return <InvoiceList userRole="client" />;
     case 'metrics':
       return <ClientMetricsDashboard />;
+    case 'settings':
+      return <ClientSettings />;
     default:
       return renderStartContent();
   }
@@ -1026,7 +1029,7 @@ const headerContent = (
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur-md opacity-0 group-hover:opacity-70 transition-opacity" />
           <div className="relative w-9 h-9 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-lg flex items-center justify-center">
-            <Mic className="w-4 h-4 text-white" />
+            <Bot className="w-4 h-4 text-white" />
           </div>
         </div>
       </Button>
@@ -1078,7 +1081,25 @@ return (
     {/* Assistant Vocal IA */}
     <EnhancedVoiceAssistant
       isOpen={isVoiceAssistantOpen}
-      onClose={() => setIsVoiceAssistantOpen(false)}
+      onClose={() => {
+        setIsVoiceAssistantOpen(false);
+        // Rafraîchir les projets après fermeture de l'assistant
+        const refreshProjects = async () => {
+          if (!user?.id) return;
+          const { data: projectsData } = await supabase
+            .from('projects')
+            .select('*')
+            .eq('owner_id', user.id);
+          
+          if (projectsData) {
+            const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);
+            const archived = projectsData.filter(p => p.archived_at || p.deleted_at);
+            setProjects(active);
+            setArchivedProjects(archived);
+          }
+        };
+        refreshProjects();
+      }}
       context="client-dashboard"
     />
   </SidebarProvider>

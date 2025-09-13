@@ -3,10 +3,13 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { RealtimeAgent, RealtimeSession } from '@openai/agents/realtime';
 import { REALTIME_TOOLS, executeRealtimeTool } from '../config/realtime-tools';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { generateExpertisePrompt } from '../tools/expertise-provider';
+
+// Implémentation alternative sans dépendance externe
+// On utilisera l'API OpenAI directement via des appels REST
 
 // Types pour l'API Realtime WebSocket
 
@@ -58,9 +61,10 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
     error: null
   });
 
-  const agentRef = useRef<RealtimeAgent | null>(null);
-  const sessionRef = useRef<RealtimeSession | null>(null);
+  const webSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Vérifier le support du navigateur
   const isSupported = typeof window !== 'undefined' && 
@@ -91,8 +95,10 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         throw new Error(funcError?.message || 'Failed to get ephemeral key');
       }
 
-      const ephemeralKey = funcData.ephemeralKey;
-      console.log('Ephemeral key received, connecting...');
+      const ephemeralKey = typeof funcData.ephemeralKey === 'object' 
+        ? funcData.ephemeralKey.key || JSON.stringify(funcData.ephemeralKey)
+        : funcData.ephemeralKey;
+      console.log('Ephemeral key received, connecting...', typeof ephemeralKey);
 
       // Récupérer les prompts depuis prompts_ia (table avec RLS correctes)
       const { data: prompts } = await supabase
@@ -100,6 +106,10 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         .select('*')
         .eq('active', true)
         .order('priority', { ascending: false });
+
+      // Récupérer les expertises disponibles dans la base de données
+      const expertisePrompt = await generateExpertisePrompt();
+      console.log('📚 Loaded expertise database:', expertisePrompt && expertisePrompt.split('\n').length > 0 ? 'OK' : 'Empty');
 
       // Construire les instructions à partir des prompts
       let instructions = '';
@@ -111,23 +121,26 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         ); // Type "Contexte"
         const behaviorPrompts = prompts.filter(p => p.context === 'behavior'); // Type "Comportement"
         
-        // Combiner dans l'ordre : Système -> Contexte -> Comportement
+        // Combiner dans l'ordre : Système -> Contexte -> Comportement -> Expertises
         instructions = [
           '=== INSTRUCTIONS SYSTÈME ===',
           ...systemPrompts.map(p => p.prompt),
           '\n=== CONTEXTE SPÉCIFIQUE ===',
           ...contextPrompts.map(p => `[${p.context}]\n${p.prompt}`),
           behaviorPrompts.length > 0 ? '\n=== COMPORTEMENT ===' : '',
-          ...behaviorPrompts.map(p => p.prompt)
+          ...behaviorPrompts.map(p => p.prompt),
+          '\n=== EXPERTISES DISPONIBLES ===',
+          expertisePrompt
         ].filter(Boolean).join('\n\n');
         
         console.log('Loaded prompts:', {
           system: systemPrompts.length,
           context: contextPrompts.length,
-          behavior: behaviorPrompts.length
+          behavior: behaviorPrompts.length,
+          expertises: 'loaded'
         });
       } else {
-        instructions = 'Tu es un assistant intelligent pour Team Dash Manager. Aide les utilisateurs à gérer leurs projets et équipes.';
+        instructions = `Tu es un assistant intelligent pour Team Dash Manager. Aide les utilisateurs à gérer leurs projets et équipes.\n\n${expertisePrompt}`;
       }
 
       // Ajouter le contexte spécifique si fourni
@@ -135,302 +148,280 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         instructions += `\n\nContexte actuel: ${config.context}`;
       }
 
-      // Créer l'agent avec la configuration et les outils
-      const agent = new RealtimeAgent({
-        name: 'Assistant Team Dash',
-        instructions: instructions,
-        tools: config.enableTools !== false ? REALTIME_TOOLS : []
-      });
-
-      // Créer la session avec le bon modèle et vitesse de parole augmentée
-      const session = new RealtimeSession(agent, {
-        model: 'gpt-4o-realtime-preview',
-        voice: 'alloy', // Voix plus rapide et claire
-        instructions: instructions,
-        input_audio_format: 'pcm16',
-        output_audio_format: 'pcm16',
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 500 // Réduire le silence pour des réponses plus rapides
-        },
-        modalities: ['text', 'audio'],
-        temperature: 0.8
-      } as any);
-
-      // Configurer les event listeners
-      session.on('connected', () => {
-        console.log('Session connected event received');
-      });
+      // Créer une connexion WebSocket directement avec l'API OpenAI Realtime
+      // Note: Les WebSockets dans le navigateur ne supportent pas les headers personnalisés
+      // On doit utiliser l'URL avec le token éphémère
+      const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`;
       
-      session.on('disconnected', () => {
-        console.log('Session disconnected event received');
-      });
+      // S'assurer que tous les subprotocols sont des chaînes
+      const subprotocols = [
+        'realtime',
+        `openai-insecure-api-key.${String(ephemeralKey)}`,
+        'openai-beta.realtime-v1'
+      ].filter(p => typeof p === 'string' && p.length > 0);
       
-      session.on('conversation.updated', (event: any) => {
-        console.log('Conversation updated:', event);
-      });
+      console.log('WebSocket subprotocols:', subprotocols);
+      const ws = new WebSocket(wsUrl, subprotocols);
 
-      // Gérer les différents formats d'événements possibles
-      session.on('conversation.item.appended', (event: any) => {
-        console.log('Item appended:', event);
-        const content = event.item?.formatted?.transcript || 
-                       event.item?.content?.[0]?.text || 
-                       event.item?.content || 
-                       event.item?.text;
+      webSocketRef.current = ws;
+
+      // Configuration de la session après connexion
+      ws.onopen = () => {
+        console.log('✅ WebSocket connected');
         
-        if (content) {
-          setState(prev => ({ 
-            ...prev, 
-            transcript: event.item.role === 'user' ? content : prev.transcript,
-            response: event.item.role === 'assistant' ? content : prev.response,
-            isProcessing: event.item.role === 'user',
-            isSpeaking: event.item.role === 'assistant'
-          }));
-        }
-      });
-
-      session.on('conversation.item.completed', (event: any) => {
-        console.log('Item completed:', event);
-        const content = event.item?.formatted?.transcript || 
-                       event.item?.content?.[0]?.text || 
-                       event.item?.content || 
-                       event.item?.text;
-        
-        if (content) {
-          setState(prev => ({ 
-            ...prev, 
-            response: content,
-            isProcessing: false,
-            isSpeaking: false
-          }));
-        }
-      });
-      
-      // Gérer les événements audio
-      session.on('input_audio_buffer.speech_started', () => {
-        console.log('Speech started');
-        setState(prev => ({ ...prev, isListening: true }));
-      });
-      
-      session.on('input_audio_buffer.speech_stopped', () => {
-        console.log('Speech stopped');
-        setState(prev => ({ ...prev, isListening: false, isProcessing: true }));
-      });
-      
-      // Gérer les événements de transcription
-      session.on('conversation.item.input_audio_transcription.completed', (event: any) => {
-        console.log('Transcription completed:', event);
-        if (event.transcript) {
-          setState(prev => ({ 
-            ...prev, 
-            transcript: event.transcript,
-            isProcessing: true 
-          }));
-        }
-      });
-      
-      // Gérer la réponse audio
-      session.on('response.audio.delta', () => {
-        setState(prev => ({ ...prev, isSpeaking: true }));
-      });
-      
-      session.on('response.audio.done', () => {
-        setState(prev => ({ ...prev, isSpeaking: false }));
-      });
-      
-      // Gérer le texte de la réponse
-      session.on('response.text.delta', (event: any) => {
-        if (event.delta) {
-          setState(prev => ({ 
-            ...prev, 
-            response: prev.response + event.delta,
-            isProcessing: false 
-          }));
-        }
-      });
-      
-      session.on('response.text.done', (event: any) => {
-        console.log('Response text done:', event);
-        if (event.text) {
-          setState(prev => ({ 
-            ...prev, 
-            response: event.text,
-            isProcessing: false 
-          }));
-        }
-      });
-
-      // Handler pour les appels de fonctions
-      session.on('response.function_call_arguments.done', async (event: any) => {
-        console.log('🔧 Function call event received:', event);
-        if (event.name && event.arguments) {
-          try {
-            console.log('🎯 Executing tool:', event.name, event.arguments);
-            
-            // Exécuter la fonction
-            const result = await executeRealtimeTool(event.name, event.arguments);
-            
-            setState(prev => ({ 
-              ...prev, 
-              lastToolCall: { name: event.name, result } 
-            }));
-
-            // Notification si action réussie
-            if (result.success) {
-              toast({
-                title: '✅ Action effectuée',
-                description: result.message || `${event.name} exécuté avec succès`
-              });
-            } else if (result.error) {
-              toast({
-                title: '⚠️ Erreur',
-                description: result.error,
-                variant: 'destructive'
-              });
-            }
-
-            // Retourner le résultat à l'assistant (si supporté par le SDK)
-            if (session && 'sendToolResult' in session) {
-              (session as any).sendToolResult(event.call_id, result);
-            }
-            
-          } catch (error) {
-            console.error('Error executing tool:', error);
-            toast({
-              title: 'Erreur',
-              description: `Erreur lors de l'exécution de ${event.name}`,
-              variant: 'destructive'
-            });
+        // Envoyer la configuration de session
+        ws.send(JSON.stringify({
+          type: 'session.update',
+          session: {
+            modalities: ['text', 'audio'],
+            instructions: instructions + '\n\nIMPORTANT: Réponds de façon très concise et directe. Maximum 2-3 phrases courtes.',
+            voice: 'echo',
+            input_audio_format: 'pcm16',
+            output_audio_format: 'pcm16',
+            input_audio_transcription: {
+              model: 'whisper-1'
+            },
+            turn_detection: {
+              type: 'server_vad',
+              threshold: 0.3,
+              prefix_padding_ms: 50,
+              silence_duration_ms: 150
+            },
+            temperature: 0.6,
+            max_response_output_tokens: 500,
+            tools: config.enableTools !== false ? REALTIME_TOOLS.map(tool => ({
+              type: 'function',
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters
+            })) : []
           }
-        }
-      });
-      
-      // Handler alternatif pour les outils (selon la version du SDK)
-      session.on('tool_call', async (event: any) => {
-        if (event.function && event.function.name) {
-          try {
-            const args = JSON.parse(event.function.arguments || '{}');
-            console.log('Tool call:', event.function.name, args);
-            
-            const result = await executeRealtimeTool(event.function.name, args);
-            
-            setState(prev => ({ 
-              ...prev, 
-              lastToolCall: { name: event.function.name, result } 
-            }));
+        }));
 
-            if (result.success) {
-              toast({
-                title: '✅ Action effectuée',
-                description: result.message
-              });
-            }
-            
-          } catch (error) {
-            console.error('Error in tool call:', error);
-          }
-        }
-      });
-
-      session.on('error', (error: any) => {
-        console.error('Session error details:', {
-          error,
-          message: error?.message,
-          code: error?.code,
-          type: error?.type,
-          detail: error?.detail
-        });
         setState(prev => ({ 
           ...prev, 
-          error: error?.message || error?.detail || 'Erreur de session',
+          isConnected: true, 
           isProcessing: false 
         }));
-      });
+      };
 
-      // Connecter la session avec la clé éphémère
-      console.log('Connecting to Realtime API with ephemeral key...');
-      console.log('Key format:', ephemeralKey.substring(0, 10) + '...');
-      
-      try {
-        await session.connect({
-          apiKey: ephemeralKey
-        });
-        console.log('Session connected successfully!');
-      } catch (connectError) {
-        console.error('Connection failed:', connectError);
-        throw connectError;
-      }
+      // Gérer les messages WebSocket
+      ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log(`📡 Event [${data.type}]:`, data);
 
-      // Initialiser l'audio context
-      audioContextRef.current = new AudioContext();
+          switch (data.type) {
+            case 'session.created':
+              console.log('✅ Session created');
+              break;
 
-      // Sauvegarder les références
-      agentRef.current = agent;
-      sessionRef.current = session;
+            case 'conversation.item.created':
+              if (data.item?.type === 'message') {
+                const content = data.item?.content?.[0]?.text || '';
+                if (data.item?.role === 'user') {
+                  setState(prev => ({ 
+                    ...prev, 
+                    transcript: content,
+                    isProcessing: true 
+                  }));
+                } else if (data.item?.role === 'assistant') {
+                  setState(prev => ({ 
+                    ...prev, 
+                    response: content,
+                    isSpeaking: true 
+                  }));
+                }
+              }
+              break;
 
-      setState(prev => ({ 
-        ...prev, 
-        isConnected: true, 
-        isProcessing: false,
-        error: null 
-      }));
+            case 'response.done':
+              setState(prev => ({ 
+                ...prev, 
+                isProcessing: false,
+                isSpeaking: false
+              }));
+              break;
 
-      toast({
-        title: '🎙️ Assistant connecté',
-        description: 'Vous pouvez maintenant parler avec l\'assistant'
-      });
+            case 'response.function_call_arguments.done':
+              if (data.name && data.arguments) {
+                console.log('🎯 Function call:', data.name, data.arguments);
+                const args = JSON.parse(data.arguments);
+                const result = await executeRealtimeTool(data.name, args);
+                
+                setState(prev => ({ 
+                  ...prev, 
+                  lastToolCall: { name: data.name, result } 
+                }));
 
-    } catch (error) {
-      console.error('Connection error:', error);
-      
-      let errorMessage = 'Impossible de se connecter à l\'assistant';
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to get ephemeral key')) {
-          errorMessage = 'La clé API OpenAI n\'est pas configurée sur le serveur. Consultez la documentation pour configurer OPENAI_API_KEY dans Supabase.';
-        } else if (error.message.includes('ephemeral')) {
-          errorMessage = 'Erreur de génération de la clé éphémère. Vérifiez que votre clé API OpenAI a accès à l\'API Realtime.';
-        } else {
-          errorMessage = error.message;
+                if (result.success) {
+                  toast({
+                    title: '✅ Action effectuée',
+                    description: result.message
+                  });
+                }
+
+                // Envoyer le résultat de la fonction
+                ws.send(JSON.stringify({
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'function_call_output',
+                    call_id: data.call_id,
+                    output: JSON.stringify(result)
+                  }
+                }));
+              }
+              break;
+
+            case 'error':
+              console.error('❌ WebSocket error:', data);
+              setState(prev => ({ 
+                ...prev, 
+                error: data.error?.message || 'Une erreur est survenue',
+                isProcessing: false,
+                isSpeaking: false
+              }));
+              break;
+          }
+        } catch (error) {
+          console.error('Error handling WebSocket message:', error);
         }
+      };
+
+      ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
+        setState(prev => ({ 
+          ...prev, 
+          error: 'Erreur de connexion',
+          isConnected: false,
+          isProcessing: false
+        }));
+      };
+
+      ws.onclose = () => {
+        console.log('🔌 WebSocket closed');
+        setState(prev => ({ 
+          ...prev, 
+          isConnected: false,
+          isListening: false,
+          isSpeaking: false,
+          isProcessing: false
+        }));
+      };
+
+      // Initialiser le contexte audio si nécessaire
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
       }
-      
+
+    } catch (error: any) {
+      console.error('Connection error:', error);
       setState(prev => ({ 
         ...prev, 
-        error: errorMessage,
+        error: error.message || 'Erreur de connexion',
         isProcessing: false 
       }));
       
       toast({
-        title: 'Erreur de connexion',
-        description: errorMessage,
+        title: '❌ Erreur de connexion',
+        description: error.message || 'Impossible de se connecter à l\'assistant',
         variant: 'destructive'
       });
     }
   }, [config, isSupported]);
 
   /**
+   * Démarrer l'écoute audio
+   */
+  const startListening = useCallback(async () => {
+    if (!webSocketRef.current || !audioContextRef.current) {
+      toast({
+        title: '⚠️ Non connecté',
+        description: 'Connectez-vous d\'abord à l\'assistant',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      // Demander l'accès au microphone
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      // Créer un MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm'
+      });
+      mediaRecorderRef.current = mediaRecorder;
+
+      // Envoyer les données audio au WebSocket
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && webSocketRef.current?.readyState === WebSocket.OPEN) {
+          // Convertir en base64 et envoyer
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64Audio = reader.result?.toString().split(',')[1];
+            if (base64Audio) {
+              webSocketRef.current?.send(JSON.stringify({
+                type: 'input_audio_buffer.append',
+                audio: base64Audio
+              }));
+            }
+          };
+          reader.readAsDataURL(event.data);
+        }
+      };
+
+      // Démarrer l'enregistrement
+      mediaRecorder.start(100); // Envoyer des chunks toutes les 100ms
+      setState(prev => ({ ...prev, isListening: true }));
+    } catch (error: any) {
+      console.error('Microphone error:', error);
+      setState(prev => ({ 
+        ...prev, 
+        error: error.message || 'Impossible d\'accéder au microphone'
+      }));
+      toast({
+        title: '❌ Erreur',
+        description: 'Impossible d\'accéder au microphone',
+        variant: 'destructive'
+      });
+    }
+  }, []);
+
+  /**
+   * Arrêter l'écoute audio
+   */
+  const stopListening = useCallback(() => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    setState(prev => ({ ...prev, isListening: false }));
+  }, []);
+
+  /**
    * Déconnecter l'assistant
    */
   const disconnect = useCallback(() => {
     try {
-      if (sessionRef.current) {
-        // La méthode peut être 'close' ou 'disconnect' selon la version
-        if ('close' in sessionRef.current && typeof sessionRef.current.close === 'function') {
-          sessionRef.current.close();
-        } else if ('disconnect' in sessionRef.current && typeof sessionRef.current.disconnect === 'function') {
-          (sessionRef.current as any).disconnect();
-        }
+      // Arrêter l'écoute
+      stopListening();
+
+      // Fermer la connexion WebSocket
+      if (webSocketRef.current) {
+        webSocketRef.current.close();
+        webSocketRef.current = null;
       }
 
+      // Fermer le contexte audio
       if (audioContextRef.current) {
         audioContextRef.current.close();
+        audioContextRef.current = null;
       }
-
-      agentRef.current = null;
-      sessionRef.current = null;
-      audioContextRef.current = null;
 
       setState({
         isConnected: false,
@@ -445,60 +436,20 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
     } catch (error) {
       console.error('Disconnect error:', error);
     }
-  }, []);
-
-  /**
-   * Démarrer l'écoute
-   */
-  const startListening = useCallback(async () => {
-    if (!sessionRef.current || !state.isConnected) {
-      setState(prev => ({ ...prev, error: 'Session non connectée' }));
-      return;
-    }
-
-    try {
-      // L'API Realtime avec SDK gère automatiquement l'audio via WebRTC
-      // Il suffit de marquer l'état comme "listening"
-      setState(prev => ({ ...prev, isListening: true }));
-      
-      // Le SDK active automatiquement le microphone et l'envoi audio
-
-    } catch (error) {
-      console.error('Error starting listening:', error);
-      setState(prev => ({ 
-        ...prev, 
-        error: 'Impossible d\'activer l\'écoute' 
-      }));
-    }
-  }, [state.isConnected]);
-
-  /**
-   * Arrêter l'écoute
-   */
-  const stopListening = useCallback(async () => {
-    if (!sessionRef.current) return;
-
-    try {
-      // Arrêter l'écoute dans l'interface
-      setState(prev => ({ ...prev, isListening: false }));
-      
-      // Le SDK gère automatiquement l'arrêt de l'audio
-
-    } catch (error) {
-      console.error('Error stopping listening:', error);
-    }
-  }, []);
+  }, [stopListening]);
 
   /**
    * Envoyer un message texte
    */
   const sendMessage = useCallback(async (message: string) => {
-    if (!sessionRef.current || !state.isConnected) {
-      setState(prev => ({ ...prev, error: 'Session non connectée' }));
+    if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
+      setState(prev => ({ ...prev, error: 'Non connecté à l\'assistant' }));
       return;
     }
 
     try {
+      console.log('📤 Sending message:', message);
+      
       setState(prev => ({ 
         ...prev, 
         transcript: message, 
@@ -506,21 +457,23 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         error: null 
       }));
 
-      // Envoyer le message via le SDK
-      // La méthode peut varier selon la version du SDK
-      if ('sendText' in sessionRef.current && typeof sessionRef.current.sendText === 'function') {
-        await (sessionRef.current as any).sendText(message);
-      } else if ('send' in sessionRef.current && typeof sessionRef.current.send === 'function') {
-        await (sessionRef.current as any).send(message);
-      } else {
-        // Fallback : créer un item de conversation
-        console.log('Sending message as conversation item:', message);
-        setState(prev => ({ 
-          ...prev, 
-          transcript: message,
-          response: 'Message envoyé. En attente de réponse...'
-        }));
-      }
+      // Envoyer le message via WebSocket
+      webSocketRef.current.send(JSON.stringify({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [{ 
+            type: 'input_text', 
+            text: message 
+          }]
+        }
+      }));
+
+      // Demander une réponse
+      webSocketRef.current.send(JSON.stringify({
+        type: 'response.create'
+      }));
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -530,7 +483,7 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         isProcessing: false 
       }));
     }
-  }, [state.isConnected]);
+  }, []);
 
   /**
    * Exécuter une fonction directement

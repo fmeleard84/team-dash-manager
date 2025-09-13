@@ -627,7 +627,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-white border-[#ECEEF1]">
+              <DropdownMenuContent align="end" className="bg-white border-[#ECEEF1] z-[100]">
                 {!isArchived && (
                   <>
                     <DropdownMenuItem onClick={() => onView(project.id)} className="hover:bg-[#F7F8FA] text-[#0E0F12]">
