@@ -83,6 +83,16 @@ const edgeTypes = {
   custom: SimpleXyflowEdge,
 };
 
+// Helper function to generate UUID v4 compatible with all browsers
+const generateUUID = (): string => {
+  // Générer un UUID v4 valide
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 // Helper function to ensure valid position
 const ensureValidPosition = (position?: { x: number; y: number }) => {
   if (!position || typeof position.x !== 'number' || typeof position.y !== 'number' || 
@@ -114,7 +124,7 @@ const ensureValidPosition = (position?: { x: number; y: number }) => {
 
 const Project = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   // User auth handled by AuthContext
   const navigate = useNavigate();
@@ -779,19 +789,28 @@ const Project = () => {
     }
   };
 
+  // Si l'authentification est en cours de chargement, attendre
+  if (authLoading) {
+    return;
+  }
+
+  // Si pas d'utilisateur après le chargement, rediriger
   if (!user) {
     // For template preview, allow access without auth
     if (id === 'template-preview') {
       fetchProjectAndFlow();
       return;
     }
-    navigate('/client-dashboard');
+    // Rediriger vers la page de connexion
+    navigate('/login');
     return;
   }
-  if (id) {
+  
+  // Si l'utilisateur est connecté et qu'on a un ID de projet
+  if (user && id) {
     fetchProjectAndFlow();
   }
-}, [user, id, navigate]);
+}, [user, id, navigate, authLoading]);
 
   // Défini après handleEdgeClick
 
@@ -806,7 +825,7 @@ const Project = () => {
       return;
     }
     
-    const nodeId = crypto.randomUUID();
+    const nodeId = generateUUID();
     
     // Créer une nouvelle ressource HR
     const newResource: HRResource = {
@@ -972,7 +991,7 @@ const Project = () => {
         y: event.clientY - reactFlowBounds.top - 50,
       });
 
-      const nodeId = crypto.randomUUID();
+      const nodeId = generateUUID();
       
       // Si c'est un membre de l'équipe client
       if (isTeamMember) {
@@ -1095,7 +1114,7 @@ const Project = () => {
       if (validatedNode.data?.hrResource) {
         const hrResourceData = validatedNode.data.hrResource as any;
         const newResource: HRResource = {
-          id: hrResourceData.id || crypto.randomUUID(),
+          id: hrResourceData.id || generateUUID(),
           profile_id: hrResourceData.profileId || '',
           seniority: hrResourceData.seniority || 'junior',
           languages: hrResourceData.languages || [],
@@ -1400,7 +1419,7 @@ const Project = () => {
         
         // Generate new UUID for template-based resources (if current ID is not a valid UUID)
         const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resource.id);
-        const assignmentId = isValidUUID ? resource.id : crypto.randomUUID();
+        const assignmentId = isValidUUID ? resource.id : generateUUID();
         
         console.log('Processing resource:', resource.id, 'isValidUUID:', isValidUUID, 'assignmentId:', assignmentId);
         
@@ -1769,11 +1788,14 @@ const Project = () => {
     }
   };
 
-  if (isLoading) {
+  // Afficher un loader si l'authentification ou le projet est en cours de chargement
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <p className="text-muted-foreground">Chargement du projet...</p>
+          <p className="text-muted-foreground">
+            {authLoading ? "Vérification de l'authentification..." : "Chargement du projet..."}
+          </p>
         </div>
       </div>
     );

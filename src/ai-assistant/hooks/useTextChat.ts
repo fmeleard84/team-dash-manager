@@ -9,11 +9,12 @@ export interface Message {
   content: string;
   timestamp: Date;
   toolCalls?: any[];
+  isStreaming?: boolean;
 }
 
 export interface TextChatConfig {
   context?: string;
-  onToolCall?: (toolName: string, args: any) => void;
+  onToolCall?: (toolName: string, args: any, result?: any) => void;
 }
 
 export function useTextChat(config: TextChatConfig = {}) {
@@ -21,6 +22,7 @@ export function useTextChat(config: TextChatConfig = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Récupérer les outils disponibles
   const tools = REALTIME_TOOLS;
@@ -242,13 +244,16 @@ Utilisez ces fonctions seulement après avoir validé tous les paramètres.
     return words;
   };
 
-  // Envoyer un message
+  // Envoyer un message avec streaming
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
 
     // Annuler la requête précédente si elle existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
 
     // Créer un nouveau controller pour cette requête
@@ -285,9 +290,31 @@ Utilisez ces fonctions seulement après avoir validé tous les paramètres.
       // Construire le prompt système
       const systemPrompt = await buildSystemPrompt();
 
-      // Appeler l'API OpenAI via une edge function
-      const { data, error: apiError } = await supabase.functions.invoke('chat-completion', {
-        body: {
+      // Créer le message assistant avec streaming
+      const assistantMessage: Message = {
+        id: `msg_${Date.now()}`,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isStreaming: true
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Obtenir le token d'authentification
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Non authentifié');
+      }
+
+      // Appeler l'API avec streaming
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/chat-completion`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           messages: [
             { role: 'system', content: systemPrompt },
             ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -303,54 +330,132 @@ Utilisez ces fonctions seulement après avoir validé tous les paramètres.
           })),
           model: 'gpt-4o',
           temperature: 0.7,
-          max_tokens: 2000
-        },
+          max_tokens: 2000,
+          stream: true // Activer le streaming
+        }),
         signal: abortController.signal
       });
 
-      if (apiError) throw apiError;
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
 
-      // Traiter la réponse
-      const assistantMessage: Message = {
-        id: `msg_${Date.now()}`,
-        role: 'assistant',
-        content: data.content || 'Je n\'ai pas pu générer une réponse.',
-        timestamp: new Date(),
-        toolCalls: data.tool_calls
-      };
+      // Lire le stream SSE
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulatedContent = '';
+      let toolCalls: any[] = [];
 
-      // Si des outils ont été appelés, les exécuter
-      if (data.tool_calls && data.tool_calls.length > 0) {
-        for (const toolCall of data.tool_calls) {
-          // Parser les arguments si c'est une chaîne JSON
-          let args = toolCall.function.arguments;
-          if (typeof args === 'string') {
-            try {
-              args = JSON.parse(args);
-            } catch (e) {
-              console.error('Erreur parsing arguments:', e);
-            }
-          }
-          
-          // Notifier le composant parent
-          if (config.onToolCall) {
-            config.onToolCall(toolCall.function.name, args);
-          }
-          
-          // Essayer d'exécuter la fonction localement si elle existe
-          const tool = tools.find(t => t.name === toolCall.function.name);
-          if (tool && tool.execute) {
-            try {
-              const result = await tool.execute(args);
-              console.log(`✅ Fonction ${toolCall.function.name} exécutée:`, result);
-            } catch (error) {
-              console.error(`❌ Erreur exécution ${toolCall.function.name}:`, error);
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            
+            if (data === '[DONE]') {
+              // Stream terminé
+              setMessages(prev => prev.map(msg => 
+                msg.id === assistantMessage.id 
+                  ? { ...msg, content: accumulatedContent, isStreaming: false, toolCalls: toolCalls.length > 0 ? toolCalls : undefined }
+                  : msg
+              ));
+
+              // Exécuter les tool calls si présents
+              if (toolCalls.length > 0) {
+                for (let i = 0; i < toolCalls.length; i++) {
+                  const toolCall = toolCalls[i];
+                  // Essayer d'exécuter la fonction localement si elle existe
+                  const tool = tools.find(t => t.name === toolCall.function.name);
+                  let result = null;
+
+                  if (tool && tool.execute) {
+                    try {
+                      result = await tool.execute(toolCall.function.arguments);
+                      console.log(`✅ Fonction ${toolCall.function.name} exécutée:`, result);
+                      // Ajouter le résultat au toolCall
+                      toolCalls[i] = { ...toolCall, result };
+                    } catch (error) {
+                      console.error(`❌ Erreur exécution ${toolCall.function.name}:`, error);
+                      // Ajouter l'erreur au toolCall
+                      toolCalls[i] = { ...toolCall, result: { success: false, error: error.message } };
+                    }
+                  }
+
+                  // Notifier le composant parent avec le résultat
+                  if (config.onToolCall) {
+                    config.onToolCall(toolCall.function.name, toolCall.function.arguments, result);
+                  }
+                }
+              }
+            } else {
+              try {
+                const parsed = JSON.parse(data);
+                
+                if (parsed.type === 'delta') {
+                  // Accumuler le contenu
+                  if (parsed.content) {
+                    accumulatedContent += parsed.content;
+                    
+                    // Mettre à jour le message en temps réel
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === assistantMessage.id 
+                        ? { ...msg, content: accumulatedContent }
+                        : msg
+                    ));
+                  }
+                  
+                  // Accumuler les tool calls
+                  if (parsed.tool_calls) {
+                    // Les tool calls arrivent par chunks, il faut les assembler
+                    parsed.tool_calls.forEach((tc: any) => {
+                      const existing = toolCalls.find(t => t.index === tc.index);
+                      if (existing) {
+                        // Compléter l'appel existant
+                        if (tc.function?.name) existing.function.name = tc.function.name;
+                        if (tc.function?.arguments) {
+                          existing.function.arguments = (existing.function.arguments || '') + tc.function.arguments;
+                        }
+                      } else {
+                        // Nouvel appel
+                        toolCalls.push({
+                          index: tc.index,
+                          id: tc.id,
+                          type: 'function',
+                          function: {
+                            name: tc.function?.name || '',
+                            arguments: tc.function?.arguments || ''
+                          }
+                        });
+                      }
+                    });
+                  }
+                } else if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+              } catch (e) {
+                console.error('Erreur parsing SSE:', e, data);
+              }
             }
           }
         }
       }
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Parser les arguments JSON des tool calls
+      toolCalls = toolCalls.map(tc => ({
+        ...tc,
+        function: {
+          ...tc.function,
+          arguments: tc.function.arguments ? JSON.parse(tc.function.arguments) : {}
+        }
+      }));
+
     } catch (err: any) {
       if (err.name === 'AbortError') {
         console.log('Requête annulée');
@@ -371,6 +476,7 @@ Utilisez ces fonctions seulement après avoir validé tous les paramètres.
     } finally {
       setIsLoading(false);
       abortControllerRef.current = null;
+      eventSourceRef.current = null;
     }
   }, [messages, isLoading, buildSystemPrompt, searchVectorDatabase, config.onToolCall]);
 
@@ -378,6 +484,9 @@ Utilisez ces fonctions seulement après avoir validé tous les paramètres.
   const resetChat = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
     setMessages([]);
     setError(null);

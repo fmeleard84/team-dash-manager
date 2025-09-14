@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardHeader, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { FullScreenModal, ModalActions } from "./ui/fullscreen-modal";
-import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, Edit, Clock, TrendingUp, CheckCircle2, AlertCircle, Rocket, Calendar, Euro, Archive, RotateCcw, Paperclip, Download, Info, FileText, Video, Link2 } from "lucide-react";
+import { Play, Pause, Eye, Trash2, ExternalLink, Users, Loader2, MoreVertical, Edit, Clock, TrendingUp, CheckCircle2, AlertCircle, Rocket, Calendar, Euro, Archive, RotateCcw, Paperclip, Download, Info, FileText, Video, Link2, CreditCard } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -17,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import EditProjectModal from "@/components/EditProjectModal";
+import { useClientCredits } from '@/hooks/useClientCredits';
+import { StripePaymentModal } from './payment/StripePaymentModal';
 
 interface Project {
   id: string;
@@ -65,6 +67,7 @@ interface PlankaProject {
 
 export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart, onEdit, onArchive, onUnarchive, isArchived = false, refreshTrigger }: ProjectCardProps) {
   const { user } = useAuth();
+  const { checkCreditsForAction, formatBalance } = useClientCredits();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
@@ -75,6 +78,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   const [showEditModal, setShowEditModal] = useState(false);
   const [isBookingRequested, setIsBookingRequested] = useState(false);
   const [projectFiles, setProjectFiles] = useState<any[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showProjectDetailsModal, setShowProjectDetailsModal] = useState(false);
 
@@ -389,6 +393,14 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   };
 
   const handleStatusToggle = async () => {
+    // Vérifier les crédits avant de démarrer
+    const creditCheck = checkCreditsForAction('Démarrer un projet', 5000);
+    if (!creditCheck.success) {
+      toast.error(creditCheck.message);
+      setShowPaymentModal(true);
+      return;
+    }
+
     // On peut démarrer le projet dès qu'il y a des ressources
     if ((project.status === 'pause' || project.status === 'attente-team') && resourceAssignments.length === 0) {
       toast.error('Vous devez d\'abord créer une équipe pour ce projet');
@@ -409,6 +421,14 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   };
 
   const handleBookingTeam = async () => {
+    // Vérifier les crédits avant de booker une équipe
+    const creditCheck = checkCreditsForAction('Booker une équipe', 5000);
+    if (!creditCheck.success) {
+      toast.error(creditCheck.message);
+      setShowPaymentModal(true);
+      return;
+    }
+
     setIsBookingTeam(true);
     try {
       // First, update all resource assignments to 'recherche' status
@@ -601,7 +621,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   return (
     <>
-      <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-purple-600/10 via-pink-600/10 to-blue-600/10 dark:from-purple-600/20 dark:via-pink-600/20 dark:to-blue-600/20 p-[1px] rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/25 hover:scale-[1.02]">
+      <Card className="group relative border-0 bg-gradient-to-br from-purple-600/10 via-pink-600/10 to-blue-600/10 dark:from-purple-600/20 dark:via-pink-600/20 dark:to-blue-600/20 p-[1px] rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/25 hover:scale-[1.02]">
         <div className="relative bg-white dark:bg-gradient-to-br dark:from-[#0f172a] dark:via-[#1e1b4b] dark:to-[#312e81] rounded-2xl p-6">
         
         <div className="space-y-4">
@@ -627,7 +647,12 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-white border-[#ECEEF1] z-[100]">
+              <DropdownMenuContent
+                align="end"
+                className="bg-white border-[#ECEEF1]"
+                sideOffset={5}
+                style={{ zIndex: 99999, position: 'relative' }}
+              >
                 {!isArchived && (
                   <>
                     <DropdownMenuItem onClick={() => onView(project.id)} className="hover:bg-[#F7F8FA] text-[#0E0F12]">
@@ -1183,6 +1208,17 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           )}
         </div>
       </FullScreenModal>
+
+      {/* Modal de paiement Stripe */}
+      <StripePaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => {
+          setShowPaymentModal(false);
+          toast.success('Crédits ajoutés avec succès');
+        }}
+        minimumAmount={50}
+      />
     </>
   );
 }

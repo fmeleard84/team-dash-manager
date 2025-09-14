@@ -51,7 +51,34 @@ export const createTeamTool: RealtimeTool = {
   },
   async execute(params: any) {
     console.log('🚀 Tool create_team executing with params:', params);
-    const result = await createTeamFunc(params);
+
+    // Si params est une chaîne, la parser
+    let parsedParams = params;
+    if (typeof params === 'string') {
+      try {
+        parsedParams = JSON.parse(params);
+        console.log('📦 Parsed params from string:', parsedParams);
+      } catch (error) {
+        console.error('❌ Failed to parse params:', error);
+        return { success: false, error: 'Paramètres invalides' };
+      }
+    }
+
+    console.log('🔍 Params type:', typeof parsedParams);
+    console.log('🔍 project_name value:', parsedParams.project_name);
+
+    // S'assurer que les paramètres sont bien passés
+    const teamParams = {
+      project_name: parsedParams.project_name,
+      project_description: parsedParams.project_description,
+      start_date: parsedParams.start_date,
+      end_date: parsedParams.end_date,
+      budget: parsedParams.budget,
+      profiles: parsedParams.profiles
+    };
+
+    console.log('📦 Passing to createTeam:', teamParams);
+    const result = await createTeamFunc(teamParams);
     console.log('✅ Tool create_team result:', result);
     return result;
   }

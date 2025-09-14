@@ -126,7 +126,7 @@ export function VoiceChatDirect({
         const initMessage = {
           type: 'conversation_initiation_client_data',
           conversation_initiation_client_data: {
-            conversation_id: data.conversation_id || crypto.randomUUID()
+            conversation_id: data.conversation_id || `conv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
           },
           // Ajouter les variables directement dans le message d'init
           user_name: 'Candidat',

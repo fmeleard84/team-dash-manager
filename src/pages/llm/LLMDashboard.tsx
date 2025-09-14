@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, FileText, Users, FolderOpen, GitBranch, Database, AlertCircle, ChevronRight, ChevronDown, Home, Play, Calendar, MessageSquare, Layout, Code, Shield, Server, Zap, BookOpen } from 'lucide-react';
+import { Save, FileText, Users, FolderOpen, GitBranch, Database, AlertCircle, ChevronRight, ChevronDown, Home, Play, Calendar, MessageSquare, Layout, Code, Shield, Server, Zap, BookOpen, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -104,6 +104,14 @@ const LLMDashboard = () => {
       children: [
         { id: 'api-supabase', label: 'Supabase' },
         { id: 'api-hooks', label: 'React Hooks' },
+      ]
+    },
+    {
+      id: 'payment',
+      label: '💳 Paiements',
+      icon: CreditCard,
+      children: [
+        { id: 'payment-system', label: 'Système de paiement Stripe' },
       ]
     },
     {
@@ -4239,6 +4247,206 @@ useEffect(() => {
     editor.removeAllListeners();
   };
 }, [editor]);
+\`\`\``,
+
+    'payment-system': `# 💳 Système de Paiement Stripe
+
+## 📝 Vue d'ensemble
+
+Le système de paiement intégré permet aux clients de gérer leurs crédits pour créer des projets et booker des équipes.
+
+## 🏗️ Architecture
+
+### Tables de base de données
+
+#### client_credits
+\`\`\`sql
+CREATE TABLE public.client_credits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  balance_cents INTEGER NOT NULL DEFAULT 0,
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+\`\`\`
+
+#### payment_history
+\`\`\`sql
+CREATE TABLE public.payment_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  amount_cents INTEGER NOT NULL,
+  stripe_payment_id TEXT,
+  payment_status TEXT DEFAULT 'pending',
+  payment_method TEXT DEFAULT 'stripe',
+  invoice_url TEXT,
+  payment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+\`\`\`
+
+## 💰 Gestion des crédits
+
+### Hook useClientCredits
+\`\`\`typescript
+import { useClientCredits } from '@/hooks/useClientCredits';
+
+const { 
+  balance,           // Solde en centimes
+  loading,          // État de chargement
+  hasMinimumCredits, // Vérification du minimum
+  formatBalance,     // Format pour affichage (EUR)
+  checkCreditsForAction, // Vérifier avant action
+  deductCredits,    // Déduire des crédits
+  refreshBalance    // Rafraîchir le solde
+} = useClientCredits();
+\`\`\`
+
+### Vérification avant action
+\`\`\`typescript
+// Avant de démarrer un projet
+const creditCheck = checkCreditsForAction('Démarrer un projet', 5000);
+if (!creditCheck.success) {
+  toast.error(creditCheck.message);
+  setShowPaymentModal(true);
+  return;
+}
+\`\`\`
+
+## 💳 Intégration Stripe
+
+### Configuration
+\`\`\`typescript
+// Clés Stripe (test pour le moment)
+const STRIPE_PUBLISHABLE_KEY = 'pk_test_...'
+const STRIPE_SECRET_KEY = 'sk_test_...' // Côté serveur uniquement
+\`\`\`
+
+### Composant StripePaymentModal
+\`\`\`typescript
+<StripePaymentModal
+  isOpen={showPaymentModal}
+  onClose={() => setShowPaymentModal(false)}
+  onSuccess={() => {
+    toast.success('Crédits ajoutés');
+    refreshBalance();
+  }}
+  minimumAmount={50} // Minimum 50€
+/>
+\`\`\`
+
+## 📊 Historique des paiements
+
+### Page dédiée dans les paramètres
+- Onglet "Mes paiements" dans ClientSettings
+- Affichage du solde actuel
+- Liste chronologique des paiements
+- Téléchargement de factures HTML
+
+### Composant PaymentHistory
+\`\`\`typescript
+<PaymentHistory />
+// Affiche:
+// - Solde actuel avec bouton d'ajout
+// - Historique complet
+// - Boutons de téléchargement facture
+\`\`\`
+
+## 🔐 Sécurité
+
+### RLS Policies
+\`\`\`sql
+-- Clients voient uniquement leurs crédits
+CREATE POLICY "Users can view own credits" 
+ON client_credits FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Clients voient uniquement leur historique
+CREATE POLICY "Users can view own payment history"
+ON payment_history FOR SELECT
+USING (auth.uid() = user_id);
+\`\`\`
+
+## 🚀 Edge Functions
+
+### manage-client-credits
+Actions disponibles:
+- **check_balance**: Vérifier le solde
+- **add_credits**: Ajouter des crédits (avec Stripe)
+- **deduct_credits**: Déduire des crédits
+
+\`\`\`typescript
+const { data } = await supabase.functions.invoke('manage-client-credits', {
+  body: {
+    action: 'add_credits',
+    userId: user.id,
+    amount: 5000, // En centimes
+    paymentMethodId: 'pm_card_visa'
+  }
+});
+\`\`\`
+
+## 📝 Workflow complet
+
+### 1. Client veut créer un projet
+1. Clic sur "Booker une équipe" ou "Démarrer"
+2. Vérification des crédits (minimum 50€)
+3. Si insuffisant → Popup de paiement
+4. Paiement via Stripe
+5. Crédits ajoutés au compte
+6. Action autorisée
+
+### 2. Ajout de crédits
+1. Client va dans Paramètres → Mes paiements
+2. Clic sur "Ajouter des crédits"
+3. Saisie du montant (minimum 50€)
+4. Saisie des informations de carte
+5. Paiement sécurisé via Stripe
+6. Mise à jour instantanée du solde
+7. Enregistrement dans l'historique
+
+### 3. Téléchargement de facture
+1. Client accède à l'historique
+2. Clic sur l'icône de téléchargement
+3. Génération de la facture HTML
+4. Téléchargement automatique
+
+## ⚠️ Points importants
+
+### Montants minimums
+- Dépôt minimum: 50€
+- Projet nécessite: 50€ minimum
+
+### Format des montants
+- Base de données: Centimes (INTEGER)
+- Affichage: Euros (formatBalance())
+- Stripe: Centimes
+
+### Temps réel
+- Solde mis à jour en temps réel
+- Subscription Supabase Realtime
+- Refresh automatique après paiement
+
+## 🔧 Maintenance
+
+### Vérifier les paiements
+\`\`\`sql
+SELECT * FROM payment_history 
+WHERE user_id = '[USER_ID]'
+ORDER BY payment_date DESC;
+\`\`\`
+
+### Vérifier le solde
+\`\`\`sql
+SELECT * FROM client_credits
+WHERE user_id = '[USER_ID]';
+\`\`\`
+
+### Ajouter des crédits manuellement (admin)
+\`\`\`sql
+UPDATE client_credits
+SET balance_cents = balance_cents + 5000
+WHERE user_id = '[USER_ID]';
 \`\`\``
   });
 
@@ -4304,8 +4512,8 @@ useEffect(() => {
           }}
           className={cn(
             "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors",
-            "hover:bg-gray-100",
-            activeSection === item.id && "bg-blue-50 text-blue-700 font-medium",
+            "text-gray-300 hover:bg-gray-700 hover:text-white",
+            activeSection === item.id && "bg-blue-600 text-white font-medium",
             level > 0 && "pl-8"
           )}
         >
@@ -4314,7 +4522,7 @@ useEffect(() => {
               {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </span>
           )}
-          {Icon && <Icon className="w-4 h-4" />}
+          {Icon && <Icon className="w-4 h-4 text-gray-400" />}
           <span className="flex-1 text-left">{item.label}</span>
         </button>
         
@@ -4328,15 +4536,15 @@ useEffect(() => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-900">
       {/* Sidebar */}
-      <div className="w-80 bg-white border-r">
-        <div className="p-6 border-b">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="w-6 h-6" />
+      <div className="w-80 bg-gray-800 border-r border-gray-700">
+        <div className="p-6 border-b border-gray-700">
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <FileText className="w-6 h-6 text-blue-400" />
             Documentation LLM
           </h1>
-          <p className="text-sm text-gray-600 mt-2">
+          <p className="text-sm text-gray-400 mt-2">
             Référence technique pour l'IA
           </p>
         </div>
@@ -4349,22 +4557,22 @@ useEffect(() => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-gray-50">
         <div className="max-w-5xl mx-auto p-8">
-          <Alert className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+          <Alert className="mb-6 bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-gray-700">
               Cette documentation est utilisée comme référence par l'IA pour comprendre l'architecture du projet.
               Les sections marquées 🔥 contiennent les dernières mises à jour importantes.
             </AlertDescription>
           </Alert>
 
-          <Card>
+          <Card className="bg-white shadow-lg">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle className="text-2xl">{getSectionTitle()}</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-2xl text-gray-900">{getSectionTitle()}</CardTitle>
+                  <CardDescription className="text-gray-600">
                     {activeSection === 'projet-demarrage' && 
                       "Documentation technique complète du processus de démarrage de projet"
                     }
@@ -4412,12 +4620,12 @@ useEffect(() => {
                 <Textarea
                   value={getContent()}
                   onChange={(e) => handleContentChange(e.target.value)}
-                  className="min-h-[600px] font-mono text-sm"
+                  className="min-h-[600px] font-mono text-sm bg-gray-50 text-gray-900 border-gray-300"
                   placeholder="Documentation..."
                 />
               ) : (
                 <div className="prose prose-sm max-w-none">
-                  <pre className="whitespace-pre-wrap bg-gray-50 p-6 rounded-lg overflow-x-auto">
+                  <pre className="whitespace-pre-wrap bg-gray-50 text-gray-900 p-6 rounded-lg overflow-x-auto border border-gray-200">
                     {getContent()}
                   </pre>
                 </div>

@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,15 +11,42 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const dbUrl = Deno.env.get('SUPABASE_DB_URL')!
+    
+    console.log('🔧 Creating invoice_payments table...')
 
-    // Create the invoice_payments table
-    const { error: createTableError } = await supabase.rpc('exec_sql', {
-      sql: `
-        -- Create invoice_payments table to track payments
-        CREATE TABLE IF NOT EXISTS public.invoice_payments (
+    const { Client } = await import('https://deno.land/x/postgres@v0.17.0/mod.ts')
+    const client = new Client(dbUrl)
+    await client.connect()
+
+    try {
+      // Check if table exists
+      const checkTable = await client.queryObject(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'invoice_payments'
+        );
+      `)
+      
+      if (checkTable.rows[0].exists) {
+        console.log('✅ Table invoice_payments already exists')
+        await client.end()
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Table invoice_payments already exists'
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
+      }
+
+      // Create table
+      await client.queryArray(`
+        CREATE TABLE public.invoice_payments (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
           period_start DATE NOT NULL,
@@ -35,78 +61,65 @@ serve(async (req) => {
           client_id UUID NOT NULL REFERENCES auth.users(id),
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           
-          -- Ensure unique payment per project and period
           UNIQUE(project_id, period_start, period_end)
-        );
+        )
+      `)
+      console.log('✅ Table created')
 
-        -- Create indexes
-        CREATE INDEX IF NOT EXISTS idx_invoice_payments_project_id ON public.invoice_payments(project_id);
-        CREATE INDEX IF NOT EXISTS idx_invoice_payments_client_id ON public.invoice_payments(client_id);
-        CREATE INDEX IF NOT EXISTS idx_invoice_payments_period ON public.invoice_payments(period_start, period_end);
+      // Create indexes
+      await client.queryArray('CREATE INDEX idx_invoice_payments_project_id ON public.invoice_payments(project_id)')
+      await client.queryArray('CREATE INDEX idx_invoice_payments_client_id ON public.invoice_payments(client_id)')
+      await client.queryArray('CREATE INDEX idx_invoice_payments_period ON public.invoice_payments(period_start, period_end)')
+      console.log('✅ Indexes created')
 
-        -- Enable RLS
-        ALTER TABLE public.invoice_payments ENABLE ROW LEVEL SECURITY;
-
-        -- Drop existing policies if they exist
-        DROP POLICY IF EXISTS "Clients can view own payments" ON public.invoice_payments;
-        DROP POLICY IF EXISTS "Clients can create payments" ON public.invoice_payments;
-        DROP POLICY IF EXISTS "Candidates can view project payments" ON public.invoice_payments;
-
-        -- RLS policies
-        -- Clients can view their own payments
+      // Enable RLS
+      await client.queryArray('ALTER TABLE public.invoice_payments ENABLE ROW LEVEL SECURITY')
+      
+      // Create RLS policies
+      await client.queryArray(`
         CREATE POLICY "Clients can view own payments" ON public.invoice_payments
-          FOR SELECT
-          USING (auth.uid() = client_id);
-
-        -- Clients can create payments for their projects
+        FOR SELECT
+        USING (auth.uid() = client_id)
+      `)
+      
+      await client.queryArray(`
         CREATE POLICY "Clients can create payments" ON public.invoice_payments
-          FOR INSERT
-          WITH CHECK (
-            auth.uid() = client_id
-            AND EXISTS (
-              SELECT 1 FROM projects
-              WHERE projects.id = project_id
-              AND projects.owner_id = auth.uid()
-            )
-          );
+        FOR INSERT
+        WITH CHECK (
+          auth.uid() = client_id
+          AND EXISTS (
+            SELECT 1 FROM projects
+            WHERE projects.id = project_id
+            AND projects.owner_id = auth.uid()
+          )
+        )
+      `)
+      
+      console.log('✅ RLS policies created')
 
-        -- Candidates can view payments for projects they're assigned to
-        CREATE POLICY "Candidates can view project payments" ON public.invoice_payments
-          FOR SELECT
-          USING (
-            EXISTS (
-              SELECT 1 FROM hr_resource_assignments
-              WHERE hr_resource_assignments.project_id = invoice_payments.project_id
-              AND hr_resource_assignments.assigned_resource_id = auth.uid()
-            )
-          );
+      await client.end()
 
-        -- Enable realtime
-        ALTER PUBLICATION supabase_realtime ADD TABLE public.invoice_payments;
-      `
-    })
-
-    if (createTableError) {
-      throw createTableError
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Table invoice_payments created successfully'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    } catch (error) {
+      await client.end()
+      throw error
     }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Invoice payments table created successfully'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    )
   } catch (error) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ error: error.message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400 
+        status: 500
       }
     )
   }

@@ -76,6 +76,7 @@ import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { useProjectSort, type ProjectWithDate } from "@/hooks/useProjectSort";
 import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
 import { useProjectSelector } from "@/hooks/useProjectSelector";
+import { useClientCredits } from "@/hooks/useClientCredits";
 import ClientMetricsDashboard from "./ClientMetricsDashboard";
 import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
@@ -126,6 +127,7 @@ const [refreshTrigger, setRefreshTrigger] = useState(0);
 
 const { setupProject, isLoading: isOrchestrating } = useProjectOrchestrator();
 const { categories, templates, getTemplatesByCategory } = useTemplates();
+const { balance, formatBalance } = useClientCredits();
 
 // Sort projects for different sections using the universal hook
 const playProjects = useMemo(() => 
@@ -166,30 +168,31 @@ useEffect(() => {
 useEffect(() => {
   const loadProjects = async () => {
     if (!user?.id) return;
-    
+
     const { data: projectsData, error } = await supabase
       .from('projects')
       .select('*')
       .eq('owner_id', user.id);
-    
+
     if (!error && projectsData) {
+      console.log('Projects loaded:', projectsData.length, 'projects');
       const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);
       const archived = projectsData.filter(p => p.archived_at || p.deleted_at);
       setProjects(active);
       setArchivedProjects(archived);
     }
-    
+
     // Load resource assignments
     const { data: assignmentsData } = await supabase
       .from('hr_resource_assignments')
       .select('*')
       .in('project_id', projectsData?.map(p => p.id) || []);
-    
+
     if (assignmentsData) {
       setResourceAssignments(assignmentsData);
     }
   };
-  
+
   loadProjects();
 }, [user?.id]);
 
@@ -875,7 +878,7 @@ const renderContent = () => {
     case 'metrics':
       return <ClientMetricsDashboard />;
     case 'settings':
-      return <ClientSettings />;
+      return <ClientSettings defaultTab={searchParams.get('tab') as 'profile' | 'payments' || 'profile'} />;
     default:
       return renderStartContent();
   }
@@ -1019,6 +1022,30 @@ const headerContent = (
       <h1 className="text-xl font-semibold">Dashboard Client</h1>
     </div>
     <div className="flex items-center gap-4">
+      {/* Affichage du solde de crédits */}
+      <Button
+        variant="ghost"
+        onClick={() => navigateToSection('settings', 'payments')}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${
+          balance === 0 
+            ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20' 
+            : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:from-purple-500/20 hover:to-pink-500/20'
+        }`}
+        title={balance === 0 ? "Cliquez pour ajouter des crédits" : "Voir l'historique des paiements"}
+      >
+        <Euro className={`w-4 h-4 ${balance === 0 ? 'text-red-500' : 'text-purple-500'}`} />
+        <span className="text-sm font-medium">
+          Solde: <span className={`font-bold ${balance === 0 ? 'text-red-500' : 'text-purple-500'}`}>
+            {formatBalance()}
+          </span>
+        </span>
+        {balance === 0 && (
+          <Badge variant="secondary" className="ml-2 bg-red-500 text-white text-xs animate-pulse">
+            Ajouter des crédits
+          </Badge>
+        )}
+      </Button>
+      
       <Button
         variant="ghost"
         size="icon"

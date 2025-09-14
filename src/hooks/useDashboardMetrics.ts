@@ -170,10 +170,7 @@ export const useDashboardMetrics = () => {
         .from('time_tracking_sessions')
         .select(`
           *,
-          projects (title),
-          profiles!candidate_id (
-            first_name
-          )
+          projects (title)
         `)
         .in('project_id', projectIds)
         .gte('start_time', weekAgo.toISOString())

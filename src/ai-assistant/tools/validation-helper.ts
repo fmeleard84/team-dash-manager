@@ -133,7 +133,7 @@ export async function validateTeam(profiles: ProfileToValidate[]): Promise<{
  * Normalise un profil avec les valeurs correctes
  */
 export async function normalizeProfile(profile: ProfileToValidate): Promise<ProfileToValidate | null> {
-  const expertiseProvider = ExpertiseProvider.getInstance();
+  // Utiliser l'instance importée
   await expertiseProvider.loadData();
 
   // Trouver le métier correct

@@ -3,6 +3,15 @@ import { toast } from '@/hooks/use-toast';
 import { expertiseProvider } from './expertise-provider';
 import { validateProfile, normalizeProfile } from './validation-helper';
 
+// Helper function to generate UUID v4 compatible with all browsers
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 /**
  * Outils pour la gestion des projets via l'assistant vocal
  */
@@ -170,7 +179,15 @@ export async function createTeam(params: CreateTeamParams) {
     // Pour create_team, on crée TOUJOURS un nouveau projet
     // On ne cherche PAS de projet existant
     let projectId = params.project_id;
-    
+
+    // Debug
+    console.log('🔍 Debug createTeam:', {
+      projectId,
+      project_name: params.project_name,
+      hasProjectName: !!params.project_name,
+      condition: !projectId && params.project_name
+    });
+
     // Si pas de project_id fourni, créer un nouveau projet
     if (!projectId && params.project_name) {
       // Calculer les dates si non fournies
@@ -183,16 +200,20 @@ export async function createTeam(params: CreateTeamParams) {
         // Parser la date pour vérifier si elle est valide
         const parsedEnd = new Date(endDate);
         const parsedStart = new Date(startDate);
-        
-        // Si la date de fin est avant ou égale à la date de début, c'est probablement une erreur
-        // Cela peut arriver si l'IA a mal interprété "1 semaine" comme "1 mois"
-        const diffDays = Math.floor((parsedEnd.getTime() - parsedStart.getTime()) / (1000 * 60 * 60 * 24));
-        
-        // Si la différence est exactement 30 ou 31 jours et que l'utilisateur a dit "1 semaine"
-        // on corrige à 7 jours
-        if (diffDays >= 28 && diffDays <= 31) {
-          console.log('⚠️ Correction probable: 1 mois détecté, peut-être voulu dire 1 semaine');
-          // On garde la date telle quelle car on ne peut pas être sûr
+        const now = new Date();
+
+        // Si la date de fin est dans le passé, la corriger
+        if (parsedEnd < now) {
+          console.log('⚠️ Date de fin dans le passé détectée, correction automatique');
+          // Calculer la durée originale et l'appliquer depuis aujourd'hui
+          const originalDuration = parsedEnd.getTime() - parsedStart.getTime();
+          const durationDays = Math.max(7, Math.floor(originalDuration / (1000 * 60 * 60 * 24)));
+          endDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        }
+        // Si la date de fin est avant la date de début
+        else if (parsedEnd <= parsedStart) {
+          console.log('⚠️ Date de fin avant date de début, utilisation durée par défaut');
+          endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         }
       } else {
         // Par défaut: 90 jours
@@ -325,7 +346,7 @@ export async function createTeam(params: CreateTeamParams) {
         // Utiliser la séniorité normalisée
         const normalizedSeniority = expertiseProvider.normalizeSeniority(normalizedProfile.seniority);
         
-        const resourceId = crypto.randomUUID();
+        const resourceId = generateUUID();
         
         console.log(`✅ Création de la ressource pour ${hrProfile.name} avec:`);
         console.log(`   - Séniorité: ${normalizedSeniority}`);

@@ -8,7 +8,8 @@ import {
   Building2,
   Loader2,
   Copy,
-  ExternalLink
+  ExternalLink,
+  CreditCard
 } from 'lucide-react';
 import { PageHeader } from '@/ui/layout/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '@/ui/components/Card';
@@ -22,6 +23,8 @@ import { ThemeToggle } from '@/ui/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PaymentHistory } from './PaymentHistory';
 
 // Validation Luhn pour SIRET/SIREN
 function luhnCheck(num: string): boolean {
@@ -63,14 +66,18 @@ interface CompanyInfo {
   legalForm?: string;
 }
 
-export function ClientSettings() {
+interface ClientSettingsProps {
+  defaultTab?: 'profile' | 'payments';
+}
+
+export function ClientSettings({ defaultTab = 'profile' }: ClientSettingsProps = {}) {
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [verificationError, setVerificationError] = useState<string>('');
-  
+
   // États pour l'édition
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
@@ -273,8 +280,21 @@ ${companyInfo.address || ''}`;
         subtitle="Gérez vos informations personnelles et de l'entreprise"
       />
       
-      {/* Informations personnelles */}
-      <Card>
+      <Tabs defaultValue={defaultTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="profile">
+            <Settings className="w-4 h-4 mr-2" />
+            Profil & Entreprise
+          </TabsTrigger>
+          <TabsTrigger value="payments">
+            <CreditCard className="w-4 h-4 mr-2" />
+            Mes paiements
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="profile" className="space-y-6">
+          {/* Informations personnelles */}
+          <Card>
         <CardHeader>
           <CardTitle>Informations personnelles</CardTitle>
           <CardDescription>Modifiez vos Informations de contact</CardDescription>
@@ -486,6 +506,12 @@ ${companyInfo.address || ''}`;
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <PaymentHistory />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

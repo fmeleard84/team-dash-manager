@@ -39,7 +39,7 @@ const InvoiceDetail = ({ invoiceId, onBack, onPay }: InvoiceDetailProps) => {
     getInvoiceStatus,
     companyInfo
   } = useInvoices();
-  
+
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [clientInfo, setClientInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -51,19 +51,19 @@ const InvoiceDetail = ({ invoiceId, onBack, onPay }: InvoiceDetailProps) => {
   const loadInvoiceDetails = async () => {
     try {
       setLoading(true);
-      
+
       // Load invoice
       const invoiceData = await getInvoiceById(invoiceId);
       if (invoiceData) {
         setInvoice(invoiceData);
-        
-        // Load client info
+
+        // Load client info from client_profiles
         const { data: client } = await supabase
-          .from('profiles')
+          .from('client_profiles')
           .select('*')
           .eq('id', invoiceData.client_id)
           .single();
-        
+
         setClientInfo(client);
       }
     } catch (error) {
@@ -114,7 +114,7 @@ const InvoiceDetail = ({ invoiceId, onBack, onPay }: InvoiceDetailProps) => {
   return (
     <div className="space-y-6">
       {/* Header with actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between no-print">
         <Button
           variant="ghost"
           onClick={onBack}
@@ -123,7 +123,7 @@ const InvoiceDetail = ({ invoiceId, onBack, onPay }: InvoiceDetailProps) => {
           <ArrowLeft className="w-4 h-4" />
           Retour aux factures
         </Button>
-        
+
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -153,164 +153,142 @@ const InvoiceDetail = ({ invoiceId, onBack, onPay }: InvoiceDetailProps) => {
         </div>
       </div>
 
-      {/* Invoice document */}
-      <Card className="invoice-document">
+      {/* Invoice document - Style inspired by Luna model */}
+      <Card className="invoice-document bg-white print:shadow-none">
         <CardContent className="p-8">
-          {/* Invoice header */}
-          <div className="flex justify-between items-start mb-8">
-            {/* Company info */}
+          {/* Invoice Title */}
+          <h1 className="text-3xl font-bold mb-8">Facture</h1>
+
+          {/* Invoice details in header */}
+          <div className="grid grid-cols-3 gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-purple-600 mb-2">
-                {companyInfo?.company_name || 'Ialla'}
-              </h1>
-              <div className="text-sm text-gray-600 space-y-1">
-                <p className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  {companyInfo?.address_line1}
-                </p>
-                <p className="ml-6">
-                  {companyInfo?.postal_code} {companyInfo?.city}
-                </p>
-                {companyInfo?.phone && (
-                  <p className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    {companyInfo.phone}
-                  </p>
-                )}
-                {companyInfo?.email && (
-                  <p className="flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    {companyInfo.email}
-                  </p>
-                )}
-              </div>
+              <p className="text-sm text-gray-600">Numéro de facture</p>
+              <p className="font-semibold">{invoice.invoice_number}</p>
             </div>
-
-            {/* Client info */}
-            <div className="text-right">
-              <h2 className="text-lg font-semibold mb-2">Facturé à:</h2>
-              <div className="text-sm text-gray-600 space-y-1">
-                <p className="font-medium text-gray-900">
-                  {clientInfo?.first_name} {clientInfo?.last_name}
-                </p>
-                {clientInfo?.company && (
-                  <p className="flex items-center justify-end gap-2">
-                    <Building className="w-4 h-4" />
-                    {clientInfo.company}
-                  </p>
-                )}
-                <p className="flex items-center justify-end gap-2">
-                  <Mail className="w-4 h-4" />
-                  {clientInfo?.email}
-                </p>
-                {clientInfo?.phone && (
-                  <p className="flex items-center justify-end gap-2">
-                    <Phone className="w-4 h-4" />
-                    {clientInfo.phone}
-                  </p>
-                )}
-              </div>
+            <div>
+              <p className="text-sm text-gray-600">Date d'émission</p>
+              <p className="font-semibold">
+                {format(new Date(invoice.issued_date), 'dd/MM/yyyy')}
+              </p>
             </div>
-          </div>
-
-          {/* Invoice details */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg mb-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">N° Facture</p>
-                <p className="font-semibold">{invoice.invoice_number}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Date d'émission</p>
-                <p className="font-semibold">
-                  {format(new Date(invoice.issued_date), 'dd/MM/yyyy')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Date d'échéance</p>
-                <p className={cn("font-semibold", isOverdue && "text-red-600")}>
-                  {format(new Date(invoice.due_date), 'dd/MM/yyyy')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Statut</p>
-                <Badge className={cn(status.color)}>
-                  {status.label}
-                </Badge>
-              </div>
-            </div>
-            
-            <div className="mt-4">
-              <p className="text-sm text-gray-600">Projet</p>
-              <p className="font-semibold">{invoice.project?.title}</p>
-              <p className="text-sm text-gray-500">
-                Période du {format(new Date(invoice.period_start), 'dd/MM/yyyy')} au {format(new Date(invoice.period_end), 'dd/MM/yyyy')}
+            <div>
+              <p className="text-sm text-gray-600">Date d'échéance</p>
+              <p className={cn("font-semibold", isOverdue && "text-red-600")}>
+                {format(new Date(invoice.due_date), 'dd/MM/yyyy')}
               </p>
             </div>
           </div>
 
-          {/* Invoice items */}
-          <div className="space-y-6 mb-8">
-            <h3 className="text-lg font-semibold">Détail des prestations</h3>
-            
-            {invoice.items?.map((item) => (
-              <div key={item.id} className="border rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">
-                      {item.service_name}
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      {item.candidate?.first_name} {item.candidate?.last_name}
-                    </p>
-                    
-                    {/* Task details */}
-                    <div className="mt-3 space-y-1">
-                      {item.task_details.map((task, index) => (
-                        <div key={index} className="flex justify-between text-sm text-gray-500">
-                          <span className="flex items-center gap-2">
-                            <Clock className="w-3 h-3" />
-                            {task.description}
-                          </span>
-                          <span>{formatMinutesToHours(task.duration_minutes)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="text-right ml-4">
-                    <p className="text-sm text-gray-600">
-                      {formatMinutesToHours(item.total_minutes)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {formatCurrency(item.rate_per_minute_cents)}/min
-                    </p>
-                    <p className="font-semibold text-lg">
-                      {formatCurrency(item.amount_cents)} HT
-                    </p>
-                  </div>
-                </div>
+          {/* Company and Client info */}
+          <div className="grid grid-cols-2 gap-8 mb-8">
+            {/* Vaya info (left) */}
+            <div>
+              <h2 className="text-lg font-bold mb-2">Vaya</h2>
+              <div className="text-sm space-y-0.5">
+                <p className="text-gray-700">6 Rue de Verdun</p>
+                <p className="text-gray-700">13840 Rognes, FR</p>
+                <p className="text-gray-700">contact@vaya.fr</p>
+                <p className="text-gray-700 font-semibold">85234791200015</p>
               </div>
-            ))}
+            </div>
+
+            {/* Client info (right) */}
+            <div>
+              <h2 className="text-lg font-bold mb-2 uppercase">
+                {clientInfo?.company_name || 'CLIENT'}
+              </h2>
+              <div className="text-sm space-y-0.5">
+                <p className="text-gray-700">
+                  {clientInfo?.first_name} {clientInfo?.last_name}
+                </p>
+                {clientInfo?.address && (
+                  <p className="text-gray-700">{clientInfo.address}</p>
+                )}
+                {(clientInfo?.postal_code || clientInfo?.city) && (
+                  <p className="text-gray-700">
+                    {clientInfo?.postal_code} {clientInfo?.city?.toUpperCase()}, FR
+                  </p>
+                )}
+                {clientInfo?.siret && (
+                  <p className="text-gray-700 font-semibold">{clientInfo.siret}</p>
+                )}
+                {clientInfo?.vat_number && (
+                  <p className="text-gray-700">Numéro de TVA: {clientInfo.vat_number}</p>
+                )}
+              </div>
+            </div>
           </div>
 
-          <Separator className="my-6" />
+          {/* Invoice items table */}
+          <div className="mb-8">
+            <table className="w-full">
+              <thead className="bg-gray-900 text-white">
+                <tr>
+                  <th className="text-left p-3">Description</th>
+                  <th className="text-center p-3">Qté</th>
+                  <th className="text-right p-3">Prix unitaire</th>
+                  <th className="text-center p-3">TVA (%)</th>
+                  <th className="text-right p-3">Total HT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.items?.map((item, index) => {
+                  const days = Math.ceil(item.total_minutes / 480); // 8 hours per day
+                  const dailyRate = (item.amount_cents / days) / 100; // Convert cents to euros
+
+                  return (
+                    <tr key={item.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                      <td className="p-3">
+                        <div>
+                          <p className="font-semibold">
+                            {format(new Date(invoice.period_start), 'MMMM yyyy', { locale: fr })}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">{item.service_name}</p>
+                          {item.task_details.map((task, idx) => (
+                            <p key={idx} className="text-xs text-gray-500 ml-2">
+                              - {task.description}
+                            </p>
+                          ))}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Intervenant: {item.candidate?.first_name} {item.candidate?.last_name}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="text-center p-3">
+                        {days} j
+                      </td>
+                      <td className="text-right p-3">
+                        {dailyRate.toFixed(2)} €
+                      </td>
+                      <td className="text-center p-3">20 %</td>
+                      <td className="text-right p-3 font-semibold">
+                        {(item.amount_cents / 100).toFixed(2)} €
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-64 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Sous-total HT</span>
-                <span className="font-medium">{formatCurrency(invoice.subtotal_cents)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">TVA ({invoice.vat_rate}%)</span>
-                <span className="font-medium">{formatCurrency(invoice.vat_amount_cents)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total TTC</span>
-                <span className="text-purple-600">{formatCurrency(invoice.total_cents)}</span>
+          <div className="flex justify-end mt-8">
+            <div className="w-80">
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between py-2">
+                  <span className="font-semibold">Total HT</span>
+                  <span className="font-semibold">
+                    {(invoice.subtotal_cents / 100).toFixed(2)} €
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span>Montant total de la TVA</span>
+                  <span>{(invoice.vat_amount_cents / 100).toFixed(2)} €</span>
+                </div>
+                <div className="flex justify-between py-2 text-lg font-bold">
+                  <span>Total TTC</span>
+                  <span>{(invoice.total_cents / 100).toFixed(2)} €</span>
+                </div>
               </div>
             </div>
           </div>
@@ -329,6 +307,29 @@ const InvoiceDetail = ({ invoiceId, onBack, onPay }: InvoiceDetailProps) => {
             </div>
           )}
 
+          {/* Payment details */}
+          <div className="mt-12 p-4 bg-gray-50 rounded">
+            <h3 className="font-bold mb-3">Détails du paiement</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-600">Nom du bénéficiaire</p>
+                <p className="font-medium">Vaya</p>
+              </div>
+              <div>
+                <p className="text-gray-600">BIC</p>
+                <p className="font-medium">QNTOFRP1XXX</p>
+              </div>
+              <div>
+                <p className="text-gray-600">IBAN</p>
+                <p className="font-medium">FR76 1695 8000 0187 9696 3374 445</p>
+              </div>
+              <div>
+                <p className="text-gray-600">Référence</p>
+                <p className="font-medium">{invoice.invoice_number}</p>
+              </div>
+            </div>
+          </div>
+
           {/* Notes */}
           {invoice.notes && (
             <div className="mt-8 p-4 bg-gray-50 rounded-lg">
@@ -338,17 +339,25 @@ const InvoiceDetail = ({ invoiceId, onBack, onPay }: InvoiceDetailProps) => {
           )}
 
           {/* Footer */}
-          <div className="mt-12 pt-6 border-t text-center text-sm text-gray-500">
-            <p>Merci pour votre confiance</p>
-            {companyInfo?.siret && (
-              <p>SIRET: {companyInfo.siret}</p>
-            )}
-            {companyInfo?.vat_number && (
-              <p>N° TVA: {companyInfo.vat_number}</p>
-            )}
+          <div className="mt-8 pt-4 border-t text-center text-xs text-gray-500">
+            <p>Vaya, SAS</p>
+            <p>{invoice.invoice_number} · Page 1/1</p>
           </div>
         </CardContent>
       </Card>
+
+      {/* Print styles */}
+      <style jsx>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          .invoice-document {
+            box-shadow: none !important;
+            border: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

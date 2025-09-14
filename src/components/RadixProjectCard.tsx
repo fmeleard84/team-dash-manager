@@ -322,9 +322,10 @@ export function RadixProjectCard({
                   </DropdownMenu.Trigger>
 
                   <DropdownMenu.Portal>
-                    <DropdownMenu.Content 
-                      className="min-w-[200px] bg-popover rounded-lg p-1 shadow-lg border border-border"
+                    <DropdownMenu.Content
+                      className="min-w-[200px] bg-popover rounded-lg p-1 shadow-lg border border-border z-[99999]"
                       sideOffset={5}
+                      style={{ zIndex: 99999 }}
                     >
                       <DropdownMenu.Item 
                         className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer outline-none"
