@@ -90,8 +90,8 @@ const statusConfig = {
 };
 
 export function CandidateProjectsSection({
-  activeProjects,
-  pendingInvitations,
+  activeProjects = [],
+  pendingInvitations = [],
   onViewProject,
   onAcceptMission,
   onDeclineMission,
@@ -214,12 +214,12 @@ export function CandidateProjectsSection({
 
   // Catégoriser tous les projets
   const allProjects = [
-    ...pendingInvitations.map(p => ({ 
-      ...p, 
-      category: 'invitations' 
+    ...(Array.isArray(pendingInvitations) ? pendingInvitations : []).map(p => ({
+      ...p,
+      category: 'invitations'
     })),
-    ...activeProjects.map(p => ({ 
-      ...p, 
+    ...(Array.isArray(activeProjects) ? activeProjects : []).map(p => ({
+      ...p,
       // Le candidat a accepté (booking_status='accepted'), donc on regarde le statut du projet
       category: p.booking_status === 'completed' ? 'termines' :  // Projet terminé pour ce candidat
                 p.status === 'completed' ? 'termines' :  // Projet globalement terminé
@@ -234,11 +234,14 @@ export function CandidateProjectsSection({
     : allProjects.filter(p => selectedFilters.includes(p.category));
 
   // Compteurs par statut
+  const safeActiveProjects = Array.isArray(activeProjects) ? activeProjects : [];
+  const safePendingInvitations = Array.isArray(pendingInvitations) ? pendingInvitations : [];
+
   const statusCounts = {
-    'invitations': pendingInvitations.length,
-    'en-cours': activeProjects.filter(p => p.booking_status !== 'completed' && p.status === 'play').length,
-    'attente-kickoff': activeProjects.filter(p => p.booking_status === 'accepted' && p.status !== 'play' && p.status !== 'completed').length,
-    'termines': activeProjects.filter(p => p.booking_status === 'completed' || p.status === 'completed').length,
+    'invitations': safePendingInvitations.length,
+    'en-cours': safeActiveProjects.filter(p => p.booking_status !== 'completed' && p.status === 'play').length,
+    'attente-kickoff': safeActiveProjects.filter(p => p.booking_status === 'accepted' && p.status !== 'play' && p.status !== 'completed').length,
+    'termines': safeActiveProjects.filter(p => p.booking_status === 'completed' || p.status === 'completed').length,
   };
 
   const toggleFilter = (filter: string) => {

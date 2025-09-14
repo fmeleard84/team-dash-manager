@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, MapPin, Video, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface EventNotification {
   id: string;
@@ -18,21 +19,23 @@ interface EventNotification {
   created_at: string;
 }
 
-interface CandidateEventNotificationsProps {
-  candidateId: string;
-}
-
-export default function CandidateEventNotifications({ candidateId }: CandidateEventNotificationsProps) {
+export default function CandidateEventNotifications() {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<EventNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   const loadEventNotifications = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('candidate_event_notifications')
         .select('*')
-        .eq('candidate_id', candidateId)
+        .eq('candidate_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -54,7 +57,7 @@ export default function CandidateEventNotifications({ candidateId }: CandidateEv
 
   useEffect(() => {
     loadEventNotifications();
-  }, [candidateId]);
+  }, [user?.id]);
 
   const markAsRead = async (notificationId: string) => {
     try {

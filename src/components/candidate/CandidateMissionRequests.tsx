@@ -98,6 +98,7 @@ export const CandidateMissionRequests = () => {
   const [loading, setLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'declined'>('pending');
+  const [candidateProfileId, setCandidateProfileId] = useState<string | null>(null);
 
   const fetchMissionRequests = async () => {
     if (!user?.email) return;
@@ -117,6 +118,9 @@ export const CandidateMissionRequests = () => {
       let candidateExpertisesData = [];
       
       if (candidateProfile) {
+        // Sauvegarder l'ID du profil pour le cleanup
+        setCandidateProfileId(candidateProfile.id);
+
         // Récupérer les langues
         const { data: langData } = await supabase
           .from('candidate_languages')
@@ -172,25 +176,18 @@ export const CandidateMissionRequests = () => {
             client_budget,
             project_date,
             due_date
-          ),
-          hr_profiles (
-            id,
-            name,
-            hr_categories (
-              name
-            )
           )
         `)
         .order('created_at', { ascending: false });
       
-      console.log('All hr_resource_assignments:', data?.map(a => ({
+      console.log('All hr_resource_assignments:', data && Array.isArray(data) ? data.map(a => ({
         id: a.id,
         project: a.projects?.title,
         booking_status: a.booking_status,
         seniority: a.seniority,
         languages: a.languages,
         expertises: a.expertises
-      })));
+      })) : 'No data or not an array');
       
       // Filter by status after getting all data
       const searchingAssignments = (data || []).filter(assignment => 
@@ -264,8 +261,10 @@ export const CandidateMissionRequests = () => {
       console.log('Matching assignments for candidate:', matchingAssignments.length, 'out of', searchingAssignments.length);
 
       // Get unique owner IDs to fetch client information
-      const ownerIds = [...new Set(matchingAssignments.map(assignment => assignment.projects?.owner_id).filter(Boolean))];
-      
+      const ownerIds = matchingAssignments && Array.isArray(matchingAssignments)
+        ? [...new Set(matchingAssignments.map(assignment => assignment.projects?.owner_id).filter(Boolean))]
+        : [];
+
       // Fetch client profiles separately
       let clientProfiles = new Map();
       if (ownerIds.length > 0) {
@@ -273,13 +272,14 @@ export const CandidateMissionRequests = () => {
           .from('profiles')
           .select('id, first_name, last_name, email')
           .in('id', ownerIds);
-        
-        if (profilesData) {
+
+        if (profilesData && Array.isArray(profilesData)) {
           clientProfiles = new Map(profilesData.map(profile => [profile.id, profile]));
         }
       }
 
-      const formattedRequests: MissionRequest[] = matchingAssignments.map(assignment => {
+      const formattedRequests: MissionRequest[] = matchingAssignments && Array.isArray(matchingAssignments)
+        ? matchingAssignments.map(assignment => {
         const clientProfile = clientProfiles.get(assignment.projects?.owner_id);
         return {
         id: assignment.id,
@@ -288,9 +288,9 @@ export const CandidateMissionRequests = () => {
         project_description: assignment.projects?.description || '',
         client_name: `${clientProfile?.first_name || ''} ${clientProfile?.last_name || ''}`.trim() || clientProfile?.email || 'Client',
         client_email: clientProfile?.email || '',
-        profile_name: assignment.hr_profiles?.name || 'Profil inconnu',
+        profile_name: 'Profil recherché', // Will be fetched separately if needed
         profile_id: assignment.profile_id,
-        category_name: assignment.hr_profiles?.hr_categories?.name || 'Catégorie',
+        category_name: 'Mission',
         seniority: assignment.seniority || 'intermediate',
         languages: assignment.languages || [],
         expertises: assignment.expertises || [],
@@ -304,8 +304,9 @@ export const CandidateMissionRequests = () => {
         created_at: assignment.created_at,
         expires_at: assignment.created_at, // Using created_at for time display
         booking_data: null
-        };
-      });
+      };
+    })
+    : [];
 
       setRequests(formattedRequests);
     } catch (error: any) {
@@ -363,7 +364,7 @@ export const CandidateMissionRequests = () => {
   useEffect(() => {
     fetchMissionRequests();
 
-    if (!candidateProfile?.id) return;
+    if (!candidateProfileId) return;
 
     // Set up real-time subscription for new mission requests
     const channel = supabase
@@ -374,7 +375,7 @@ export const CandidateMissionRequests = () => {
           event: '*',
           schema: 'public',
           table: 'candidate_notifications',
-          filter: `candidate_id=eq.${candidateProfile.id}`
+          filter: `candidate_id=eq.${candidateProfileId}`
         },
         (payload) => {
           console.log('🔄 Real-time update: candidate_notifications changed', payload);
@@ -401,7 +402,7 @@ export const CandidateMissionRequests = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.email, candidateProfile?.id]);
+  }, [user?.email, candidateProfileId]);
 
   const filteredRequests = requests.filter(request => {
     if (filter === 'all') return true;

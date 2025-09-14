@@ -20,6 +20,27 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Fonction pour obtenir l'URL de base correcte
+const getAppUrl = () => {
+  // Debug logging
+  console.log('🌐 Current location:', {
+    hostname: window.location.hostname,
+    port: window.location.port,
+    origin: window.location.origin
+  });
+
+  // En production ou sur le serveur de développement
+  if (window.location.port === '8081') {
+    const url = `http://${window.location.hostname}:8081`;
+    console.log('🔗 Using server URL:', url);
+    return url;
+  }
+
+  // Fallback sur l'origin
+  console.log('🔗 Using origin:', window.location.origin);
+  return window.location.origin;
+};
+
 export const Register = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -105,6 +126,11 @@ export const Register = () => {
     setError('');
 
     try {
+      // Debug: Log the redirect URL
+      const redirectUrl = `${getAppUrl()}/auth/callback?next=/email-confirmation`;
+      console.log('🔗 Email redirect URL:', redirectUrl);
+      console.log('📧 Signing up user:', formData.email);
+
       // Sign up user with email confirmation disabled for dev
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -116,9 +142,11 @@ export const Register = () => {
             role: role === 'team_member' ? 'client' : role,
             is_team_member: role === 'team_member'
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/email-confirmation`
+          emailRedirectTo: redirectUrl
         }
       });
+
+      console.log('📬 Signup response:', { authData, authError });
 
       if (authError) throw authError;
 
@@ -178,8 +206,16 @@ export const Register = () => {
         }
 
         // Check if email confirmation is required
+        console.log('🔐 Session status:', {
+          hasSession: !!authData.session,
+          hasUser: !!authData.user,
+          userEmailConfirmed: authData.user?.email_confirmed_at,
+          identities: authData.user?.identities
+        });
+
         if (!authData.session) {
           // Email confirmation required
+          console.log('📧 Email confirmation required - showing step 3');
           toast.success('Compte créé ! Vérifiez votre email pour confirmer votre inscription.');
           setStep(3); // Show confirmation step
           return;
@@ -344,23 +380,23 @@ export const Register = () => {
                   <div className="space-y-3">
                     <Label>Vous êtes ?</Label>
                     <RadioGroup value={role} onValueChange={(value) => setRole(value as 'client' | 'candidate')}>
-                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg bg-background hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
                         <RadioGroupItem value="client" id="client" />
                         <Label htmlFor="client" className="flex items-center gap-2 cursor-pointer flex-1">
                           <Building2 className="w-4 h-4 text-blue-600" />
                           <div>
                             <p className="font-medium">Client</p>
-                            <p className="text-sm text-gray-500">Je souhaite constituer une équipe</p>
+                            <p className="text-sm text-muted-foreground">Je souhaite constituer une équipe</p>
                           </div>
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg bg-background hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
                         <RadioGroupItem value="candidate" id="candidate" />
                         <Label htmlFor="candidate" className="flex items-center gap-2 cursor-pointer flex-1">
                           <Briefcase className="w-4 h-4 text-purple-600" />
                           <div>
                             <p className="font-medium">Expert</p>
-                            <p className="text-sm text-gray-500">Je souhaite rejoindre des équipes</p>
+                            <p className="text-sm text-muted-foreground">Je souhaite rejoindre des équipes</p>
                           </div>
                         </Label>
                       </div>
@@ -517,7 +553,7 @@ export const Register = () => {
                             type: 'signup',
                             email: formData.email,
                             options: {
-                              emailRedirectTo: `${window.location.origin}/auth/callback?next=/email-confirmation`
+                              emailRedirectTo: `${getAppUrl()}/auth/callback?next=/email-confirmation`
                             }
                           });
                           if (error) throw error;
