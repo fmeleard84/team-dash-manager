@@ -620,20 +620,6 @@ const CandidateDashboard = () => {
   };
 
   const renderContent = () => {
-    // Show onboarding if needed
-    if (needsOnboarding) {
-      return (
-        <Card>
-          <CardContent className="p-6">
-            <CandidateOnboarding onComplete={() => {
-              completeOnboarding();
-              refetchProfile();
-            }} />
-          </CardContent>
-        </Card>
-      );
-    }
-
     switch (activeSection) {
       case 'projects':
         return renderProjectsContent();
@@ -908,12 +894,30 @@ const CandidateDashboard = () => {
         <div className={`px-3 py-1 rounded-full text-xs font-medium ${isAvailable ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
           {isAvailable ? "Disponible" : "Indisponible"}
         </div>
-        <CandidateEventNotifications />
+        {/* Removed CandidateEventNotifications from header - was causing overflow */}
         <NotificationBell />
         <ThemeToggle />
       </div>
     </header>
   );
+
+  // Show onboarding fullscreen if needed
+  if (needsOnboarding) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background">
+        <div className="h-full overflow-auto">
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="w-full max-w-4xl">
+              <CandidateOnboarding onComplete={() => {
+                completeOnboarding();
+                refetchProfile();
+              }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -930,7 +934,7 @@ const CandidateDashboard = () => {
                   <ValidationPromoBanner status={candidateProfile?.qualification_status || 'pending'} />
                 </div>
               )}
-              
+
               {renderContent()}
             </div>
           </main>
