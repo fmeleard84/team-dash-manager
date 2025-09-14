@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { IallaLogo } from "@/components/IallaLogo";
+import { SiretVerification } from "@/components/shared/SiretVerification";
 
 interface OnboardingData {
   step: number;
@@ -322,10 +323,11 @@ const CandidateOnboarding = ({ candidateId, onComplete, completeOnboarding }: Ca
           </div>
         </div>
 
-        {/* Contenu de l'étape - Zone centrale */}
-        <div className="flex-1 flex items-center justify-center pb-8">
-          <Card className="w-full max-w-4xl bg-white/90 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
-            <CardContent className="p-10">
+      {/* Contenu de l'étape - Zone centrale scrollable */}
+      <div className="flex-1 overflow-auto">
+        <div className="min-h-full flex items-center justify-center p-6">
+          <Card className="w-full max-w-4xl">
+            <CardContent className="p-8">
               {renderStepContent()}
             </CardContent>
           </Card>
@@ -633,25 +635,27 @@ const LanguagesStep = ({
   );
 };
 
-const BillingStep = ({ 
-  billingType, 
-  companyName, 
-  siret, 
-  onBillingTypeChange, 
-  onCompanyDataChange, 
-  onNext, 
-  onPrev 
+const BillingStep = ({
+  billingType,
+  companyName,
+  siret,
+  onBillingTypeChange,
+  onCompanyDataChange,
+  onNext,
+  onPrev
 }: any) => {
+  const [siretValid, setSiretValid] = useState(false);
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center mx-auto">
-          <Receipt className="w-8 h-8 text-white" />
+        <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
+          <Receipt className="w-8 h-8 text-primary-foreground" />
         </div>
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">
+        <h2 className="text-2xl font-bold">
           Comment souhaitez-vous facturer ?
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Choisissez votre mode de facturation préféré
         </p>
       </div>
@@ -673,27 +677,17 @@ const BillingStep = ({
                 </p>
               </div>
             </div>
-            
+
             {billingType === 'company' && (
-              <div className="mt-4 space-y-4">
-                <div>
-                  <Label className="text-sm font-medium">Nom de l'entreprise</Label>
-                  <Input
-                    value={companyName || ''}
-                    onChange={(e) => onCompanyDataChange(e.target.value, siret)}
-                    placeholder="Ex: Mon Entreprise SARL"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Numéro SIRET</Label>
-                  <Input
-                    value={siret || ''}
-                    onChange={(e) => onCompanyDataChange(companyName, e.target.value)}
-                    placeholder="Ex: 12345678901234"
-                    className="mt-1"
-                  />
-                </div>
+              <div className="mt-6 border-t pt-6">
+                <SiretVerification
+                  siret={siret || ''}
+                  companyName={companyName || ''}
+                  onSiretChange={(value) => onCompanyDataChange(companyName, value)}
+                  onCompanyNameChange={(value) => onCompanyDataChange(value, siret)}
+                  onValidation={(isValid) => setSiretValid(isValid)}
+                  required={true}
+                />
               </div>
             )}
           </div>
@@ -737,10 +731,10 @@ const BillingStep = ({
           <ArrowLeft className="w-4 h-4 mr-2" />
           Précédent
         </Button>
-        <Button 
-          onClick={onNext} 
-          disabled={!billingType || (billingType === 'company' && (!companyName || !siret))}
-          className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700"
+        <Button
+          onClick={onNext}
+          disabled={!billingType || (billingType === 'company' && !siretValid)}
+          variant={billingType === 'company' && !siretValid ? 'secondary' : 'default'}
         >
           Suivant
           <ArrowRight className="w-4 h-4 ml-2" />
