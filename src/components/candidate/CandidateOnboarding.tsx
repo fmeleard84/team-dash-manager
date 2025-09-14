@@ -31,7 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { IallaLogo } from "@/components/IallaLogo";
-import { SiretVerification } from "@/components/shared/SiretVerification";
+import { CompactSiretVerification } from "@/components/shared/CompactSiretVerification";
 
 interface OnboardingData {
   step: number;
@@ -251,60 +251,35 @@ const CandidateOnboarding = ({ candidateId, onComplete, completeOnboarding }: Ca
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-green-50 overflow-auto">
-      <div className="min-h-screen p-8 flex flex-col">
-        {/* Header avec logo et progression */}
-        <div className="w-full max-w-6xl mx-auto mb-8">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <IallaLogo size="lg" />
-              <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Configuration du profil
-                </h2>
-                <p className="text-sm text-gray-600">Bienvenue dans votre espace candidat</p>
-              </div>
-            </div>
-            {/* Bouton pour fermer/skip (optionnel, mais désactivé pour les premières étapes) */}
-            {currentStep > 5 && (
-              <Button
-                variant="ghost"
-                onClick={onComplete}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            )}
-          </div>
-          
-          {/* Stepper amélioré */}
-          <div className="flex items-center justify-center mb-6">
-            <div className="flex items-center gap-2">
+    <div className="fixed inset-0 bg-background">
+      <div className="h-full flex flex-col">
+        {/* Header avec stepper */}
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center gap-2">
               {steps.map((step, index) => (
                 <div key={step.number} className="flex items-center">
-                  <div className={`relative transition-all duration-500 ${
-                    step.number === currentStep ? 'scale-125' : ''
+                  <div className={`relative transition-all duration-300 ${
+                    step.number === currentStep ? 'scale-110' : ''
                   }`}>
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold transition-all duration-300 ${
-                      step.number <= currentStep 
-                        ? `bg-gradient-to-r ${step.color} shadow-lg` 
-                        : 'bg-gray-300'
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${
+                      step.number <= currentStep
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground'
                     }`}>
                       {step.number < currentStep ? (
-                        <CheckCircle className="w-7 h-7" />
+                        <CheckCircle className="w-5 h-5" />
                       ) : (
-                        <step.icon className="w-7 h-7" />
+                        <step.icon className="w-5 h-5" />
                       )}
                     </div>
-                    {step.number === currentStep && (
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 animate-ping opacity-25" />
-                    )}
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={`h-1 w-20 mx-2 rounded-full transition-all duration-500 ${
-                      step.number < currentStep 
-                        ? 'bg-gradient-to-r from-green-400 to-blue-400' 
-                        : 'bg-gray-200'
+                    <div className={`h-0.5 w-8 mx-1 transition-all duration-300 ${
+                      step.number < currentStep
+                        ? 'bg-primary'
+                        : 'bg-muted'
                     }`} />
                   )}
                 </div>
@@ -312,25 +287,27 @@ const CandidateOnboarding = ({ candidateId, onComplete, completeOnboarding }: Ca
             </div>
           </div>
 
-          {/* Titre étape courante */}
-          <div className="text-center mb-8">
-            <h1 className={`text-4xl font-bold mb-3 bg-gradient-to-r ${currentStepData.color} bg-clip-text text-transparent`}>
-              {currentStepData.title}
-            </h1>
-            <p className="text-lg text-gray-600">
-              Étape {currentStep} sur {steps.length}
-            </p>
+            {/* Titre étape courante */}
+            <div className="text-center mt-4">
+              <h1 className="text-xl font-semibold text-foreground">
+                {currentStepData.title}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Étape {currentStep} sur {steps.length}
+              </p>
+            </div>
           </div>
         </div>
 
-      {/* Contenu de l'étape - Zone centrale scrollable */}
-      <div className="flex-1 overflow-auto">
-        <div className="min-h-full flex items-center justify-center p-6">
-          <Card className="w-full max-w-4xl">
-            <CardContent className="p-8">
-              {renderStepContent()}
-            </CardContent>
-          </Card>
+        {/* Contenu de l'étape */}
+        <div className="flex-1 overflow-y-auto bg-muted/50">
+          <div className="max-w-4xl mx-auto p-6">
+            <Card className="border-border bg-card">
+              <CardContent className="p-6">
+                {renderStepContent()}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
@@ -350,22 +327,22 @@ const WelcomeStep = ({ onNext }: { onNext: () => void }) => {
         <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
           Bienvenue chez Ialla !
         </h2>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           Bonjour {user?.firstName}, nous sommes ravis de vous accueillir dans notre communauté de talents.
         </p>
-        <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           Nous allons maintenant configurer votre profil pour vous connecter aux meilleures opportunités qui correspondent à vos compétences.
         </p>
       </div>
 
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200/50">
+      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-2xl p-6 border border-purple-200/50 dark:border-purple-800/50">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
             <User className="w-6 h-6 text-white" />
           </div>
           <div className="text-left">
-            <h3 className="font-bold text-purple-900 mb-2">Ce que nous allons faire ensemble :</h3>
-            <ul className="text-purple-700 space-y-1 text-sm">
+            <h3 className="font-bold text-purple-900 dark:text-purple-100 mb-2">Ce que nous allons faire ensemble :</h3>
+            <ul className="text-muted-foreground space-y-1 text-sm">
               <li>• Définir votre métier et vos expertises</li>
               <li>• Configurer vos préférences linguistiques</li>
               <li>• Paramétrer votre système de facturation</li>
@@ -376,10 +353,10 @@ const WelcomeStep = ({ onNext }: { onNext: () => void }) => {
         </div>
       </div>
 
-      <Button 
-        onClick={onNext} 
+      <Button
+        onClick={onNext}
         size="lg"
-        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 px-8 py-3 text-lg"
+        className="w-full sm:w-auto"
       >
         Commencer mon profil
         <ArrowRight className="w-5 h-5 ml-2" />
@@ -400,21 +377,21 @@ const JobStep = ({
 }: any) => {
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto">
-          <Briefcase className="w-8 h-8 text-white" />
+      <div className="text-center mb-6">
+        <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+          <Briefcase className="w-7 h-7 text-primary-foreground" />
         </div>
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+        <h3 className="text-xl font-bold text-foreground mb-2">
           Quel est votre métier principal ?
-        </h2>
-        <p className="text-gray-600">
+        </h3>
+        <p className="text-muted-foreground">
           Sélectionnez votre domaine d'expertise et votre poste spécifique
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
-          <Label className="text-sm font-semibold">Domaine d'activité</Label>
+          <Label className="text-sm font-semibold text-foreground">Domaine d'activité</Label>
           <Select value={selectedCategory || ''} onValueChange={onCategoryChange}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Choisissez votre domaine" />
@@ -430,7 +407,7 @@ const JobStep = ({
         </div>
 
         <div className="space-y-3">
-          <Label className="text-sm font-semibold">Poste spécifique</Label>
+          <Label className="text-sm font-semibold text-foreground">Poste spécifique</Label>
           <Select value={selectedProfile || ''} onValueChange={onProfileChange} disabled={!selectedCategory}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Choisissez votre poste" />
@@ -498,7 +475,7 @@ const ExpertisesStep = ({
         <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
           Quelles sont vos compétences ?
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Sélectionnez toutes les compétences que vous maîtrisez
         </p>
       </div>
@@ -512,8 +489,8 @@ const ExpertisesStep = ({
               key={expertise.id}
               className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
                 selectedExpertises.includes(expertise.id)
-                  ? 'border-green-500 bg-green-50 text-green-700'
-                  : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+                  ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20'
+                  : 'border-border hover:border-primary/50 hover:bg-muted'
               }`}
               onClick={() => toggleExpertise(expertise.id)}
             >
@@ -586,14 +563,14 @@ const LanguagesStep = ({
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto">
-          <Globe className="w-8 h-8 text-white" />
+      <div className="text-center mb-6">
+        <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+          <Globe className="w-7 h-7 text-primary-foreground" />
         </div>
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+        <h3 className="text-xl font-bold text-foreground mb-2">
           Quelles langues parlez-vous ?
-        </h2>
-        <p className="text-gray-600">
+        </h3>
+        <p className="text-muted-foreground">
           Sélectionnez toutes les langues que vous maîtrisez
         </p>
       </div>
@@ -604,8 +581,8 @@ const LanguagesStep = ({
             key={language.id}
             className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
               selectedLanguages.includes(language.id)
-                ? 'border-orange-500 bg-orange-50 text-orange-700'
-                : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50/50'
+                ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300'
+                : 'border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700 hover:bg-orange-50/50 dark:hover:bg-orange-950/20'
             }`}
             onClick={() => toggleLanguage(language.id)}
           >
@@ -648,13 +625,13 @@ const BillingStep = ({
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
-          <Receipt className="w-8 h-8 text-primary-foreground" />
+      <div className="text-center mb-6">
+        <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+          <Receipt className="w-7 h-7 text-primary-foreground" />
         </div>
-        <h2 className="text-2xl font-bold">
+        <h3 className="text-xl font-bold text-foreground mb-2">
           Comment souhaitez-vous facturer ?
-        </h2>
+        </h3>
         <p className="text-muted-foreground">
           Choisissez votre mode de facturation préféré
         </p>
@@ -662,25 +639,28 @@ const BillingStep = ({
 
       <RadioGroup value={billingType || ''} onValueChange={onBillingTypeChange} className="space-y-4">
         <div className="space-y-4">
-          <div className={`p-6 rounded-2xl border-2 transition-all ${
-            billingType === 'company' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+          <label
+            htmlFor="company"
+            className={`block p-6 rounded-xl border-2 transition-all cursor-pointer ${
+            billingType === 'company' ? 'border-primary bg-accent' : 'border-border hover:border-primary/50'
           }`}>
             <div className="flex items-center space-x-3">
               <RadioGroupItem value="company" id="company" />
               <div className="flex-1">
-                <Label htmlFor="company" className="text-lg font-semibold cursor-pointer">
+                <span className="text-lg font-semibold text-foreground">
                   <Building className="w-5 h-5 inline mr-2" />
                   J'ai une entreprise
-                </Label>
-                <p className="text-gray-600 text-sm mt-1">
+                </span>
+                <p className="text-muted-foreground text-sm mt-1">
                   Vous avez déjà une société et pouvez émettre des factures
                 </p>
               </div>
             </div>
+          </label>
 
             {billingType === 'company' && (
-              <div className="mt-6 border-t pt-6">
-                <SiretVerification
+              <div className="mt-6 border-t border-border pt-6">
+                <CompactSiretVerification
                   siret={siret || ''}
                   companyName={companyName || ''}
                   onSiretChange={(value) => onCompanyDataChange(companyName, value)}
@@ -690,39 +670,40 @@ const BillingStep = ({
                 />
               </div>
             )}
-          </div>
 
-          <div className={`p-6 rounded-2xl border-2 transition-all ${
-            billingType === 'micro' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300'
+          <label
+            htmlFor="micro"
+            className={`block p-6 rounded-xl border-2 transition-all cursor-pointer ${
+            billingType === 'micro' ? 'border-primary bg-accent' : 'border-border hover:border-primary/50'
           }`}>
             <div className="flex items-center space-x-3">
               <RadioGroupItem value="micro" id="micro" />
               <div className="flex-1">
-                <Label htmlFor="micro" className="text-lg font-semibold cursor-pointer">
+                <span className="text-lg font-semibold text-foreground">
                   <User className="w-5 h-5 inline mr-2" />
                   Je veux créer une micro-entreprise
-                </Label>
-                <p className="text-gray-600 text-sm mt-1">
+                </span>
+                <p className="text-muted-foreground text-sm mt-1">
                   Statut simplifié pour freelances et consultants
                 </p>
               </div>
             </div>
+          </label>
             
             {billingType === 'micro' && (
-              <div className="mt-4 p-4 bg-green-100 rounded-xl">
-                <h4 className="font-semibold text-green-800 mb-2">📋 Étapes pour créer votre micro-entreprise :</h4>
-                <ul className="text-green-700 text-sm space-y-1">
-                  <li>1. Rendez-vous sur <strong>autoentrepreneur.urssaf.fr</strong></li>
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <h4 className="font-semibold text-foreground mb-2">📋 Étapes pour créer votre micro-entreprise :</h4>
+                <ul className="text-muted-foreground text-sm space-y-1">
+                  <li>1. Rendez-vous sur <strong className="text-foreground">autoentrepreneur.urssaf.fr</strong></li>
                   <li>2. Créez votre compte et déclarez votre activité</li>
                   <li>3. Obtenez votre numéro SIRET (sous 15 jours)</li>
                   <li>4. Revenez ici pour finaliser votre profil</li>
                 </ul>
-                <p className="text-green-600 text-xs mt-2">
+                <p className="text-muted-foreground text-xs mt-2">
                   💡 La création est gratuite et entièrement en ligne
                 </p>
               </div>
             )}
-          </div>
         </div>
       </RadioGroup>
 
@@ -782,7 +763,7 @@ const TestStep = ({ profileId, testAnswers, onAnswersChange, onNext, onPrev }: a
         <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
           Test de compétences
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Quelques questions pour valider votre profil
         </p>
       </div>
@@ -799,8 +780,8 @@ const TestStep = ({ profileId, testAnswers, onAnswersChange, onNext, onPrev }: a
                   key={optionIndex}
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     testAnswers[question.id] === optionIndex
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:border-indigo-300'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-muted'
                   }`}
                   onClick={() => handleAnswer(question.id, optionIndex)}
                 >
@@ -908,7 +889,7 @@ const ValidationStep = ({ testScore, qualificationStatus, onStatusChange, onNext
           
           {testScore !== undefined && (
             <div className="mt-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Score obtenu : {testScore}/2
               </p>
             </div>
@@ -982,7 +963,7 @@ const ProjectsStep = ({
         <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
           Projets qui vous correspondent
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Basé sur votre profil et vos compétences, voici les projets qui pourraient vous intéresser
         </p>
       </div>
@@ -990,23 +971,23 @@ const ProjectsStep = ({
       {isLoading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="text-gray-600 mt-2">Recherche de projets correspondants...</p>
+          <p className="text-muted-foreground mt-2">Recherche de projets correspondants...</p>
         </div>
       )}
 
       {!isLoading && projectMatches.length > 0 && (
         <div className="space-y-4">
-          <h3 className="font-semibold text-gray-800">✨ Projets recommandés ({projectMatches.length})</h3>
+          <h3 className="font-semibold text-foreground">✨ Projets recommandés ({projectMatches.length})</h3>
           
           {projectMatches.map((project, index) => (
             <Card key={project.id} className="border-l-4 border-l-orange-500">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
-                    <h4 className="font-semibold text-gray-800">{project.title}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{project.description}</p>
+                    <h4 className="font-semibold text-foreground">{project.title}</h4>
+                    <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
                     {project.client_name && (
-                      <p className="text-xs text-gray-500 mt-1">Client: {project.client_name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Client: {project.client_name}</p>
                     )}
                   </div>
                   <div className="text-right ml-4">
@@ -1023,7 +1004,7 @@ const ProjectsStep = ({
                 
                 {project.match_reasons.length > 0 && (
                   <div className="mb-3">
-                    <p className="text-xs text-gray-500 mb-1">Pourquoi ce projet vous correspond :</p>
+                    <p className="text-xs text-muted-foreground mb-1">Pourquoi ce projet vous correspond :</p>
                     <div className="flex flex-wrap gap-1">
                       {project.match_reasons.map((reason, idx) => (
                         <Badge key={idx} variant="outline" className="text-xs">
@@ -1036,7 +1017,7 @@ const ProjectsStep = ({
 
                 {project.required_expertises.length > 0 && (
                   <div className="mb-3">
-                    <p className="text-xs text-gray-500 mb-1">Compétences requises :</p>
+                    <p className="text-xs text-muted-foreground mb-1">Compétences requises :</p>
                     <div className="flex flex-wrap gap-1">
                       {project.required_expertises.map((skill, idx) => (
                         <Badge key={idx} variant="secondary" className="text-xs">
@@ -1047,7 +1028,7 @@ const ProjectsStep = ({
                   </div>
                 )}
 
-                <div className="flex justify-between items-center text-xs text-gray-500">
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
                   <span>📅 {new Date(project.project_date).toLocaleDateString()}</span>
                   <span className="capitalize">🔄 {project.status}</span>
                 </div>
@@ -1059,7 +1040,7 @@ const ProjectsStep = ({
 
       {!isLoading && projectMatches.length === 0 && (
         <div className="text-center py-8 space-y-4">
-          <div className="text-gray-400">
+          <div className="text-muted-foreground">
             <FolderOpen className="w-12 h-12 mx-auto mb-3" />
             <p>Aucun projet correspondant pour le moment</p>
             <p className="text-sm">De nouveaux projets sont ajoutés régulièrement !</p>

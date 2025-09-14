@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
+import { cn } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -36,10 +39,10 @@ export const CandidatePayments = () => {
   const { user } = useAuth();
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [projects, setProjects] = useState<any[]>([]);
   const [timeRecords, setTimeRecords] = useState<any[]>([]);
-  
+
   // Date filters - default to last 4 weeks
   const today = new Date();
   const fourWeeksAgo = subWeeks(today, 4);
@@ -50,7 +53,7 @@ export const CandidatePayments = () => {
   useEffect(() => {
     if (!user?.id) return;
     loadData();
-  }, [user, startDate, endDate, selectedProject]);
+  }, [user, startDate, endDate, selectedProjectId]);
 
   const loadData = async () => {
     if (!user?.id) return;
@@ -90,8 +93,8 @@ export const CandidatePayments = () => {
           .lte('period_end', endDate)
           .order('payment_date', { ascending: false });
         
-        if (selectedProject !== 'all') {
-          paymentsQuery = paymentsQuery.eq('project_id', selectedProject);
+        if (selectedProjectId && selectedProjectId !== '') {
+          paymentsQuery = paymentsQuery.eq('project_id', selectedProjectId);
         }
         
         const { data: paymentsData, error: paymentsError } = await paymentsQuery;
@@ -197,111 +200,127 @@ export const CandidatePayments = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters */}
-      <div className="bg-gradient-to-r from-green-50 via-white to-blue-50 p-8 rounded-2xl border border-green-100">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-14 h-14 bg-gradient-to-br from-green-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <Euro className="w-7 h-7 text-white" />
-          </div>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-              Mes Paiements
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Suivi de vos revenus et paiements validés
-            </p>
-          </div>
-        </div>
-
-        {/* Filters */}
+      {/* Header with unified filters */}
+      <PageHeaderNeon
+        title="Mes Paiements"
+        description="Suivi de vos revenus et paiements validés"
+        icon={Euro}
+        iconColor="from-green-500 to-emerald-500"
+      >
         <div className="flex items-center gap-4">
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-40 bg-white border-green-200 focus:border-green-400"
+          {/* Date filters with modern calendar */}
+          <div className="flex items-center gap-3">
+            <DatePicker
+              value={startDate}
+              onChange={setStartDate}
+              placeholder="Date de début"
+              className="w-44 bg-black/40 backdrop-blur-xl border-purple-500/30 text-white hover:bg-white/10 hover:border-purple-400"
+              maxDate={endDate}
+            />
+            <span className="text-gray-400 font-medium">→</span>
+            <DatePicker
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="Date de fin"
+              className="w-44 bg-black/40 backdrop-blur-xl border-purple-500/30 text-white hover:bg-white/10 hover:border-purple-400"
+              minDate={startDate}
+            />
+          </div>
+
+          {/* Universal project selector (same as other pages) */}
+          <ProjectSelectorNeon
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            onProjectChange={setSelectedProjectId}
+            placeholder="Tous les projets"
+            className="w-64"
+            showStatus={false}
+            showDates={false}
           />
-          <span className="text-gray-500">-</span>
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-40 bg-white border-green-200 focus:border-green-400"
-          />
-          
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-64 bg-white border-green-200 focus:border-green-400">
-              <SelectValue placeholder="Tous les projets" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les projets</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
-      </div>
+      </PageHeaderNeon>
 
-      {/* Stats cards */}
+      {/* Stats cards with neon design */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600">Revenus totaux</p>
-                <p className="text-2xl font-bold text-green-800">
-                  {formatCurrency(candidateEarnings)}
-                </p>
+        {/* Revenus totaux */}
+        <div className="relative group">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl blur-lg opacity-20 group-hover:opacity-30 transition-opacity" />
+          <Card className="relative bg-black/40 backdrop-blur-xl border-green-500/30 hover:border-green-400/50 transition-all duration-300">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-green-400 mb-1">Revenus totaux</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                    {formatCurrency(candidateEarnings)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl flex items-center justify-center">
+                  <Euro className="w-6 h-6 text-green-400" />
+                </div>
               </div>
-              <Euro className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600">Heures facturées</p>
-                <p className="text-2xl font-bold text-blue-800">
-                  {formatMinutesToHours(totalMinutesWorked)}
-                </p>
+        {/* Heures facturées */}
+        <div className="relative group">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl blur-lg opacity-20 group-hover:opacity-30 transition-opacity" />
+          <Card className="relative bg-black/40 backdrop-blur-xl border-blue-500/30 hover:border-blue-400/50 transition-all duration-300">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-blue-400 mb-1">Heures facturées</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                    {formatMinutesToHours(totalMinutesWorked)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-blue-400" />
+                </div>
               </div>
-              <Clock className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-600">Paiements reçus</p>
-                <p className="text-2xl font-bold text-purple-800">
-                  {totalPayments}
-                </p>
+        {/* Paiements reçus */}
+        <div className="relative group">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-lg opacity-20 group-hover:opacity-30 transition-opacity" />
+          <Card className="relative bg-black/40 backdrop-blur-xl border-purple-500/30 hover:border-purple-400/50 transition-all duration-300">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-purple-400 mb-1">Paiements reçus</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    {totalPayments}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-purple-400" />
+                </div>
               </div>
-              <CheckCircle className="w-8 h-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-orange-600">Taux horaire</p>
-                <p className="text-2xl font-bold text-orange-800">
-                  {candidateHourlyRate}€/h
-                </p>
+        {/* Taux horaire */}
+        <div className="relative group">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl blur-lg opacity-20 group-hover:opacity-30 transition-opacity" />
+          <Card className="relative bg-black/40 backdrop-blur-xl border-orange-500/30 hover:border-orange-400/50 transition-all duration-300">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-orange-400 mb-1">Taux horaire</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
+                    {candidateHourlyRate}€/h
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-amber-500/20 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-orange-400" />
+                </div>
               </div>
-              <TrendingUp className="w-8 h-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Payments table */}

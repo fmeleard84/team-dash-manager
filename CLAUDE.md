@@ -1,5 +1,342 @@
 # Documentation Technique Claude - Team Dash Manager
 
+## 🎨 CHARTE GRAPHIQUE & DESIGN SYSTEM (14/09/2025)
+
+### 📐 Principes de base
+- **Framework CSS** : Tailwind CSS exclusivement (pas de CSS inline ni de couleurs hex en dur)
+- **Mode sombre** : Support natif obligatoire avec préfixe `dark:`
+- **Cohérence** : Tous les styles dérivent de la configuration Tailwind
+- **Effet néon moderne** : Utilisation de shadows, gradients et animations pour un look cyberpunk élégant
+
+### 🎨 Palette de couleurs
+
+#### Couleurs principales
+```js
+primary: {
+  50: '#faf5ff',
+  100: '#f3e8ff',
+  200: '#e9d5ff',
+  300: '#d8b4fe',
+  400: '#c084fc',
+  500: '#a855f7',  // DEFAULT - Violet principal
+  600: '#9333ea',
+  700: '#7e22ce',
+  800: '#6b21a8',
+  900: '#581c87',
+  950: '#3b0764'
+}
+
+secondary: {
+  50: '#fdf2f8',
+  100: '#fce7f3',
+  200: '#fbcfe8',
+  300: '#f9a8d4',
+  400: '#f472b6',
+  500: '#ec4899',  // DEFAULT - Rose/Pink
+  600: '#db2777',
+  700: '#be185d',
+  800: '#9f1239',
+  900: '#831843',
+  950: '#500724'
+}
+
+accent: {
+  cyan: '#06b6d4',    // Cyan pour accents
+  blue: '#3b82f6',    // Bleu électrique
+  indigo: '#6366f1',  // Indigo profond
+}
+
+neutral: {
+  50: '#fafafa',
+  100: '#f4f4f5',
+  200: '#e4e4e7',
+  300: '#d4d4d8',
+  400: '#a1a1aa',
+  500: '#71717a',
+  600: '#52525b',
+  700: '#3f3f46',
+  800: '#27272a',
+  900: '#18181b',
+  950: '#0a0a0b'
+}
+```
+
+### 🌟 Effets Néon & Glassmorphism
+
+#### Classes utilitaires néon
+```css
+/* Shadows néon */
+.neon-purple: shadow-[0_0_15px_rgba(168,85,247,0.5)]
+.neon-pink: shadow-[0_0_15px_rgba(236,72,153,0.5)]
+.neon-cyan: shadow-[0_0_15px_rgba(6,182,212,0.5)]
+
+/* Effets de texte néon */
+.text-neon: text-transparent bg-clip-text bg-gradient-to-r
+
+/* Glassmorphism */
+.glass: backdrop-blur-xl bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10
+
+/* Animations */
+.animate-pulse-slow: animation-duration: 3s
+.animate-glow: animation avec keyframes pour effet de brillance
+```
+
+### 📝 Typographie
+
+#### Hiérarchie des titres
+```jsx
+// H1 - Titre principal de page
+<h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text">
+
+// H2 - Sections principales
+<h2 className="text-2xl md:text-3xl font-semibold text-neutral-900 dark:text-white">
+
+// H3 - Sous-sections
+<h3 className="text-xl md:text-2xl font-medium text-neutral-800 dark:text-neutral-100">
+
+// Corps de texte
+<p className="text-base text-neutral-600 dark:text-neutral-400">
+
+// Texte secondaire/meta
+<span className="text-sm text-neutral-500 dark:text-neutral-500">
+```
+
+### 🔘 Composants UI
+
+#### Boutons
+```jsx
+// Primaire - Action principale avec effet néon
+<Button className="
+  bg-gradient-to-r from-primary-500 to-secondary-500
+  text-white font-medium
+  px-6 py-3 rounded-xl
+  shadow-lg shadow-primary-500/25
+  hover:shadow-xl hover:shadow-primary-500/40
+  hover:scale-105 active:scale-95
+  transition-all duration-200
+">
+
+// Secondaire - Actions secondaires
+<Button className="
+  bg-neutral-100 dark:bg-neutral-800
+  text-neutral-900 dark:text-white
+  border border-neutral-200 dark:border-neutral-700
+  px-6 py-3 rounded-xl
+  hover:bg-neutral-200 dark:hover:bg-neutral-700
+  transition-all duration-200
+">
+
+// Ghost - Actions tertiaires
+<Button className="
+  text-neutral-600 dark:text-neutral-400
+  hover:text-primary-500 dark:hover:text-primary-400
+  hover:bg-neutral-100 dark:hover:bg-neutral-800
+  px-4 py-2 rounded-lg
+  transition-all duration-200
+">
+
+// Néon - Actions spéciales
+<Button className="
+  relative
+  bg-gradient-to-r from-primary-600 to-secondary-600
+  text-white font-bold
+  px-8 py-4 rounded-2xl
+  shadow-[0_0_20px_rgba(168,85,247,0.5)]
+  hover:shadow-[0_0_30px_rgba(168,85,247,0.7)]
+  before:absolute before:inset-0
+  before:bg-gradient-to-r before:from-primary-400 before:to-secondary-400
+  before:blur-xl before:opacity-50
+  hover:before:opacity-75
+  transition-all duration-300
+">
+```
+
+#### Cards
+```jsx
+// Card standard avec glassmorphism
+<Card className="
+  backdrop-blur-xl
+  bg-white/80 dark:bg-neutral-900/80
+  border border-neutral-200/50 dark:border-neutral-700/50
+  rounded-2xl
+  shadow-xl
+  p-6
+">
+
+// Card néon
+<Card className="
+  relative
+  bg-gradient-to-br from-neutral-900 to-neutral-950
+  border border-primary-500/20
+  rounded-2xl
+  p-6
+  shadow-[0_0_30px_rgba(168,85,247,0.1)]
+  hover:shadow-[0_0_40px_rgba(168,85,247,0.2)]
+  transition-all duration-300
+">
+
+// Card avec bordure gradient
+<div className="p-[1px] bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl">
+  <Card className="
+    bg-white dark:bg-neutral-900
+    rounded-2xl
+    p-6
+  ">
+```
+
+#### Badges & Tags
+```jsx
+// Badge status
+<Badge className="
+  bg-gradient-to-r from-green-500/10 to-emerald-500/10
+  text-green-600 dark:text-green-400
+  border border-green-500/20
+  px-3 py-1 rounded-full
+  font-medium text-xs
+">
+
+// Badge néon
+<Badge className="
+  bg-primary-500/10
+  text-primary-400
+  border border-primary-500/30
+  shadow-[0_0_10px_rgba(168,85,247,0.3)]
+  px-3 py-1 rounded-full
+">
+```
+
+#### Inputs & Forms
+```jsx
+// Input standard
+<Input className="
+  bg-white dark:bg-neutral-900
+  border border-neutral-200 dark:border-neutral-700
+  rounded-xl
+  px-4 py-3
+  focus:border-primary-500 dark:focus:border-primary-400
+  focus:ring-2 focus:ring-primary-500/20
+  transition-all duration-200
+  placeholder:text-neutral-400 dark:placeholder:text-neutral-600
+">
+
+// Input avec effet néon au focus
+<Input className="
+  bg-neutral-50 dark:bg-neutral-900/50
+  border border-neutral-200 dark:border-neutral-700
+  rounded-xl
+  px-4 py-3
+  focus:border-primary-500
+  focus:shadow-[0_0_10px_rgba(168,85,247,0.3)]
+  focus:ring-0
+  transition-all duration-200
+">
+```
+
+### 🎭 États et interactions
+
+#### Hover States
+- Augmentation subtile de l'ombre : `hover:shadow-xl`
+- Scale léger : `hover:scale-105`
+- Changement de luminosité : `hover:brightness-110`
+- Effet glow néon : `hover:shadow-[0_0_20px_rgba(168,85,247,0.5)]`
+
+#### Active States
+- Scale réduit : `active:scale-95`
+- Ombre réduite : `active:shadow-sm`
+
+#### Disabled States
+```jsx
+disabled:opacity-50
+disabled:cursor-not-allowed
+disabled:hover:scale-100
+```
+
+### 📱 Responsive Design
+
+#### Breakpoints standards
+- Mobile: default
+- Tablet: `md:` (768px)
+- Desktop: `lg:` (1024px)
+- Large: `xl:` (1280px)
+
+#### Espacements
+- Toujours multiples de 4 : `p-4`, `m-8`, `gap-6`
+- Mobile first : commencer par mobile puis ajouter `md:`, `lg:`
+
+### ✨ Animations & Transitions
+
+#### Transitions par défaut
+```jsx
+transition-all duration-200 ease-in-out
+```
+
+#### Animations personnalisées
+```jsx
+// Pulse néon
+@keyframes neon-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+// Glow effect
+@keyframes glow {
+  0% { box-shadow: 0 0 5px rgba(168,85,247,0.5); }
+  50% { box-shadow: 0 0 20px rgba(168,85,247,0.8); }
+  100% { box-shadow: 0 0 5px rgba(168,85,247,0.5); }
+}
+```
+
+### ✅ Checklist avant commit
+
+- [ ] Aucune couleur hex hardcodée
+- [ ] Compatible dark/light mode
+- [ ] Effets hover/active/disabled implémentés
+- [ ] Responsive (mobile, tablet, desktop)
+- [ ] Animations fluides (60fps)
+- [ ] Accessibilité (contraste, focus visible)
+- [ ] Performance (pas d'animations sur mobile si lourdes)
+- [ ] Cohérence avec le design system
+
+### 🚀 Exemples de mise en œuvre
+
+#### Header avec effet néon
+```jsx
+<header className="
+  fixed top-0 w-full z-50
+  backdrop-blur-xl
+  bg-white/80 dark:bg-neutral-900/80
+  border-b border-neutral-200/50 dark:border-neutral-700/50
+  shadow-lg
+">
+```
+
+#### Section hero avec gradient
+```jsx
+<section className="
+  relative
+  bg-gradient-to-br from-neutral-900 via-primary-900/20 to-neutral-900
+  overflow-hidden
+">
+  {/* Effet de particules/grille en background */}
+  <div className="
+    absolute inset-0
+    bg-[url('/grid.svg')] opacity-20
+  "/>
+</section>
+```
+
+### 🎯 Règles d'or
+
+1. **Minimalisme** : Less is more - éviter la surcharge visuelle
+2. **Cohérence** : Utiliser les mêmes patterns partout
+3. **Performance** : Animations légères, pas de blur excessif sur mobile
+4. **Accessibilité** : Contraste suffisant, focus states clairs
+5. **Modernité** : Effets subtils mais impactants
+
+> 💡 **Note** : Cette charte est LA référence pour tout développement frontend. Chaque composant doit respecter ces guidelines pour maintenir une identité visuelle forte et cohérente.
+
+---
+
 ## 📋 Accès Documentation LLM
 La documentation complète est disponible et éditable sur : `/llm` (admin uniquement)
 

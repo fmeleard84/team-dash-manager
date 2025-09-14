@@ -82,10 +82,10 @@ export const ProjectSelectorNeon: React.FC<ProjectSelectorNeonProps> = ({
       
       <Select value={selectedProjectId} onValueChange={onProjectChange}>
         <SelectTrigger className="relative bg-black/40 backdrop-blur-xl border-purple-500/30 text-white hover:bg-white/10 hover:border-purple-400 transition-all duration-300 shadow-lg shadow-purple-500/20">
-          <SelectValue placeholder={placeholder}>
+          <SelectValue placeholder={placeholder} className="text-white">
             {selectedProject && (
               <div className="flex items-center gap-2">
-                <span className="font-medium truncate">{selectedProject.title}</span>
+                <span className="font-medium truncate text-white">{selectedProject.title}</span>
                 {showStatus && selectedProject.status && (
                   <Badge className={cn(
                     "ml-auto border-0 text-white shadow-lg",
@@ -123,7 +123,7 @@ export const ProjectSelectorNeon: React.FC<ProjectSelectorNeonProps> = ({
                   >
                     {/* Titre et statut */}
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-medium truncate flex-1">{project.title}</span>
+                      <span className="font-medium truncate flex-1 text-white">{project.title}</span>
                       {showStatus && project.status && (
                         <div className="flex items-center gap-1">
                           <StatusIcon className="w-4 h-4" />

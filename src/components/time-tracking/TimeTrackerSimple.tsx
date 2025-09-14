@@ -140,57 +140,72 @@ export const TimeTrackerSimple = () => {
     }
   };
 
-  // If there's an active session, show the timer
+  // If there's an active session, show the timer with neon design
   if (activeSession) {
     return (
-      <div className="flex items-center gap-2">
-        {/* Timer display */}
+      <div className="flex items-center gap-3">
+        {/* Timer display with neon design */}
         <div className={cn(
-          "flex items-center gap-2 px-3 py-1.5 rounded-lg border",
-          activeSession.isPaused 
-            ? "bg-orange-50 border-orange-200" 
-            : "bg-green-50 border-green-200 animate-pulse"
+          "relative flex items-center gap-3 px-4 py-2 rounded-xl backdrop-blur-xl border transition-all duration-300",
+          activeSession.isPaused
+            ? "bg-orange-500/10 border-orange-500/30 shadow-lg shadow-orange-500/10"
+            : "bg-gradient-to-r from-primary-500/10 to-secondary-500/10 border-primary-500/30 shadow-lg shadow-primary-500/20"
         )}>
+          {/* Glow effect */}
+          {!activeSession.isPaused && (
+            <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl blur-lg opacity-20 animate-pulse" />
+          )}
+
           <Timer className={cn(
-            "w-4 h-4",
-            activeSession.isPaused ? "text-orange-600" : "text-green-600"
+            "w-5 h-5 relative z-10",
+            activeSession.isPaused ? "text-orange-500" : "text-primary-500"
           )} />
-          <span className="font-mono font-semibold text-sm">
-            {formatTime(activeSession.elapsedSeconds)}
-          </span>
-          <div className="flex flex-col items-start ml-2">
-            <span className="text-xs font-medium text-gray-700 line-clamp-1 max-w-[150px]">
-              {activeSession.projectTitle}
+
+          <div className="relative z-10 flex items-center gap-3">
+            <span className={cn(
+              "font-mono font-bold text-lg",
+              activeSession.isPaused ? "text-orange-500" : "bg-gradient-to-r from-primary-500 to-secondary-500 text-transparent bg-clip-text"
+            )}>
+              {formatTime(activeSession.elapsedSeconds)}
             </span>
-            <span className="text-xs text-gray-500">
-              {(activeSession.currentCost).toFixed(2)}€
-            </span>
+
+            <div className="flex flex-col items-start">
+              <span className="text-xs font-medium text-white line-clamp-1 max-w-[150px]">
+                {activeSession.projectTitle}
+              </span>
+              <span className={cn(
+                "text-xs font-semibold",
+                activeSession.isPaused ? "text-orange-400" : "text-secondary-400"
+              )}>
+                {(activeSession.currentCost).toFixed(2)}€
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Control buttons */}
-        <div className="flex items-center gap-1">
+        {/* Control buttons with neon style */}
+        <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9 border border-primary-500/30 hover:bg-primary-500/10 hover:border-primary-500/50 transition-all duration-200"
             onClick={togglePause}
             disabled={loading}
           >
             {activeSession.isPaused ? (
-              <Play className="w-4 h-4 text-green-600" />
+              <Play className="w-4 h-4 text-primary-500" />
             ) : (
-              <Pause className="w-4 h-4 text-orange-600" />
+              <Pause className="w-4 h-4 text-orange-500" />
             )}
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9 border border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 transition-all duration-200"
             onClick={handleStop}
             disabled={loading}
           >
-            <Square className="w-4 h-4 text-red-600" />
+            <Square className="w-4 h-4 text-red-500" />
           </Button>
         </div>
       </div>

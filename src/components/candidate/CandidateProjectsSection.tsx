@@ -285,12 +285,12 @@ export function CandidateProjectsSection({
     if (!assignment) return null;
     
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-600">
-        <Briefcase className="w-4 h-4" />
+      <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+        <Briefcase className="w-4 h-4 text-primary-500" />
         <span>{assignment.hr_profiles?.label || 'Non défini'}</span>
         {assignment.seniority && (
           <>
-            <span className="text-gray-400">•</span>
+            <span className="text-neutral-400 dark:text-neutral-500">•</span>
             <span className="capitalize">{assignment.seniority}</span>
           </>
         )}
@@ -304,11 +304,14 @@ export function CandidateProjectsSection({
       <div className="mt-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="flex items-center gap-3 text-4xl font-extrabold text-[#0E0F12]">
-              <FolderOpen className="h-9 w-9 text-[#7B3EF4] fill-current" />
+            <h1 className="flex items-center gap-3 text-4xl font-extrabold bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl blur-lg opacity-50 animate-pulse" />
+                <FolderOpen className="relative h-9 w-9 text-primary-500" />
+              </div>
               Mes missions
             </h1>
-            <p className="mt-2 text-lg text-[#6B7280]">
+            <p className="mt-2 text-lg text-neutral-600 dark:text-neutral-400">
               {filteredProjects.length} mission{filteredProjects.length > 1 ? 's' : ''} 
               {selectedFilters.length > 0 && ` • Filtré${filteredProjects.length > 1 ? 's' : ''}`}
             </p>
@@ -335,9 +338,9 @@ export function CandidateProjectsSection({
 
       {/* Barre de filtres */}
       {showFilters && (
-        <div className="bg-gray-50 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
+        <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border border-neutral-200/50 dark:border-neutral-700/50 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2 shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Filtrer par statut</span>
+            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Filtrer par statut</span>
             <div className="flex gap-2">
               <Button 
                 variant="ghost" 
@@ -369,20 +372,20 @@ export function CandidateProjectsSection({
                   onClick={() => toggleFilter(key)}
                   className={cn(
                     "flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 transition-all",
-                    isSelected 
-                      ? "border-purple-500 bg-purple-50" 
-                      : "border-gray-200 bg-white hover:border-gray-300"
+                    isSelected
+                      ? "border-primary-500 bg-primary-500/10 dark:bg-primary-500/20"
+                      : "border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:border-primary-300 dark:hover:border-primary-700"
                   )}
                 >
                   <span className={cn("w-2 h-2 rounded-full", config.dotColor)} />
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium text-neutral-900 dark:text-white">
                     {config.label}
                   </span>
                   <Badge 
                     variant="secondary" 
                     className={cn(
                       "text-xs px-1.5 py-0",
-                      isSelected ? "bg-purple-200 text-purple-700" : "bg-gray-100"
+                      isSelected ? "bg-primary-200 dark:bg-primary-800 text-primary-700 dark:text-primary-300" : "bg-neutral-100 dark:bg-neutral-700"
                     )}
                   >
                     {count}
@@ -397,14 +400,17 @@ export function CandidateProjectsSection({
       {/* Liste des projets */}
       <div className="space-y-4">
         {filteredProjects.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FolderOpen className="w-8 h-8 text-gray-400" />
+          <div className="text-center py-12 backdrop-blur-xl bg-white/50 dark:bg-neutral-900/50 rounded-xl border border-neutral-200/50 dark:border-neutral-700/50">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full blur-xl opacity-30 animate-pulse" />
+              <div className="relative w-16 h-16 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 rounded-full flex items-center justify-center">
+                <FolderOpen className="w-8 h-8 text-primary-500" />
+              </div>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-2">
               Aucune mission trouvée
             </h3>
-            <p className="text-gray-500 mb-4">
+            <p className="text-neutral-600 dark:text-neutral-400 mb-4">
               {selectedFilters.length > 0 
                 ? "Aucune mission ne correspond aux filtres sélectionnés"
                 : "Vous n'avez pas encore de mission"}
@@ -423,7 +429,7 @@ export function CandidateProjectsSection({
             {filteredProjects.map((project) => (
               <div 
                 key={project.id} 
-                className="relative bg-white rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all p-6"
+                className="relative backdrop-blur-xl bg-white/90 dark:bg-neutral-900/90 rounded-xl border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/50 hover:shadow-neon-purple transition-all duration-300 p-6"
               >
                 {/* Badge de statut positionné en haut à droite */}
                 <div className="absolute -top-2 right-4 z-10">
@@ -434,17 +440,17 @@ export function CandidateProjectsSection({
                   {/* En-tête du projet */}
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
                         {project.title}
                       </h3>
                       {project.description && (
-                        <p className="text-gray-600 mb-3">{project.description}</p>
+                        <p className="text-neutral-600 dark:text-neutral-400 mb-3">{project.description}</p>
                       )}
                       
                       {/* Infos du projet */}
                       <div className="flex flex-wrap gap-4 text-sm">
                         {project.owner?.company_name && (
-                          <div className="flex items-center gap-1.5 text-gray-600">
+                          <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
                             <Building2 className="w-4 h-4" />
                             <span>{project.owner.company_name}</span>
                           </div>
@@ -453,8 +459,8 @@ export function CandidateProjectsSection({
                         {getCandidateRole(project)}
                         
                         {project.project_date && (
-                          <div className="flex items-center gap-1.5 text-gray-600">
-                            <Calendar className="w-4 h-4" />
+                          <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+                            <Calendar className="w-4 h-4 text-primary-500" />
                             <span>
                               Début le {new Date(project.project_date).toLocaleDateString('fr-FR', {
                                 day: 'numeric',
@@ -485,19 +491,19 @@ export function CandidateProjectsSection({
                     
                     {project.category === 'invitations' && (
                       <>
-                        <Button 
+                        <Button
                           size="sm"
                           onClick={() => onAcceptMission?.(project.id)}
-                          className="bg-green-600 hover:bg-green-700 flex items-center gap-1"
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-neon-cyan transition-all duration-300 flex items-center gap-1"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           Accepter
                         </Button>
-                        <Button 
+                        <Button
                           size="sm"
                           variant="outline"
                           onClick={() => onDeclineMission?.(project.id)}
-                          className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
+                          className="border-red-500/50 text-red-500 hover:bg-red-500/10 dark:hover:bg-red-500/20 hover:border-red-500 hover:shadow-lg transition-all duration-300 flex items-center gap-1"
                         >
                           <X className="w-4 h-4" />
                           Refuser
@@ -539,12 +545,15 @@ export function CandidateProjectsSection({
         {selectedProject && (
           <div className="space-y-6">
               {/* Description */}
-              <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-purple-600" />
+              <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-xl p-6 border border-neutral-200/50 dark:border-neutral-700/50">
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-neutral-900 dark:text-white">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded blur opacity-50" />
+                    <FileText className="relative w-5 h-5 text-primary-500" />
+                  </div>
                   Description
                 </h3>
-                <p className="text-gray-700 leading-relaxed">
+                <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
                   {selectedProject.description || 'Aucune description disponible pour ce projet.'}
                 </p>
               </div>
@@ -553,26 +562,26 @@ export function CandidateProjectsSection({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Client */}
                 {selectedProject.owner?.company_name && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                      <Building2 className="w-4 h-4" />
+                  <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/50 hover:shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
+                      <Building2 className="w-4 h-4 text-primary-500" />
                       <span>Client</span>
                     </div>
-                    <p className="font-semibold">{selectedProject.owner.company_name}</p>
+                    <p className="font-semibold text-neutral-900 dark:text-white">{selectedProject.owner.company_name}</p>
                   </div>
                 )}
                 
                 {/* Rôle */}
                 {selectedProject.hr_resource_assignments?.[0]?.hr_profiles?.label && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                      <Briefcase className="w-4 h-4" />
+                  <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/50 hover:shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
+                      <Briefcase className="w-4 h-4 text-primary-500" />
                       <span>Rôle demandé</span>
                     </div>
-                    <p className="font-semibold">
+                    <p className="font-semibold text-neutral-900 dark:text-white">
                       {selectedProject.hr_resource_assignments[0].hr_profiles.label}
                       {selectedProject.hr_resource_assignments[0].seniority && (
-                        <span className="text-sm text-gray-600 ml-2 capitalize">
+                        <span className="text-sm text-neutral-600 dark:text-neutral-400 ml-2 capitalize">
                           ({selectedProject.hr_resource_assignments[0].seniority})
                         </span>
                       )}
@@ -582,12 +591,12 @@ export function CandidateProjectsSection({
                 
                 {/* Date de début */}
                 {selectedProject.project_date && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                      <Calendar className="w-4 h-4" />
+                  <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/50 hover:shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
+                      <Calendar className="w-4 h-4 text-primary-500" />
                       <span>Date de début</span>
                     </div>
-                    <p className="font-semibold">
+                    <p className="font-semibold text-neutral-900 dark:text-white">
                       {new Date(selectedProject.project_date).toLocaleDateString('fr-FR', {
                         day: 'numeric',
                         month: 'long',
@@ -599,12 +608,12 @@ export function CandidateProjectsSection({
                 
                 {/* Date de fin */}
                 {selectedProject.due_date && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                      <Clock className="w-4 h-4" />
+                  <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/50 hover:shadow-sm transition-all duration-300">
+                    <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
+                      <Clock className="w-4 h-4 text-primary-500" />
                       <span>Date de fin estimée</span>
                     </div>
-                    <p className="font-semibold">
+                    <p className="font-semibold text-neutral-900 dark:text-white">
                       {new Date(selectedProject.due_date).toLocaleDateString('fr-FR', {
                         day: 'numeric',
                         month: 'long',
@@ -616,12 +625,12 @@ export function CandidateProjectsSection({
                 
                 {/* Budget */}
                 {selectedProject.client_budget && (
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-sm text-purple-600 mb-1">
+                  <div className="backdrop-blur-xl bg-gradient-to-br from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 rounded-lg p-4 border border-primary-500/30 dark:border-primary-500/50 shadow-lg shadow-primary-500/10">
+                    <div className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 mb-1">
                       <Euro className="w-4 h-4" />
                       <span>Budget du projet</span>
                     </div>
-                    <p className="font-bold text-xl text-purple-700">
+                    <p className="font-bold text-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-transparent bg-clip-text">
                       {selectedProject.client_budget.toLocaleString('fr-FR', {
                         style: 'currency',
                         currency: 'EUR'
@@ -632,17 +641,17 @@ export function CandidateProjectsSection({
 
                 {/* Fichiers attachés */}
                 {projectFiles.length > 0 && (
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-sm text-blue-600 mb-3">
+                  <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50">
+                    <div className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 mb-3">
                       <Paperclip className="w-4 h-4" />
                       <span>Fichiers attachés ({projectFiles.length})</span>
                     </div>
                     <div className="space-y-2">
                       {projectFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between bg-white rounded p-2">
+                        <div key={index} className="flex items-center justify-between bg-white/50 dark:bg-neutral-800/50 rounded p-2 border border-neutral-200/30 dark:border-neutral-700/30">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                            <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                            <FileText className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                            <span className="text-sm text-neutral-700 dark:text-neutral-300 truncate">{file.name}</span>
                           </div>
                           <Button
                             size="sm"
@@ -660,7 +669,7 @@ export function CandidateProjectsSection({
                                 URL.revokeObjectURL(url);
                               }
                             }}
-                            className="text-blue-600 hover:text-blue-700"
+                            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                           >
                             <Download className="w-4 h-4" />
                           </Button>
@@ -674,32 +683,35 @@ export function CandidateProjectsSection({
               {/* Constitution de l'équipe */}
               {fullTeam.length > 0 && (
                 <div className="mt-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded blur opacity-50" />
+                      <Users className="relative w-5 h-5 text-primary-500" />
+                    </div>
                     Constitution de l'équipe complète ({fullTeam.length} membre{fullTeam.length > 1 ? 's' : ''})
                   </h3>
                   <div className="space-y-3">
                     {fullTeam.map((assignment, index) => (
-                      <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div key={index} className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/30 transition-all duration-300">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-4 flex-1">
                             <div>
-                              <span className="font-semibold text-gray-900">
+                              <span className="font-semibold text-neutral-900 dark:text-white">
                                 {assignment.hr_profiles?.label || 'Poste non défini'}
                               </span>
-                              <span className="text-gray-400 mx-2">•</span>
-                              <span className="text-gray-700">
+                              <span className="text-neutral-400 dark:text-neutral-500 mx-2">•</span>
+                              <span className="text-neutral-700 dark:text-neutral-300">
                                 {assignment.seniority || 'Séniorité non définie'}
                               </span>
                             </div>
                           </div>
                           {assignment.booking_status === 'accepted' && (
-                            <Badge className="bg-green-100 text-green-700 border-green-200">
+                            <Badge className="bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
                               ✓ Confirmé
                             </Badge>
                           )}
                           {assignment.booking_status === 'recherche' && (
-                            <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                            <Badge className="bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
                               En recherche
                             </Badge>
                           )}
@@ -708,10 +720,10 @@ export function CandidateProjectsSection({
                         <div className="flex flex-wrap items-center gap-4 text-sm">
                           {assignment.languages && assignment.languages.length > 0 && (
                             <div className="flex items-center gap-2">
-                              <span className="text-gray-500">Langues:</span>
+                              <span className="text-neutral-500 dark:text-neutral-400">Langues:</span>
                               <div className="flex gap-1">
                                 {assignment.languages.map((lang: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs">
+                                  <Badge key={i} variant="secondary" className="text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-primary-200 dark:border-primary-700">
                                     {lang}
                                   </Badge>
                                 ))}
@@ -721,10 +733,10 @@ export function CandidateProjectsSection({
                           
                           {assignment.expertises && assignment.expertises.length > 0 && (
                             <div className="flex items-center gap-2">
-                              <span className="text-gray-500">Expertises:</span>
+                              <span className="text-neutral-500 dark:text-neutral-400">Expertises:</span>
                               <div className="flex gap-1">
                                 {assignment.expertises.map((exp: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs">
+                                  <Badge key={i} variant="secondary" className="text-xs bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 border-secondary-200 dark:border-secondary-700">
                                     {exp}
                                   </Badge>
                                 ))}
@@ -734,7 +746,7 @@ export function CandidateProjectsSection({
                         </div>
                         
                         {assignment.booking_status === 'accepted' && assignment.candidate_profiles && (
-                          <div className="mt-3 pt-3 border-t border-gray-200">
+                          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
                             <UserAvatarNeon
                               user={{
                                 id: assignment.candidate_profiles.id,

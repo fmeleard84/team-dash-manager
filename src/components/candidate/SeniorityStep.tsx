@@ -39,17 +39,17 @@ export const SeniorityStep = ({
   onPrev
 }: SeniorityStepProps) => {
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto border-border">
       <CardHeader>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-            <Briefcase className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
+            <Briefcase className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <CardTitle className="text-2xl bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            <CardTitle className="text-2xl text-foreground">
               Niveau de séniorité
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-muted-foreground">
               Indiquez votre niveau d'expérience professionnelle
             </CardDescription>
           </div>
@@ -64,10 +64,10 @@ export const SeniorityStep = ({
           {seniorityLevels.map((level) => (
             <div
               key={level.value}
-              className={`relative flex items-start space-x-3 p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-green-200 hover:bg-green-50/50 ${
+              className={`relative flex items-start space-x-3 p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50 hover:bg-accent ${
                 seniority === level.value
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200'
+                  ? 'border-primary bg-accent'
+                  : 'border-border'
               }`}
               onClick={() => onSeniorityChange(level.value)}
             >
@@ -81,14 +81,14 @@ export const SeniorityStep = ({
                 className="flex-1 cursor-pointer space-y-1"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-foreground">
                     {level.label}
                   </span>
-                  <span className="text-sm font-medium text-green-600">
+                  <span className="text-sm font-medium text-primary">
                     {level.description}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   {level.details}
                 </p>
               </Label>
@@ -96,7 +96,7 @@ export const SeniorityStep = ({
           ))}
         </RadioGroup>
 
-        <div className="flex justify-between pt-6 border-t">
+        <div className="flex justify-between pt-6 border-t border-border">
           <Button
             variant="outline"
             onClick={onPrev}

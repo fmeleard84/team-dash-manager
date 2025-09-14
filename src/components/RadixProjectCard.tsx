@@ -66,6 +66,7 @@ interface ResourceAssignment {
 
 interface RadixProjectCardProps {
   project: Project;
+  resourceAssignments?: ResourceAssignment[];
   onStatusToggle: (id: string, status: string) => void;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
@@ -77,21 +78,22 @@ interface RadixProjectCardProps {
   refreshTrigger?: number;
 }
 
-export function RadixProjectCard({ 
-  project, 
-  onStatusToggle, 
-  onDelete, 
-  onView, 
-  onStart, 
-  onEdit, 
-  onArchive, 
-  onUnarchive, 
-  isArchived = false, 
-  refreshTrigger 
+export function RadixProjectCard({
+  project,
+  resourceAssignments: propsResourceAssignments,
+  onStatusToggle,
+  onDelete,
+  onView,
+  onStart,
+  onEdit,
+  onArchive,
+  onUnarchive,
+  isArchived = false,
+  refreshTrigger
 }: RadixProjectCardProps) {
   const { user } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
+  const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>(propsResourceAssignments || []);
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
   const [isBookingTeam, setIsBookingTeam] = useState(false);
   const [showKickoff, setShowKickoff] = useState(false);
@@ -112,9 +114,15 @@ export function RadixProjectCard({
 
   // Fetch des ressources
   useEffect(() => {
-    fetchResourceAssignments();
+    // Si on a des resourceAssignments depuis les props, les utiliser
+    if (propsResourceAssignments) {
+      setResourceAssignments(propsResourceAssignments);
+    } else {
+      // Sinon, les charger
+      fetchResourceAssignments();
+    }
     fetchProjectFiles();
-  }, [project.id, refreshTrigger]);
+  }, [project.id, refreshTrigger, propsResourceAssignments]);
 
   const fetchResourceAssignments = async () => {
     const { data: assignments, error } = await supabase
@@ -193,8 +201,44 @@ export function RadixProjectCard({
     }
   }, [resourceAssignments]);
 
-  const canStartProject = resourceAssignments.length > 0 && 
+  // Check if all resources are accepted
+  const allResourcesAccepted = resourceAssignments.length > 0 &&
     resourceAssignments.every(r => r.booking_status === 'accepted');
+
+  // Un projet 'play' sans outils collaboratifs est un projet qui vient d'être accepté par tous
+  // mais qui n'a pas encore eu son kickoff - nous devons vérifier planning_shared
+  const [planningShared, setPlanningShared] = useState(false);
+
+  useEffect(() => {
+    const checkPlanningShared = async () => {
+      const { data } = await supabase
+        .from('projects')
+        .select('planning_shared')
+        .eq('id', project.id)
+        .single();
+
+      if (data) {
+        setPlanningShared(data.planning_shared || false);
+      }
+    };
+    checkPlanningShared();
+  }, [project.id]);
+
+  const isPlayWithoutKickoff = project.status === 'play' && !planningShared;
+
+  const canStartProject = ((project.status === 'pause' || project.status === 'attente-team') || isPlayWithoutKickoff) &&
+    allResourcesAccepted;
+
+  // Debug logs
+  console.log(`[RadixProjectCard] Project: ${project.title}`);
+  console.log(`  - Status: ${project.status}`);
+  console.log(`  - Planning Shared: ${planningShared}`);
+  console.log(`  - Is Play Without Kickoff: ${isPlayWithoutKickoff}`);
+  console.log(`  - All Resources Accepted: ${allResourcesAccepted}`);
+  console.log(`  - Can Start Project: ${canStartProject}`);
+  if (resourceAssignments.length > 0) {
+    console.log(`  - Booking statuses:`, resourceAssignments.map(r => r.booking_status));
+  }
 
   const hasResourcesInDraft = () => {
     return resourceAssignments.some(r => r.booking_status === 'draft');
@@ -224,24 +268,42 @@ export function RadixProjectCard({
   };
 
   const handleStatusToggle = () => {
-    if (project.status === 'pause' || project.status === 'attente-team') {
+    // Si le projet est en pause, attente-team, ou play sans kickoff -> ouvrir la popup kickoff
+    if (project.status === 'pause' || project.status === 'attente-team' || isPlayWithoutKickoff) {
+      console.log('🚀 Opening kickoff dialog');
       setShowKickoff(true);
     } else {
+      // Sinon, c'est un projet play avec outils -> mettre en pause
       onStatusToggle(project.id, 'pause');
     }
   };
 
   const startProject = async (kickoffISO: string) => {
+    console.log('🚀 startProject called with kickoffISO:', kickoffISO);
     setIsSyncing(true);
     try {
       if (onStart) {
-        await onStart({ 
-          id: project.id, 
-          title: project.title, 
-          kickoffISO 
+        console.log('✅ Calling onStart with:', { id: project.id, title: project.title, kickoffISO });
+        await onStart({
+          id: project.id,
+          title: project.title,
+          kickoffISO
         });
+
+        // Rafraîchir les données après le démarrage
+        await fetchResourceAssignments();
+
+        // Le projet est maintenant en status 'play' avec outils configurés
+        // donc le bouton devrait automatiquement changer en "Mettre en pause"
+        toast.success("Projet démarré avec succès ! Les outils collaboratifs sont maintenant disponibles.");
+      } else {
+        console.error('❌ onStart is not defined!');
+        toast.error('Fonction de démarrage non définie');
       }
       setShowKickoff(false);
+    } catch (error) {
+      console.error('Error starting project:', error);
+      toast.error('Erreur lors du démarrage du projet');
     } finally {
       setIsSyncing(false);
     }
@@ -466,7 +528,7 @@ export function RadixProjectCard({
             </div>
 
             {/* Primary Action Button */}
-            {(project.status === 'pause' || project.status === 'attente-team') && (
+            {(project.status === 'pause' || project.status === 'attente-team' || isPlayWithoutKickoff) && (
               <>
                 {resourceAssignments.length === 0 ? (
                   <button
@@ -500,6 +562,7 @@ export function RadixProjectCard({
                     )}
                     
                     {canStartProject && (
+                      console.log('✅ SHOWING START PROJECT BUTTON'),
                       <button
                         onClick={handleStatusToggle}
                         disabled={isSyncing}
@@ -529,7 +592,7 @@ export function RadixProjectCard({
               </>
             )}
 
-            {project.status === 'play' && (
+            {project.status === 'play' && !isPlayWithoutKickoff && (
               <button
                 onClick={handleStatusToggle}
                 disabled={isSyncing}

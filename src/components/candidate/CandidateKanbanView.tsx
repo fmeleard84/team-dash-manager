@@ -27,7 +27,7 @@ interface CandidateKanbanViewProps {
 
 export default function CandidateKanbanView({ projectId }: CandidateKanbanViewProps = {}) {
   const { projects, loading, candidateId } = useCandidateProjectsOptimized();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || "");
+  const selectedProjectId = projectId || "";
   const [boardId, setBoardId] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
@@ -414,34 +414,7 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header with project selector */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Layout className="w-6 h-6 text-white" />
-              </div>
-              
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger className="w-64 bg-white/90 backdrop-blur-sm border-white/20">
-                  <SelectValue placeholder="Sélectionner un projet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div>
       {/* Kanban board or empty state */}
       {selectedProjectId && boardId && board ? (
         <div className="h-[calc(100vh-20rem)]">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeaderNeon } from "@/components/ui/page-header-neon";
+import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
 import { Star, MessageCircle, Calendar, FolderOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -215,31 +216,24 @@ export default function CandidateRatings() {
 
   return (
     <div className="space-y-6">
-      {/* Header avec design Ialla - même style que Drive et Planning */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
-              <Star className="w-6 h-6 text-white" />
-            </div>
-            
-            {/* Select aligné à gauche comme dans Drive */}
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-64 bg-white border-purple-200 focus:border-purple-400">
-                <SelectValue placeholder="Tous les projets" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les projets</SelectItem>
-                {projects.map(project => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+      {/* Header with unified modern design */}
+      <PageHeaderNeon
+        title="Évaluations"
+        description="Vos performances et retours clients"
+        icon={Star}
+        iconColor="from-yellow-500 to-amber-500"
+      >
+        {/* Universal project selector */}
+        <ProjectSelectorNeon
+          projects={projects}
+          selectedProjectId={selectedProjectId === "all" ? "" : selectedProjectId}
+          onProjectChange={(id) => setSelectedProjectId(id || "all")}
+          placeholder="Tous les projets"
+          className="w-64"
+          showStatus={false}
+          showDates={false}
+        />
+      </PageHeaderNeon>
 
       {/* Contenu */}
       <div className="space-y-4">

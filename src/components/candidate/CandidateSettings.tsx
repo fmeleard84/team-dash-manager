@@ -124,9 +124,9 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
     queryKey: ['profileData', candidateData?.profile_id],
     queryFn: async () => {
       if (!candidateData?.profile_id) return null;
-      
+
       console.log('Fetching profile with ID:', candidateData.profile_id);
-      
+
       const { data, error } = await supabase
         .from('hr_profiles')
         .select(`
@@ -140,10 +140,10 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
         `)
         .eq('id', candidateData.profile_id)
         .single();
-      
+
       if (error) {
         console.error('Error fetching profile:', error);
-        
+
         // Si l'erreur est "no rows", essayons de voir tous les profils disponibles
         if (error.code === 'PGRST116') {
           console.log('Profile not found, listing available profiles...');
@@ -153,16 +153,16 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
             .limit(10);
           console.log('Available profiles:', allProfiles);
         }
-        
+
         return null;
       }
-      
+
       console.log('Profile fetched successfully:', data);
-      
+
       // Calculer le tarif journalier basé sur le profil et la séniorité
       if (data && data.base_price && candidateData?.seniority) {
         const dailyRate = calculateDailyRate(data.base_price, candidateData.seniority);
-        
+
         // Si le tarif n'est pas défini ou différent, le mettre à jour
         if (!candidateData.daily_rate || Math.abs(candidateData.daily_rate - dailyRate) > 1) {
           console.log('Updating daily rate from', candidateData.daily_rate, 'to', dailyRate);
@@ -172,10 +172,12 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
             .eq('id', candidateData.id);
         }
       }
-      
+
       return data;
     },
-    enabled: !!candidateData?.profile_id
+    enabled: !!candidateData?.profile_id,
+    staleTime: Infinity,  // Les données ne deviennent jamais obsolètes
+    cacheTime: 1000 * 60 * 60  // Garder en cache pendant 1 heure
   });
 
   // Fetch candidate's languages
@@ -192,10 +194,12 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
           )
         `)
         .eq('candidate_id', candidateId);
-      
+
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: Infinity,  // Les données ne deviennent jamais obsolètes
+    cacheTime: 1000 * 60 * 60  // Garder en cache pendant 1 heure
   });
 
   // Fetch candidate's expertises
@@ -212,10 +216,12 @@ export const CandidateSettings = ({ candidateId, onProfileUpdate }: CandidateSet
           )
         `)
         .eq('candidate_id', candidateId);
-      
+
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: Infinity,  // Les données ne deviennent jamais obsolètes
+    cacheTime: 1000 * 60 * 60  // Garder en cache pendant 1 heure
   });
 
   const handleUpdate = () => {

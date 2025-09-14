@@ -117,9 +117,14 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
             cancelText="Annuler"
             saveText="Lancer le projet"
             customActions={
-              <div className="flex items-center gap-2 text-green-600 mr-4">
-                <Rocket className="w-5 h-5" />
-                <span className="font-medium">Kickoff</span>
+              <div className="flex items-center gap-2 mr-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded blur opacity-50" />
+                  <Rocket className="w-5 h-5 text-primary-500 relative z-10" />
+                </div>
+                <span className="font-medium bg-gradient-to-r from-primary-600 to-secondary-600 text-transparent bg-clip-text">
+                  Kickoff
+                </span>
               </div>
             }
           />
@@ -129,24 +134,27 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
       <div className="space-y-8">
         {/* Loader de progression pendant le traitement */}
         {isProcessing && (
-          <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-neutral-900/95 dark:bg-black/95 backdrop-blur-xl z-50 flex items-center justify-center">
             <div className="max-w-md w-full mx-4">
-              <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-6">
+              <div className="backdrop-blur-xl bg-white/90 dark:bg-neutral-900/90 rounded-2xl shadow-2xl shadow-primary-500/20 border border-primary-500/30 dark:border-primary-500/50 p-8 space-y-6">
                 <div className="flex flex-col items-center space-y-4">
                   <div className="relative">
-                    <Loader2 className="h-16 w-16 text-green-600 animate-spin" />
-                    <Rocket className="h-8 w-8 text-green-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full blur-xl opacity-50 animate-pulse" />
+                    <Loader2 className="h-16 w-16 text-primary-500 animate-spin relative z-10" />
+                    <Rocket className="h-8 w-8 text-secondary-500 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">Création du projet en cours</h3>
-                  <p className="text-sm text-gray-600 text-center">{progressMessage}</p>
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 text-transparent bg-clip-text">
+                    Création du projet en cours
+                  </h3>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 text-center">{progressMessage}</p>
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Progress value={progress} className="h-2" />
-                  <p className="text-xs text-gray-500 text-center">{progress}%</p>
+                  <Progress value={progress} className="h-2 bg-neutral-200 dark:bg-neutral-800" />
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center">{progress}%</p>
                 </div>
-                
-                <div className="text-xs text-gray-500 text-center">
+
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 text-center">
                   Veuillez patienter pendant la configuration de vos outils collaboratifs...
                 </div>
               </div>
@@ -155,16 +163,19 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
         )}
         
         {/* Section information */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200/50">
+        <div className="backdrop-blur-xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 rounded-xl p-6 border border-primary-500/30 dark:border-primary-500/50 shadow-lg shadow-primary-500/10">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-lg">
-              <Users className="w-6 h-6 text-white" />
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg blur-lg opacity-50 animate-pulse" />
+              <div className="relative w-12 h-12 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center shadow-neon-purple">
+                <Users className="w-6 h-6 text-white" />
+              </div>
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-blue-900 text-lg mb-2">
+              <h3 className="font-semibold text-neutral-900 dark:text-white text-lg mb-2">
                 Démarrer avec votre nouvelle équipe !
               </h3>
-              <p className="text-blue-700">
+              <p className="text-neutral-700 dark:text-neutral-300">
                 Planifiez la première réunion de lancement avec toute l'équipe. 
                 Un email d'invitation sera automatiquement envoyé à tous les participants.
               </p>
@@ -173,71 +184,71 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
         </div>
 
         {/* Section date et heure */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-green-600" />
+        <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border border-primary-500/30 dark:border-primary-500/50 rounded-xl p-6 shadow-lg shadow-primary-500/10">
+          <h3 className="text-lg font-semibold bg-gradient-to-r from-primary-600 to-secondary-600 text-transparent bg-clip-text mb-6 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary-500" />
             Choisir la date et l'heure
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
-              <Label 
-                htmlFor="kickoff-date" 
-                className="flex items-center gap-2 text-sm font-medium text-gray-700"
+              <Label
+                htmlFor="kickoff-date"
+                className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300"
               >
-                <Calendar className="w-4 h-4 text-green-600" />
+                <Calendar className="w-4 h-4 text-primary-500" />
                 Date du kickoff
               </Label>
-              <Input 
-                id="kickoff-date" 
-                type="date" 
-                value={date} 
+              <Input
+                id="kickoff-date"
+                type="date"
+                value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="h-12 text-base border-gray-300 focus:border-green-500 focus:ring-green-500"
+                className="h-12 text-base bg-white/50 dark:bg-neutral-800/50 border-primary-300 dark:border-primary-700 focus:border-primary-500 focus:ring-primary-500 text-neutral-900 dark:text-white"
                 min={new Date().toISOString().slice(0, 10)}
               />
             </div>
-            
+
             <div className="space-y-3">
-              <Label 
-                htmlFor="kickoff-time" 
-                className="flex items-center gap-2 text-sm font-medium text-gray-700"
+              <Label
+                htmlFor="kickoff-time"
+                className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300"
               >
-                <Clock className="w-4 h-4 text-green-600" />
+                <Clock className="w-4 h-4 text-primary-500" />
                 Heure de début
               </Label>
-              <Input 
-                id="kickoff-time" 
-                type="time" 
-                value={time} 
+              <Input
+                id="kickoff-time"
+                type="time"
+                value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="h-12 text-base border-gray-300 focus:border-green-500 focus:ring-green-500"
+                className="h-12 text-base bg-white/50 dark:bg-neutral-800/50 border-primary-300 dark:border-primary-700 focus:border-primary-500 focus:ring-primary-500 text-neutral-900 dark:text-white"
               />
             </div>
           </div>
 
           {/* Affichage de la date formatée */}
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-800">
-              <strong>Réunion planifiée :</strong>{' '}
-              {new Date(date + 'T' + time).toLocaleDateString('fr-FR', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+          <div className="mt-6 p-4 backdrop-blur-xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 border border-primary-500/30 dark:border-primary-500/50 rounded-lg shadow-neon-purple">
+            <p className="text-sm text-neutral-800 dark:text-neutral-200">
+              <strong className="text-primary-600 dark:text-primary-400">Réunion planifiée :</strong>{' '}
+              {new Date(date + 'T' + time).toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               })}{' '}
-              à {time}
+              à <span className="font-semibold text-secondary-600 dark:text-secondary-400">{time}</span>
             </p>
           </div>
         </div>
 
         {/* Section informations supplémentaires */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div className="backdrop-blur-xl bg-gradient-to-r from-secondary-500/10 to-primary-500/10 dark:from-secondary-500/20 dark:to-primary-500/20 border border-secondary-500/30 dark:border-secondary-500/50 rounded-xl p-4 shadow-lg shadow-secondary-500/10">
           <div className="flex gap-3">
-            <Rocket className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-800">
-              <p className="font-medium mb-1">Ce qui va se passer :</p>
-              <ul className="list-disc list-inside space-y-1 text-amber-700">
+            <Rocket className="w-5 h-5 text-secondary-500 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-neutral-700 dark:text-neutral-300">
+              <p className="font-medium mb-1 text-secondary-600 dark:text-secondary-400">Ce qui va se passer :</p>
+              <ul className="list-disc list-inside space-y-1">
                 <li>Création automatique du calendrier Schedule-X partagé</li>
                 <li>Configuration des outils collaboratifs (Kanban, Drive, Messages)</li>
                 <li>Envoi des invitations à tous les membres de l'équipe</li>

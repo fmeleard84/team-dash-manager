@@ -46,7 +46,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
+import { PageHeaderNeon } from "@/components/ui/page-header-neon";
 import { useProjectSelector } from "@/hooks/useProjectSelector";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 // Business Logic Components (unchanged)
 import { IallaLogo } from "@/components/IallaLogo";
@@ -61,8 +64,6 @@ import { CandidateNotes } from "@/components/candidate/CandidateNotes";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
 import { useUserProjects } from "@/hooks/useUserProjects";
 import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 import CandidateEventNotifications from "@/components/candidate/CandidateEventNotifications";
 import { CandidateMissionRequests } from "@/components/candidate/CandidateMissionRequests";
 import CandidateMessagesView from "@/components/candidate/CandidateMessagesView";
@@ -70,7 +71,6 @@ import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { CandidatePayments } from "@/components/candidate/CandidatePayments";
 import CandidateRatings from "@/pages/CandidateRatings";
 import CandidateActivities from "@/pages/CandidateActivities";
-import { TimeTrackerSimple } from "@/components/time-tracking/TimeTrackerSimple";
 import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
 import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
@@ -85,8 +85,11 @@ const CandidateDashboard = () => {
   const [candidateExpertises, setCandidateExpertises] = useState<string[]>([]);
   const [selectedDriveProjectId, setSelectedDriveProjectId] = useState<string>("");
   const [selectedWikiProjectId, setSelectedWikiProjectId] = useState<string>("");
+  const [selectedKanbanProjectId, setSelectedKanbanProjectId] = useState<string>("");
+  const [selectedMessagesProjectId, setSelectedMessagesProjectId] = useState<string>("");
   const [isWikiFullscreen, setIsWikiFullscreen] = useState(false);
   const [assignmentTrigger, setAssignmentTrigger] = useState(0);
+  const [acceptedProjects, setAcceptedProjects] = useState<any[]>([]);
   const { user, logout } = useAuth();
   const { getCandidateProjects, projects: userProjects } = useUserProjects();
   const { projects: activeProjects, loading: activeProjectsLoading } = useCandidateProjectsOptimized();
@@ -124,7 +127,8 @@ const CandidateDashboard = () => {
   // Set initial availability based on status from database
   useEffect(() => {
     if (candidateStatus) {
-      setIsAvailable(candidateStatus === 'disponible' || candidateStatus === null);
+      // Consider 'disponible' as available, all others as not available
+      setIsAvailable(candidateStatus === 'disponible');
     }
   }, [candidateStatus]);
 
@@ -156,6 +160,22 @@ const CandidateDashboard = () => {
       } else if (assignmentsData) {
         console.log('📦 Loaded resource assignments:', assignmentsData);
         setResourceAssignments(assignmentsData);
+
+        // Extract accepted projects (including those not yet started)
+        const acceptedAssignments = assignmentsData.filter(a =>
+          a.candidate_id === candidateId &&
+          a.booking_status === 'accepted' &&
+          a.projects
+        );
+
+        const acceptedProjectsList = acceptedAssignments.map(a => ({
+          ...a.projects,
+          hr_resource_assignments: [a],
+          booking_status: a.booking_status
+        }));
+
+        console.log('✅ Accepted projects (all statuses):', acceptedProjectsList);
+        setAcceptedProjects(acceptedProjectsList);
       }
       
       // Load candidate languages
@@ -193,6 +213,12 @@ const CandidateDashboard = () => {
       if (!selectedWikiProjectId) {
         setSelectedWikiProjectId(activeProjects[0].id);
       }
+      if (!selectedKanbanProjectId) {
+        setSelectedKanbanProjectId(activeProjects[0].id);
+      }
+      if (!selectedMessagesProjectId) {
+        setSelectedMessagesProjectId(activeProjects[0].id);
+      }
     }
   }, [activeProjects]);
 
@@ -213,23 +239,39 @@ const CandidateDashboard = () => {
   const handleAvailabilityChange = async (available: boolean) => {
     if (!candidateId) {
       console.error('No candidateId available');
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour votre disponibilité. Veuillez recharger la page.",
+        variant: "destructive"
+      });
       return;
     }
 
     try {
-      const newStatus = available ? 'disponible' : 'indisponible';
-      
+      // Use 'en_pause' instead of 'indisponible' to match the constraint
+      const newStatus = available ? 'disponible' : 'en_pause';
+
       const { error } = await supabase
         .from('candidate_profiles')
         .update({ status: newStatus })
         .eq('id', candidateId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating availability:', error);
+        toast({
+          title: "Erreur",
+          description: error.message || "Impossible de mettre à jour votre statut",
+          variant: "destructive",
+        });
+        // Revert the UI state on error
+        setIsAvailable(!available);
+        return;
+      }
 
       setIsAvailable(available);
       toast({
         title: "Statut mis à jour",
-        description: `Vous êtes maintenant ${available ? 'disponible' : 'indisponible'}`,
+        description: `Vous êtes maintenant ${available ? 'disponible' : 'en pause'}`,
       });
 
       // Refetch identity to update local state
@@ -241,6 +283,8 @@ const CandidateDashboard = () => {
         description: "Impossible de mettre à jour votre statut",
         variant: "destructive",
       });
+      // Revert the UI state on error
+      setIsAvailable(!available);
     }
   };
 
@@ -270,20 +314,21 @@ const CandidateDashboard = () => {
       <div className="relative">
         <AnimatedBackground variant="subtle" speed="slow" className="fixed inset-0" />
         <div className="relative z-10 space-y-8">
-        {/* KPIs avec design néon */}
-        <div className="border-0 bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-[1px] rounded-2xl shadow-2xl shadow-purple-500/25">
-          <div className="bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#312e81] rounded-2xl p-6">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+        {/* KPIs avec design néon amélioré */}
+        <div className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-neon-cyan rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-300" />
+          <div className="relative border border-primary-500/20 bg-gradient-to-br from-neutral-900/95 to-neutral-950/95 backdrop-blur-xl rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text mb-6 flex items-center gap-3">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur-xl opacity-70 animate-pulse" />
-                <div className="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-xl flex items-center justify-center shadow-2xl">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl blur-xl opacity-70 animate-neon-pulse" />
+                <div className="relative w-10 h-10 bg-gradient-to-br from-primary-500 via-secondary-500 to-neon-cyan rounded-xl flex items-center justify-center shadow-neon-purple">
                   <TrendingUp className="w-5 h-5 text-white" />
                 </div>
               </div>
               Vue d'ensemble
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+              <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">Projets actifs</p>
@@ -294,7 +339,7 @@ const CandidateDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+              <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">Demandes en attente</p>
@@ -305,7 +350,7 @@ const CandidateDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+              <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">Heures hebdo</p>
@@ -316,7 +361,7 @@ const CandidateDashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+              <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">TJM moyen</p>
@@ -376,7 +421,7 @@ const CandidateDashboard = () => {
               </div>
             ) : (
               <CandidateProjectsSection
-                activeProjects={activeProjects || []}
+                activeProjects={acceptedProjects || []}
                 pendingInvitations={resourceAssignments.filter(a => a.booking_status === 'recherche').map(a => ({
                   id: a.project_id || a.id,
                   title: a.projects?.title || 'Projet sans titre',
@@ -390,21 +435,135 @@ const CandidateDashboard = () => {
                   booking_status: a.booking_status
                 }))}
                 onViewProject={(id) => console.log('View project:', id)}
-                onAcceptMission={() => setAssignmentTrigger(prev => prev + 1)}
-                onDeclineMission={() => setAssignmentTrigger(prev => prev + 1)}
+                onAcceptMission={async (projectId) => {
+                  try {
+                    // Trouver l'assignment correspondant
+                    const assignment = resourceAssignments.find(a => a.project_id === projectId && a.booking_status === 'recherche');
+                    if (!assignment) {
+                      console.error('Assignment not found for project:', projectId);
+                      return;
+                    }
+
+                    console.log('Accepting mission with assignment_id:', assignment.id);
+                    const response = await supabase.functions.invoke('resource-booking', {
+                      body: {
+                        action: 'accept_mission',
+                        assignment_id: assignment.id,
+                        candidate_email: user?.email
+                      }
+                    });
+
+                    if (response.error) throw response.error;
+
+                    toast({
+                      title: "Mission acceptée",
+                      description: "Vous avez accepté cette mission avec succès."
+                    });
+
+                    // Rafraîchir les données
+                    setAssignmentTrigger(prev => prev + 1);
+
+                    // Recharger les assignments pour mettre à jour acceptedProjects
+                    const { data: updatedAssignments } = await supabase
+                      .from('hr_resource_assignments')
+                      .select(`
+                        *,
+                        projects (
+                          id,
+                          title,
+                          description,
+                          status,
+                          project_date,
+                          due_date,
+                          client_budget,
+                          owner_id
+                        )
+                      `)
+                      .or(`candidate_id.eq.${candidateId},booking_status.eq.recherche`);
+
+                    if (updatedAssignments) {
+                      setResourceAssignments(updatedAssignments);
+
+                      // Mettre à jour les projets acceptés
+                      const acceptedAssignments = updatedAssignments.filter(a =>
+                        a.candidate_id === candidateId &&
+                        a.booking_status === 'accepted' &&
+                        a.projects
+                      );
+
+                      const acceptedProjectsList = acceptedAssignments.map(a => ({
+                        ...a.projects,
+                        hr_resource_assignments: [a],
+                        booking_status: a.booking_status
+                      }));
+
+                      console.log('🔄 Updated accepted projects:', acceptedProjectsList);
+                      setAcceptedProjects(acceptedProjectsList);
+                    }
+                  } catch (error) {
+                    console.error('Error accepting mission:', error);
+                    toast({
+                      variant: "destructive",
+                      title: "Erreur",
+                      description: "Impossible d'accepter la mission."
+                    });
+                  }
+                }}
+                onDeclineMission={async (projectId) => {
+                  try {
+                    // Trouver l'assignment correspondant
+                    const assignment = resourceAssignments.find(a => a.project_id === projectId && a.booking_status === 'recherche');
+                    if (!assignment) {
+                      console.error('Assignment not found for project:', projectId);
+                      return;
+                    }
+
+                    console.log('Declining mission with assignment_id:', assignment.id);
+                    const response = await supabase.functions.invoke('resource-booking', {
+                      body: {
+                        action: 'decline_mission',
+                        assignment_id: assignment.id,
+                        candidate_email: user?.email
+                      }
+                    });
+
+                    if (response.error) throw response.error;
+
+                    toast({
+                      title: "Mission refusée",
+                      description: "Vous avez refusé cette mission."
+                    });
+
+                    // Rafraîchir les données
+                    setAssignmentTrigger(prev => prev + 1);
+                  } catch (error) {
+                    console.error('Error declining mission:', error);
+                    toast({
+                      variant: "destructive",
+                      title: "Erreur",
+                      description: "Impossible de refuser la mission."
+                    });
+                  }
+                }}
               />
             )}
           </CardContent>
         </Card>
 
         {/* Mission Requests */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Demandes de mission
-            </CardTitle>
-          </CardHeader>
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity duration-300" />
+          <Card className="relative border border-primary-500/10 backdrop-blur-xl bg-white/90 dark:bg-neutral-900/90 shadow-xl rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-primary-600/10 to-secondary-600/10 backdrop-blur-sm border-b border-primary-500/10">
+              <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 shadow-neon-purple">
+                  <Users className="h-4 w-4 text-white" />
+                </div>
+                <span className="bg-gradient-to-r from-primary-600 to-secondary-600 text-transparent bg-clip-text">
+                  Demandes de mission
+                </span>
+              </CardTitle>
+            </CardHeader>
           <CardContent>
             <CandidateMissionRequests 
               profileId={profileId}
@@ -414,8 +573,9 @@ const CandidateDashboard = () => {
               assignmentTrigger={assignmentTrigger}
               onAssignmentUpdate={() => setAssignmentTrigger(prev => prev + 1)}
             />
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
         </div>
       </div>
     );
@@ -424,35 +584,39 @@ const CandidateDashboard = () => {
   const renderKanbanContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Trello className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-            <p className="text-sm text-muted-foreground">
-              Acceptez une mission pour accéder au tableau Kanban
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
+          <Trello className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder au tableau Kanban
+          </p>
+        </div>
       );
     }
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trello className="h-5 w-5" />
-            Tableau Kanban
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {activeProjects?.map(project => (
-            <div key={project.id} className="mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-white">{project.title}</h3>
-              <CandidateKanbanView projectId={project.id} />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Header unifié avec design néon */}
+        <PageHeaderNeon
+          icon={Trello}
+          title="Tableau Kanban"
+          subtitle="Gérez vos tâches et suivez l'avancement du projet"
+          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          selectedProjectId={selectedKanbanProjectId}
+          onProjectChange={setSelectedKanbanProjectId}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: false,
+            showTeamProgress: false,
+            className: "w-[350px]"
+          }}
+        />
+
+        {selectedKanbanProjectId && (
+          <CandidateKanbanView projectId={selectedKanbanProjectId} />
+        )}
+      </div>
     );
   };
 
@@ -477,145 +641,152 @@ const CandidateDashboard = () => {
   const renderMessagesContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-            <p className="text-sm text-muted-foreground">
-              Acceptez une mission pour accéder à la messagerie
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
+          <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder à la messagerie
+          </p>
+        </div>
       );
     }
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Messages
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CandidateMessagesView projects={activeProjects} />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Header unifié avec design néon */}
+        <PageHeaderNeon
+          icon={MessageSquare}
+          title="Messagerie"
+          subtitle="Communication en temps réel avec votre équipe"
+          badge={{ text: "En ligne", animate: true }}
+          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          selectedProjectId={selectedMessagesProjectId}
+          onProjectChange={setSelectedMessagesProjectId}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: true,
+            showTeamProgress: false,
+            className: "w-[350px]"
+          }}
+        />
+
+        {/* Zone de messagerie */}
+        {selectedMessagesProjectId && (
+          <div className="h-[700px]">
+            <CandidateMessagesView projects={[activeProjects.find(p => p.id === selectedMessagesProjectId)].filter(Boolean)} />
+          </div>
+        )}
+      </div>
     );
   };
 
   const renderDriveContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Cloud className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-            <p className="text-sm text-muted-foreground">
-              Acceptez une mission pour accéder au Drive
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
+          <Cloud className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder au Drive
+          </p>
+        </div>
       );
     }
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5" />
-            Drive
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <ProjectSelectorNeon
-              projects={activeProjects || []}
-              selectedProjectId={selectedDriveProjectId}
-              onProjectChange={setSelectedDriveProjectId}
-              placeholder="Sélectionner un projet"
-              className="w-64"
-              showStatus={true}
-              showDates={false}
-              showTeamProgress={false}
-            />
-          </div>
+      <div className="space-y-6">
+        {/* Header unifié avec design néon */}
+        <PageHeaderNeon
+          icon={Cloud}
+          title="Drive"
+          subtitle="Stockage et partage de fichiers pour votre équipe"
+          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          selectedProjectId={selectedDriveProjectId}
+          onProjectChange={setSelectedDriveProjectId}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: false,
+            showTeamProgress: false,
+            className: "w-[350px]"
+          }}
+        />
 
-          {selectedDriveProjectId && (
-            <div className="border rounded-lg overflow-hidden">
-              <SimpleDriveView projectId={selectedDriveProjectId} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {selectedDriveProjectId && (
+          <div className="border border-primary-500/30 rounded-lg overflow-hidden">
+            <SimpleDriveView projectId={selectedDriveProjectId} />
+          </div>
+        )}
+      </div>
     );
   };
 
   const renderWikiContent = () => {
     if (!activeProjects || activeProjects.length === 0) {
       return (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-            <p className="text-sm text-muted-foreground">
-              Acceptez une mission pour accéder au Wiki
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
+          <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <p className="text-sm text-gray-300">
+            Acceptez une mission pour accéder au Wiki
+          </p>
+        </div>
       );
     }
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Wiki
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex gap-4">
-            <ProjectSelectorNeon
-              projects={activeProjects || []}
-              selectedProjectId={selectedWikiProjectId}
-              onProjectChange={setSelectedWikiProjectId}
-              placeholder="Sélectionner un projet"
-              className="w-64"
-              showStatus={true}
-              showDates={false}
-              showTeamProgress={false}
-            />
-
-            {selectedWikiProjectId && (
+      <div className="space-y-6">
+        {/* Header unifié avec design néon */}
+        <PageHeaderNeon
+          icon={BookOpen}
+          title="Wiki"
+          subtitle="Documentation et ressources du projet"
+          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          selectedProjectId={selectedWikiProjectId}
+          onProjectChange={setSelectedWikiProjectId}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: false,
+            showTeamProgress: false,
+            className: "w-[350px]"
+          }}
+          customActions={
+            selectedWikiProjectId && (
               <Button
                 variant="outline"
                 onClick={() => setIsWikiFullscreen(!isWikiFullscreen)}
+                className="border-primary-500/30 text-white hover:bg-primary-500/10"
               >
                 {isWikiFullscreen ? 'Réduire' : 'Plein écran'}
               </Button>
-            )}
-          </div>
-          
-          {selectedWikiProjectId && (
-            <div className={isWikiFullscreen ? 'fixed inset-0 bg-background z-50 p-4' : ''}>
-              {isWikiFullscreen && (
-                <div className="mb-4 flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">
-                    Wiki - {activeProjects.find(p => p.id === selectedWikiProjectId)?.title}
-                  </h2>
-                  <Button variant="outline" onClick={() => setIsWikiFullscreen(false)}>
-                    Fermer
-                  </Button>
-                </div>
-              )}
-              <div className={`border rounded-lg overflow-hidden ${isWikiFullscreen ? 'h-[calc(100vh-120px)]' : ''}`}>
-                <WikiView projectId={selectedWikiProjectId} />
+            )
+          }
+        />
+
+        {selectedWikiProjectId && (
+          <div className={isWikiFullscreen ? 'fixed inset-0 bg-background z-50 p-4' : ''}>
+            {isWikiFullscreen && (
+              <div className="mb-4 flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-white">
+                  Wiki - {activeProjects.find(p => p.id === selectedWikiProjectId)?.title}
+                </h2>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsWikiFullscreen(false)}
+                  className="border-primary-500/30 text-white hover:bg-primary-500/10"
+                >
+                  Fermer
+                </Button>
               </div>
+            )}
+            <div className={`border border-primary-500/30 rounded-lg overflow-hidden ${isWikiFullscreen ? 'h-[calc(100vh-120px)]' : ''}`}>
+              <WikiView projectId={selectedWikiProjectId} />
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -633,65 +804,28 @@ const CandidateDashboard = () => {
         return renderDriveContent();
       case 'wiki':
         return renderWikiContent();
-      case 'time':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Suivi du temps
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TimeTrackerSimple projects={activeProjects || []} />
-            </CardContent>
-          </Card>
-        );
       case 'invoices':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Paiements
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CandidatePayments />
-            </CardContent>
-          </Card>
-        );
+        return <CandidatePayments />;
       case 'ratings':
         return <CandidateRatings />;
       case 'activities':
         return <CandidateActivities />;
       case 'notes':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CandidateNotes />
-            </CardContent>
-          </Card>
-        );
+        return <CandidateNotes currentCandidateId={candidateId} />;
       case 'settings':
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Paramètres
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CandidateSettings />
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            {/* Header unifié avec design néon */}
+            <PageHeaderNeon
+              icon={Settings}
+              title="Paramètres"
+              subtitle="Configuration de votre profil candidat"
+            />
+
+            <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border border-primary-500/30 rounded-xl p-6">
+              <CandidateSettings candidateId={candidateId} onProfileUpdate={refetchIdentity} />
+            </div>
+          </div>
         );
       default:
         return renderProjectsContent();
@@ -700,39 +834,56 @@ const CandidateDashboard = () => {
 
   const sidebarContent = (
     <Sidebar>
-      <SidebarContent className="bg-background border-r">
-        <div className="p-4 border-b">
+      <SidebarContent className="bg-gradient-to-b from-neutral-900 to-neutral-950 dark:from-neutral-950 dark:to-black border-r border-neutral-800/50">
+        <div className="p-4 border-b border-neutral-800/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <IallaLogo className="h-8 w-8" />
-              <span className="font-semibold text-lg">Candidat</span>
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl blur-lg opacity-50 animate-pulse" />
+                <div className="relative">
+                  <IallaLogo className="h-8 w-8" />
+                </div>
+              </div>
+              <span className="font-bold text-lg bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text">
+                Candidat
+              </span>
             </div>
           </div>
 
           {/* Availability Toggle */}
-          <div className="mt-4 flex items-center justify-between">
-            <Label htmlFor="availability" className="text-sm">
-              Disponible
-            </Label>
-            <Switch
-              id="availability"
-              checked={isAvailable}
-              onCheckedChange={handleAvailabilityChange}
-            />
+          <div className="mt-4 p-3 rounded-xl bg-neutral-800/50 border border-neutral-700/50">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="availability" className="text-sm font-medium text-neutral-300">
+                Statut
+              </Label>
+              <Switch
+                id="availability"
+                checked={isAvailable}
+                onCheckedChange={handleAvailabilityChange}
+                className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-green-500 data-[state=checked]:to-emerald-500"
+              />
+            </div>
           </div>
         </div>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-neutral-400 text-xs uppercase tracking-wider px-2">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => setActiveSection('projects')}
-                  isActive={activeSection === 'projects'}
+                  className={`group relative overflow-hidden transition-all duration-200 ${
+                    activeSection === 'projects'
+                      ? 'bg-gradient-to-r from-primary-500/20 to-secondary-500/20 text-white border-l-2 border-primary-500'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800/50'
+                  }`}
                 >
                   <FolderOpen className="h-4 w-4" />
                   <span>Projets</span>
+                  {activeSection === 'projects' && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 animate-shimmer" />
+                  )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
@@ -783,27 +934,6 @@ const CandidateDashboard = () => {
                 >
                   <BookOpen className="h-4 w-4" />
                   <span>Wiki</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => setActiveSection('notes')}
-                  isActive={activeSection === 'notes'}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span>Notes</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => setActiveSection('time')}
-                  isActive={activeSection === 'time'}
-                  className={activeSection === 'time' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-white hover:bg-white/10'}
-                >
-                  <Activity className="h-4 w-4" />
-                  <span>Temps</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -885,18 +1015,27 @@ const CandidateDashboard = () => {
   );
 
   const headerContent = (
-    <header className="h-16 px-6 flex items-center justify-between bg-background border-b sticky top-0 z-40">
+    <header className="h-16 px-6 flex items-center justify-between backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border-b border-neutral-200/50 dark:border-neutral-700/50 sticky top-0 z-40 shadow-lg">
       <div className="flex items-center gap-4">
-        <SidebarTrigger />
-        <h1 className="text-xl font-semibold">Dashboard Candidat</h1>
+        <SidebarTrigger className="hover:scale-105 transition-transform duration-200" />
+        <h1 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text">
+          Dashboard Candidat
+        </h1>
       </div>
       <div className="flex items-center gap-4">
-        <div className={`px-3 py-1 rounded-full text-xs font-medium ${isAvailable ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
-          {isAvailable ? "Disponible" : "Indisponible"}
+        <div className={`px-4 py-2 rounded-full text-xs font-medium shadow-lg transition-all duration-300 ${
+          isAvailable
+            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25'
+            : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-orange-500/25'
+        }`}>
+          <span className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full animate-pulse ${isAvailable ? 'bg-white' : 'bg-white/70'}`} />
+            {isAvailable ? "Disponible" : "En pause"}
+          </span>
         </div>
         {/* Removed CandidateEventNotifications from header - was causing overflow */}
-        <NotificationBell />
-        <ThemeToggle />
+        <NotificationBell className="hover:scale-110 transition-transform duration-200" />
+        <ThemeToggle className="hover:scale-110 transition-transform duration-200" />
       </div>
     </header>
   );
@@ -908,10 +1047,11 @@ const CandidateDashboard = () => {
         <div className="h-full overflow-auto">
           <div className="min-h-screen flex items-center justify-center p-4">
             <div className="w-full max-w-4xl">
-              <CandidateOnboarding onComplete={() => {
-                completeOnboarding();
-                refetchProfile();
-              }} />
+              <CandidateOnboarding
+                candidateId={user?.id}
+                onComplete={() => refetchProfile()}
+                completeOnboarding={completeOnboarding}
+              />
             </div>
           </div>
         </div>
@@ -927,7 +1067,7 @@ const CandidateDashboard = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           {headerContent}
 
-          <main className="flex-1 overflow-auto bg-muted/50">
+          <main className="flex-1 overflow-auto bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-neutral-950 dark:to-black">
             <div className="w-full p-6 lg:p-8">
               {candidateProfile?.qualification_status === 'pending' && (
                 <div className="mb-6">

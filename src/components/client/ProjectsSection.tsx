@@ -297,29 +297,37 @@ export function ProjectsSection({
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredProjects.map((project) => (
-              <RadixProjectCard
-                key={project.id}
-                project={{
-                  id: project.id,
-                  title: project.title,
-                  description: project.description,
-                  date: project.project_date || new Date().toISOString(),
-                  status: project.status,
-                  clientBudget: project.client_budget,
-                  dueDate: project.due_date,
-                }}
-                isArchived={project.category === 'archived'}
-                onView={() => onViewProject(project.id)}
-                onStatusToggle={(id, _) => onToggleStatus(id, project.status)}
-                onStart={(projectWithKickoff) => onStartProject(projectWithKickoff)}
-                onDelete={() => onDeleteRequest(project)}
-                onArchive={() => onArchiveProject(project.id)}
-                onUnarchive={() => onUnarchiveProject(project.id)}
-                onEdit={onProjectEdited}
-                refreshTrigger={refreshTrigger}
-              />
-            ))}
+            {filteredProjects.map((project) => {
+              // Trouver les resource assignments pour ce projet
+              const projectAssignments = (resourceAssignments || []).filter(
+                a => a.project_id === project.id
+              );
+
+              return (
+                <RadixProjectCard
+                  key={project.id}
+                  project={{
+                    id: project.id,
+                    title: project.title,
+                    description: project.description,
+                    date: project.project_date || new Date().toISOString(),
+                    status: project.status,
+                    clientBudget: project.client_budget,
+                    dueDate: project.due_date,
+                  }}
+                  resourceAssignments={projectAssignments}
+                  isArchived={project.category === 'archived'}
+                  onView={() => onViewProject(project.id)}
+                  onStatusToggle={(id, _) => onToggleStatus(id, project.status)}
+                  onStart={(projectWithKickoff) => onStartProject(projectWithKickoff)}
+                  onDelete={() => onDeleteRequest(project)}
+                  onArchive={() => onArchiveProject(project.id)}
+                  onUnarchive={() => onUnarchiveProject(project.id)}
+                  onEdit={onProjectEdited}
+                  refreshTrigger={refreshTrigger}
+                />
+              );
+            })}
           </div>
         )}
       </div>

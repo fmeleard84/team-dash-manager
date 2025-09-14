@@ -3,13 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { PageHeaderNeon } from '@/components/ui/page-header-neon';
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
+import { DatePicker } from '@/components/ui/date-picker';
 import { FullScreenModal, ModalActions, useFullScreenModal } from '@/components/ui/fullscreen-modal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -336,56 +332,47 @@ export default function CandidateActivities() {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters - Style unifié avec le planning */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Activity className="w-6 h-6 text-white" />
-              </div>
-              
-              {/* Filters integrated in header */}
-              <div className="flex items-center gap-3">
-                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                  <SelectTrigger className="w-56 bg-white/90 backdrop-blur-sm border-white/20">
-                    <SelectValue placeholder="Tous les projets" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les projets</SelectItem>
-                    {uniqueProjects.map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      {/* Header with unified modern design */}
+      <PageHeaderNeon
+        title="Activités"
+        description="Suivi de votre temps et activités"
+        icon={Activity}
+        iconColor="from-blue-500 to-cyan-500"
+      >
+        <div className="flex items-center gap-4">
+          {/* Universal project selector */}
+          <ProjectSelectorNeon
+            projects={uniqueProjects}
+            selectedProjectId={selectedProjectId === "all" ? "" : selectedProjectId}
+            onProjectChange={(id) => setSelectedProjectId(id || "all")}
+            placeholder="Tous les projets"
+            className="w-64"
+            showStatus={false}
+            showDates={false}
+          />
 
-                <Select value={dateRange} onValueChange={(v) => setDateRange(v as 'week' | 'month' | 'all')}>
-                  <SelectTrigger className="w-48 bg-white/90 backdrop-blur-sm border-white/20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="week">Cette semaine</SelectItem>
-                    <SelectItem value="month">Ce mois</SelectItem>
-                    <SelectItem value="all">Tout</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <Button
-              onClick={exportToCSV}
-              variant="secondary"
-              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-white/20"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Exporter CSV
-            </Button>
-          </div>
+          {/* Date range selector with modern design */}
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as 'week' | 'month' | 'all')}
+            className="w-48 h-10 px-3 bg-black/40 backdrop-blur-xl border border-purple-500/30 text-white rounded-lg hover:bg-white/10 hover:border-purple-400 transition-all duration-300 focus:outline-none focus:border-purple-400"
+          >
+            <option value="week" className="bg-gray-900">Cette semaine</option>
+            <option value="month" className="bg-gray-900">Ce mois</option>
+            <option value="all" className="bg-gray-900">Tout</option>
+          </select>
+
+          {/* Export button with neon style */}
+          <Button
+            onClick={exportToCSV}
+            variant="ghost"
+            className="bg-black/40 backdrop-blur-xl border border-purple-500/30 text-white hover:bg-white/10 hover:border-purple-400"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exporter CSV
+          </Button>
         </div>
-      </div>
+      </PageHeaderNeon>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
