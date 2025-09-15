@@ -125,7 +125,7 @@ serve(async (req) => {
         
         // Create destination path in project-files bucket
         // Put files in a "Kanban" subfolder within the project
-        const destinationPath = `project/${projectId}/Kanban/${file.name}`
+        const destinationPath = `projects/${projectId}/Kanban/${file.name}`
         
         console.log('📤 Uploading to project-files:', destinationPath)
         

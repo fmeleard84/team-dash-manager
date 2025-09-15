@@ -100,11 +100,12 @@ export const useProjectUsers = (projectId: string | null) => {
           }
         }
 
-        // 2. Candidats - requête simple sans jointure pour éviter l'erreur 400
+        // 2. Candidats - requête simple puis récupération séparée du hr_profile
         const { data: assignments, error: assignError } = await supabase
           .from('hr_resource_assignments')
           .select('*')
-          .eq('project_id', projectId);
+          .eq('project_id', projectId)
+          .eq('booking_status', 'accepted');
         
         // Log simplifié
         if (assignError) {
@@ -124,24 +125,52 @@ export const useProjectUsers = (projectId: string | null) => {
               if (candError) {
                 // FALLBACK: Si le candidate n'existe pas, créer un utilisateur temporaire
                 const tempEmail = `user_${assignment.candidate_id.substring(0, 8)}@temp.com`;
-                const tempName = assignment.job_title || 'Assistant';
-                
+                // Récupérer le hr_profile séparément si profile_id existe
+                let jobTitle = assignment.job_title || 'Consultant';
+                let tempName = 'Candidat';
+
+                if (assignment.profile_id) {
+                  const { data: hrProfile } = await supabase
+                    .from('hr_profiles')
+                    .select('id, name')
+                    .eq('id', assignment.profile_id)
+                    .single();
+
+                  if (hrProfile) {
+                    // name contient le nom du métier (ex: "Chef de projet")
+                    jobTitle = hrProfile.name || assignment.job_title || 'Consultant';
+                    tempName = hrProfile.name?.split(' ')[0] || 'Candidat';
+                  }
+                }
+
                 usersList.push({
                   user_id: assignment.candidate_id,
                   email: tempEmail,
                   display_name: tempName,
-                  job_title: assignment.job_title || 'Assistant comptable',
+                  job_title: jobTitle,
                   role: 'candidate',
                   joined_at: assignment.created_at
                 });
               } else if (candidate) {
-                const firstName = candidate.first_name || 
-                                 candidate.email?.split('@')[0]?.split('.')[0] || 
+                const firstName = candidate.first_name ||
+                                 candidate.email?.split('@')[0]?.split('.')[0] ||
                                  'Candidat';
-                // Priorité: job_title de l'assignment, puis du candidat, puis expertise par défaut
-                const jobTitle = assignment.job_title || 
-                                candidate.job_title || 
-                                'Assistant comptable'; // Défaut plus logique
+
+                // Récupérer le hr_profile si profile_id existe
+                let jobTitle = assignment.job_title || candidate.job_title || 'Consultant';
+
+                if (assignment.profile_id) {
+                  const { data: hrProfile } = await supabase
+                    .from('hr_profiles')
+                    .select('id, name')
+                    .eq('id', assignment.profile_id)
+                    .single();
+
+                  if (hrProfile?.name) {
+                    // name contient le nom du métier (ex: "Chef de projet")
+                    jobTitle = hrProfile.name;
+                  }
+                }
 
                 usersList.push({
                   user_id: candidate.id,
@@ -168,10 +197,11 @@ export const useProjectUsers = (projectId: string | null) => {
               }
 
               if (hrProfile) {
+                // name contient le nom complet du métier
+                const jobTitle = hrProfile.name ||
+                                assignment.job_title ||
+                                'Consultant';
                 const displayName = hrProfile.name?.split(' ')[0] || 'Ressource';
-                const jobTitle = assignment.job_title || 
-                                hrProfile.job_title || 
-                                'Assistant comptable';
 
                 usersList.push({
                   user_id: assignment.profile_id,

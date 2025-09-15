@@ -50,7 +50,7 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
   const navigate = useNavigate();
 
   // Use the unified hook for project users
-  const { displayNames: projectMembers } = useProjectUsers(selectedProjectId);
+  const { displayNames: projectMembers, users: projectUsers } = useProjectUsers(selectedProjectId);
 
   const { 
     board, 
@@ -453,6 +453,7 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
         card={selectedCard}
         onCardChange={setSelectedCard}
         projectMembers={projectMembers}
+        projectUsers={projectUsers}
         uploadedFiles={uploadedFiles}
         onUploadedFilesChange={setUploadedFiles}
         onSave={handleSaveCard}
@@ -468,6 +469,7 @@ export default function CandidateKanbanView({ projectId }: CandidateKanbanViewPr
         cardData={newCardData}
         onCardDataChange={setNewCardData}
         projectMembers={projectMembers}
+        projectUsers={projectUsers}
         uploadedFiles={uploadedFiles}
         onUploadedFilesChange={setUploadedFiles}
         onSave={handleSaveNewCard}

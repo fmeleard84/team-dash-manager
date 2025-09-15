@@ -46,16 +46,16 @@ const sizeClasses = {
 };
 
 const statusColors = {
-  online: 'bg-green-400',
-  offline: 'bg-gray-400',
-  busy: 'bg-red-400',
-  away: 'bg-yellow-400'
+  online: 'bg-green-500 dark:bg-green-400',
+  offline: 'bg-neutral-400 dark:bg-neutral-500',
+  busy: 'bg-red-500 dark:bg-red-400',
+  away: 'bg-yellow-500 dark:bg-yellow-400'
 };
 
 const seniorityColors = {
   junior: 'from-green-500 to-emerald-500',
   confirmé: 'from-blue-500 to-cyan-500',
-  senior: 'from-purple-500 to-pink-500',
+  senior: 'from-primary-500 to-secondary-500',
   expert: 'from-orange-500 to-red-500',
   lead: 'from-yellow-500 to-amber-500'
 };
@@ -86,15 +86,39 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
     if (user.firstName && user.lastName) {
       return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
     }
+    if (user.name) {
+      const parts = user.name.split(' ');
+      if (parts.length > 1) {
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      }
+      return user.name.substring(0, 2).toUpperCase();
+    }
     return displayName.substring(0, 2).toUpperCase();
   };
   
   // Déterminer le gradient en fonction du rôle ou de la séniorité
   const getGradient = () => {
+    // Utiliser un gradient basé sur les premières lettres pour la variété
+    const initials = getInitials();
+    const charCode = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
+
+    const gradients = [
+      'from-purple-500 to-pink-500',
+      'from-blue-500 to-cyan-500',
+      'from-green-500 to-emerald-500',
+      'from-orange-500 to-red-500',
+      'from-indigo-500 to-purple-500',
+      'from-teal-500 to-green-500',
+      'from-rose-500 to-pink-500',
+      'from-amber-500 to-orange-500'
+    ];
+
     if (user.seniority && seniorityColors[user.seniority as keyof typeof seniorityColors]) {
       return seniorityColors[user.seniority as keyof typeof seniorityColors];
     }
-    return 'from-purple-500 to-pink-500';
+
+    // Sélectionner un gradient basé sur les initiales pour la cohérence
+    return gradients[charCode % gradients.length];
   };
   
   // Obtenir l'icône de rôle
@@ -127,16 +151,18 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
     <div className="relative">
       <Avatar className={cn(
         sizeConfig.avatar,
-        "border-2 border-purple-500/50 shadow-lg shadow-purple-500/20",
-        interactive && "cursor-pointer"
+        "border-2 border-white dark:border-neutral-800",
+        "shadow-md dark:shadow-lg",
+        interactive && "cursor-pointer hover:scale-105 transition-transform duration-200"
       )}>
         {user.avatar ? (
           <AvatarImage src={user.avatar} alt={displayName} />
         ) : (
           <AvatarFallback className={cn(
-            "bg-gradient-to-br text-white font-semibold",
+            "bg-gradient-to-br text-white font-bold",
             getGradient(),
-            sizeConfig.text
+            sizeConfig.text,
+            "shadow-inner"
           )}>
             {getInitials()}
           </AvatarFallback>
@@ -146,7 +172,8 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
       {/* Status indicator */}
       {showStatus && user.status && (
         <div className={cn(
-          "absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-[#0f172a]",
+          "absolute -bottom-0.5 -right-0.5 rounded-full",
+          "border-2 border-white dark:border-neutral-900",
           size === 'xs' ? 'w-2 h-2' : size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3',
           statusColors[user.status],
           user.status === 'online' && 'animate-pulse'
@@ -180,7 +207,8 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
           "flex flex-col items-center gap-2 p-4",
           "bg-black/40 backdrop-blur-xl rounded-xl",
           "border border-purple-500/30",
-          interactive && "cursor-pointer hover:bg-white/5 hover:border-purple-400/50",
+          interactive && "cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/80",
+          "hover:border-primary-500 dark:hover:border-primary-400",
           "transition-all duration-200",
           className
         )}
@@ -213,7 +241,7 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
         onClick={onClick}
         className={cn(
           "flex items-center gap-3 p-2 rounded-lg",
-          interactive && "cursor-pointer hover:bg-white/5",
+          interactive && "cursor-pointer hover:bg-neutral-100 dark:hover:bg-white/5",
           "transition-all duration-200",
           className
         )}
@@ -221,12 +249,12 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
         {AvatarComponent}
         <div className="flex-1 min-w-0">
           {showName && (
-            <p className={cn("font-medium text-white truncate", sizeConfig.text)}>
+            <p className={cn("font-medium text-neutral-900 dark:text-white truncate", sizeConfig.text)}>
               {displayName}
             </p>
           )}
           {showRole && displayRole && (
-            <p className={cn("text-gray-400 truncate", sizeConfig.role)}>
+            <p className={cn("text-neutral-500 dark:text-neutral-400 truncate", sizeConfig.role)}>
               {displayRole}
             </p>
           )}
@@ -248,9 +276,10 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
         onClick={onClick}
         className={cn(
           "flex items-center gap-3 p-3 rounded-xl",
-          "bg-black/40 backdrop-blur-xl",
-          "border border-purple-500/30",
-          interactive && "cursor-pointer hover:bg-white/5 hover:border-purple-400/50",
+          "bg-white dark:bg-neutral-900/80 backdrop-blur-xl",
+          "border border-neutral-200 dark:border-neutral-700",
+          interactive && "cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/80",
+          "hover:border-primary-500 dark:hover:border-primary-400",
           "transition-all duration-200",
           className
         )}
@@ -314,12 +343,12 @@ export const UserAvatarNeon: React.FC<UserAvatarNeonProps> = ({
       {(showName || showRole) && (
         <div className="min-w-0">
           {showName && (
-            <p className={cn("font-medium text-white truncate", sizeConfig.text)}>
+            <p className={cn("font-medium text-neutral-900 dark:text-white truncate", sizeConfig.text)}>
               {displayName}
             </p>
           )}
           {showRole && displayRole && (
-            <p className={cn("text-gray-400 truncate", sizeConfig.role)}>
+            <p className={cn("text-neutral-500 dark:text-neutral-400 truncate", sizeConfig.role)}>
               {displayRole}
             </p>
           )}

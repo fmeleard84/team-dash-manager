@@ -151,7 +151,15 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
             };
           }));
           
-          setEntries([...virtualFolders, ...realEntries]);
+          // Filtrer les dossiers réels pour exclure ceux qui existent déjà comme dossiers virtuels
+          const virtualFolderNames = virtualFolders.map(f => f.name.toLowerCase());
+          const filteredRealEntries = realEntries.filter(entry => {
+            // Exclure les dossiers qui ont le même nom qu'un dossier virtuel
+            const entryNameLower = entry.name.toLowerCase();
+            return !virtualFolderNames.includes(entryNameLower);
+          });
+
+          setEntries([...virtualFolders, ...filteredRealEntries]);
         } else {
           setEntries(virtualFolders);
         }
@@ -173,11 +181,19 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
         
         setEntries(entries);
       } else if (prefix.includes('/Kanban/') || prefix === `${basePrefix}Kanban/`) {
-        // Charger les fichiers depuis le bucket kanban-files
+        // Charger les fichiers depuis le dossier Kanban dans project-files
+        // Les fichiers sont synchronisés depuis kanban-files vers project-files/projects/{projectId}/Kanban/
+        const kanbanPath = `projects/${projectId}/Kanban/`;
+        console.log('📂 Loading Kanban files from:', kanbanPath);
+
         const { data, error } = await supabase.storage
-          .from('kanban-files')
-          .list(`cards/`, { limit: 100, offset: 0 });
-        
+          .from('project-files')
+          .list(kanbanPath, { limit: 100, offset: 0 });
+
+        if (error) {
+          console.error('❌ Error loading Kanban files:', error);
+        }
+
         const entries = data?.map(item => ({
           name: item.name,
           id: item.id,
@@ -185,9 +201,13 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
           updated_at: item.updated_at,
           metadata: item.metadata,
           size: (item.metadata as any)?.size,
-          mimeType: getMimeType(item.name.split('.').pop()?.toLowerCase() || '')
+          mimeType: getMimeType(item.name.split('.').pop()?.toLowerCase() || ''),
+          thumbnailUrl: item.name.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+            ? supabase.storage.from('project-files').getPublicUrl(`${kanbanPath}${item.name}`).data.publicUrl
+            : ''
         })) || [];
-        
+
+        console.log(`✅ Found ${entries.length} files in Kanban folder`);
         setEntries(entries);
       } else {
         // Charger le contenu d'un sous-dossier normal
@@ -344,8 +364,9 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
         bucket = 'message-files';
         downloadPath = `projects/${projectId}/${fileName}`;
       } else if (currentPath.includes('/Kanban/')) {
-        bucket = 'kanban-files';
-        downloadPath = `cards/${fileName}`;
+        // Les fichiers Kanban sont maintenant dans project-files
+        bucket = 'project-files';
+        downloadPath = `projects/${projectId}/Kanban/${fileName}`;
       }
 
       const { data, error } = await supabase.storage

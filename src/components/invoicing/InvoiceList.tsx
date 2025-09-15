@@ -331,13 +331,17 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
           
           {/* Project filter with universal selector */}
           <ProjectSelectorNeon
-            projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...projects.map(p => ({ ...p, created_at: p.project_date }))]}
+            projects={[{ id: 'all', title: 'Tous les projets', created_at: new Date().toISOString(), status: 'play' }, ...projects.map(p => ({
+              ...p,
+              created_at: p.project_date || p.created_at || new Date().toISOString(),
+              status: p.status || 'play'
+            }))]}
             selectedProjectId={selectedProject}
             onProjectChange={setSelectedProject}
-            placeholder="Tous les projets"
-            className="w-[280px]"
-            showStatus={false}
-            showDates={true}
+            placeholder="Filtrer par projet"
+            className="w-[220px]"
+            showStatus={true}
+            showDates={false}
             showTeamProgress={false}
           />
         </div>

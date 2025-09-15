@@ -622,5 +622,62 @@ npx supabase functions logs [function-name] --project-ref egdelmcijszuapcpglsy -
 - handle-new-user-simple   # Création automatique des profils à l'inscription (06/09/2025)
 ```
 
+## 📊 Structure Base de Données - Tables Importantes (15/09/2025)
+
+### Table: hr_resource_assignments
+Structure pour l'assignation des ressources aux projets :
+```sql
+- id: UUID PRIMARY KEY
+- project_id: UUID (référence projects)
+- profile_id: UUID (référence hr_profiles) -- Le profil métier
+- candidate_id: UUID (référence candidate_profiles) -- Peut être null
+- booking_status: 'draft' | 'recherche' | 'accepted' | 'declined'
+- seniority: 'junior' | 'confirmé' | 'senior' | 'expert'
+- languages: TEXT[]
+- expertises: TEXT[]
+```
+
+### Table: hr_profiles
+Contient les métiers disponibles :
+```sql
+- id: UUID PRIMARY KEY
+- name: TEXT -- NOM DU MÉTIER (ex: "Chef de projet", "Développeur Full-Stack")
+- category_id: UUID (référence hr_categories)
+- base_price: DECIMAL
+```
+**⚠️ IMPORTANT**: Le nom du métier est dans la colonne `name`, PAS `label` !
+
+### Table: hr_categories
+Catégories de métiers :
+```sql
+- id: UUID PRIMARY KEY
+- name: TEXT -- Nom de la catégorie (ex: "Marketing", "Développement", "Comptabilité")
+```
+
+### Récupération des membres d'équipe
+Pour récupérer correctement les membres d'une équipe projet :
+1. Requête sur `hr_resource_assignments` avec `project_id`
+2. Joindre `hr_profiles` via `profile_id` pour obtenir le métier (`name`)
+3. Joindre `candidate_profiles` via `candidate_id` pour les infos candidat
+4. Filtrer par `booking_status = 'accepted'` pour les membres confirmés
+
+## 🎨 Composants Universels de Design
+
+### Sélecteurs Universels
+1. **ProjectSelectorNeon** (`/src/components/ui/project-selector-neon.tsx`)
+   - Sélecteur de projet avec indicateur de statut coloré
+   - Titre limité à 15 caractères
+   - Support Material Design dark/light
+
+2. **UserSelectNeon** (`/src/components/ui/user-select-neon.tsx`)
+   - Sélecteur d'équipe/utilisateur universel
+   - Avatars avec initiales et dégradés
+   - Affichage du métier depuis `hr_profiles.name`
+
+3. **UserAvatarNeon** (`/src/components/ui/user-avatar-neon.tsx`)
+   - Avatars avec support complet dark/light
+   - Initiales avec fond dégradé
+   - Indicateurs de statut
+
 ## 📚 Pour Plus d'Infos
 Consulter `/llm` dans l'application pour la documentation complète et éditable.

@@ -16,6 +16,7 @@ interface CardCreateDialogProps {
   cardData: any;
   onCardDataChange: (data: any) => void;
   projectMembers: string[];
+  projectUsers?: any[];
   uploadedFiles: File[];
   onUploadedFilesChange: (files: File[]) => void;
   onSave: () => void;
@@ -29,6 +30,7 @@ export function CardCreateDialog({
   cardData,
   onCardDataChange,
   projectMembers,
+  projectUsers,
   uploadedFiles,
   onUploadedFilesChange,
   onSave,
@@ -128,28 +130,46 @@ export function CardCreateDialog({
               <div className="space-y-2">
                 {/* Membres sélectionnés */}
                 {cardData.assignedTo.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-lg min-h-[32px] border border-gray-100">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg min-h-[32px] border border-neutral-200 dark:border-neutral-700">
                     {cardData.assignedTo.map((user: string, index: number) => {
-                      const firstName = user.split(' ')[0] || user.split('(')[0] || user;
-                      const initials = firstName.substring(0, 2).toUpperCase();
+                      const parts = user.split(' - ');
+                      const name = parts[0] || user;
+                      const role = parts[1] || '';
+                      const nameParts = name.split(' ');
+                      const initials = nameParts.length > 1
+                        ? `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase()
+                        : name.substring(0, 2).toUpperCase();
+
+                      // Générer un gradient basé sur les initiales
+                      const charCode = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
+                      const gradients = [
+                        'from-purple-500 to-pink-500',
+                        'from-blue-500 to-cyan-500',
+                        'from-green-500 to-emerald-500',
+                        'from-orange-500 to-red-500',
+                        'from-indigo-500 to-purple-500'
+                      ];
+                      const gradient = gradients[charCode % gradients.length];
+
                       return (
-                        <div key={index} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-full border border-gray-200 shadow-sm">
-                          <Avatar className="w-5 h-5">
-                            <AvatarFallback className="text-[9px] bg-gradient-to-br from-blue-600 to-purple-600 text-white font-medium">
+                        <div key={index} className="flex items-center gap-1.5 bg-white dark:bg-neutral-800 px-2 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                          <Avatar className="w-5 h-5 border border-white dark:border-neutral-800">
+                            <AvatarFallback className={`text-[9px] bg-gradient-to-br ${gradient} text-white font-bold`}>
                               {initials}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-xs text-gray-700">{user}</span>
+                          <span className="text-xs text-neutral-700 dark:text-neutral-300">{name}</span>
+                          {role && <span className="text-xs text-neutral-500 dark:text-neutral-400">({role})</span>}
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="ml-0.5 h-3.5 w-3.5 p-0 hover:bg-gray-100 rounded-full"
+                            className="ml-0.5 h-3.5 w-3.5 p-0 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-full"
                             onClick={() => {
                               const newAssignees = cardData.assignedTo.filter((_: any, i: number) => i !== index);
                               onCardDataChange({ ...cardData, assignedTo: newAssignees });
                             }}
                           >
-                            <X className="w-2.5 h-2.5 text-gray-400 hover:text-gray-600" />
+                            <X className="w-2.5 h-2.5 text-neutral-400 dark:text-neutral-300 hover:text-neutral-600 dark:hover:text-neutral-100" />
                           </Button>
                         </div>
                       );
@@ -158,16 +178,24 @@ export function CardCreateDialog({
                 )}
                 {/* Sélecteur de membres avec design néon */}
                 <UserSelectNeon
-                  users={projectMembers.filter(m => !cardData.assignedTo.includes(m)).map((member) => {
-                    const parts = member.split(' - ');
-                    const name = parts[0];
-                    const role = parts[1] || '';
-                    return {
-                      id: member,
-                      name: name,
-                      role: role
-                    };
-                  })}
+                  users={projectUsers ?
+                    projectUsers.filter(u => !cardData.assignedTo.includes(`${u.display_name} - ${u.job_title}`)).map(user => ({
+                      id: `${user.display_name} - ${user.job_title}`,
+                      name: user.display_name,
+                      role: user.job_title,
+                      email: user.email
+                    }))
+                    : projectMembers.filter(m => !cardData.assignedTo.includes(m)).map((member) => {
+                      const parts = member.split(' - ');
+                      const name = parts[0];
+                      const role = parts[1] || '';
+                      return {
+                        id: member,
+                        name: name,
+                        role: role
+                      };
+                    })
+                  }
                   selectedUserId=""
                   onUserChange={(value) => {
                     if (value && !cardData.assignedTo.includes(value)) {
@@ -231,8 +259,11 @@ export function CardCreateDialog({
                   onChange={(e) => {
                     if (e.target.files) {
                       const newFiles = Array.from(e.target.files);
-                      onUploadedFilesChange(newFiles);
+                      // Ajouter aux fichiers existants au lieu de remplacer
+                      const existingFiles = uploadedFiles || [];
+                      onUploadedFilesChange([...existingFiles, ...newFiles]);
                       console.log('New card files selected:', newFiles);
+                      console.log('Total files to upload:', [...existingFiles, ...newFiles].length);
                     }
                   }}
                 />

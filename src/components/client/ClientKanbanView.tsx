@@ -9,6 +9,7 @@ import { Plus, Paperclip, Eye, Download, Trash2, Columns, Layout, User, Users, X
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TaskRatingDialog } from "@/components/kanban/TaskRatingDialog";
 import { FullScreenModal, ModalActions, useFullScreenModal } from "@/components/ui/fullscreen-modal";
+import { UserSelectNeon } from "@/components/ui/user-select-neon";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
 import { useToast } from '@/hooks/use-toast';
-import { uploadMultipleFiles, syncKanbanFilesToDrive, UploadedFile } from "@/utils/fileUpload";
+import { uploadMultipleFiles, syncKanbanFilesToDrive, UploadedFile, forceFileDownload } from "@/utils/fileUpload";
 
 interface Project {
   id: string;
@@ -60,7 +61,7 @@ export default function ClientKanbanView({ projectId: propProjectId }: ClientKan
   const navigate = useNavigate();
 
   // Use the unified hook for project users
-  const { displayNames: projectMembers } = useProjectUsers(selectedProjectId);
+  const { displayNames: projectMembers, users: projectUsers } = useProjectUsers(selectedProjectId);
 
   const { 
     board, 
@@ -734,22 +735,89 @@ export default function ClientKanbanView({ projectId: propProjectId }: ClientKan
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="assignedTo">Assigné à</Label>
-                <Select 
-                  value={selectedCard.assignedTo?.[0] || 'unassigned'}
-                  onValueChange={(value) => setSelectedCard({ ...selectedCard, assignedTo: value === 'unassigned' ? [] : [value] })}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Sélectionner un membre" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Non assigné</SelectItem>
-                    {projectMembers.map((member) => (
-                      <SelectItem key={member} value={member}>
-                        {member}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="mt-2">
+                  {/* Affichage des membres déjà assignés */}
+                  {selectedCard.assignedTo?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg min-h-[32px] border border-neutral-200 dark:border-neutral-700 mb-2">
+                      {selectedCard.assignedTo?.map((member: string, index: number) => {
+                        const parts = member.split(' - ');
+                        const name = parts[0] || member;
+                        const role = parts[1] || '';
+                        const nameParts = name.split(' ');
+                        const initials = nameParts.length > 1
+                          ? `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase()
+                          : name.substring(0, 2).toUpperCase();
+
+                        // Générer un gradient basé sur les initiales
+                        const charCode = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
+                        const gradients = [
+                          'from-purple-500 to-pink-500',
+                          'from-blue-500 to-cyan-500',
+                          'from-green-500 to-emerald-500',
+                          'from-orange-500 to-red-500',
+                          'from-indigo-500 to-purple-500'
+                        ];
+                        const gradient = gradients[charCode % gradients.length];
+
+                        return (
+                          <div key={index} className="flex items-center gap-1.5 bg-white dark:bg-neutral-800 px-2 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                            <Avatar className="w-5 h-5 border border-white dark:border-neutral-800">
+                              <AvatarFallback className={`text-[9px] bg-gradient-to-br ${gradient} text-white font-bold`}>
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs text-neutral-700 dark:text-neutral-300">{name}</span>
+                            {role && <span className="text-xs text-neutral-500 dark:text-neutral-400">({role})</span>}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="ml-0.5 h-3.5 w-3.5 p-0 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-full"
+                              onClick={() => {
+                                const newAssignees = selectedCard.assignedTo.filter((_: any, i: number) => i !== index);
+                                setSelectedCard({ ...selectedCard, assignedTo: newAssignees });
+                              }}
+                            >
+                              <X className="w-2.5 h-2.5 text-neutral-400 dark:text-neutral-300 hover:text-neutral-600 dark:hover:text-neutral-100" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Sélecteur pour ajouter de nouveaux membres */}
+                  <UserSelectNeon
+                    users={projectUsers ?
+                      projectUsers.filter(u => !selectedCard.assignedTo?.includes(`${u.display_name} - ${u.job_title}`)).map(user => ({
+                        id: `${user.display_name} - ${user.job_title}`,
+                        name: user.display_name,
+                        role: user.job_title,
+                        email: user.email
+                      }))
+                      : projectMembers.filter(m => !selectedCard.assignedTo?.includes(m)).map((member) => {
+                        const parts = member.split(' - ');
+                        const name = parts[0];
+                        const role = parts[1] || '';
+                        return {
+                          id: member,
+                          name: name,
+                          role: role
+                        };
+                      })
+                    }
+                    selectedUserId=""
+                    onUserChange={(value) => {
+                      if (value && !selectedCard.assignedTo?.includes(value)) {
+                        setSelectedCard({
+                          ...selectedCard,
+                          assignedTo: [...(selectedCard.assignedTo || []), value]
+                        });
+                      }
+                    }}
+                    placeholder="Ajouter un membre"
+                    className="w-full"
+                  />
+                </div>
               </div>
 
               <div>
@@ -784,27 +852,101 @@ export default function ClientKanbanView({ projectId: propProjectId }: ClientKan
               <Label>Fichiers attachés</Label>
               <div className="mt-2 space-y-2">
                 {selectedCard.files?.map((file: any, index: number) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                    <Paperclip className="w-4 h-4" />
-                    <span className="text-sm flex-1">{file.name || file}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        const newFiles = selectedCard.files.filter((_: any, i: number) => i !== index);
-                        setSelectedCard({ ...selectedCard, files: newFiles });
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-neutral-800 rounded hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors">
+                    <div className="flex items-center gap-2 flex-1">
+                      <Paperclip className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm font-medium">{file.name || `Fichier ${index + 1}`}</span>
+                      {file.size && (
+                        <span className="text-xs text-gray-500">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {file.url ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2"
+                            onClick={() => window.open(file.url, '_blank')}
+                            title="Voir le fichier"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2"
+                            onClick={async () => {
+                              toast.info('Téléchargement en cours...');
+                              await forceFileDownload(file.url, file.name || `fichier-${index + 1}`);
+                              toast.success('Téléchargement terminé');
+                            }}
+                            title="Télécharger le fichier"
+                          >
+                            <Download className="w-3 h-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic px-2">
+                          Fichier sauvegardé
+                        </span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                        onClick={() => {
+                          const newFiles = selectedCard.files.filter((_: any, i: number) => i !== index);
+                          setSelectedCard({ ...selectedCard, files: newFiles });
+                          toast.success('Fichier supprimé de la carte');
+                        }}
+                        title="Supprimer le fichier"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
+                {/* Afficher les fichiers en attente d'upload */}
+                {uploadedFiles.length > 0 && (
+                  <div className="space-y-2 mb-2">
+                    <div className="text-xs font-medium text-gray-600">Fichiers à uploader :</div>
+                    {uploadedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Paperclip className="w-4 h-4 text-blue-500" />
+                          <span className="text-sm font-medium">{file.name}</span>
+                          <span className="text-xs text-gray-500">
+                            ({(file.size / 1024).toFixed(1)} KB)
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                          onClick={() => {
+                            const newFiles = uploadedFiles.filter((_, i) => i !== index);
+                            setUploadedFiles(newFiles);
+                            toast.info('Fichier retiré de la liste');
+                          }}
+                          title="Retirer de la liste"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <Input
                   type="file"
                   multiple
                   onChange={(e) => {
                     if (e.target.files) {
-                      setUploadedFiles(Array.from(e.target.files));
+                      const newFiles = Array.from(e.target.files);
+                      // Ajouter aux fichiers existants au lieu de remplacer
+                      setUploadedFiles(prev => [...prev, ...newFiles]);
                     }
                   }}
                   className="mt-2"
@@ -862,22 +1004,89 @@ export default function ClientKanbanView({ projectId: propProjectId }: ClientKan
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="new-assignedTo">Assigné à</Label>
-              <Select 
-                value={newCardData.assignedTo?.[0] || 'unassigned'}
-                onValueChange={(value) => setNewCardData({ ...newCardData, assignedTo: value === 'unassigned' ? [] : [value] })}
-              >
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Sélectionner un membre" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Non assigné</SelectItem>
-                  {projectMembers.map((member) => (
-                    <SelectItem key={member} value={member}>
-                      {member}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="mt-2">
+                {/* Affichage des membres déjà assignés */}
+                {newCardData.assignedTo?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg min-h-[32px] border border-neutral-200 dark:border-neutral-700 mb-2">
+                    {newCardData.assignedTo?.map((member: string, index: number) => {
+                      const parts = member.split(' - ');
+                      const name = parts[0] || member;
+                      const role = parts[1] || '';
+                      const nameParts = name.split(' ');
+                      const initials = nameParts.length > 1
+                        ? `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase()
+                        : name.substring(0, 2).toUpperCase();
+
+                      // Générer un gradient basé sur les initiales
+                      const charCode = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
+                      const gradients = [
+                        'from-purple-500 to-pink-500',
+                        'from-blue-500 to-cyan-500',
+                        'from-green-500 to-emerald-500',
+                        'from-orange-500 to-red-500',
+                        'from-indigo-500 to-purple-500'
+                      ];
+                      const gradient = gradients[charCode % gradients.length];
+
+                      return (
+                        <div key={index} className="flex items-center gap-1.5 bg-white dark:bg-neutral-800 px-2 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                          <Avatar className="w-5 h-5 border border-white dark:border-neutral-800">
+                            <AvatarFallback className={`text-[9px] bg-gradient-to-br ${gradient} text-white font-bold`}>
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-neutral-700 dark:text-neutral-300">{name}</span>
+                          {role && <span className="text-xs text-neutral-500 dark:text-neutral-400">({role})</span>}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-0.5 h-3.5 w-3.5 p-0 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-full"
+                            onClick={() => {
+                              const newAssignees = newCardData.assignedTo.filter((_: any, i: number) => i !== index);
+                              setNewCardData({ ...newCardData, assignedTo: newAssignees });
+                            }}
+                          >
+                            <X className="w-2.5 h-2.5 text-neutral-400 dark:text-neutral-300 hover:text-neutral-600 dark:hover:text-neutral-100" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Sélecteur pour ajouter de nouveaux membres */}
+                <UserSelectNeon
+                  users={projectUsers ?
+                    projectUsers.filter(u => !newCardData.assignedTo?.includes(`${u.display_name} - ${u.job_title}`)).map(user => ({
+                      id: `${user.display_name} - ${user.job_title}`,
+                      name: user.display_name,
+                      role: user.job_title,
+                      email: user.email
+                    }))
+                    : projectMembers.filter(m => !newCardData.assignedTo?.includes(m)).map((member) => {
+                      const parts = member.split(' - ');
+                      const name = parts[0];
+                      const role = parts[1] || '';
+                      return {
+                        id: member,
+                        name: name,
+                        role: role
+                      };
+                    })
+                  }
+                  selectedUserId=""
+                  onUserChange={(value) => {
+                    if (value && !newCardData.assignedTo?.includes(value)) {
+                      setNewCardData({
+                        ...newCardData,
+                        assignedTo: [...(newCardData.assignedTo || []), value]
+                      });
+                    }
+                  }}
+                  placeholder="Ajouter un membre"
+                  className="w-full"
+                />
+              </div>
             </div>
 
             <div>
