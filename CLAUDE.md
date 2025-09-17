@@ -679,5 +679,232 @@ Pour récupérer correctement les membres d'une équipe projet :
    - Initiales avec fond dégradé
    - Indicateurs de statut
 
+## 🚀 Configuration Environnements DEV/PROD (15/09/2025)
+
+### Architecture Déployée
+
+Le projet utilise deux environnements séparés sur le même serveur :
+
+#### 🔧 Environnement de Développement
+- **Chemin** : `/opt/team-dash-manager/`
+- **Port** : 8081
+- **URL** : http://localhost:8081 (ou dev.vaya.rip)
+- **Base Supabase** : `egdelmcijszuapcpglsy` (développement)
+- **Fichier config** : `.env.development`
+- **Commande** : `npm run dev` ou `pm2 start ecosystem.config.cjs --only team-dash-dev`
+
+#### 🌐 Environnement de Production
+- **Chemin** : `/opt/team-dash-manager-prod/`
+- **Port** : 3000
+- **URL** : http://localhost:3000 (ou vaya.rip)
+- **Base Supabase** : `nlesrzepybeeghhgjafc` (production)
+- **Fichier config** : `.env.production`
+- **Commande** : `npm run preview` ou `pm2 start ecosystem.config.cjs --only team-dash-prod`
+
+### Configuration Supabase
+
+#### Base de Développement
+```javascript
+// .env.development
+VITE_SUPABASE_URL=https://egdelmcijszuapcpglsy.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+#### Base de Production
+```javascript
+// .env.production
+VITE_SUPABASE_URL=https://nlesrzepybeeghhgjafc.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Gestion avec PM2
+
+```bash
+# Voir le statut des applications
+pm2 status
+
+# Démarrer/Redémarrer
+pm2 restart team-dash-dev    # Développement
+pm2 restart team-dash-prod   # Production
+
+# Logs
+pm2 logs team-dash-dev
+pm2 logs team-dash-prod
+
+# Configuration PM2
+/opt/team-dash-manager/ecosystem.config.cjs
+```
+
+### Scripts de Déploiement
+
+```bash
+# Déployer les deux environnements
+/opt/team-dash-manager/deploy.sh both
+
+# Pousser dev vers prod
+/opt/team-dash-manager/push-to-prod.sh
+
+# Configuration rapide production
+/opt/team-dash-manager/quick-setup-prod.sh
+```
+
+### Assets et Médias
+
+**IMPORTANT** : Les assets (images, vidéos) doivent être dans :
+- Dev : `/opt/team-dash-manager/public/assets/`
+- Prod : `/opt/team-dash-manager-prod/public/assets/`
+
+Les chemins dans le code doivent utiliser `/assets/` et NON `/src/assets/`.
+
+### URL de Callback Email
+
+Pour la confirmation d'email, configurer dans Supabase Dashboard :
+
+#### Développement
+- **Site URL** : `http://localhost:8081`
+- **Redirect URLs** :
+  - `http://localhost:8081`
+  - `http://localhost:8081/auth/callback`
+  - `http://dev.vaya.rip:8081`
+  - `http://dev.vaya.rip:8081/auth/callback`
+
+#### Production
+- **Site URL** : `http://vaya.rip:3000`
+- **Redirect URLs** :
+  - `http://localhost:3000`
+  - `http://localhost:3000/auth/callback`
+  - `http://vaya.rip:3000`
+  - `http://vaya.rip:3000/auth/callback`
+  - `https://vaya.rip` (pour HTTPS futur)
+
+### Domaine vaya.rip
+
+- **Production** : vaya.rip:3000
+- **Développement** : dev.vaya.rip:8081
+- **Note** : Port 80 occupé par Docker, utilisation des ports alternatifs
+
+## 📧 Configuration Email - BREVO (IMPORTANT - 17/09/2025)
+
+**⚠️ ATTENTION : Nous utilisons exclusivement BREVO pour l'envoi d'emails, PAS Mailjet, PAS Resend !**
+
+### Variables d'environnement Supabase requises
+
+```bash
+# Configuration Brevo (SendInBlue)
+BREVO_API_KEY=xkeysib-xxxxxxxxx  # Clé API depuis dashboard.brevo.com
+BREVO_FROM_EMAIL=hello@vaya.rip  # Email expéditeur vérifié dans Brevo
+BREVO_FROM_NAME=Vaya Platform    # Nom affiché de l'expéditeur
+```
+
+### Edge Functions pour l'envoi d'emails
+
+1. **send-email-brevo** : Fonction générique d'envoi
+2. **send-validation-email** : Emails de validation manuelle (score 60-89%)
+3. **send-verification-email** : Emails de vérification de compte
+
+### Structure API Brevo
+
+```typescript
+// Format d'envoi Brevo
+const emailData = {
+  sender: {
+    email: BREVO_FROM_EMAIL,
+    name: BREVO_FROM_NAME
+  },
+  to: [{
+    email: destinataire,
+    name: nomDestinataire
+  }],
+  subject: "Objet de l'email",
+  htmlContent: "<html>...</html>",
+  textContent: "Version texte" // optionnel
+};
+
+// Appel API
+fetch('https://api.brevo.com/v3/smtp/email', {
+  method: 'POST',
+  headers: {
+    'api-key': BREVO_API_KEY,  // ⚠️ Pas 'Authorization' !
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(emailData)
+});
+```
+
+### ⚠️ Erreurs à éviter
+
+1. **NE PAS** utiliser Mailjet (ancienne config)
+2. **NE PAS** utiliser Resend (jamais configuré)
+3. **NE PAS** hardcoder les clés API
+4. **TOUJOURS** utiliser `Deno.env.get('BREVO_API_KEY')`
+5. **Header API** : Utiliser `'api-key'` et non `'Authorization'`
+
+### Commandes de déploiement
+
+```bash
+# Déployer une fonction email
+SUPABASE_ACCESS_TOKEN="sbp_b8ec67e2a4f3a7922f6cfea023b2cf81a00a7d9e" \
+SUPABASE_DB_PASSWORD="R@ymonde7510_2a" \
+npx supabase functions deploy send-validation-email --project-ref egdelmcijszuapcpglsy
+```
+
+## 🚨 ÉTAT DE PRODUCTION (17/09/2025)
+
+### ⚠️ Points Critiques Production
+
+#### Tables HR en Production
+La base de production (`nlesrzepybeeghghjafc`) a été mise à jour le 17/09/2025 avec les tables HR :
+- ✅ `hr_categories` : Créée et peuplée avec 10 catégories
+- ✅ `hr_profiles` : Créée et peuplée avec 16 profils métiers
+- ✅ `hr_resource_assignments` : Structure créée SANS la colonne `calculated_price`
+
+**IMPORTANT** : La colonne `calculated_price` n'existe PAS en production. Ne pas l'utiliser dans les requêtes.
+
+#### Différences DEV vs PROD
+
+| Élément | Développement | Production |
+|---------|--------------|------------|
+| Base Supabase | `egdelmcijszuapcpglsy` | `nlesrzepybeeghghjafc` |
+| hr_profiles.skills | ✅ Existe | ❌ N'existe pas |
+| hr_resource_assignments.calculated_price | ✅ Existe | ❌ N'existe pas |
+| Webhook handle-new-user-simple | ✅ Configuré | ⚠️ À vérifier |
+
+#### Fonctions Edge déployées en PROD
+- `handle-new-user-simple` : Création automatique des profils
+- `apply-hr-migration-prod` : Migration des tables HR
+- `fix-hr-profiles-prod` : Correction structure hr_profiles
+- `fix-production-hr-tables` : Diagnostic et réparation tables HR
+
+### 📝 Scripts de Maintenance Production
+
+```bash
+# Tester les tables HR en production
+node test-candidate-access-prod.mjs
+
+# Exécuter une migration HR
+node execute-hr-migration-prod.mjs
+
+# Corriger la structure hr_profiles
+node fix-hr-profiles-prod.mjs
+
+# Déployer une fonction sur production
+SUPABASE_ACCESS_TOKEN="sbp_b8ec67e2a4f3a7922f6cfea023b2cf81a00a7d9e" \
+SUPABASE_DB_PASSWORD="Raymonde7510" \
+npx supabase functions deploy [function-name] --project-ref nlesrzepybeeghghjafc
+```
+
+### 🔧 Résolution de Problèmes Production
+
+#### Erreur 400 sur hr_resource_assignments
+**Cause** : Utilisation de colonnes inexistantes (`calculated_price`, `skills`)
+**Solution** : Retirer ces colonnes des requêtes SELECT
+
+#### Erreur "Cannot coerce to single object"
+**Cause** : Multiple profils pour un utilisateur
+**Solution** : Utiliser `.maybeSingle()` ou gérer les profils multiples
+
+#### Tables HR manquantes
+**Solution** : Exécuter `node execute-hr-migration-prod.mjs`
+
 ## 📚 Pour Plus d'Infos
 Consulter `/llm` dans l'application pour la documentation complète et éditable.

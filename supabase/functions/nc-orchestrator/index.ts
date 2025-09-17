@@ -21,11 +21,10 @@ const NEXTCLOUD_ADMIN_USERNAME = Deno.env.get("NEXTCLOUD_ADMIN_USERNAME")!;
 const NEXTCLOUD_ADMIN_PASSWORD = Deno.env.get("NEXTCLOUD_ADMIN_PASSWORD")!;
 const NEXTCLOUD_SSO_PREFIX = Deno.env.get("NEXTCLOUD_SSO_PREFIX") || "keycloak-";
 
-// Mailjet (optional)
-const MJ_API_KEY = Deno.env.get("MJ_API_KEY");
-const MJ_SECRET_KEY = Deno.env.get("MJ_SECRET_KEY");
-const MJ_FROM_EMAIL = Deno.env.get("MJ_FROM_EMAIL");
-const MJ_FROM_NAME = Deno.env.get("MJ_FROM_NAME") || "Cercle Vaya";
+// Brevo (optional)
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY");
+const BREVO_FROM_EMAIL = Deno.env.get("BREVO_FROM_EMAIL") || "hello@vaya.rip";
+const BREVO_FROM_NAME = Deno.env.get("BREVO_FROM_NAME") || "Vaya Platform";
 
 // Helpers
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -100,32 +99,31 @@ async function deckRequest(method: string, path: string, body?: any) {
   return { status: res.status, ok: res.ok, text, json };
 }
 
-// Mailjet email sender
-async function sendMailjetEmail(subject: string, html: string, to: string[], trace?: boolean) {
-  if (!MJ_API_KEY || !MJ_SECRET_KEY || !MJ_FROM_EMAIL) {
-    if (trace) console.warn('[Mailjet] missing configuration');
+// Brevo email sender
+async function sendBrevoEmail(subject: string, html: string, to: string[], trace?: boolean) {
+  if (!BREVO_API_KEY) {
+    if (trace) console.warn('[Brevo] missing configuration');
     return;
   }
   const payload = {
-    Messages: [
-      {
-        From: { Email: MJ_FROM_EMAIL, Name: MJ_FROM_NAME },
-        To: to.map((Email) => ({ Email })),
-        Subject: subject,
-        HTMLPart: html,
-      },
-    ],
+    sender: {
+      email: BREVO_FROM_EMAIL,
+      name: BREVO_FROM_NAME
+    },
+    to: to.map((email) => ({ email, name: email.split('@')[0] })),
+    subject: subject,
+    htmlContent: html,
   };
-  const res = await fetch('https://api.mailjet.com/v3.1/send', {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: 'Basic ' + btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`),
+      'api-key': BREVO_API_KEY,
     },
     body: JSON.stringify(payload),
   });
-  const mjText = await res.text();
-  if (trace) console.log('[Mailjet] send', res.status, mjText);
+  const brevoText = await res.text();
+  if (trace) console.log('[Brevo] send', res.status, brevoText);
 }
 
 async function ensureGroup(groupName: string, trace: boolean) {
@@ -579,11 +577,11 @@ try {
   // Send personalized emails
   for (const email of members.client) {
     const html = renderEmail(nameFromEmail(email), 'Client', projectUrl);
-    await sendMailjetEmail(subject, html, [email], trace);
+    await sendBrevoEmail(subject, html, [email], trace);
   }
   for (const email of members.resources) {
     const html = renderEmail(nameFromEmail(email), 'Ressource', projectUrl);
-    await sendMailjetEmail(subject, html, [email], trace);
+    await sendBrevoEmail(subject, html, [email], trace);
   }
 } catch (e) {
   if (trace) console.warn('[Mailjet] notifications failed', e);

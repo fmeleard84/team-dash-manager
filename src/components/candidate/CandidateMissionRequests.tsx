@@ -164,7 +164,6 @@ export const CandidateMissionRequests = () => {
           seniority,
           languages,
           expertises,
-          calculated_price,
           booking_status,
           candidate_id,
           created_at,

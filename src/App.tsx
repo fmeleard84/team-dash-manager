@@ -22,7 +22,7 @@ const AdminResources = lazy(() => import("./pages/AdminResources"));
 const TemplateFlowSimple = lazy(() => import("./pages/TemplateFlowSimple"));
 const CandidateDashboard = lazy(() => import("./pages/CandidateDashboard"));
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard"));
-const CandidateSkillTest = lazy(() => import("./pages/CandidateSkillTest"));
+const CandidateSkillTestNew = lazy(() => import("./pages/CandidateSkillTestNew"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -81,7 +81,7 @@ const AppContent = () => {
           <Route path="/candidate/skill-test" element={
             <ProtectedRoute>
               <Suspense fallback={<PageLoader />}>
-                <CandidateSkillTest />
+                <CandidateSkillTestNew />
               </Suspense>
             </ProtectedRoute>
           } />

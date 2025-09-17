@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import custom animations */
+@import './styles/animations.css';
+
 /* Design System Tokens - Source of Truth */
 @layer base {
   :root {

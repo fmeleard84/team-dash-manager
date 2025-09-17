@@ -12,9 +12,9 @@ interface EmailRequest {
   firstName: string;
 }
 
-const MAILJET_API_KEY = "e63a0cf530fb8dce830a0017fdba0be3";
-const MAILJET_SECRET_KEY = "0f0a8b481140888844fed6e1f640c6b3";
-const FROM_EMAIL = "candidat@ialla.fr";
+const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY');
+const BREVO_FROM_EMAIL = Deno.env.get('BREVO_FROM_EMAIL') || 'hello@vaya.rip';
+const BREVO_FROM_NAME = Deno.env.get('BREVO_FROM_NAME') || 'Vaya Platform';
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -26,20 +26,18 @@ serve(async (req) => {
     const { email, code, firstName }: EmailRequest = await req.json();
 
     const emailData = {
-      Messages: [
+      sender: {
+        email: BREVO_FROM_EMAIL,
+        name: BREVO_FROM_NAME
+      },
+      to: [
         {
-          From: {
-            Email: FROM_EMAIL,
-            Name: "IALLA - Plateforme Candidats"
-          },
-          To: [
-            {
-              Email: email,
-              Name: firstName
-            }
-          ],
-          Subject: "Vérification de votre compte IALLA",
-          HTMLPart: `
+          email: email,
+          name: firstName
+        }
+      ],
+      subject: "Vérification de votre compte Vaya",
+      htmlContent: `
             <!DOCTYPE html>
             <html>
             <head>
@@ -56,7 +54,7 @@ serve(async (req) => {
               <div class="container">
                 <div class="header">
                   <h1 style="color: #1f2937;">Bienvenue ${firstName} !</h1>
-                  <p style="color: #666;">Merci de vous être inscrit sur notre plateforme de ressources.</p>
+                  <p style="color: #666;">Merci de vous être inscrit sur la plateforme Vaya.</p>
                 </div>
                 
                 <div style="text-align: center;">
@@ -72,14 +70,14 @@ serve(async (req) => {
                 </div>
                 
                 <div class="footer">
-                  <p>Équipe IALLA<br>
-                  <a href="mailto:candidat@ialla.fr" style="color: #2563eb;">candidat@ialla.fr</a></p>
+                  <p>Équipe Vaya<br>
+                  <a href="mailto:hello@vaya.rip" style="color: #2563eb;">hello@vaya.rip</a></p>
                 </div>
               </div>
             </body>
             </html>
           `,
-          TextPart: `
+      textContent: `
             Bonjour ${firstName},
             
             Bienvenue sur notre plateforme de ressources !
@@ -90,17 +88,15 @@ serve(async (req) => {
             
             Si vous n'avez pas demandé cette vérification, ignorez cet email.
             
-            Équipe IALLA
-            candidat@ialla.fr
+            Équipe Vaya
+            hello@vaya.rip
           `
-        }
-      ]
     };
 
-    const response = await fetch('https://api.mailjet.com/v3.1/send', {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${btoa(`${MAILJET_API_KEY}:${MAILJET_SECRET_KEY}`)}`,
+        'api-key': BREVO_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(emailData),
@@ -109,7 +105,7 @@ serve(async (req) => {
     const result = await response.json();
 
     if (!response.ok) {
-      console.error('Mailjet error:', result);
+      console.error('Brevo error:', result);
       throw new Error('Erreur lors de l\'envoi de l\'email');
     }
 

@@ -16,57 +16,66 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // First, let's check the current constraint
-    const { data: checkConstraint, error: checkError } = await supabase.rpc('exec_sql', {
-      sql: `
-        SELECT conname, pg_get_constraintdef(oid) as definition
-        FROM pg_constraint
-        WHERE conname LIKE '%candidate_profiles_status%'
-      `
-    })
+    console.log('Modification de la table candidate_qualification_results...')
 
-    console.log('Current constraints:', checkConstraint)
-
-    // Drop the old constraint and create a new one with correct values
+    // Corriger le type de test_id dans candidate_qualification_results
     const { error: fixError } = await supabase.rpc('exec_sql', {
       sql: `
-        -- Drop the old constraint if it exists
+        -- 1. Supprimer toutes les contraintes liées à test_id
+        ALTER TABLE candidate_qualification_results
+        DROP CONSTRAINT IF EXISTS candidate_qualification_results_test_id_fkey;
+
+        -- 2. Modifier le type de la colonne test_id pour accepter TEXT
+        DO $$
+        BEGIN
+          -- Vérifier si la colonne est UUID et la changer en TEXT
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'candidate_qualification_results'
+            AND column_name = 'test_id'
+            AND data_type = 'uuid'
+          ) THEN
+            ALTER TABLE candidate_qualification_results
+            ALTER COLUMN test_id TYPE TEXT USING test_id::TEXT;
+          END IF;
+        END $$;
+
+        -- 3. Permettre NULL pour test_id
+        ALTER TABLE candidate_qualification_results
+        ALTER COLUMN test_id DROP NOT NULL;
+
+        -- 4. Corriger aussi le statut du candidat si nécessaire
         ALTER TABLE public.candidate_profiles
         DROP CONSTRAINT IF EXISTS candidate_profiles_status_check;
 
-        -- Add the new constraint with correct values
         ALTER TABLE public.candidate_profiles
         ADD CONSTRAINT candidate_profiles_status_check
         CHECK (status IN ('qualification', 'disponible', 'en_pause', 'indisponible'));
-
-        -- Update any invalid statuses to a valid default
-        UPDATE public.candidate_profiles
-        SET status = 'disponible'
-        WHERE status IS NULL OR status NOT IN ('qualification', 'disponible', 'en_pause', 'indisponible');
       `
     })
 
     if (fixError) {
-      console.error('Error fixing constraint:', fixError)
+      console.error('Error fixing table:', fixError)
       throw fixError
     }
 
-    // Verify the fix
-    const { data: verifyConstraint, error: verifyError } = await supabase.rpc('exec_sql', {
+    // Vérifier la structure finale
+    const { data: verifyStructure } = await supabase.rpc('exec_sql', {
       sql: `
-        SELECT conname, pg_get_constraintdef(oid) as definition
-        FROM pg_constraint
-        WHERE conname = 'candidate_profiles_status_check'
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'candidate_qualification_results'
+        AND column_name = 'test_id';
       `
     })
 
-    console.log('New constraint:', verifyConstraint)
+    console.log('Structure finale:', verifyStructure)
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Constraint fixed successfully',
-        constraint: verifyConstraint
+        message: 'Tables corrigées avec succès',
+        structure: verifyStructure
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
