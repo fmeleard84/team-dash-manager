@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { ensureMediaDevices, requestMicrophoneAccess } from '../utils/media-polyfill';
 
 interface RealtimeState {
   isConnected: boolean;
@@ -80,18 +81,37 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
     try {
       setState(prev => ({ ...prev, error: null }));
 
+      // Check browser support first
+      if (!isSupported()) {
+        throw new Error('WebRTC not supported in this browser. Please use Chrome, Firefox, or Edge.');
+      }
+
       // Get ephemeral key
       const ephemeralKey = await getEphemeralKey();
       ephemeralKeyRef.current = ephemeralKey;
 
-      // Get user media
-      mediaStream.current = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+      // Ensure media devices are available (with polyfill if needed)
+      ensureMediaDevices();
+
+      // Check if mediaDevices is available after polyfill
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not available. Please ensure you are using HTTPS or localhost.');
+      }
+
+      // Request microphone access with better error handling
+      try {
+        mediaStream.current = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+      } catch (error: any) {
+        console.error('Failed to get user media:', error);
+        // Try again with simpler constraints
+        mediaStream.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
 
       // Create peer connection
       const pc = new RTCPeerConnection({

@@ -154,6 +154,17 @@ export const RealtimeQualificationAgentV2 = ({
     setTestStarted(true);
 
     try {
+      // Vérifier le support du navigateur
+      if (!isSupported || !isSupported()) {
+        throw new Error('Votre navigateur ne supporte pas WebRTC. Veuillez utiliser Chrome, Firefox ou Edge.');
+      }
+
+      // Vérifier l'accès au micro
+      if (!navigator.mediaDevices) {
+        console.error('navigator.mediaDevices non disponible');
+        throw new Error('Accès au microphone impossible. Assurez-vous d\'utiliser HTTPS ou localhost.');
+      }
+
       await connect();
 
       // Envoyer le message initial pour démarrer avec le contexte du candidat
