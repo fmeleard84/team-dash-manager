@@ -14,18 +14,18 @@ serve(async (req: Request) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Generate ephemeral key from OpenAI
+    console.log('Requesting ephemeral key from OpenAI...');
+
+    // Generate ephemeral key from OpenAI - using the NEW endpoint from documentation
     const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        session: {
-          type: 'realtime',
-          model: 'gpt-4o-realtime-preview' // Utiliser le bon nom du modèle
-        }
+        model: 'gpt-realtime',
+        voice: 'echo'
       })
     });
 
@@ -36,18 +36,23 @@ serve(async (req: Request) => {
     }
 
     const data = await response.json();
-    
-    // Extract the ephemeral key
-    const ephemeralKey = data.client_secret?.value || data.value;
-    
+    console.log('OpenAI response received:', Object.keys(data));
+
+    // Extract the ephemeral key from the response
+    // The response should contain a client_secret field
+    const ephemeralKey = data.client_secret?.value || data.client_secret || data.value;
+
     if (!ephemeralKey) {
+      console.error('OpenAI full response:', JSON.stringify(data));
       throw new Error('No ephemeral key received from OpenAI');
     }
 
+    console.log('Ephemeral key generated successfully');
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         ephemeralKey,
-        expiresIn: 3600 // 1 hour
+        expiresIn: 60 // 1 minute (OpenAI Realtime keys are short-lived)
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

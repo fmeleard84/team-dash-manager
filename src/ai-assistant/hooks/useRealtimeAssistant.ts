@@ -101,11 +101,24 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
       console.log('Ephemeral key received, connecting...', typeof ephemeralKey);
 
       // Récupérer les prompts depuis prompts_ia (table avec RLS correctes)
-      const { data: prompts } = await supabase
+      let promptsQuery = supabase
         .from('prompts_ia')
         .select('*')
-        .eq('active', true)
+        .eq('active', true);
+
+      // Pour la qualification, chercher les prompts avec [QUALIFICATION] dans le nom
+      if (config.context === 'qualification') {
+        promptsQuery = promptsQuery.or(`name.ilike.%QUALIFICATION%,context.eq.general`);
+      } else if (config.context) {
+        promptsQuery = promptsQuery.or(`context.eq.${config.context},context.eq.general`);
+      }
+
+      const { data: prompts, error: promptsError } = await promptsQuery
         .order('priority', { ascending: false });
+
+      if (promptsError) {
+        console.error('Error loading prompts:', promptsError);
+      }
 
       // Récupérer les expertises disponibles dans la base de données
       const expertisePrompt = await generateExpertisePrompt();
@@ -114,31 +127,46 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
       // Construire les instructions à partir des prompts
       let instructions = '';
       if (prompts && prompts.length > 0) {
-        // Organiser les prompts par type logique (basé sur le contexte)
-        const systemPrompts = prompts.filter(p => p.context === 'general'); // Type "Système"
-        const contextPrompts = prompts.filter(p => 
-          ['team-composition', 'project-management', 'technical', 'meeting', 'task-management'].includes(p.context)
-        ); // Type "Contexte"
-        const behaviorPrompts = prompts.filter(p => p.context === 'behavior'); // Type "Comportement"
-        
-        // Combiner dans l'ordre : Système -> Contexte -> Comportement -> Expertises
-        instructions = [
-          '=== INSTRUCTIONS SYSTÈME ===',
-          ...systemPrompts.map(p => p.prompt),
-          '\n=== CONTEXTE SPÉCIFIQUE ===',
-          ...contextPrompts.map(p => `[${p.context}]\n${p.prompt}`),
-          behaviorPrompts.length > 0 ? '\n=== COMPORTEMENT ===' : '',
-          ...behaviorPrompts.map(p => p.prompt),
-          '\n=== EXPERTISES DISPONIBLES ===',
-          expertisePrompt
-        ].filter(Boolean).join('\n\n');
-        
-        console.log('Loaded prompts:', {
-          system: systemPrompts.length,
-          context: contextPrompts.length,
-          behavior: behaviorPrompts.length,
-          expertises: 'loaded'
-        });
+        // Pour le contexte qualification, utiliser les prompts avec [QUALIFICATION]
+        if (config.context === 'qualification') {
+          const qualificationPrompts = prompts.filter(p => p.name?.includes('[QUALIFICATION]'));
+          const generalPrompts = prompts.filter(p => p.context === 'general' && !p.name?.includes('[QUALIFICATION]'));
+
+          instructions = [
+            ...qualificationPrompts.map(p => p.prompt),
+            ...generalPrompts.map(p => p.prompt)
+          ].filter(Boolean).join('\n\n');
+
+          console.log('Loaded qualification prompts:', {
+            qualification: qualificationPrompts.length,
+            general: generalPrompts.length
+          });
+        } else {
+          // Organiser les prompts par type logique (basé sur le contexte)
+          const systemPrompts = prompts.filter(p => p.context === 'general');
+          const contextPrompts = prompts.filter(p =>
+            ['team-composition', 'project-management', 'technical', 'meeting', 'task-management'].includes(p.context)
+          );
+          const behaviorPrompts = prompts.filter(p => p.context === 'behavior');
+
+          instructions = [
+            '=== INSTRUCTIONS SYSTÈME ===',
+            ...systemPrompts.map(p => p.prompt),
+            '\n=== CONTEXTE SPÉCIFIQUE ===',
+            ...contextPrompts.map(p => `[${p.context}]\n${p.prompt}`),
+            behaviorPrompts.length > 0 ? '\n=== COMPORTEMENT ===' : '',
+            ...behaviorPrompts.map(p => p.prompt),
+            '\n=== EXPERTISES DISPONIBLES ===',
+            expertisePrompt
+          ].filter(Boolean).join('\n\n');
+
+          console.log('Loaded prompts:', {
+            system: systemPrompts.length,
+            context: contextPrompts.length,
+            behavior: behaviorPrompts.length,
+            expertises: 'loaded'
+          });
+        }
       } else {
         instructions = `Tu es un assistant intelligent pour Team Dash Manager. Aide les utilisateurs à gérer leurs projets et équipes.\n\n${expertisePrompt}`;
       }
@@ -148,31 +176,53 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
         instructions += `\n\nContexte actuel: ${config.context}`;
       }
 
-      // Créer une connexion WebSocket directement avec l'API OpenAI Realtime
-      // Note: Les WebSockets dans le navigateur ne supportent pas les headers personnalisés
-      // On doit utiliser l'URL avec le token éphémère
-      const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`;
-      
-      // S'assurer que tous les subprotocols sont des chaînes
-      const subprotocols = [
-        'realtime',
-        `openai-insecure-api-key.${String(ephemeralKey)}`,
-        'openai-beta.realtime-v1'
-      ].filter(p => typeof p === 'string' && p.length > 0);
-      
-      console.log('WebSocket subprotocols:', subprotocols);
-      const ws = new WebSocket(wsUrl, subprotocols);
+      // Créer une connexion WebSocket avec l'API OpenAI Realtime
+      // IMPORTANT: Ne PAS spécifier le modèle dans l'URL, il sera défini dans session.update
+      const wsUrl = `wss://api.openai.com/v1/realtime`;
 
-      webSocketRef.current = ws;
+      // Format correct selon la documentation OpenAI officielle Voice Agents
+      // La clé éphémère doit être dans le subprotocol comme auth bearer token
+      const subprotocols = [
+        'openai-beta.realtime-v1',
+        `openai-insecure-api-key.${ephemeralKey}`
+      ];
+
+      console.log('🔌 Connecting to WebSocket:', wsUrl);
+      console.log('🔑 Using ephemeral key:', ephemeralKey.substring(0, 10) + '...');
+      console.log('📋 Subprotocols:', subprotocols);
+
+      // Créer la connexion WebSocket avec le bon subprotocol
+      console.log('🔄 Creating WebSocket with subprotocols:', subprotocols);
+
+      try {
+        const ws = new WebSocket(wsUrl, subprotocols);
+        webSocketRef.current = ws;
+
+        console.log('✅ WebSocket created, state:', ws.readyState);
+      } catch (wsError) {
+        console.error('❌ Failed to create WebSocket:', wsError);
+        setState(prev => ({
+          ...prev,
+          error: 'Failed to create WebSocket connection',
+          isProcessing: false
+        }));
+        throw wsError;
+      }
 
       // Configuration de la session après connexion
+      const ws = webSocketRef.current;
+      if (!ws) {
+        throw new Error('WebSocket not initialized');
+      }
+
       ws.onopen = () => {
         console.log('✅ WebSocket connected');
-        
-        // Envoyer la configuration de session
-        ws.send(JSON.stringify({
+
+        // Configuration de session pour le contexte qualification
+        const sessionConfig = {
           type: 'session.update',
           session: {
+            model: 'gpt-realtime', // Nouveau modèle selon la doc OpenAI
             modalities: ['text', 'audio'],
             instructions: instructions + '\n\nIMPORTANT: Réponds de façon très concise et directe. Maximum 2-3 phrases courtes.',
             voice: 'echo',
@@ -183,20 +233,27 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
             },
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.3,
-              prefix_padding_ms: 50,
-              silence_duration_ms: 150
+              threshold: 0.5,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 200
             },
             temperature: 0.6,
-            max_response_output_tokens: 500,
-            tools: config.enableTools !== false ? REALTIME_TOOLS.map(tool => ({
-              type: 'function',
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.parameters
-            })) : []
+            max_response_output_tokens: 500
           }
-        }));
+        };
+
+        // Ajouter les tools seulement si activés et pas en contexte qualification
+        if (config.enableTools !== false && config.context !== 'qualification') {
+          sessionConfig.session.tools = REALTIME_TOOLS.map(tool => ({
+            type: 'function',
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.parameters
+          }));
+        }
+
+        console.log('📤 Sending session config:', sessionConfig);
+        ws.send(JSON.stringify(sessionConfig));
 
         setState(prev => ({ 
           ...prev, 
@@ -209,11 +266,19 @@ export function useRealtimeAssistant(config: AssistantConfig = {}): UseRealtimeA
       ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log(`📡 Event [${data.type}]:`, data);
+
+          // Log détaillé pour le debug sauf pour les audio chunks
+          if (!data.type?.includes('audio')) {
+            console.log(`📡 Event [${data.type}]:`, data);
+          }
 
           switch (data.type) {
             case 'session.created':
-              console.log('✅ Session created');
+              console.log('✅ Session created with config:', data.session);
+              break;
+
+            case 'session.updated':
+              console.log('✅ Session updated successfully');
               break;
 
             case 'conversation.item.created':
