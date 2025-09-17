@@ -29,10 +29,19 @@ const getAppUrl = () => {
     origin: window.location.origin
   });
 
-  // En production ou sur le serveur de développement
+  // En production - toujours utiliser vaya.rip
+  if (window.location.hostname === 'vaya.rip' ||
+      window.location.hostname === '95.216.204.226' ||
+      window.location.port === '3000') {
+    const url = 'https://vaya.rip';
+    console.log('🔗 Using production URL:', url);
+    return url;
+  }
+
+  // En développement
   if (window.location.port === '8081') {
     const url = `http://${window.location.hostname}:8081`;
-    console.log('🔗 Using server URL:', url);
+    console.log('🔗 Using dev URL:', url);
     return url;
   }
 
@@ -131,7 +140,7 @@ export const Register = () => {
       console.log('🔗 Email redirect URL:', redirectUrl);
       console.log('📧 Signing up user:', formData.email);
 
-      // Sign up user with email confirmation disabled for dev
+      // Sign up user - l'email sera envoyé via SMTP Brevo configuré dans Supabase
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -140,8 +149,10 @@ export const Register = () => {
             first_name: formData.firstName,
             last_name: formData.lastName,
             role: role === 'team_member' ? 'client' : role,
-            is_team_member: role === 'team_member'
+            is_team_member: role === 'team_member',
+            user_type: role === 'team_member' ? 'client' : role
           },
+          // Utilise l'URL appropriée selon l'environnement
           emailRedirectTo: redirectUrl
         }
       });
