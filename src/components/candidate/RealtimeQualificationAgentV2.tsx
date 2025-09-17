@@ -78,56 +78,64 @@ export const RealtimeQualificationAgentV2 = ({
     if (!state.response || !testStarted) return;
 
     // Parser la réponse pour extraire les questions et feedbacks
-    const response = state.response.toLowerCase();
+    const response = state.response;
 
-    // Détecter si c'est une nouvelle question
-    if (response.includes('question') && response.includes('sur 10')) {
-      const questionMatch = response.match(/question (\d+) sur 10[:\s]*(.*)/i);
-      if (questionMatch) {
-        const questionNumber = parseInt(questionMatch[1]) - 1;
-        const questionText = questionMatch[2];
+    // Détecter si c'est une nouvelle question avec un regex plus flexible
+    const questionRegex = /question\s+(\d+)\s+sur\s+10\s*[:：]?/gi;
+    const matches = response.matchAll(questionRegex);
 
-        if (questionNumber === currentQuestionIndex && questionNumber < 10) {
-          // C'est une nouvelle question
-          if (questions.length <= questionNumber) {
-            const newQuestion: Question = {
-              id: `q${questionNumber + 1}`,
-              question: questionText,
-              category: questionNumber < 6 ? 'technical' :
-                       questionNumber < 8 ? 'behavioral' : 'situational',
-              difficulty: candidateProfile.seniority === 'junior' ? 'easy' :
-                         candidateProfile.seniority === 'senior' ? 'hard' : 'medium'
-            };
-            setQuestions(prev => [...prev, newQuestion]);
-          }
+    for (const match of matches) {
+      const questionNumber = parseInt(match[1]);
+
+      // Mettre à jour l'index de la question actuelle
+      if (questionNumber > currentQuestionIndex) {
+        console.log(`🎯 Détection question ${questionNumber}`);
+        setCurrentQuestionIndex(questionNumber);
+
+        // Extraire le texte de la question
+        const questionStartIndex = match.index! + match[0].length;
+        const questionText = response.substring(questionStartIndex).split('\n')[0].trim();
+
+        // Ajouter la question si elle n'existe pas déjà
+        if (questions.length < questionNumber) {
+          const newQuestion: Question = {
+            id: `q${questionNumber}`,
+            question: questionText,
+            category: questionNumber % 2 === 1 ? 'technical' : 'behavioral', // Alterner hard/soft skills
+            difficulty: candidateProfile.seniority === 'junior' ? 'easy' :
+                       candidateProfile.seniority === 'senior' ? 'hard' : 'medium'
+          };
+          setQuestions(prev => [...prev, newQuestion]);
         }
       }
     }
 
-    // Détecter le feedback et score
-    if (response.includes('score:') || response.includes('points')) {
-      const scoreMatch = response.match(/(\d+)\s*(\/10|points|sur 10)/);
-      if (scoreMatch && currentQuestionIndex > 0) {
-        const score = parseInt(scoreMatch[1]);
+    // Détecter le feedback et score avec plus de flexibilité
+    const scoreRegex = /(\d+)\s*(?:\/\s*10|sur\s*10|points)/gi;
+    const scoreMatches = response.matchAll(scoreRegex);
+
+    for (const scoreMatch of scoreMatches) {
+      const score = parseInt(scoreMatch[1]);
+      if (score <= 10 && currentQuestionIndex > 0) {
         const lastAnswer = answers[answers.length - 1];
         if (lastAnswer && !lastAnswer.score) {
+          console.log(`📊 Score détecté: ${score}/10 pour question ${currentQuestionIndex - 1}`);
           // Mettre à jour le score de la dernière réponse
           setAnswers(prev => prev.map((ans, idx) =>
             idx === prev.length - 1 ? { ...ans, score, feedback: state.response } : ans
           ));
-
-          // Passer à la question suivante
-          if (currentQuestionIndex < 10) {
-            setCurrentQuestionIndex(prev => prev + 1);
-          }
         }
       }
     }
 
     // Détecter la fin du test
-    if ((response.includes('terminé') || response.includes('fini') ||
-         response.includes('félicitations') || response.includes('résultat')) &&
-        currentQuestionIndex >= 10) {
+    if ((response.toLowerCase().includes('terminé') ||
+         response.toLowerCase().includes('fini') ||
+         response.toLowerCase().includes('félicitations') ||
+         response.toLowerCase().includes('bravo') ||
+         response.toLowerCase().includes('résultat final')) &&
+        (currentQuestionIndex >= 10 || answers.length >= 10)) {
+      console.log('✅ Test terminé détecté');
       handleTestComplete();
     }
   }, [state.response, testStarted, currentQuestionIndex]);
@@ -294,8 +302,9 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
             {/* État actuel */}
             <div className="space-y-2">
               <h3 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">
-                {testCompleted ? 'Évaluation terminée !' :
+                {testCompleted ? 'Évaluation terminée ! 🎉' :
                  testStarted && currentQuestionIndex > 0 ? `Question ${currentQuestionIndex} sur 10` :
+                 testStarted ? 'Démarrage du test...' :
                  'Préparation...'}
               </h3>
               <p className="text-neutral-600 dark:text-neutral-400">
@@ -311,13 +320,13 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
             {testStarted && !testCompleted && (
               <div className="w-full max-w-md mx-auto">
                 <Progress
-                  value={(Math.max(0, currentQuestionIndex - 1) / 10) * 100}
-                  className="h-2"
+                  value={(Math.max(0, Math.min(10, currentQuestionIndex)) / 10) * 100}
+                  className="h-3"
                 />
                 <div className="flex justify-between text-xs text-neutral-500 mt-2">
-                  <span>Début</span>
-                  <span>{Math.round((Math.max(0, currentQuestionIndex - 1) / 10) * 100)}%</span>
-                  <span>Fin</span>
+                  <span>🚀 Début</span>
+                  <span className="font-bold text-primary-500">{currentQuestionIndex}/10 questions</span>
+                  <span>🏁 Fin</span>
                 </div>
               </div>
             )}

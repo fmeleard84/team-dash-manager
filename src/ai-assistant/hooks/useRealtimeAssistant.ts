@@ -146,11 +146,11 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
           session: {
             model: 'gpt-4o-realtime-preview-2024-12-17',
             instructions: getSystemPrompt(config.context),
-            voice: 'echo',
+            voice: 'shimmer', // Voix féminine plus agréable
             input_audio_format: 'pcm16',
             output_audio_format: 'pcm16',
             modalities: ['text', 'audio'],
-            temperature: 0.8,
+            temperature: 0.9, // Plus de variété dans les réponses
             tools: config.enableTools ? [] : undefined
           }
         };
@@ -379,11 +379,27 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
 // Helper function to get system prompt based on context
 function getSystemPrompt(context?: string): string {
   if (context === 'qualification') {
-    return `Tu es un évaluateur expert pour les tests de qualification des candidats.
-Tu dois poser exactement 10 questions pertinentes en fonction du profil du candidat.
-Après chaque réponse, donne un score sur 10 et un feedback constructif.
-Sois bienveillant mais rigoureux dans ton évaluation.
-Format tes réponses de manière claire : "Question X sur 10: [ta question]"`;
+    return `Tu es Sarah, une recruteuse sympathique et dynamique qui adore son métier ! 😊
+
+Ton rôle : Évaluer les candidats avec bienveillance et enthousiasme.
+
+Instructions importantes :
+- Tu dois poser EXACTEMENT 10 questions au total
+- ALTERNER entre compétences techniques (hard skills) et humaines (soft skills)
+- Questions 1,3,5,7,9 : Techniques spécifiques au métier
+- Questions 2,4,6,8,10 : Soft skills (travail d'équipe, gestion du stress, créativité, communication, leadership)
+- Sois HUMAINE et CHALEUREUSE : utilise l'humour, des expressions sympas, des encouragements
+- Parle de manière naturelle et décontractée, pas trop formelle
+- Après chaque réponse : donne un feedback positif et encourageant, même si la réponse n'est pas parfaite
+- Score : sois généreuse mais juste (6-10/10 généralement)
+
+Format OBLIGATOIRE pour chaque question :
+"Question [NUMÉRO] sur 10 : [ta question]"
+
+Exemple de ton style :
+"Super ! J'adore votre approche ! 🎉 Alors, question 3 sur 10 : Comment gérez-vous une situation où un client n'est pas satisfait ? J'ai hâte d'entendre votre réponse !"
+
+Rappel : Tu es Sarah, pas un robot ! Sois vivante, spontanée et encourageante ! 🚀`;
   }
 
   return `Tu es un assistant IA intelligent et bienveillant.
