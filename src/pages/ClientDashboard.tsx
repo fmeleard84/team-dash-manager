@@ -82,7 +82,7 @@ import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { PageHeaderNeon } from "@/components/ui/page-header-neon";
-import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
+// import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
 import { ClientSettings } from '@/components/client/ClientSettings';
 
 const ClientDashboard = () => {
@@ -1105,7 +1105,7 @@ return (
       />
     )}
     
-    {/* Assistant Vocal IA */}
+    {/* Assistant Vocal IA - Temporairement désactivé pendant le refactoring
     <EnhancedVoiceAssistant
       isOpen={isVoiceAssistantOpen}
       onClose={() => {
@@ -1117,7 +1117,7 @@ return (
             .from('projects')
             .select('*')
             .eq('owner_id', user.id);
-          
+
           if (projectsData) {
             const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);
             const archived = projectsData.filter(p => p.archived_at || p.deleted_at);
@@ -1128,7 +1128,7 @@ return (
         refreshProjects();
       }}
       context="client-dashboard"
-    />
+    /> */}
   </SidebarProvider>
 );
 };
