@@ -7,12 +7,14 @@ import { RealtimeQualificationAgentV2 } from "@/components/candidate/RealtimeQua
 import { FullScreenModal, useFullScreenModal } from "@/components/ui/fullscreen-modal";
 import {
   Loader2, Brain, Timer, Target,
-  AlertCircle, CheckCircle, User, Sparkles
+  AlertCircle, CheckCircle, User, Sparkles,
+  Trophy, Clock, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import confetti from "canvas-confetti";
 
 export default function CandidateSkillTestNew() {
   const navigate = useNavigate();
@@ -175,14 +177,28 @@ export default function CandidateSkillTestNew() {
 
       if (profileError) throw profileError;
 
-      // Notification selon le résultat
+      // Notification et animations selon le résultat
       if (status === 'validated') {
-        toast.success('🎉 Félicitations ! Votre profil est validé !');
+        // Lancer les confettis
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ['#a855f7', '#ec4899', '#3b82f6', '#10b981']
+        });
+
+        toast.success('🎉 Félicitations ! Votre profil est validé !', {
+          duration: 7000
+        });
       } else if (status === 'stand_by') {
-        toast.info('⏳ Votre profil est en attente de validation');
+        toast.info('⏳ Votre profil est en attente de validation', {
+          duration: 5000
+        });
         await sendValidationEmail(score, answers);
       } else {
-        toast.error('Le test nécessite plus de pratique. Vous pourrez le repasser dans 24h');
+        toast.error('Le test nécessite plus de pratique. Vous pourrez le repasser dans 24h', {
+          duration: 5000
+        });
       }
 
       // Redirection après 5 secondes
@@ -196,13 +212,16 @@ export default function CandidateSkillTestNew() {
     }
   };
 
-  // Envoyer un email pour validation manuelle
+  // Envoyer un email pour validation manuelle avec note IA
   const sendValidationEmail = async (score: number, answers: any[]) => {
+    // Générer une note d'analyse de l'IA
+    const aiNote = generateAINote(score, answers);
+
     try {
       const { error } = await supabase.functions.invoke('send-validation-email', {
         body: {
           to: 'hello@vaya.rip',
-          subject: `[Validation Manuelle] ${candidateProfile?.first_name} ${candidateProfile?.last_name}`,
+          subject: `[Validation Manuelle] ${candidateProfile?.first_name} ${candidateProfile?.last_name} - Score: ${Math.round(score)}%`,
           candidateId: user?.id,
           candidateName: `${candidateProfile?.first_name} ${candidateProfile?.last_name}`,
           candidateEmail: candidateProfile?.email,
@@ -212,7 +231,8 @@ export default function CandidateSkillTestNew() {
           expertises: candidateProfile?.expertises,
           score: score,
           answers: answers,
-          testDate: new Date().toISOString()
+          testDate: new Date().toISOString(),
+          aiAnalysis: aiNote
         }
       });
 
@@ -222,6 +242,36 @@ export default function CandidateSkillTestNew() {
     } catch (error) {
       console.error('Erreur envoi email validation:', error);
     }
+  };
+
+  // Générer une note d'analyse IA pour l'email
+  const generateAINote = (score: number, answers: any[]): string => {
+    const technicalScores = answers.filter((_, i) => i % 2 === 0).map(a => a.score);
+    const softScores = answers.filter((_, i) => i % 2 === 1).map(a => a.score);
+    const avgTechnical = technicalScores.reduce((a, b) => a + b, 0) / technicalScores.length;
+    const avgSoft = softScores.reduce((a, b) => a + b, 0) / softScores.length;
+
+    return `📊 Analyse IA du candidat:
+
+Score global: ${Math.round(score)}%
+Compétences techniques: ${avgTechnical.toFixed(1)}/10
+Soft skills: ${avgSoft.toFixed(1)}/10
+
+💭 Raison du stand-by (60-89%):
+${score >= 80 ? "Le candidat montre de très bonnes compétences, juste en dessous du seuil automatique. Une validation rapide est recommandée." :
+  score >= 70 ? "Le candidat présente un profil solide avec quelques points à clarifier. Potentiel intéressant à confirmer." :
+  "Le candidat a des bases mais nécessite une évaluation approfondie pour valider l'adéquation avec vos besoins."}
+
+📝 Points forts identifiés:
+${avgTechnical > avgSoft ? "- Excellentes compétences techniques" : "- Très bonnes soft skills"}
+${answers.filter(a => a.score >= 8).length > 0 ? `- ${answers.filter(a => a.score >= 8).length} réponses excellentes (8+/10)` : ""}
+
+⚠️ Points d'attention:
+${avgTechnical < 6 ? "- Compétences techniques à approfondir" : ""}
+${avgSoft < 6 ? "- Soft skills à développer" : ""}
+${answers.filter(a => a.score < 5).length > 0 ? `- ${answers.filter(a => a.score < 5).length} réponses faibles (<5/10)` : ""}
+
+🎯 Recommandation: ${score >= 75 ? "Validation recommandée" : "Évaluation complémentaire suggérée"}`;
   };
 
   const handleClose = () => {
@@ -272,19 +322,19 @@ export default function CandidateSkillTestNew() {
             </div>
             <div className="space-y-4">
               <h2 className="text-3xl font-bold">
-                {testResults.status === 'validated' ? 'Félicitations !' :
-                 testResults.status === 'stand_by' ? 'Test complété' :
-                 'Continuez votre progression'}
+                {testResults.status === 'validated' ? 'Félicitations, vous êtes qualifié ! 🎉' :
+                 testResults.status === 'stand_by' ? 'Test terminé, analyse en cours... ⏳' :
+                 'Merci pour votre participation 🙏'}
               </h2>
               <div className="text-xl font-medium text-neutral-700 dark:text-neutral-300">
                 Votre évaluation est terminée
               </div>
               <p className="text-neutral-600 dark:text-neutral-400 max-w-2xl">
                 {testResults.status === 'validated' ?
-                  'Votre profil est maintenant validé et vous pouvez recevoir des missions.' :
+                  `🎆 Bienvenue dans l'équipe ! Vos compétences ont été reconnues et votre profil est désormais activé. Vous allez pouvoir recevoir des propositions de projets adaptés à vos expertises. Nous sommes ravis de vous compter parmi nous !` :
                  testResults.status === 'stand_by' ?
-                  'Notre équipe examinera vos réponses et vous contactera sous 24-48h.' :
-                  'Prenez le temps de développer vos compétences. Vous pourrez repasser le test ultérieurement.'}
+                  `🙏 Merci pour votre participation ! Vos réponses montrent un potentiel intéressant. Notre équipe va analyser vos compétences en détail et reviendra vers vous sous 24-48h pour confirmer votre profil. Vous recevrez alors vos premiers projets !` :
+                  `💪 Merci d'avoir passé ce test. Malheureusement, vos expertises ne correspondent pas complètement à nos attentes actuelles. Nous vous encourageons à continuer à développer vos compétences. Vous pourrez repasser le test dans 24h.`}
               </p>
               <Button
                 onClick={() => navigate('/candidate-dashboard')}
