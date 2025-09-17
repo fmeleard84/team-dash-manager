@@ -208,6 +208,8 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
 
   // Handle messages from OpenAI Realtime
   const handleRealtimeMessage = (data: any) => {
+    console.log('📨 Message OpenAI reçu:', data.type, data);
+
     switch (data.type) {
       case 'transcript':
         if (data.role === 'user') {
@@ -216,6 +218,7 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
         break;
 
       case 'response.text.delta':
+        console.log('📝 Delta texte reçu:', data.content);
         setState(prev => ({
           ...prev,
           response: prev.response + data.content,
@@ -223,7 +226,17 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
         }));
         break;
 
+      case 'response.audio_transcript.delta':
+        console.log('🎙️ Transcription audio reçue:', data.delta);
+        setState(prev => ({
+          ...prev,
+          response: prev.response + data.delta,
+          assistantMessage: prev.assistantMessage + data.delta
+        }));
+        break;
+
       case 'response.text.done':
+        console.log('✅ Réponse texte terminée');
         setState(prev => ({
           ...prev,
           conversationHistory: [
@@ -231,6 +244,25 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
             { role: 'assistant', content: prev.response }
           ]
         }));
+        break;
+
+      case 'response.audio_transcript.done':
+        console.log('✅ Transcription audio terminée');
+        setState(prev => ({
+          ...prev,
+          conversationHistory: [
+            ...prev.conversationHistory,
+            { role: 'assistant', content: prev.response }
+          ]
+        }));
+        break;
+
+      case 'response.audio.delta':
+        console.log('🔊 Audio delta reçu');
+        break;
+
+      case 'response.audio.done':
+        console.log('🔊 Audio terminé');
         break;
 
       case 'audio_buffer.speech_started':
@@ -244,6 +276,17 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
       case 'error':
         console.error('Realtime error:', data);
         setState(prev => ({ ...prev, error: data.message || 'Unknown error' }));
+        break;
+
+      case 'response.content_part.done':
+      case 'response.output_item.done':
+      case 'response.done':
+      case 'rate_limits.updated':
+        // Messages informatifs, pas besoin de logs
+        break;
+
+      default:
+        console.log('📨 Message non géré:', data.type);
         break;
     }
   };
@@ -275,10 +318,19 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
 
   // Send a text message
   const sendMessage = useCallback(async (message: string) => {
-    if (!dataChannel.current || dataChannel.current.readyState !== 'open') {
-      console.error('Data channel not ready');
+    console.log('📤 Tentative d\'envoi message:', message.substring(0, 100) + '...');
+
+    if (!dataChannel.current) {
+      console.error('❌ Data channel n\'existe pas');
       return;
     }
+
+    if (dataChannel.current.readyState !== 'open') {
+      console.error('❌ Data channel not ready, état:', dataChannel.current.readyState);
+      return;
+    }
+
+    console.log('✅ Data channel prêt, envoi du message...');
 
     const messageData = {
       type: 'conversation.item.create',
@@ -289,12 +341,15 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
       }
     };
 
+    console.log('📤 Envoi conversation.item.create:', messageData);
     dataChannel.current.send(JSON.stringify(messageData));
 
     // Trigger response
     const responseData = {
       type: 'response.create'
     };
+
+    console.log('🚀 Déclenchement response.create:', responseData);
     dataChannel.current.send(JSON.stringify(responseData));
 
     setState(prev => ({
@@ -305,6 +360,8 @@ export const useRealtimeAssistant = (config: RealtimeConfig = {}) => {
         { role: 'user', content: message }
       ]
     }));
+
+    console.log('✅ Message ajouté à l\'historique');
   }, []);
 
   // Toggle mute
@@ -383,6 +440,12 @@ function getSystemPrompt(context?: string): string {
 
 Ton rôle : Évaluer les candidats avec bienveillance et enthousiasme.
 
+INTRODUCTION (au début UNIQUEMENT) :
+- Salue chaleureusement le candidat : "Bonjour ! Moi c'est Sarah, votre recruteuse préférée ! 😊"
+- Explique brièvement : "Je vais vous poser 10 questions pour mieux connaître vos compétences"
+- Rassure : "Pas de stress, on va discuter comme entre amis !"
+- Lance directement avec "Question 1 sur 10 :"
+
 Instructions importantes :
 - Tu dois poser EXACTEMENT 10 questions au total
 - ALTERNER entre compétences techniques (hard skills) et humaines (soft skills)
@@ -390,9 +453,18 @@ Instructions importantes :
 - Questions 2,4,6,8,10 : Soft skills (travail d'équipe, gestion du stress, créativité, communication, leadership)
 
 ADAPTATION SELON LA SÉNIORITÉ (TRÈS IMPORTANT) :
-- Junior : Questions simples et pratiques, concepts de base, situations concrètes
-- Intermédiaire/Confirmé : Questions techniques modérées, bonnes pratiques, gestion de projets
-- Senior/Expert : Questions avancées, architecture, stratégie, leadership, mentoring
+- Junior : Questions simples et pratiques, concepts de base, situations concrètes, premiers pas métier
+- Intermédiaire/Confirmé : Questions techniques modérées, bonnes pratiques, gestion de projets, expériences terrain
+- Senior/Expert : Questions avancées, architecture, stratégie, leadership, mentoring, vision long terme
+
+ADAPTATION SELON LE MÉTIER (CRUCIAL) :
+- Développeur : HTML/CSS, JavaScript, frameworks, bases de données, outils de développement
+- Designer : UI/UX, outils design, typographie, couleurs, wireframes, prototypage
+- Chef de projet : planification, gestion équipe, méthodes agiles, communication client
+- Marketing : stratégie marketing, réseaux sociaux, analytics, campagnes, ROI
+- Commercial : prospection, négociation, CRM, closing, relation client
+- Comptable : comptabilité générale, fiscalité, logiciels comptables, reporting
+- Si profil général : questions généralistes sur organisation, communication, adaptabilité
 
 PERSONNALITÉ :
 - Sois HUMAINE et CHALEUREUSE : utilise l'humour, des expressions sympas, des encouragements

@@ -1,28 +1,31 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { AlertTriangle, Sparkles, ArrowRight, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { RealtimeQualificationAgentV2 } from "./RealtimeQualificationAgentV2";
 
 export const ValidationPromoBanner = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [isValidated, setIsValidated] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [candidateProfile, setCandidateProfile] = useState<any>(null);
 
   useEffect(() => {
     const checkValidationStatus = async () => {
       if (!user?.id) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('candidate_profiles')
-        .select('qualification_status')
+        .select('*')
         .eq('id', user.id)  // ID universel maintenant
         .single();
+
+      console.log('📋 Profil candidat récupéré:', data, 'Erreur:', error);
 
       if (data) {
         // qualified = validé, pending = en attente, rejected = rejeté
@@ -30,6 +33,48 @@ export const ValidationPromoBanner = () => {
         setIsValidated(isQualified);
         // Montrer la bannière si le candidat est pending ou rejected (ou null)
         setShowBanner(data.qualification_status !== 'qualified');
+
+        // Récupérer les infos du métier séparément si profile_id existe
+        let profileName = 'Profil général';
+        let categoryName = 'Généraliste';
+
+        if (data.profile_id) {
+          try {
+            const { data: hrProfile } = await supabase
+              .from('hr_profiles')
+              .select(`
+                id,
+                name,
+                hr_categories (
+                  id,
+                  name
+                )
+              `)
+              .eq('id', data.profile_id)
+              .single();
+
+            if (hrProfile) {
+              profileName = hrProfile.name || 'Profil général';
+              categoryName = hrProfile.hr_categories?.name || 'Généraliste';
+            }
+          } catch (hrError) {
+            console.warn('⚠️ Erreur récupération hr_profiles:', hrError);
+          }
+        }
+
+        // Enrichir le profil avec les infos métier
+        const enrichedProfile = {
+          ...data,
+          profile_name: profileName,
+          category: categoryName,
+          seniority: data.seniority || 'junior',
+          languages: Array.isArray(data.languages) ? data.languages :
+                    (data.languages ? [data.languages] : ['Français']),
+          expertises: Array.isArray(data.expertises) ? data.expertises : []
+        };
+
+        console.log('🎯 Profil enrichi pour Sarah:', enrichedProfile);
+        setCandidateProfile(enrichedProfile);
       }
       setLoading(false);
     };
@@ -71,7 +116,7 @@ export const ValidationPromoBanner = () => {
             
             <div className="flex items-center gap-3">
               <Button
-                onClick={() => navigate('/candidate/skill-test')}
+                onClick={() => setShowTestModal(true)}
                 className="bg-white text-purple-600 hover:bg-gray-100 font-bold shadow-lg hover:shadow-xl transition-all group animate-pulse hover:animate-none"
                 size="default"
               >
@@ -91,6 +136,79 @@ export const ValidationPromoBanner = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de test de qualification fullscreen */}
+      <FullScreenModal
+        isOpen={showTestModal}
+        onClose={() => setShowTestModal(false)}
+        title="Test de Qualification IA"
+        subtitle="Évaluation de vos compétences avec Sarah, votre recruteuse IA"
+      >
+        <div className="h-full">
+          {candidateProfile && (
+            <RealtimeQualificationAgentV2
+              candidateProfile={candidateProfile}
+              onClose={() => setShowTestModal(false)}
+              onTestComplete={async (score, status, answers) => {
+                console.log('🎉 Test terminé:', score, status, answers);
+
+                try {
+                  // Sauvegarder les résultats - structure minimale
+                  const { data: insertedResult, error: testError } = await supabase
+                    .from('candidate_qualification_results')
+                    .insert({
+                      candidate_id: user?.id,
+                      test_id: `realtime_${Date.now()}`,
+                      score: Math.round(score),
+                      max_score: 100,
+                      status: status === 'validated' ? 'passed' : status === 'stand_by' ? 'pending' : 'failed'
+                      // Utilise created_at par défaut, pas test_date
+                    })
+                    .select()
+                    .single();
+
+                  if (testError) {
+                    console.error('❌ Erreur sauvegarde résultats:', testError);
+                    console.error('Code:', testError.code, 'Message:', testError.message);
+                  } else {
+                    console.log('✅ Résultats sauvegardés:', insertedResult);
+                  }
+
+                  // Mettre à jour le statut du candidat
+                  const newQualificationStatus =
+                    status === 'validated' ? 'qualified' :
+                    status === 'stand_by' ? 'stand_by' :
+                    'rejected';
+
+                  const { error: profileError } = await supabase
+                    .from('candidate_profiles')
+                    .update({
+                      qualification_status: newQualificationStatus,
+                      status: status === 'validated' ? 'disponible' : 'qualification'
+                    })
+                    .eq('id', user?.id);
+
+                  if (profileError) {
+                    console.error('Erreur mise à jour profil:', profileError);
+                  } else {
+                    console.log('✅ Profil mis à jour:', newQualificationStatus);
+                  }
+
+                  // Fermer le modal après le test
+                  setTimeout(() => {
+                    setShowTestModal(false);
+                    window.location.reload(); // Rafraîchir pour mettre à jour le statut
+                  }, 5000);
+
+                } catch (error) {
+                  console.error('Erreur générale:', error);
+                }
+              }}
+              autoStart={true}
+            />
+          )}
+        </div>
+      </FullScreenModal>
     </div>
   );
 };

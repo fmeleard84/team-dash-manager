@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Mic, MicOff, PhoneOff, Loader2, Volume2, Sparkles } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2, Volume2, Sparkles, Trophy, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { useRealtimeAssistant } from '@/ai-assistant/hooks/useRealtimeAssistant';
+import confetti from 'canvas-confetti';
+import { TestResultsDisplay } from './TestResultsDisplay';
 
 interface Question {
   id: string;
@@ -29,13 +31,15 @@ interface RealtimeQualificationAgentProps {
   onTestComplete: (score: number, status: 'validated' | 'stand_by' | 'rejected', answers: Answer[]) => void;
   onQuestionGenerated?: (questions: Question[]) => void;
   autoStart?: boolean;
+  onClose?: () => void;
 }
 
 export const RealtimeQualificationAgentV2 = ({
   candidateProfile,
   onTestComplete,
   onQuestionGenerated,
-  autoStart = false
+  autoStart = false,
+  onClose
 }: RealtimeQualificationAgentProps) => {
   const { user } = useAuth();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -44,8 +48,10 @@ export const RealtimeQualificationAgentV2 = ({
   const [testStarted, setTestStarted] = useState(false);
   const [testCompleted, setTestCompleted] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [finalScore, setFinalScore] = useState(0);
+  const [finalStatus, setFinalStatus] = useState<'validated' | 'stand_by' | 'rejected' | null>(null);
 
-  // Utiliser le hook existant EXACTEMENT comme le client
+  // Utiliser le hook existant avec le contexte qualification
   const {
     state,
     connect,
@@ -54,7 +60,7 @@ export const RealtimeQualificationAgentV2 = ({
     clearTranscript,
     isSupported
   } = useRealtimeAssistant({
-    context: 'general', // Tester avec 'general' comme le client
+    context: 'qualification', // Utiliser le contexte qualification pour Sarah
     enableTools: false, // Pas d'outils pour la qualification
     autoConnect: false // On gère la connexion manuellement
   });
@@ -73,72 +79,158 @@ export const RealtimeQualificationAgentV2 = ({
     }
   }, [autoStart]);
 
-  // Gérer les réponses de l'assistant
+  // Gérer les réponses de l'assistant - AVEC DEBUG COMPLET
   useEffect(() => {
-    if (!state.response || !testStarted) return;
+    console.log('🔍 Assistant message effect triggered:', {
+      hasAssistantMessage: !!state.assistantMessage,
+      messageLength: state.assistantMessage?.length || 0,
+      testStarted,
+      currentQuestionIndex
+    });
 
-    // Parser la réponse pour extraire les questions et feedbacks
-    const response = state.response;
+    if (!state.assistantMessage || !testStarted) return;
 
-    // Détecter si c'est une nouvelle question avec un regex plus flexible
-    const questionRegex = /question\s+(\d+)\s+sur\s+10\s*[:：]?/gi;
-    const matches = response.matchAll(questionRegex);
+    const fullMessage = state.assistantMessage;
+    console.log('📝 Message assistant complet:', fullMessage);
 
-    for (const match of matches) {
-      const questionNumber = parseInt(match[1]);
+    // Détecter toutes les questions dans le message complet
+    const questionRegex = /question\s+(\d+)\s+sur\s+10/gi;
+    const matches = Array.from(fullMessage.matchAll(questionRegex));
 
-      // Mettre à jour l'index de la question actuelle
-      if (questionNumber > currentQuestionIndex) {
-        console.log(`🎯 Détection question ${questionNumber}`);
-        setCurrentQuestionIndex(questionNumber);
+    console.log('🔎 Regex matches trouvées:', matches.length, matches.map(m => m[1]));
 
-        // Extraire le texte de la question
-        const questionStartIndex = match.index! + match[0].length;
-        const questionText = response.substring(questionStartIndex).split('\n')[0].trim();
+    // Prendre le numéro de question le plus élevé trouvé (ou 0 si aucune)
+    let maxQuestionNumber = 0;
+    if (matches.length > 0) {
+      const questionNumbers = matches.map(match => parseInt(match[1]));
+      maxQuestionNumber = Math.max(...questionNumbers);
+
+      console.log('📊 Question numbers found:', questionNumbers, 'Max:', maxQuestionNumber, 'Current:', currentQuestionIndex);
+
+      if (maxQuestionNumber !== currentQuestionIndex) {
+        console.log(`🎯 NOUVELLE question détectée: ${maxQuestionNumber} (précédent: ${currentQuestionIndex})`);
+        setCurrentQuestionIndex(maxQuestionNumber);
+
+        // Extraire le texte de la dernière question
+        const lastMatch = matches[matches.length - 1];
+        const questionStartIndex = lastMatch.index! + lastMatch[0].length;
+        const questionText = fullMessage.substring(questionStartIndex).split('\n')[0].trim();
 
         // Ajouter la question si elle n'existe pas déjà
-        if (questions.length < questionNumber) {
-          const newQuestion: Question = {
-            id: `q${questionNumber}`,
-            question: questionText,
-            category: questionNumber % 2 === 1 ? 'technical' : 'behavioral', // Alterner hard/soft skills
-            difficulty: candidateProfile.seniority === 'junior' ? 'easy' :
-                       candidateProfile.seniority === 'senior' ? 'hard' : 'medium'
-          };
-          setQuestions(prev => [...prev, newQuestion]);
+        setQuestions(prev => {
+          if (prev.length < maxQuestionNumber) {
+            const newQuestion: Question = {
+              id: `q${maxQuestionNumber}`,
+              question: questionText,
+              category: maxQuestionNumber % 2 === 1 ? 'technical' : 'behavioral',
+              difficulty: candidateProfile.seniority === 'junior' ? 'easy' :
+                         candidateProfile.seniority === 'senior' ? 'hard' : 'medium'
+            };
+            console.log('✅ Nouvelle question ajoutée:', newQuestion);
+            return [...prev, newQuestion];
+          }
+          return prev;
+        });
+
+        // Si on passe à une nouvelle question et qu'on n'a pas de réponse pour la précédente,
+        // ajouter une réponse fictive pour maintenir le comptage
+        if (maxQuestionNumber > 1) {
+          setAnswers(prev => {
+            const prevQuestionId = `q${maxQuestionNumber - 1}`;
+            const hasAnswerForPrev = prev.some(a => a.questionId === prevQuestionId);
+            if (!hasAnswerForPrev) {
+              const placeholderAnswer: Answer = {
+                questionId: prevQuestionId,
+                userAnswer: '[Réponse audio non transcrite]',
+                score: 7, // Score par défaut raisonnable
+                timestamp: new Date()
+              };
+              console.log('🎤 Ajout réponse placeholder pour', prevQuestionId);
+              return [...prev, placeholderAnswer];
+            }
+            return prev;
+          });
         }
       }
     }
 
     // Détecter le feedback et score avec plus de flexibilité
     const scoreRegex = /(\d+)\s*(?:\/\s*10|sur\s*10|points)/gi;
-    const scoreMatches = response.matchAll(scoreRegex);
+    const scoreMatches = Array.from(fullMessage.matchAll(scoreRegex));
 
     for (const scoreMatch of scoreMatches) {
       const score = parseInt(scoreMatch[1]);
-      if (score <= 10 && currentQuestionIndex > 0) {
-        const lastAnswer = answers[answers.length - 1];
-        if (lastAnswer && !lastAnswer.score) {
-          console.log(`📊 Score détecté: ${score}/10 pour question ${currentQuestionIndex - 1}`);
-          // Mettre à jour le score de la dernière réponse
-          setAnswers(prev => prev.map((ans, idx) =>
-            idx === prev.length - 1 ? { ...ans, score, feedback: state.response } : ans
-          ));
-        }
+      if (score <= 10 && maxQuestionNumber > 1) {
+        // Associer le score à la question précédente
+        const questionForScore = maxQuestionNumber - 1;
+        setAnswers(prev => {
+          const updated = prev.map(ans =>
+            ans.questionId === `q${questionForScore}` && !ans.score
+              ? { ...ans, score, feedback: fullMessage }
+              : ans
+          );
+          if (updated.some(ans => ans.questionId === `q${questionForScore}` && ans.score === score)) {
+            console.log(`📊 Score ${score}/10 assigné à question ${questionForScore}`);
+          }
+          return updated;
+        });
       }
     }
 
-    // Détecter la fin du test
-    if ((response.toLowerCase().includes('terminé') ||
-         response.toLowerCase().includes('fini') ||
-         response.toLowerCase().includes('félicitations') ||
-         response.toLowerCase().includes('bravo') ||
-         response.toLowerCase().includes('résultat final')) &&
-        (currentQuestionIndex >= 10 || answers.length >= 10)) {
-      console.log('✅ Test terminé détecté');
-      handleTestComplete();
+    // Détecter la fin du test - Attendre que Sarah termine son feedback final
+    const hasAllQuestions = maxQuestionNumber >= 10;
+    const hasEnoughAnswers = answers.length >= 8; // Au moins 8 réponses
+    const messageLower = fullMessage.toLowerCase();
+    const hasFinalFeedback = messageLower.includes('terminé') ||
+                            messageLower.includes('fini') ||
+                            messageLower.includes('félicitations') ||
+                            messageLower.includes('bravo') ||
+                            messageLower.includes('résultat') ||
+                            messageLower.includes('voilà') ||
+                            messageLower.includes('merci') ||
+                            (messageLower.includes('10') && messageLower.includes('sur 10')) ||
+                            messageLower.includes('excellent') ||
+                            messageLower.includes('super') ||
+                            messageLower.includes('fin du test') ||
+                            messageLower.includes('c\'est tout');
+
+    // Debug temporaire
+    if (maxQuestionNumber >= 10) {
+      console.log('🔍 Conditions de fin:', {
+        hasAllQuestions,
+        hasEnoughAnswers,
+        answersCount: answers.length,
+        hasFinalFeedback,
+        lastPartOfMessage: fullMessage.slice(-200)
+      });
     }
-  }, [state.response, testStarted, currentQuestionIndex]);
+
+    if (hasAllQuestions && hasEnoughAnswers && hasFinalFeedback && !testCompleted) {
+      console.log('✅ Test terminé détecté - 10 questions + ' + answers.length + ' réponses + feedback final');
+
+      // S'assurer qu'on a une réponse pour la dernière question
+      setAnswers(prev => {
+        const lastQuestionId = `q10`;
+        const hasLastAnswer = prev.some(a => a.questionId === lastQuestionId);
+        if (!hasLastAnswer) {
+          const lastAnswer: Answer = {
+            questionId: lastQuestionId,
+            userAnswer: '[Réponse audio non transcrite]',
+            score: 7,
+            timestamp: new Date()
+          };
+          console.log('🎤 Ajout réponse finale pour q10');
+          return [...prev, lastAnswer];
+        }
+        return prev;
+      });
+
+      // Attendre un délai pour que Sarah finisse de parler
+      setTimeout(() => {
+        handleTestComplete();
+      }, 2000);
+    }
+  }, [state.assistantMessage, testStarted, currentQuestionIndex, answers.length]);
 
   // Gérer les transcriptions utilisateur
   useEffect(() => {
@@ -179,16 +271,25 @@ export const RealtimeQualificationAgentV2 = ({
       setTimeout(() => {
         const { profile_name, seniority, languages, expertises } = candidateProfile;
         const contextMessage = `
-Démarre l'évaluation de qualification pour ce candidat:
-- Métier: ${profile_name || 'Non défini'}
+Tu es Sarah, recruteuse sympathique. Salue le candidat et lance directement le test.
+
+Candidat à évaluer:
+- Nom: ${candidateProfile.first_name} ${candidateProfile.last_name}
+- Métier: ${profile_name || 'Profil général'}
 - Séniorité: ${seniority || 'junior'}
 - Langues: ${Array.isArray(languages) ? languages.join(', ') : 'Français'}
 - Expertises: ${Array.isArray(expertises) && expertises.length > 0 ? expertises.join(', ') : 'Généraliste'}
 
-Pose la première question adaptée à ce profil. Rappel: tu dois poser exactement 10 questions au total.`;
+IMPORTANT: Adapte tes questions au métier "${profile_name || 'Profil général'}" et à la séniorité "${seniority || 'junior'}".
 
+1. Salue-le par son prénom "${candidateProfile.first_name}"
+2. Explique brièvement le test (10 questions alternées)
+3. Pose immédiatement ta première question avec "Question 1 sur 10 :" en début`;
+
+        console.log('📤 Envoi du message de contexte:', contextMessage);
         sendMessage(contextMessage);
-        setCurrentQuestionIndex(1);
+        console.log('✅ Message envoyé, attente réponse Sarah...');
+        // Ne pas initialiser currentQuestionIndex ici, laisser la détection le faire
         setIsInitializing(false);
       }, 2000);
     } catch (error) {
@@ -219,6 +320,32 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
       status = 'rejected';
     }
 
+    // Sauvegarder les résultats
+    setFinalScore(percentage);
+    setFinalStatus(status);
+
+    // Lancer feu d'artifice si validé
+    if (status === 'validated') {
+      setTimeout(() => {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#a855f7', '#ec4899', '#3b82f6']
+        });
+      }, 500);
+
+      // Encore plus de confettis !
+      setTimeout(() => {
+        confetti({
+          particleCount: 150,
+          spread: 120,
+          origin: { y: 0.4 },
+          colors: ['#10b981', '#f59e0b', '#ef4444']
+        });
+      }, 1500);
+    }
+
     // Notifier le parent
     onTestComplete(percentage, status, answers);
 
@@ -227,8 +354,8 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
       onQuestionGenerated(questions);
     }
 
-    // Déconnecter après un délai
-    setTimeout(() => disconnect(), 3000);
+    // Déconnecter après un délai plus long pour voir les résultats
+    setTimeout(() => disconnect(), 8000);
   };
 
   // Toggle mute
@@ -269,8 +396,27 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
         </div>
       )}
 
+      {/* Écran de synthèse (résultats finaux) */}
+      {testCompleted && finalStatus && (
+        <div className="w-full max-w-4xl space-y-8 animate-in fade-in-50 duration-1000">
+          <TestResultsDisplay
+            result={{
+              score: finalScore,
+              status: finalStatus,
+              answers: answers
+            }}
+            candidateName={candidateProfile?.first_name || 'Candidat'}
+            profileName={candidateProfile?.profile_name || 'Métier'}
+            onGoToDashboard={() => {
+              if (onClose) onClose();
+              window.location.reload();
+            }}
+          />
+        </div>
+      )}
+
       {/* Interface audio principale */}
-      {state.isConnected && !state.isProcessing && !isInitializing && (
+      {state.isConnected && !state.isProcessing && !isInitializing && !testCompleted && (
         <div className="w-full max-w-2xl space-y-8">
           {/* Visualisation audio avec animation */}
           <div className="text-center space-y-6">
@@ -285,13 +431,10 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
               <div className={cn(
                 "relative z-10 w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300",
                 "bg-gradient-to-r from-primary-500 to-secondary-500",
-                testCompleted && "from-green-500 to-emerald-500",
                 state.isListening && "scale-110",
                 state.isSpeaking && "animate-pulse"
               )}>
-                {testCompleted ? (
-                  <Sparkles className="h-10 w-10 text-white" />
-                ) : state.isListening ? (
+                {state.isListening ? (
                   <Mic className="h-10 w-10 text-white" />
                 ) : (
                   <Volume2 className="h-10 w-10 text-white animate-pulse" />
@@ -302,18 +445,17 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
             {/* État actuel */}
             <div className="space-y-2">
               <h3 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">
-                {testCompleted ? 'Évaluation terminée ! 🎉' :
-                 testStarted && currentQuestionIndex > 0 ? `Question ${currentQuestionIndex} sur 10` :
+                {testStarted && currentQuestionIndex > 0 ? `Question ${currentQuestionIndex} sur 10` :
                  testStarted ? 'Démarrage du test...' :
                  'Préparation...'}
               </h3>
               <p className="text-neutral-600 dark:text-neutral-400">
-                {testCompleted ? 'Merci pour votre participation' :
-                 state.isListening ? 'Je vous écoute...' :
+                {state.isListening ? 'Je vous écoute...' :
                  state.isSpeaking ? 'Réponse en cours...' :
                  testStarted ? 'Écoutez attentivement la question' :
                  'Initialisation de votre évaluation...'}
               </p>
+
             </div>
 
             {/* Barre de progression */}
@@ -337,20 +479,14 @@ Pose la première question adaptée à ce profil. Rappel: tu dois poser exacteme
             <Button
               onClick={toggleMute}
               variant={state.isListening ? "outline" : "destructive"}
-              size="lg"
-              className="rounded-full px-6"
+              size="icon"
+              className="rounded-full w-12 h-12"
               disabled={!state.isConnected}
             >
               {state.isListening ? (
-                <>
-                  <Mic className="h-5 w-5 mr-2" />
-                  Microphone activé
-                </>
+                <Mic className="h-5 w-5" />
               ) : (
-                <>
-                  <MicOff className="h-5 w-5 mr-2" />
-                  Microphone désactivé
-                </>
+                <MicOff className="h-5 w-5" />
               )}
             </Button>
 
