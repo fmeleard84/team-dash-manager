@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RadixProjectCard } from '@/components/RadixProjectCard';
+// import { RadixProjectCard } from '@/components/RadixProjectCard'; // Remplacé par UnifiedProjectCard
+import { ClientProjectCard as RadixProjectCard } from '@/components/UnifiedProjectCard';
 import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 import { 
   Plus, 

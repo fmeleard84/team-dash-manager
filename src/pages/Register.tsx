@@ -20,35 +20,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Fonction pour obtenir l'URL de base correcte
-const getAppUrl = () => {
-  // Debug logging
-  console.log('🌐 Current location:', {
-    hostname: window.location.hostname,
-    port: window.location.port,
-    origin: window.location.origin
-  });
-
-  // En production - toujours utiliser vaya.rip
-  if (window.location.hostname === 'vaya.rip' ||
-      window.location.hostname === '95.216.204.226' ||
-      window.location.port === '3000') {
-    const url = 'https://vaya.rip';
-    console.log('🔗 Using production URL:', url);
-    return url;
-  }
-
-  // En développement
-  if (window.location.port === '8081') {
-    const url = `http://${window.location.hostname}:8081`;
-    console.log('🔗 Using dev URL:', url);
-    return url;
-  }
-
-  // Fallback sur l'origin
-  console.log('🔗 Using origin:', window.location.origin);
-  return window.location.origin;
-};
+import { getAppUrl } from '@/config/app.config';
 
 export const Register = () => {
   const navigate = useNavigate();

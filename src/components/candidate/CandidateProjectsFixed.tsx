@@ -11,7 +11,8 @@ import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { IallaLogo } from "@/components/IallaLogo";
-import { CandidateProjectCard } from "@/components/candidate/CandidateProjectCard";
+// import { CandidateProjectCard } from "@/components/candidate/CandidateProjectCard"; // Remplacé par UnifiedProjectCard
+import { CandidateProjectCardUnified as CandidateProjectCard } from "@/components/UnifiedProjectCard";
 import { useProjectFiles } from "@/hooks/useProjectFiles";
 
 interface ProjectDetail {
