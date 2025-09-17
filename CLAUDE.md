@@ -848,30 +848,101 @@ SUPABASE_DB_PASSWORD="R@ymonde7510_2a" \
 npx supabase functions deploy send-validation-email --project-ref egdelmcijszuapcpglsy
 ```
 
-## 🚨 ÉTAT DE PRODUCTION (17/09/2025)
+## 🚨 ÉTAT DE PRODUCTION (17/09/2025) - MISE À JOUR
 
-### ⚠️ Points Critiques Production
+### 🔄 Audit de Cohérence DEV/PROD
+
+#### Résultat de l'audit (17/09/2025)
+- ✅ **27 tables vérifiées** : Toutes les tables critiques existent en DEV et PROD
+- ✅ **Politiques RLS** : Cohérentes entre DEV et PROD
+- ⚠️ **2 colonnes manquantes en PROD** :
+  - `hr_resource_assignments.calculated_price`
+  - `hr_profiles.skills`
 
 #### Tables HR en Production
-La base de production (`nlesrzepybeeghghjafc`) a été mise à jour le 17/09/2025 avec les tables HR :
-- ✅ `hr_categories` : Créée et peuplée avec 10 catégories
-- ✅ `hr_profiles` : Créée et peuplée avec 16 profils métiers
-- ✅ `hr_resource_assignments` : Structure créée SANS la colonne `calculated_price`
+La base de production (`nlesrzepybeeghghjafc`) a été mise à jour le 17/09/2025 :
+- ✅ `hr_categories` : 10 catégories
+- ✅ `hr_profiles` : 16 profils métiers (SANS colonne `skills`)
+- ✅ `hr_resource_assignments` : Structure créée (SANS colonne `calculated_price`)
+- ✅ `hr_languages` : Tables de référence pour les langues
+- ✅ `hr_expertises` : Tables de référence pour les expertises
+- ✅ Toutes les autres tables critiques présentes et fonctionnelles
 
-**IMPORTANT** : La colonne `calculated_price` n'existe PAS en production. Ne pas l'utiliser dans les requêtes.
+#### Différences Structurelles DEV vs PROD
 
-#### Différences DEV vs PROD
+| Élément | Développement | Production | Impact | Solution |
+|---------|--------------|------------|--------|----------|
+| Base Supabase | `egdelmcijszuapcpglsy` | `nlesrzepybeeghghjafc` | - | - |
+| hr_profiles.skills | ✅ TEXT[] | ❌ N'existe pas | Requêtes échouent | Migration SQL requise |
+| hr_resource_assignments.calculated_price | ✅ DECIMAL(10,2) | ❌ N'existe pas | Requêtes échouent | Migration SQL requise |
+| Webhook handle-new-user-simple | ✅ Configuré | ✅ Configuré | - | - |
+| Politiques RLS | ✅ Actives | ✅ Actives | - | - |
 
-| Élément | Développement | Production |
-|---------|--------------|------------|
-| Base Supabase | `egdelmcijszuapcpglsy` | `nlesrzepybeeghghjafc` |
-| hr_profiles.skills | ✅ Existe | ❌ N'existe pas |
-| hr_resource_assignments.calculated_price | ✅ Existe | ❌ N'existe pas |
-| Webhook handle-new-user-simple | ✅ Configuré | ⚠️ À vérifier |
+### 📝 Migration SQL à Appliquer en Production
+
+Pour aligner la production sur le développement, exécuter dans le Dashboard Supabase > SQL Editor :
+
+```sql
+-- 1. Ajouter calculated_price
+ALTER TABLE public.hr_resource_assignments
+ADD COLUMN IF NOT EXISTS calculated_price DECIMAL(10,2);
+
+-- 2. Ajouter skills
+ALTER TABLE public.hr_profiles
+ADD COLUMN IF NOT EXISTS skills TEXT[] DEFAULT '{}';
+
+-- 3. Initialiser les compétences
+UPDATE public.hr_profiles SET skills = CASE
+  WHEN name = 'Développeur Full-Stack' THEN ARRAY['JavaScript', 'React', 'Node.js']
+  WHEN name = 'Développeur Frontend' THEN ARRAY['React', 'Vue.js', 'TypeScript']
+  WHEN name = 'Développeur Backend' THEN ARRAY['Node.js', 'Python', 'API REST']
+  ELSE '{}'::TEXT[]
+END
+WHERE skills = '{}' OR skills IS NULL;
+```
 
 #### Fonctions Edge déployées en PROD
 - `handle-new-user-simple` : Création automatique des profils
 - `apply-hr-migration-prod` : Migration des tables HR
+- `fix-hr-profiles-prod` : Correction structure hr_profiles
+- `fix-production-hr-tables` : Diagnostic et réparation tables HR
+- `check-and-fix-columns` : Vérification des colonnes manquantes
+- `apply-column-migration` : Application des migrations de colonnes
+
+### 🛠️ Scripts d'Audit et de Maintenance
+
+```bash
+# Audit complet DEV/PROD
+node audit-dev-prod-consistency.mjs
+
+# Vérifier les colonnes spécifiques
+node check-specific-columns.mjs
+
+# Tester l'accès candidat en production
+node test-candidate-access-prod.mjs
+
+# Appliquer les migrations HR
+node execute-hr-migration-prod.mjs
+```
+
+### ✅ Checklist de Cohérence DEV/PROD
+
+Avant chaque déploiement en production :
+
+- [ ] Exécuter `audit-dev-prod-consistency.mjs`
+- [ ] Vérifier les colonnes critiques avec `check-specific-columns.mjs`
+- [ ] S'assurer que le code ne référence pas les colonnes manquantes
+- [ ] Tester les requêtes complexes avec jointures
+- [ ] Vérifier les politiques RLS
+- [ ] Documenter tout écart dans CLAUDE.md
+
+### 🚧 Travail Restant
+
+1. **Appliquer la migration SQL en production** via le Dashboard Supabase
+2. **Ou adapter le code** pour ne pas utiliser :
+   - `calculated_price` (peut être calculé côté client)
+   - `skills` (peut être omis ou géré différemment)
+3. **Mettre en place un CI/CD** pour synchroniser automatiquement DEV → PROD
 - `fix-hr-profiles-prod` : Correction structure hr_profiles
 - `fix-production-hr-tables` : Diagnostic et réparation tables HR
 

@@ -25,3 +25,12 @@ dist-ssr
 *.sw?
 .env.openai
 _archive_debug/
+
+# Sensitive files - Added 17/09/2025
+.env.local
+.env.development
+.env.production
+*.env
+audit-report-*.json
+*service_key*
+*SERVICE_KEY*
