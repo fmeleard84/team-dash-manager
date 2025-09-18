@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   Sidebar, 
@@ -49,8 +48,6 @@ import {
   Mic,
   Bot
 } from "lucide-react";
-import { TextChatInterface } from '@/components/client/TextChatInterface';
-
 // Design System Components
 import { PageSection } from "@/ui/layout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/ui/components/Card";
@@ -84,7 +81,7 @@ import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { PageHeaderNeon } from "@/components/ui/page-header-neon";
-// import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
+import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
 import { ClientSettings } from '@/components/client/ClientSettings';
 
 const ClientDashboard = () => {
@@ -114,7 +111,7 @@ const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 const [projectToDelete, setProjectToDelete] = useState<DbProject | null>(null);
 const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
-const [showTextChat, setShowTextChat] = useState(false);
+// const [showTextChat, setShowTextChat] = useState(false); // Removed - using EnhancedVoiceAssistant instead
 
 // Debug useEffect
 useEffect(() => {
@@ -1052,7 +1049,7 @@ const headerContent = (
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => setShowTextChat(true)}
+        onClick={() => setIsVoiceAssistantOpen(true)}
         className="relative group"
         title="Assistant IA"
       >
@@ -1108,40 +1105,7 @@ return (
       />
     )}
 
-    {/* Interface de Chat IA */}
-    {showTextChat && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div className="relative w-full max-w-4xl h-[80vh] mx-4">
-          <Card className="relative h-full backdrop-blur-xl bg-white/95 dark:bg-neutral-900/95 border border-neutral-200/50 dark:border-neutral-700/50 shadow-2xl">
-            <div className="absolute top-4 right-4 z-10">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowTextChat(false)}
-                className="rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </Button>
-            </div>
-            <TextChatInterface
-              context="client"
-              onToolCall={(tool, args) => {
-                console.log('Tool called:', tool, args);
-                // Gérer les appels d'outils si nécessaire
-                if (tool === 'navigate_to_project') {
-                  setShowTextChat(false);
-                  // Navigation vers le projet
-                }
-              }}
-            />
-          </Card>
-        </div>
-      </div>
-    )}
-
-    {/* Assistant Vocal IA - Temporairement désactivé pendant le refactoring
+    {/* Assistant IA avec onglets Audio et Texte */}
     <EnhancedVoiceAssistant
       isOpen={isVoiceAssistantOpen}
       onClose={() => {
@@ -1163,8 +1127,8 @@ return (
         };
         refreshProjects();
       }}
-      context="client-dashboard"
-    /> */}
+      projectId={selectedProjectId}
+    />
   </SidebarProvider>
 );
 };
