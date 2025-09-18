@@ -23,7 +23,7 @@ export default function HeroLyniq() {
       >
         <img
           src="/src/assets/hp_charlie.jpg"
-          alt="Team Dash Manager Hero"
+          alt="Vaya Hero"
           className="absolute inset-0 h-[120%] w-full object-cover"
           loading="eager"
           fetchPriority="high"

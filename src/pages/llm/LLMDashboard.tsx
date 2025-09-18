@@ -139,10 +139,10 @@ const LLMDashboard = () => {
 
   // Contenu pour chaque section
   const [content, setContent] = useState({
-    'general': `# 📚 Documentation Team Dash Manager
+    'general': `# 📚 Documentation Vaya
 
 ## Vue d'ensemble
-Team Dash Manager est une plateforme complète de gestion de projets et de ressources humaines, conçue pour faciliter la collaboration entre clients et candidats.
+Vaya est une plateforme complète de gestion de projets et de ressources humaines, conçue pour faciliter la collaboration entre clients et candidats.
 
 ### 🎯 Objectifs principaux
 - **Gestion de projets** : Création, suivi et orchestration de projets complexes
@@ -686,10 +686,10 @@ useEffect(() => {
 7. **Performance**: Lazy loading des images, optimisation des animations
 
 Cette charte graphique est conçue pour créer une expérience premium, minimaliste et moderne. Elle doit être appliquée de manière cohérente sur toutes les pages du site.`,
-    general: `# Documentation Technique - Team Dash Manager
+    general: `# Documentation Technique - Vaya
 
 ## Vue d'ensemble
-Team Dash Manager est une plateforme de gestion de projets et de ressources humaines permettant de connecter des clients avec des candidats qualifiés pour former des équipes projet.
+Vaya est une plateforme de gestion de projets et de ressources humaines permettant de connecter des clients avec des candidats qualifiés pour former des équipes projet.
 
 ## Architecture
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS

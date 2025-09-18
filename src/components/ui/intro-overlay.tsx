@@ -41,7 +41,7 @@ export default function IntroOverlay() {
             }}
             className="relative flex flex-col items-center gap-8"
           >
-            {/* Logo - Team Dash Manager */}
+            {/* Logo - Vaya */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ 
@@ -66,10 +66,7 @@ export default function IntroOverlay() {
                 />
                 <h1 className="relative text-6xl md:text-7xl font-bold text-white tracking-tight">
                   <span className="bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                    Team
-                  </span>
-                  <span className="text-accent ml-3">
-                    Dash
+                    Vaya
                   </span>
                 </h1>
               </div>
@@ -90,7 +87,7 @@ export default function IntroOverlay() {
               }}
               className="text-gray-400 text-sm md:text-base tracking-widest uppercase"
             >
-              Orchestrating digital excellence
+              The future of work
             </motion.p>
 
             {/* Loading dots animation */}

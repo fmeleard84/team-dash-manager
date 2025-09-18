@@ -22,7 +22,7 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'explain_platform_feature',
-      description: 'Expliquer en détail une fonctionnalité de la plateforme Team Dash Manager',
+      description: 'Expliquer en détail une fonctionnalité de la plateforme Vaya',
       parameters: {
         type: 'object',
         properties: {

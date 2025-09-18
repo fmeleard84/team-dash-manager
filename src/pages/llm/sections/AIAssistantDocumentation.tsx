@@ -53,7 +53,7 @@ export function AIAssistantDocumentation() {
             </h2>
             <div className="space-y-4 text-sm">
               <p>
-                L'AI Assistant est un System conversationnel avancé intégré à Team Dash Manager, 
+                L'AI Assistant est un System conversationnel avancé intégré à Vaya, 
                 permettant aux Users d'interagir avec la plateforme via la voix ou le texte.
               </p>
               

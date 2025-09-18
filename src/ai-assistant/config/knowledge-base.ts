@@ -1,5 +1,5 @@
 /**
- * Team Dash Manager Platform Knowledge Base
+ * Vaya Platform Knowledge Base
  * This database contains all information about how the platform works
  */
 

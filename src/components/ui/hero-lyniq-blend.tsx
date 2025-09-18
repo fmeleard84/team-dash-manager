@@ -19,7 +19,7 @@ export default function HeroLyniqBlend() {
       <div className="fixed inset-0">
         <img
           src="/src/assets/hp_charlie.jpg"
-          alt="Team Dash Manager Hero"
+          alt="Vaya Hero"
           className="absolute inset-0 h-full w-full object-cover"
           loading="eager"
           fetchPriority="high"

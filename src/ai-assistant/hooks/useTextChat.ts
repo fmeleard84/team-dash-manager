@@ -77,7 +77,7 @@ export function useTextChat(config: TextChatConfig = {}) {
         }
       } else {
         // Prompt par défaut si aucun prompt n'est configuré
-        instructions = `Vous êtes un assistant IA pour Team Dash Manager, spécialisé dans la création et la gestion d'équipes projet.
+        instructions = `Vous êtes un assistant IA pour Vaya, spécialisé dans la création et la gestion d'équipes projet.
 
 VOTRE RÔLE PRINCIPAL :
 - Aider les clients à composer des équipes pour leurs projets
@@ -139,7 +139,7 @@ Utilisez ces fonctions seulement après avoir validé tous les paramètres.
       return instructions;
     } catch (error) {
       console.error('Erreur lors de la construction du prompt système:', error);
-      return 'Vous êtes un assistant IA pour Team Dash Manager. Aidez l\'utilisateur avec ses questions et tâches.';
+      return 'Vous êtes un assistant IA pour Vaya. Aidez l\'utilisateur avec ses questions et tâches.';
     }
   }, [config.context]);
 

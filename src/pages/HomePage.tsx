@@ -92,8 +92,7 @@ export const HomePage = () => {
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/" className="text-2xl font-bold">
-                <span className="text-white">Team</span>
-                <span className="text-white">Dash</span>
+                <span className="text-white">Vaya</span>
               </Link>
             </div>
 
@@ -305,7 +304,7 @@ export const HomePage = () => {
           <div className="text-center">
             <div className="text-6xl text-accent mb-8">"</div>
             <blockquote className="h-display mb-8">
-              TeamDash a transformé notre façon de constituer des équipes. 
+              Vaya a transformé notre façon de constituer des équipes. 
               <span className="text-accent"> En 48h, nous avions une équipe de 8 experts</span> parfaitement 
               alignés sur nos besoins.
             </blockquote>
@@ -387,7 +386,7 @@ export const HomePage = () => {
           <div className="divider-dark-premium mb-8"></div>
           
           <div className="flex flex-col md:flex-row justify-between items-center text-gray-400 text-small">
-            <p>&copy; 2024 TeamDash. Tous droits réservés.</p>
+            <p>&copy; 2024 Vaya. Tous droits réservés.</p>
             <div className="flex gap-6 mt-4 md:mt-0">
               <a href="#" className="hover:text-white transition-colors">Mentions légales</a>
               <a href="#" className="hover:text-white transition-colors">Confidentialité</a>

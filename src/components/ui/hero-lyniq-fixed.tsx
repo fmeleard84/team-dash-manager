@@ -33,7 +33,7 @@ export default function HeroLyniqFixed() {
               >
                 <span className="inline-flex items-center gap-2 text-sm md:text-base tracking-widest uppercase text-white/90">
                   <span className="w-12 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
-                  Digital Excellence
+                  Future of work
                 </span>
               </motion.div>
               
@@ -47,51 +47,16 @@ export default function HeroLyniqFixed() {
                 {/* Main title with mix-blend-mode effect */}
                 <h1 className="font-black leading-[0.85] tracking-[-0.03em]
                          text-[clamp(3rem,8vw,7rem)] text-white"
-                    style={{ 
+                    style={{
                       mixBlendMode: 'difference'
                     }}>
-                  <span className="block">Digital</span>
-                  <span className="block">design</span>
-                  <span className="block">studio</span>
+                  <span className="block">Plug talent</span>
+                  <span className="block">play result</span>
                 </h1>
               </motion.div>
 
               {/* Subtitle */}
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
-                className="mt-8 max-w-xl text-white/90 text-base md:text-lg leading-relaxed drop-shadow-lg"
-              >
-                Nous orchestrons la transformation digitale des entreprises ambitieuses. 
-                Design premium, développement sur-mesure, résultats exceptionnels.
-              </motion.p>
 
-              {/* CTA Buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
-                className="mt-10 flex flex-wrap gap-4"
-              >
-                <Button
-                  size="lg"
-                  className="bg-white text-black hover:bg-gray-100 font-semibold transition-all duration-300 group"
-                >
-                  <span className="flex items-center gap-2">
-                    Découvrir nos projets
-                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                  </span>
-                </Button>
-                
-                <Button
-                  size="lg"
-                  className="border-2 border-white bg-transparent text-white hover:bg-white hover:text-black 
-                           font-semibold transition-all duration-300"
-                >
-                  Voir les tarifs
-                </Button>
-              </motion.div>
             </div>
 
             {/* Side stats */}

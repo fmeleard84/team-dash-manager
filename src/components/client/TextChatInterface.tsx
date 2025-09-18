@@ -181,7 +181,7 @@ export function TextChatInterface({ context, onToolCall }: TextChatInterfaceProp
               <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-brand/20 to-brand/10 rounded-full flex items-center justify-center">
                 <Bot className="w-10 h-10 text-brand" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Assistant IA Team Dash</h3>
+              <h3 className="text-lg font-semibold mb-2">Assistant IA Vaya</h3>
               <p className="text-muted-foreground mb-6">
                 Je suis là pour vous aider avec vos projets et ressources.
               </p>
