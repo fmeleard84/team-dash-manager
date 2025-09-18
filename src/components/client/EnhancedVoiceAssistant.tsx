@@ -40,11 +40,11 @@ interface Message {
   };
 }
 
-export const EnhancedVoiceAssistant = ({ 
-  isOpen, 
-  onClose, 
-  context = 'general' 
-}: EnhancedVoiceAssistantProps) {
+export const EnhancedVoiceAssistant = ({
+  isOpen,
+  onClose,
+  context = 'general'
+}: EnhancedVoiceAssistantProps) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'voice' | 'text' | 'help'>('voice');
   const [textInput, setTextInput] = useState('');
