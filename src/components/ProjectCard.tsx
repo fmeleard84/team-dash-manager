@@ -649,30 +649,30 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="bg-white border-[#ECEEF1]"
+                className="bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700"
                 sideOffset={5}
                 style={{ zIndex: 99999, position: 'relative' }}
               >
                 {!isArchived && (
                   <>
-                    <DropdownMenuItem onClick={() => onView(project.id)} className="hover:bg-[#F7F8FA] text-[#0E0F12]">
+                    <DropdownMenuItem onClick={() => onView(project.id)} className="hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
                       <Users className="h-4 w-4 mr-2" />
                       Modifier l'équipe
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setShowEditModal(true)} className="hover:bg-[#F7F8FA] text-[#0E0F12]">
+                    <DropdownMenuItem onClick={() => setShowEditModal(true)} className="hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
                       <Edit className="h-4 w-4 mr-2" />
                       Éditer le projet
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => onArchive?.(project.id)}
-                      className="hover:bg-blue-50 text-blue-600"
+                      className="hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
                     >
                       <Archive className="h-4 w-4 mr-2" />
                       Archiver
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => onDelete(project.id)}
-                      className="hover:bg-red-50 text-red-600"
+                      className="hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Supprimer
@@ -680,9 +680,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   </>
                 )}
                 {isArchived && (
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => onUnarchive?.(project.id)}
-                    className="hover:bg-green-50 text-green-600"
+                    className="hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Désarchiver
@@ -1120,7 +1120,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   <Calendar className="h-4 w-4" />
                   <span>Date de début</span>
                 </div>
-                <p className="font-semibold">
+                <p className="font-semibold text-neutral-900 dark:text-white">
                   {formatDate(project.date)}
                 </p>
               </div>
@@ -1131,7 +1131,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                     <Calendar className="h-4 w-4" />
                     <span>Date de fin</span>
                   </div>
-                  <p className="font-semibold">
+                  <p className="font-semibold text-neutral-900 dark:text-white">
                     {formatDate(project.dueDate)}
                   </p>
                 </div>
