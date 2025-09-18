@@ -27,7 +27,7 @@ interface CandidateKanbanViewProps {
 
 export default function CandidateKanbanView({ projectId }: CandidateKanbanViewProps = {}) {
   const { projects, loading, candidateId } = useCandidateProjectsOptimized();
-  const selectedProjectId = projectId || "";
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId || "");
   const [boardId, setBoardId] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
