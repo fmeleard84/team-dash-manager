@@ -136,7 +136,7 @@ export const Register = () => {
       if (authData.user) {
         // Wait a moment for the trigger to create the profile
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         // Try to update the profile (it should have been created by trigger)
         const { error: profileError } = await supabase
           .from('profiles')

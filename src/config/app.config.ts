@@ -11,7 +11,7 @@ export const APP_CONFIG = {
 
   // URLs de base
   urls: {
-    development: 'http://localhost:8081',
+    development: 'https://95.216.204.226:8081',
     production: 'https://vaya.rip',
     staging: 'https://staging.vaya.rip',
   },
@@ -137,14 +137,14 @@ export const getAppUrl = (): string => {
   const hostname = window.location.hostname;
   const port = window.location.port;
 
-  // Production
-  if (hostname === 'vaya.rip' || hostname === '95.216.204.226' || port === '3000') {
-    return APP_CONFIG.urls.production;
-  }
-
-  // Development
+  // Development - Check port FIRST before hostname
   if (port === '8081') {
     return APP_CONFIG.urls.development;
+  }
+
+  // Production
+  if (hostname === 'vaya.rip' || port === '3000') {
+    return APP_CONFIG.urls.production;
   }
 
   // Fallback to origin

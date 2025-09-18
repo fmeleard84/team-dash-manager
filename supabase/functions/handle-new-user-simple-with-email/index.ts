@@ -17,8 +17,8 @@ serve(async (req) => {
 
     const { id, email, email_confirmed_at, raw_user_meta_data } = webhookData.record
 
-    // Configuration pour PRODUCTION
-    const supabaseUrl = 'https://nlesrzepybeeghghjafc.supabase.co'
+    // Configuration pour DÉVELOPPEMENT
+    const supabaseUrl = 'https://egdelmcijszuapcpglsy.supabase.co'
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseServiceKey) {
@@ -115,10 +115,10 @@ serve(async (req) => {
           // Extraire le token de l'URL
           const confirmUrl = tokenData.properties?.action_link || ''
 
-          // Remplacer l'URL de base par vaya.rip
+          // Remplacer l'URL de base par l'environnement dev
           const prodUrl = confirmUrl.replace(
             /https?:\/\/[^\/]+/,
-            'https://vaya.rip'
+            'https://95.216.204.226:8081'
           )
 
           const emailData = {

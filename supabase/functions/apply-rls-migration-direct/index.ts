@@ -24,20 +24,43 @@ serve(async (req) => {
     await client.connect()
 
     try {
-      // Appliquer les commandes SQL une par une
+      // Appliquer les commandes SQL pour candidate_qualification_results
       const commands = [
-        'ALTER TABLE prompts_ia DISABLE ROW LEVEL SECURITY',
-        'DROP POLICY IF EXISTS "prompts_ia_select_policy" ON prompts_ia',
-        'DROP POLICY IF EXISTS "prompts_ia_insert_policy" ON prompts_ia',
-        'DROP POLICY IF EXISTS "prompts_ia_update_policy" ON prompts_ia',
-        'DROP POLICY IF EXISTS "prompts_ia_delete_policy" ON prompts_ia',
-        'DROP POLICY IF EXISTS "prompts_ia_public_read" ON prompts_ia',
-        'DROP POLICY IF EXISTS "prompts_ia_admin_all" ON prompts_ia',
-        'DROP POLICY IF EXISTS "allow_public_read" ON prompts_ia',
-        'DROP POLICY IF EXISTS "allow_admin_all" ON prompts_ia',
-        `CREATE POLICY "allow_public_read" ON prompts_ia FOR SELECT USING (true)`,
-        `CREATE POLICY "allow_admin_all" ON prompts_ia FOR ALL USING (EXISTS (SELECT 1 FROM client_profiles WHERE client_profiles.id = auth.uid()))`,
-        'ALTER TABLE prompts_ia ENABLE ROW LEVEL SECURITY'
+        // Créer la table si elle n'existe pas
+        `CREATE TABLE IF NOT EXISTS public.candidate_qualification_results (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            candidate_id UUID NOT NULL REFERENCES public.candidate_profiles(id) ON DELETE CASCADE,
+            test_type VARCHAR(50) NOT NULL,
+            score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
+            total_questions INTEGER NOT NULL,
+            correct_answers INTEGER NOT NULL,
+            questions JSONB,
+            answers JSONB,
+            test_duration INTEGER,
+            completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )`,
+
+        // Index
+        'CREATE INDEX IF NOT EXISTS idx_qualification_candidate ON public.candidate_qualification_results(candidate_id)',
+        'CREATE INDEX IF NOT EXISTS idx_qualification_created ON public.candidate_qualification_results(created_at DESC)',
+
+        // Désactiver RLS temporairement pour les modifications
+        'ALTER TABLE candidate_qualification_results DISABLE ROW LEVEL SECURITY',
+
+        // Supprimer toutes les anciennes politiques
+        'DROP POLICY IF EXISTS "candidates_view_own_results" ON candidate_qualification_results',
+        'DROP POLICY IF EXISTS "candidates_insert_own_results" ON candidate_qualification_results',
+        'DROP POLICY IF EXISTS "candidates_update_own_results" ON candidate_qualification_results',
+        'DROP POLICY IF EXISTS "admins_full_access" ON candidate_qualification_results',
+        'DROP POLICY IF EXISTS "clients_view_assigned_candidates" ON candidate_qualification_results',
+        'DROP POLICY IF EXISTS "authenticated_full_access" ON candidate_qualification_results',
+
+        // Créer une politique permissive pour tous les utilisateurs authentifiés
+        `CREATE POLICY "authenticated_full_access" ON candidate_qualification_results FOR ALL USING (auth.uid() IS NOT NULL)`,
+
+        // Réactiver RLS
+        'ALTER TABLE candidate_qualification_results ENABLE ROW LEVEL SECURITY'
       ]
 
       for (const cmd of commands) {
@@ -47,21 +70,26 @@ serve(async (req) => {
 
       console.log('✅ Migration appliquée avec succès')
       
-      // Vérifier que les prompts sont maintenant visibles
+      // Vérifier que la table est maintenant accessible
       const adminClient = createClient(supabaseUrl, supabaseServiceKey)
-      const { data: prompts } = await adminClient
-        .from('prompts_ia')
-        .select('id, name, active')
-      
-      console.log(`✅ ${prompts?.length || 0} prompts dans la base`)
+      const { data: results, error: checkError } = await adminClient
+        .from('candidate_qualification_results')
+        .select('*')
+        .limit(1)
+
+      if (checkError) {
+        console.log('⚠️ Erreur de vérification:', checkError)
+      } else {
+        console.log(`✅ Table candidate_qualification_results accessible`)
+      }
 
       await client.end()
 
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Migration RLS appliquée avec succès',
-          prompts_count: prompts?.length || 0
+          message: 'Migration RLS appliquée avec succès pour candidate_qualification_results',
+          table_accessible: !checkError
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

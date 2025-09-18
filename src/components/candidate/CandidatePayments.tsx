@@ -71,7 +71,7 @@ export const CandidatePayments = () => {
             status
           )
         `)
-        .eq('assigned_resource_id', user.id);
+        .eq('candidate_id', user.id);
       
       if (assignments) {
         const uniqueProjects = assignments
