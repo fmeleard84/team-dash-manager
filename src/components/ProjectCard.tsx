@@ -811,9 +811,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                     <span
                       key={profileId} 
                       className={`text-xs px-2 py-1 rounded transition-colors ${
-                        hasBooked 
-                          ? 'bg-green-100 text-green-700 font-medium border border-green-200' 
-                          : 'bg-[#F4F6F9] text-[#0E0F12] border border-gray-200'
+                        hasBooked
+                          ? 'bg-green-500/10 text-green-600 dark:text-green-400 font-medium border border-green-500/20'
+                          : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700'
                       }`}
                     >
                       {profileName}
@@ -832,7 +832,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                 size="sm"
                 variant="ghost"
                 onClick={() => setShowTeamModal(true)}
-                className="flex items-center gap-1.5 text-sm text-[#0E0F12] hover:bg-[#F7F8FA]"
+                className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:text-primary-500 dark:hover:text-primary-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 px-4 py-2 rounded-lg transition-all duration-200"
               >
                 <Users className="h-4 w-4" />
                 Équipe
@@ -841,7 +841,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                 size="sm"
                 variant="ghost"
                 onClick={() => setShowProjectDetailsModal(true)}
-                className="flex items-center gap-1.5 text-sm text-[#0E0F12] hover:bg-[#F7F8FA]"
+                className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-400 hover:text-primary-500 dark:hover:text-primary-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 px-4 py-2 rounded-lg transition-all duration-200"
               >
                 <Info className="h-4 w-4" />
                 Détails
@@ -974,9 +974,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       >
         <div className="space-y-4">
           {resourceAssignments.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Users className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600">Aucune ressource définie pour ce projet</p>
+            <div className="text-center py-12 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
+              <Users className="h-12 w-12 mx-auto text-neutral-400 dark:text-neutral-600 mb-4" />
+              <p className="text-neutral-600 dark:text-neutral-400">Aucune ressource définie pour ce projet</p>
               <Button
                 onClick={() => {
                   setShowTeamModal(false);
@@ -989,43 +989,43 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-purple-50 rounded-lg p-4 mb-6">
+              <div className="bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 rounded-lg p-4 mb-6 border border-primary-500/20">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-600">Progression de l'équipe</p>
-                    <p className="text-lg font-semibold text-purple-900 mt-1">{bookingProgress.text}</p>
+                    <p className="text-sm text-primary-600 dark:text-primary-400">Progression de l'équipe</p>
+                    <p className="text-lg font-semibold text-neutral-900 dark:text-white mt-1">{bookingProgress.text}</p>
                   </div>
-                  <div className="text-3xl font-bold text-purple-700">
+                  <div className="text-3xl font-bold text-primary-600 dark:text-primary-400">
                     {Math.round(bookingProgress.percentage)}%
                   </div>
                 </div>
-                <div className="w-full bg-purple-100 rounded-full h-2 mt-3">
-                  <div 
-                    className="h-2 bg-purple-600 rounded-full transition-all duration-300"
+                <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2 mt-3">
+                  <div
+                    className="h-2 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full transition-all duration-300"
                     style={{ width: `${bookingProgress.percentage}%` }}
                   />
                 </div>
               </div>
 
               {resourceAssignments.map((assignment, index) => (
-                <div key={index} className="bg-white border border-gray-200 rounded-lg p-5">
+                <div key={index} className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border border-neutral-200/50 dark:border-neutral-700/50 rounded-2xl p-5 shadow-xl">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                        <Users className="h-5 w-5 text-purple-600" />
+                      <div className="w-10 h-10 bg-gradient-to-br from-primary-500/20 to-secondary-500/20 rounded-full flex items-center justify-center">
+                        <Users className="h-5 w-5 text-primary-600 dark:text-primary-400" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-gray-900">
+                        <h4 className="font-semibold text-neutral-900 dark:text-white">
                           {profileNames[assignment.profile_id] || 'Poste non défini'}
                         </h4>
-                        <p className="text-sm text-gray-600">{assignment.seniority || 'Séniorité non définie'}</p>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">{assignment.seniority || 'Séniorité non définie'}</p>
                         {assignment.languages && assignment.languages.length > 0 && (
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
                             <span className="font-medium">Langues:</span> {assignment.languages.join(', ')}
                           </p>
                         )}
                         {assignment.expertises && assignment.expertises.length > 0 && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-neutral-500 dark:text-neutral-500">
                             <span className="font-medium">Expertises:</span> {assignment.expertises.join(', ')}
                           </p>
                         )}
@@ -1036,7 +1036,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                         ✓ Confirmé
                       </Badge>
                     ) : assignment.booking_status === 'recherche' ? (
-                      <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                      <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
                         En recherche
                       </Badge>
                     ) : (
@@ -1047,7 +1047,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   </div>
                   
                   {assignment.booking_status === 'accepted' && assignment.candidate_profiles && (
-                    <div className="mt-3 pt-3 border-t">
+                    <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
                       <UserAvatarNeon
                         user={{
                           id: assignment.candidate_profiles.id,
@@ -1064,13 +1064,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                         showStatus={true}
                         showRate={true}
                         showBadges={true}
-                        className="bg-gray-50"
+                        className="bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-2"
                       />
                     </div>
                   )}
                   
                   {assignment.calculated_price && (
-                    <div className="mt-3 pt-3 border-t">
+                    <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-500">Tarif</span>
                         <span className="font-semibold text-gray-900">
@@ -1106,17 +1106,17 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           {/* Description */}
           {project.description && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{project.description}</p>
+              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Description</h3>
+              <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">{project.description}</p>
             </div>
           )}
 
           {/* Informations */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Informations</h3>
+            <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Informations</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+              <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
                   <Calendar className="h-4 w-4" />
                   <span>Date de début</span>
                 </div>
@@ -1138,19 +1138,19 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               )}
 
               {project.clientBudget && (
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-sm text-purple-600 mb-1">
+                <div className="bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 mb-1">
                     <Euro className="h-4 w-4" />
                     <span>Budget du projet</span>
                   </div>
-                  <p className="font-semibold text-purple-700">
+                  <p className="font-semibold text-primary-700 dark:text-primary-300">
                     {formatCurrency(project.clientBudget)}
                   </p>
                 </div>
               )}
 
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+              <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
                   <Info className="h-4 w-4" />
                   <span>Statut</span>
                 </div>
@@ -1167,15 +1167,15 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           {/* Fichiers attachés */}
           {projectFiles.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
                 Fichiers attachés ({projectFiles.length})
               </h3>
               <div className="space-y-2">
                 {projectFiles.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                  <div key={index} className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-3">
                     <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-purple-600" />
-                      <span className="text-sm font-medium text-gray-700">{file.name}</span>
+                      <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{file.name}</span>
                       {file.metadata?.size && (
                         <span className="text-xs text-gray-500">
                           ({(file.metadata.size / 1024).toFixed(1)} KB)
