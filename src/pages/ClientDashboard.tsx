@@ -1127,7 +1127,6 @@ return (
         };
         refreshProjects();
       }}
-      projectId={selectedProjectId}
     />
   </SidebarProvider>
 );

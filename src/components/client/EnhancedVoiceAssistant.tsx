@@ -27,13 +27,11 @@ import { toast } from 'sonner';
 interface EnhancedVoiceAssistantProps {
   isOpen: boolean;
   onClose: () => void;
-  projectId?: string;
 }
 
 export const EnhancedVoiceAssistant = ({
   isOpen,
-  onClose,
-  projectId
+  onClose
 }: EnhancedVoiceAssistantProps) => {
   const [activeTab, setActiveTab] = useState<'voice' | 'text'>('text');
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -113,7 +111,6 @@ export const EnhancedVoiceAssistant = ({
           <TabsContent value="text" className="flex-1 mt-0">
             <div className="h-full">
               <TextChatInterface
-                projectId={projectId}
                 className="h-full"
               />
             </div>
