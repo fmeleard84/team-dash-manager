@@ -1,4 +1,4 @@
--- Migration pour le module IA Team
+-- Migration pour le module IA Team (Version corrigée)
 -- Date: 19/09/2025
 
 -- 1. Ajouter la colonne prompt_id à hr_profiles
@@ -20,21 +20,21 @@ CREATE TABLE IF NOT EXISTS public.ia_resource_prompts (
 -- 3. Activer RLS sur la nouvelle table
 ALTER TABLE public.ia_resource_prompts ENABLE ROW LEVEL SECURITY;
 
--- 4. Politiques RLS
--- Drop existing policies first to avoid conflicts
+-- 4. Supprimer les politiques existantes si elles existent
 DROP POLICY IF EXISTS "ia_resource_prompts_select" ON public.ia_resource_prompts;
-DROP POLICY IF EXISTS "ia_resource_prompts_admin_only" ON public.ia_resource_prompts;
 DROP POLICY IF EXISTS "ia_resource_prompts_admin_insert" ON public.ia_resource_prompts;
 DROP POLICY IF EXISTS "ia_resource_prompts_admin_update" ON public.ia_resource_prompts;
 DROP POLICY IF EXISTS "ia_resource_prompts_admin_delete" ON public.ia_resource_prompts;
 
--- Create new policies
+-- 5. Créer les nouvelles politiques RLS
 CREATE POLICY "ia_resource_prompts_select"
-  ON public.ia_resource_prompts FOR SELECT
+  ON public.ia_resource_prompts
+  FOR SELECT
   USING (true);
 
 CREATE POLICY "ia_resource_prompts_admin_insert"
-  ON public.ia_resource_prompts FOR INSERT
+  ON public.ia_resource_prompts
+  FOR INSERT
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.profiles
@@ -44,7 +44,8 @@ CREATE POLICY "ia_resource_prompts_admin_insert"
   );
 
 CREATE POLICY "ia_resource_prompts_admin_update"
-  ON public.ia_resource_prompts FOR UPDATE
+  ON public.ia_resource_prompts
+  FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM public.profiles
@@ -54,7 +55,8 @@ CREATE POLICY "ia_resource_prompts_admin_update"
   );
 
 CREATE POLICY "ia_resource_prompts_admin_delete"
-  ON public.ia_resource_prompts FOR DELETE
+  ON public.ia_resource_prompts
+  FOR DELETE
   USING (
     EXISTS (
       SELECT 1 FROM public.profiles
@@ -63,20 +65,34 @@ CREATE POLICY "ia_resource_prompts_admin_delete"
     )
   );
 
--- 5. Index pour optimisation
+-- 6. Créer les index pour optimisation
 CREATE INDEX IF NOT EXISTS idx_ia_prompts_profile ON public.ia_resource_prompts(profile_id);
 CREATE INDEX IF NOT EXISTS idx_ia_prompts_prompt ON public.ia_resource_prompts(prompt_id);
 CREATE INDEX IF NOT EXISTS idx_hr_profiles_prompt ON public.hr_profiles(prompt_id);
 
--- 6. Insérer les prompts IA de base
+-- 7. Insérer les prompts IA de base (avec gestion des conflits)
 INSERT INTO public.prompts_ia (name, context, prompt, active, priority)
 VALUES
-  ('IA Rédacteur', 'ia_writer', 'Tu es un rédacteur IA spécialisé dans la création de contenu professionnel. Tu produis des documents structurés, clairs et adaptés au contexte du projet.', true, 100),
-  ('IA Chef de Projet', 'ia_project_manager', 'Tu es un chef de projet IA qui aide à organiser, planifier et suivre les projets. Tu crées des plannings et rapports d''avancement.', true, 100),
-  ('IA Développeur', 'ia_developer', 'Tu es un développeur IA qui aide à concevoir des architectures techniques et écrire de la documentation technique.', true, 100),
-  ('IA Designer', 'ia_designer', 'Tu es un designer IA qui aide à créer des concepts visuels et des guidelines UX/UI.', true, 100),
-  ('IA Analyste', 'ia_analyst', 'Tu es un analyste IA qui aide à analyser des données et créer des rapports.', true, 100)
+  ('IA Rédacteur', 'ia_writer',
+   'Tu es un rédacteur IA spécialisé dans la création de contenu professionnel. Tu produis des documents structurés, clairs et adaptés au contexte du projet. Tu utilises un ton professionnel et tu structures toujours tes livrables avec des titres, sous-titres et sections bien définies.',
+   true, 100),
+
+  ('IA Chef de Projet', 'ia_project_manager',
+   'Tu es un chef de projet IA qui aide à organiser, planifier et suivre les projets. Tu crées des plannings, des roadmaps, des rapports d''avancement et tu aides à coordonner les équipes. Tu es méthodique, structuré et orienté résultats.',
+   true, 100),
+
+  ('IA Développeur', 'ia_developer',
+   'Tu es un développeur IA qui aide à concevoir des architectures techniques, écrire de la documentation technique, proposer des solutions et réviser du code. Tu es précis, technique et tu fournis toujours des exemples concrets.',
+   true, 100),
+
+  ('IA Designer', 'ia_designer',
+   'Tu es un designer IA qui aide à créer des concepts visuels, des maquettes, des chartes graphiques et des guidelines UX/UI. Tu es créatif, orienté utilisateur et tu fournis des descriptions détaillées de tes propositions visuelles.',
+   true, 100),
+
+  ('IA Analyste', 'ia_analyst',
+   'Tu es un analyste IA qui aide à analyser des données, créer des rapports, identifier des tendances et proposer des recommandations stratégiques. Tu es analytique, factuel et tu bases toujours tes conclusions sur des données concrètes.',
+   true, 100)
 ON CONFLICT (name) DO NOTHING;
 
--- 7. Message de confirmation
-SELECT 'Migration IA Team appliquée avec succès' as message;
+-- 8. Message de confirmation
+SELECT 'Migration IA Team appliquée avec succès !' as message;
