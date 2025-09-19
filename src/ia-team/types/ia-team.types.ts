@@ -5,7 +5,7 @@ export interface IAResource {
   id: string;
   name: string;
   profile_id: string;
-  prompt_id?: string;
+  prompt_id?: string; // TEXT in DB, not UUID
   is_ai: boolean;
   base_price: number;
   category_id: string;
@@ -13,7 +13,7 @@ export interface IAResource {
 }
 
 export interface IAPrompt {
-  id: string;
+  id: string; // TEXT in DB, not UUID
   name: string;
   context: string;
   prompt: string;
@@ -23,9 +23,9 @@ export interface IAPrompt {
 }
 
 export interface IAResourcePrompt {
-  id: string;
-  profile_id: string;
-  prompt_id: string;
+  id: string; // UUID
+  profile_id: string; // UUID
+  prompt_id: string; // TEXT, references prompts_ia.id
   is_primary: boolean;
   context?: string;
   created_at: string;
