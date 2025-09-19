@@ -10,6 +10,9 @@
     "edit": "Modifier",
     "create": "Créer",
     "draft": "Brouillon",
+    "optional": "optionnel",
+    "documents": "Documents",
+    "file": "Fichier",
     "search": "Rechercher",
     "filter": "Filtrer",
     "archive": "Archiver",
@@ -213,8 +216,29 @@
     },
     "errors": {
       "teamRequired": "Vous devez d'abord créer une équipe pour ce projet",
-      "startError": "Erreur lors du démarrage du projet"
+      "startError": "Erreur lors du démarrage du projet",
+      "mustBeLoggedIn": "Vous devez être connecté pour créer un projet",
+      "startDatePast": "La date de début ne peut pas être dans le passé",
+      "endDateBeforeStart": "La date de fin doit être après la date de début",
+      "createError": "Erreur lors de la création du projet",
+      "uploadError": "Erreur lors de l'upload du fichier"
     },
+    "createModal": {
+      "title": "Créer votre projet sur-mesure",
+      "description": "Définissez les détails de votre projet pour que nous puissions composer l'équipe parfaite"
+    },
+    "creating": "Création en cours...",
+    "createAndComposeTeam": "Créer et composer l'équipe",
+    "descriptionPlaceholder": "Décrivez vos objectifs, contraintes et besoins spécifiques...",
+    "datesAndBudget": "Dates et budget",
+    "selectStartDate": "Sélectionner la date de début",
+    "desiredEndDate": "Date de fin souhaitée",
+    "selectEndDate": "Sélectionner la date de fin",
+    "plannedBudget": "Budget prévu",
+    "specifications": "Cahier des charges",
+    "acceptedFormats": "Formats acceptés",
+    "uploadSuccess": "Fichier uploadé avec succès",
+    "createSuccess": "Projet créé avec succès !",
     "status": {
       "settingUp": "Mise en place",
       "pausing": "Mise en pause"

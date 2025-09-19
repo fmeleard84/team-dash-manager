@@ -10,6 +10,9 @@
     "edit": "Edit",
     "create": "Create",
     "draft": "Draft",
+    "optional": "optional",
+    "documents": "Documents",
+    "file": "File",
     "search": "Search",
     "filter": "Filter",
     "archive": "Archive",
@@ -213,8 +216,29 @@
     },
     "errors": {
       "teamRequired": "You must first create a team for this project",
-      "startError": "Error starting project"
+      "startError": "Error starting project",
+      "mustBeLoggedIn": "You must be logged in to create a project",
+      "startDatePast": "Start date cannot be in the past",
+      "endDateBeforeStart": "End date must be after start date",
+      "createError": "Error creating project",
+      "uploadError": "Error uploading file"
     },
+    "createModal": {
+      "title": "Create your custom project",
+      "description": "Define your project details so we can compose the perfect team"
+    },
+    "creating": "Creating...",
+    "createAndComposeTeam": "Create and compose team",
+    "descriptionPlaceholder": "Describe your objectives, constraints and specific needs...",
+    "datesAndBudget": "Dates and budget",
+    "selectStartDate": "Select start date",
+    "desiredEndDate": "Desired end date",
+    "selectEndDate": "Select end date",
+    "plannedBudget": "Planned budget",
+    "specifications": "Specifications",
+    "acceptedFormats": "Accepted formats",
+    "uploadSuccess": "File uploaded successfully",
+    "createSuccess": "Project created successfully!",
     "status": {
       "settingUp": "Setting up",
       "pausing": "Pausing"

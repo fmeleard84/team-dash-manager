@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { IallaLogo } from "./IallaLogo";
 import { Calendar, Euro, FileUp, Loader2 } from "lucide-react";
+import { useTranslation } from 'react-i18next';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ const CreateProjectModal = ({
   onProjectCreated,
 }: CreateProjectModalProps) => {
   console.log('CreateProjectModal rendered with isOpen:', isOpen);
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -44,18 +46,18 @@ const CreateProjectModal = ({
     if (!title.trim()) return;
 
     if (!user?.id) {
-      toast.error("Vous devez être connecté pour créer un projet");
+      toast.error(t('projects.errors.mustBeLoggedIn'));
       return;
     }
 
     // Validate dates
     if (projectDate < today) {
-      toast.error("La date de début ne peut pas être dans le passé");
+      toast.error(t('projects.errors.startDatePast'));
       return;
     }
 
     if (dueDate && dueDate < projectDate) {
-      toast.error("La date de fin doit être après la date de début");
+      toast.error(t('projects.errors.endDateBeforeStart'));
       return;
     }
 
@@ -91,7 +93,7 @@ const CreateProjectModal = ({
           details: error.details,
           hint: error.hint
         });
-        toast.error(`Erreur lors de la création du projet: ${error.message}`);
+        toast.error(t('projects.errors.createError') + ': ' + error.message);
         return;
       }
       
@@ -114,15 +116,15 @@ const CreateProjectModal = ({
         
         if (uploadError) {
           console.error("Erreur upload:", uploadError);
-          toast.error("Erreur lors de l'upload du fichier");
+          toast.error(t('projects.errors.uploadError'));
         } else {
-          toast.success("Fichier uploadé avec succès");
+          toast.success(t('projects.uploadSuccess'));
           // TODO: Save file metadata once DB structure is fixed
           console.log("File uploaded to:", path);
         }
       }
 
-      toast.success("Projet créé avec succès !");
+      toast.success(t('projects.createSuccess'));
       
       // Reset form
       setTitle("");
@@ -140,7 +142,7 @@ const CreateProjectModal = ({
 
     } catch (error) {
       console.error("Erreur inattendue:", error);
-      toast.error("Une erreur inattendue est survenue");
+      toast.error(t('errors.generic'));
     } finally {
       setIsCreating(false);
     }
@@ -162,14 +164,14 @@ const handleClose = () => {
     <FullScreenModal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Créer votre projet sur-mesure"
-      description="Définissez les détails de votre projet pour que nous puissions composer l'équipe parfaite"
+      title={t('projects.createModal.title')}
+      description={t('projects.createModal.description')}
       actions={
         <ModalActions
           onSave={handleSubmit}
           onCancel={handleClose}
-          saveText={isCreating ? "Création en cours..." : "Créer et composer l'équipe"}
-          cancelText="Annuler"
+          saveText={isCreating ? t('projects.creating') : t('projects.createAndComposeTeam')}
+          cancelText={t('common.cancel')}
           saveDisabled={!title.trim() || isCreating}
           isLoading={isCreating}
         />
@@ -184,7 +186,7 @@ const handleClose = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title" className="text-sm font-semibold">Nom du projet *</Label>
+                <Label htmlFor="title" className="text-sm font-semibold">{t('projects.projectName')} *</Label>
                 <Input
                   id="title"
                   value={title}
@@ -197,12 +199,12 @@ const handleClose = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-sm font-semibold">Description du projet</Label>
+                <Label htmlFor="description" className="text-sm font-semibold">{t('projects.projectDescription')}</Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Décrivez vos objectifs, contraintes et besoins spécifiques..."
+                  placeholder={t('projects.descriptionPlaceholder')}
                   rows={5}
                   disabled={isCreating}
                   className="text-base resize-none"
@@ -211,7 +213,7 @@ const handleClose = () => {
             </CardContent>
           </Card>
           
-          {/* Dates et budget */}
+          {/* {t('projects.datesAndBudget')} */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Planning et budget</CardTitle>
@@ -221,12 +223,12 @@ const handleClose = () => {
               <div className="space-y-2">
                 <Label htmlFor="project_date" className="text-sm font-semibold flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  Date de début
+                  {t('projects.startDate')}
                 </Label>
                 <DatePicker
                   value={projectDate}
                   onChange={setProjectDate}
-                  placeholder="Sélectionner la date de début"
+                  placeholder={t('projects.selectStartDate')}
                   minDate={today}
                   disabled={isCreating}
                 />
@@ -235,12 +237,12 @@ const handleClose = () => {
               <div className="space-y-2">
                 <Label htmlFor="due_date" className="text-sm font-semibold flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  Date de fin souhaitée
+                  {t('projects.desiredEndDate')}
                 </Label>
                 <DatePicker
                   value={dueDate}
                   onChange={setDueDate}
-                  placeholder="Sélectionner la date de fin"
+                  placeholder={t('projects.selectEndDate')}
                   minDate={projectDate || today}
                   disabled={isCreating}
                 />
@@ -249,7 +251,7 @@ const handleClose = () => {
               <div className="space-y-2">
                 <Label htmlFor="client_budget" className="text-sm font-semibold flex items-center gap-2">
                   <Euro className="w-4 h-4" />
-                  Budget prévu (optionnel)
+                  {t('projects.plannedBudget')} ({t('common.optional')})
                 </Label>
                 <Input
                   id="client_budget"
@@ -268,16 +270,16 @@ const handleClose = () => {
             </CardContent>
           </Card>
           
-          {/* Fichier */}
+          {/* {t('common.file')} */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Documents</CardTitle>
+              <CardTitle className="text-lg">{t('common.documents')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
               <Label htmlFor="project_file" className="text-sm font-semibold flex items-center gap-2">
                 <FileUp className="w-4 h-4" />
-                Cahier des charges (optionnel)
+                {t('projects.specifications')} ({t('common.optional')})
               </Label>
               <Input
                 id="project_file"
@@ -288,7 +290,7 @@ const handleClose = () => {
                 accept=".pdf,.doc,.docx,.txt"
               />
               <p className="text-xs text-gray-500">
-                Formats acceptés: PDF, DOC, DOCX, TXT (max 10MB)
+                {t('projects.acceptedFormats')}: PDF, DOC, DOCX, TXT (max 10MB)
               </p>
             </div>
             </CardContent>

@@ -15,7 +15,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/ui/components/Card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Download, Upload, Copy, Euro, Users, FileText, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, Download, Upload, Copy, Euro, Users, FileText, Sparkles, Bot } from 'lucide-react';
+import { ThemeToggle } from '@/ui/components/ThemeToggle';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
@@ -398,6 +401,13 @@ const TemplateFlowSimple = () => {
             )}
 
             <div className="flex items-center gap-3">
+              {/* Icônes d'actions */}
+              <EnhancedVoiceAssistant />
+              <NotificationBell />
+              <ThemeToggle />
+
+              <div className="h-8 w-px bg-neutral-200 dark:bg-neutral-700" />
+
               <Button
                 onClick={injectToParent}
                 disabled={nodes.length === 0}

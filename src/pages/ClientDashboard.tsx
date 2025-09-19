@@ -48,7 +48,6 @@ import {
   ShoppingCart,
   Smartphone,
   Mic,
-  Bot
 } from "lucide-react";
 // Design System Components
 import { PageSection } from "@/ui/layout";
@@ -945,7 +944,11 @@ const sidebarContent = (
                 <span>{t('navigation.settings')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            
+
+            <SidebarMenuItem>
+              <LanguageSelector variant="sidebar" />
+            </SidebarMenuItem>
+
             <SidebarMenuItem>
               <SidebarMenuButton onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
@@ -989,23 +992,7 @@ const headerContent = (
           </Badge>
         )}
       </Button>
-      
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsVoiceAssistantOpen(true)}
-        className="relative group"
-        title="Assistant IA"
-      >
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur-md opacity-0 group-hover:opacity-70 transition-opacity" />
-          <div className="relative w-9 h-9 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-lg flex items-center justify-center">
-            <Bot className="w-4 h-4 text-white" />
-          </div>
-        </div>
-      </Button>
       <NotificationBell />
-      <LanguageSelector />
       <ThemeToggle />
     </div>
   </header>
