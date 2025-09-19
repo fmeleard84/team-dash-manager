@@ -70,6 +70,7 @@ interface PlankaProject {
 }
 
 export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart, onEdit, onArchive, onUnarchive, isArchived = false, refreshTrigger }: ProjectCardProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { checkCreditsForAction, formatBalance } = useClientCredits();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
