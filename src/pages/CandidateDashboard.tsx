@@ -75,6 +75,7 @@ import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
 import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
 import { AnimatedBackground } from "@/components/ui/animated-background";
+import { TimeTrackerSimple } from "@/components/time-tracking/TimeTrackerSimple";
 
 const CandidateDashboard = () => {
   const [activeSection, setActiveSection] = useState('projects');
@@ -1023,6 +1024,7 @@ const CandidateDashboard = () => {
         </h1>
       </div>
       <div className="flex items-center gap-4">
+        <TimeTrackerSimple />
         <div className={`px-4 py-2 rounded-full text-xs font-medium shadow-lg transition-all duration-300 ${
           isAvailable
             ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25'
