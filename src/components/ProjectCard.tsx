@@ -35,7 +35,6 @@ interface ResourceAssignment {
   id: string;
   profile_id: string;
   booking_status: string;
-  calculated_price?: number;  // Prix déjà calculé avec les pourcentages
   hr_profiles?: {
     name: string;
     is_ai?: boolean;
@@ -46,6 +45,11 @@ interface ResourceAssignment {
     last_name: string;
     daily_rate?: number;
   };
+  seniority?: string;
+  languages?: string[];
+  expertises?: string[];
+  industries?: string[];
+  candidate_id?: string;
 }
 
 interface ProjectCardProps {
@@ -99,17 +103,11 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     console.log('💰 Calcul des prix pour', resourceAssignments.length, 'ressources');
     
     resourceAssignments.forEach(assignment => {
-      // Utiliser calculated_price qui contient déjà le prix avec les pourcentages appliqués
-      if (assignment.calculated_price) {
-        // calculated_price est déjà en €/minute avec les pourcentages des langues et expertises
-        console.log('  - Ressource calculated_price:', assignment.calculated_price, '€/min (avec pourcentages)');
-        totalPerMinute += assignment.calculated_price;
-      }
-      // Fallback pour les candidats avec daily_rate si calculated_price n'existe pas
-      else if (assignment.candidate_profiles?.daily_rate) {
+      // Utiliser le daily_rate des candidats
+      if (assignment.candidate_profiles?.daily_rate) {
         // Convertir tarif journalier en tarif par minute (8h par jour, 60 min par heure)
         const minuteRate = assignment.candidate_profiles.daily_rate / (8 * 60);
-        console.log('  - Candidat daily_rate:', assignment.candidate_profiles.daily_rate, '=> minute:', minuteRate);
+        console.log('  - Candidat daily_rate:', assignment.candidate_profiles.daily_rate, '€/jour => minute:', minuteRate.toFixed(2), '€/min');
         totalPerMinute += minuteRate;
       }
     });
@@ -169,7 +167,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             id,
             profile_id,
             booking_status,
-            calculated_price,
             seniority,
             languages,
             expertises,
@@ -330,7 +327,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           id,
           profile_id,
           booking_status,
-          calculated_price,
           seniority,
           languages,
           expertises,
@@ -1057,7 +1053,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                           seniority: assignment.seniority,
                           status: 'online',
                           isValidated: true,
-                          hourlyRate: assignment.calculated_price ? assignment.calculated_price * 60 : undefined
+                          hourlyRate: assignment.candidate_profiles?.daily_rate ?
+                            (assignment.candidate_profiles.daily_rate / 8) : undefined
                         }}
                         size="sm"
                         variant="detailed"
@@ -1069,12 +1066,12 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                     </div>
                   )}
                   
-                  {assignment.calculated_price && (
+                  {assignment.candidate_profiles?.daily_rate && (
                     <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-500">Tarif</span>
                         <span className="font-semibold text-gray-900">
-                          {assignment.calculated_price.toFixed(2)}€/min
+                          {(assignment.candidate_profiles.daily_rate / 8).toFixed(0)}€/h
                         </span>
                       </div>
                     </div>
