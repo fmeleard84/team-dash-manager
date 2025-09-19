@@ -87,35 +87,44 @@ export function IAResourceConfig({ profileId, profileName, currentPromptId, onSa
 
       // Créer ou mettre à jour l'entrée dans ia_resource_prompts
       // Cette table sert de fallback si prompt_id n'existe pas dans hr_profiles
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from('ia_resource_prompts')
         .select('id')
         .eq('profile_id', profileId)
         .eq('prompt_id', selectedPromptId)
-        .single();
+        .maybeSingle(); // Utiliser maybeSingle au lieu de single pour éviter les erreurs
 
-      if (!existing) {
-        // Supprimer les anciennes associations pour ce profil
-        await supabase
-          .from('ia_resource_prompts')
-          .delete()
-          .eq('profile_id', profileId);
+      // Vérifier si on a une erreur 406 (RLS) et ignorer
+      if (checkError && checkError.code !== 'PGRST116' && !checkError.message.includes('406')) {
+        console.warn('Erreur vérification ia_resource_prompts:', checkError);
+      }
 
-        // Créer la nouvelle association
-        const { error: insertError } = await supabase
-          .from('ia_resource_prompts')
-          .insert({
-            profile_id: profileId,
-            prompt_id: selectedPromptId,
-            is_primary: true,
-            context: 'general'
-          });
+      // Essayer de créer/mettre à jour l'association seulement si pas d'erreur RLS
+      if (!checkError || checkError.code === 'PGRST116') {
+        if (!existing) {
+          try {
+            // Supprimer les anciennes associations pour ce profil
+            await supabase
+              .from('ia_resource_prompts')
+              .delete()
+              .eq('profile_id', profileId);
 
-        if (insertError) {
-          console.error('Erreur création association:', insertError);
-          // Si la table n'existe pas, on affiche juste un warning
-          if (!insertError.message.includes('relation')) {
-            throw insertError;
+            // Créer la nouvelle association
+            const { error: insertError } = await supabase
+              .from('ia_resource_prompts')
+              .insert({
+                profile_id: profileId,
+                prompt_id: selectedPromptId,
+                is_primary: true,
+                context: 'general'
+              });
+
+            if (insertError) {
+              console.warn('Impossible de créer l\'association dans ia_resource_prompts:', insertError);
+              // On continue quand même car prompt_id dans hr_profiles peut suffire
+            }
+          } catch (e) {
+            console.warn('Table ia_resource_prompts non accessible, utilisation de hr_profiles uniquement');
           }
         }
       }
