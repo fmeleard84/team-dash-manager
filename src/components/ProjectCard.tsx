@@ -99,33 +99,25 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   // Calcul du prix cumulé par minute des ressources
   const calculateTotalPricePerMinute = () => {
     if (resourceAssignments.length === 0) return 0;
-    
+
     let totalPerMinute = 0;
-    
-    console.log('💰 Calcul des prix pour', resourceAssignments.length, 'ressources');
-    
-    resourceAssignments.forEach(assignment => {
-      // Utiliser le daily_rate des candidats
-      if (assignment.candidate_profiles?.daily_rate) {
-        // Convertir tarif journalier en tarif par minute (8h par jour, 60 min par heure)
-        const minuteRate = assignment.candidate_profiles.daily_rate / (8 * 60);
-        console.log('  - Candidat daily_rate:', assignment.candidate_profiles.daily_rate, '€/jour => minute:', minuteRate.toFixed(2), '€/min');
-        totalPerMinute += minuteRate;
+
+    resourceAssignments.forEach((assignment: any) => {
+      // Utiliser hr_profiles.base_price pour TOUTES les ressources (IA et humaines)
+      if (assignment.hr_profiles?.base_price) {
+        totalPerMinute += assignment.hr_profiles.base_price;
       }
     });
-    
-    console.log('💰 Prix total par minute:', totalPerMinute);
+
     return totalPerMinute;
   };
 
   useEffect(() => {
-    console.log('🔄 ProjectCard mounted/updated for project:', project.id);
     fetchResourceAssignments();
   }, [project.id, refreshTrigger]);
-  
+
   // Also refresh when component mounts
   useEffect(() => {
-    console.log('🎮 ProjectCard initial mount - fetching resources in 100ms');
     const timer = setTimeout(() => {
       fetchResourceAssignments();
       fetchProjectFiles();
@@ -135,13 +127,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   // Check if booking is in progress based on resource assignment status
   useEffect(() => {
-    console.log('📌 Checking booking status - resources:', resourceAssignments.length);
     if (hasBookingInProgress()) {
-      console.log('🔄 Booking in progress detected');
       setIsBookingRequested(true);
     } else if (resourceAssignments.length > 0 && !hasBookingInProgress()) {
-      console.log('✅ Resources exist but no booking in progress');
-      // If we have assignments but none in recherche mode, reset booking requested
       setIsBookingRequested(false);
     }
   }, [resourceAssignments]);
@@ -153,16 +141,12 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     const maxAttempts = 10;
     
     const startPolling = () => {
-      console.log('🔄 Starting polling for resources...');
-      // Reset attempt count
       attemptCount = 0;
-      
-      // Start polling every 500ms
+
       intervalId = setInterval(async () => {
         attemptCount++;
-        console.log('🔄 Polling attempt', attemptCount, 'of', maxAttempts);
-        
-        // Fetch fresh data directly in the interval
+
+        // Utiliser la même logique que fetchResourceAssignments
         const { data } = await supabase
           .from('hr_resource_assignments')
           .select(`
@@ -172,26 +156,49 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             seniority,
             languages,
             expertises,
-            industries,
             candidate_id,
-            candidate_profiles!candidate_id (
+            node_data,
+            candidate_profiles (
               first_name,
               last_name,
               daily_rate
             )
           `)
           .eq('project_id', project.id);
-        
-        console.log('🔄 Polling result:', data?.length || 0, 'resources');
-        
+
         if (data && data.length > 0) {
-          console.log('🎆 Resources found in polling! Setting state.');
-          setResourceAssignments([...data]);
+          // Récupérer les hr_profiles séparément
+          const profileIds = [...new Set(data.map(a => a.profile_id).filter(Boolean))];
+
+          if (profileIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from('hr_profiles')
+              .select('id, name, base_price, is_ai')
+              .in('id', profileIds);
+
+            if (profiles) {
+              const profileMap = new Map(profiles.map(p => [p.id, p]));
+              const enrichedData = data.map(assignment => ({
+                ...assignment,
+                hr_profiles: profileMap.get(assignment.profile_id) || null
+              }));
+
+              setResourceAssignments([...enrichedData]);
+
+              // Remplir profileNames
+              const names: Record<string, string> = {};
+              enrichedData.forEach((assignment: any) => {
+                if (assignment.hr_profiles?.name) {
+                  names[assignment.profile_id] = assignment.hr_profiles.name;
+                }
+              });
+              setProfileNames(names);
+            }
+          }
         }
-        
+
         // Stop polling after finding resources or max attempts
         if ((data && data.length > 0) || attemptCount >= maxAttempts) {
-          console.log('🏏 Stopping polling:', data?.length ? 'Resources found!' : 'Max attempts reached');
           if (intervalId) {
             clearInterval(intervalId);
             intervalId = null;
@@ -214,7 +221,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     };
     
     const handleFocus = async () => {
-      console.log('👀 Window gained focus - refreshing resources');
       // Immediate fetch on focus
       await fetchResourceAssignments();
       // Start short polling only if no resources found
@@ -239,7 +245,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   useEffect(() => {
     const handleProjectUpdate = (event: CustomEvent) => {
       if (event.detail.projectId === project.id) {
-        console.log('🔔 Project updated event received, refreshing resources...');
         fetchResourceAssignments();
         fetchProjectFiles();
       }
@@ -254,8 +259,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   // Real-time subscription for resource assignments
   useEffect(() => {
-    console.log('📡 Setting up realtime subscription for resource assignments');
-    
     // Initial fetch - use the main fetchResourceAssignments function
     fetchResourceAssignments();
     
@@ -270,24 +273,16 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           filter: `project_id=eq.${project.id}`
         },
         (payload) => {
-          console.log('🔄 Resource assignment change detected:', payload);
-          console.log('📦 Change type:', payload.eventType);
-          console.log('📦 New data:', payload.new);
-          console.log('📦 Old data:', payload.old);
           // Refresh resource assignments when any change occurs
           // Call the main fetchResourceAssignments function to update the UI
           fetchResourceAssignments();
         }
       )
       .subscribe((status) => {
-        console.log('📡 Subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to resource assignments changes');
-        }
+        // Subscription ready
       });
 
     return () => {
-      console.log('🔌 Cleaning up realtime subscription for resource assignments');
       supabase.removeChannel(channel);
     };
   }, [project.id]);
@@ -320,9 +315,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
 
   const fetchResourceAssignments = async () => {
-    console.log('🔎 Fetching resource assignments for project:', project.id);
-    console.log('🔎 Project status:', project.status);
     try {
+      // D'abord récupérer les assignments sans la jointure hr_profiles
       const { data, error } = await supabase
         .from('hr_resource_assignments')
         .select(`
@@ -333,7 +327,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           languages,
           expertises,
           candidate_id,
-          candidate_profiles!candidate_id (
+          candidate_profiles (
             first_name,
             last_name,
             daily_rate
@@ -345,17 +339,45 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         console.error('❌ Error fetching resource assignments:', error);
         return;
       }
-      console.log('✅ Found', data?.length || 0, 'resource assignments:', data);
-      console.log('📊 Resource assignments state before update:', resourceAssignments);
-      
-      // Force un rafraîchissement du state même si les données sont identiques
-      setResourceAssignments([...data || []]);
-      console.log('📊 Resource assignments state after update:', data);
-      
-      // Récupérer les noms des profils HR séparément
+
+      // Ensuite récupérer les hr_profiles séparément
+      let enrichedData = data || [];
       if (data && data.length > 0) {
         const profileIds = [...new Set(data.map(a => a.profile_id).filter(Boolean))];
-        
+
+        if (profileIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('hr_profiles')
+            .select('id, name, base_price, is_ai')
+            .in('id', profileIds);
+
+          // Enrichir les données avec hr_profiles
+          if (profiles) {
+            const profileMap = new Map(profiles.map(p => [p.id, p]));
+            enrichedData = data.map(assignment => ({
+              ...assignment,
+              hr_profiles: profileMap.get(assignment.profile_id) || null
+            }));
+          }
+        }
+      }
+
+      // Mettre à jour les ressources
+      setResourceAssignments([...enrichedData]);
+
+      // Remplir profileNames avec les noms des métiers depuis hr_profiles
+      const names: Record<string, string> = {};
+      enrichedData.forEach((assignment: any) => {
+        if (assignment.hr_profiles?.name) {
+          names[assignment.profile_id] = assignment.hr_profiles.name;
+        }
+      });
+      setProfileNames(names);
+
+      // Récupérer les noms des profils HR séparément (ancien code - peut être retiré)
+      if (false && data && data.length > 0) {
+        const profileIds = [...new Set(data.map(a => a.profile_id).filter(Boolean))];
+
         if (profileIds.length > 0) {
           // Récupérer les profils HR
           const { data: profiles } = await supabase
@@ -380,10 +402,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           }
         }
         
-        console.log('🎆 Resources found! Stopping any active polling.');
-        console.log('🎯 Button should be active now!');
-      } else {
-        console.log('⚠️ No resources found - button will remain disabled');
+        // Resources found
       }
     } catch (error) {
       console.error('❌ Exception:', error);
@@ -407,7 +426,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     
     // Si le projet est en play sans kickoff (tous ont accepté mais pas encore de planning)
     if (isPlayWithoutKickoff) {
-      console.log('🚀 Opening kickoff dialog for play project without tools');
+      // Opening kickoff dialog for play project without tools
       setShowKickoff(true);
     } else if (project.status === 'pause' || project.status === 'attente-team') {
       // If starting, show kickoff dialog first
@@ -415,6 +434,19 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     } else if (project.status === 'play') {
       // If pausing from play status, call toggle with current status
       await onStatusToggle(project.id, project.status);
+    }
+  };
+
+  // Fonction temporaire pour corriger les statuts IA
+  const fixIAStatuses = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('fix-ia-booking-status');
+      if (error) throw error;
+      toast.success(data.message || 'Statuts IA corrigés');
+      await fetchResourceAssignments();
+    } catch (error) {
+      console.error('Error fixing IA statuses:', error);
+      toast.error('Erreur lors de la correction des statuts IA');
     }
   };
 
@@ -429,16 +461,70 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
     setIsBookingTeam(true);
     try {
-      // First, update all resource assignments to 'recherche' status
-      const { error: updateError } = await supabase
+      // Récupérer toutes les ressources du projet pour identifier les IA
+      const { data: allAssignments, error: fetchError } = await supabase
         .from('hr_resource_assignments')
-        .update({ booking_status: 'recherche' })
-        .eq('project_id', project.id)
-        .in('booking_status', ['draft', 'recherche']); // Only update draft and recherche statuses
+        .select('id, profile_id, booking_status, node_data')
+        .eq('project_id', project.id);
 
-      if (updateError) {
-        console.error('Error updating booking status:', updateError);
-        throw updateError;
+      if (fetchError) {
+        console.error('Error fetching assignments:', fetchError);
+        throw fetchError;
+      }
+
+      // Récupérer les profils IA pour une vérification supplémentaire
+      const { data: iaProfiles } = await supabase
+        .from('hr_profiles')
+        .select('id')
+        .eq('is_ai', true);
+
+      const iaProfileIds = iaProfiles?.map(p => p.id) || [];
+
+      // Identifier les ressources IA et membres d'équipe qui doivent être auto-acceptées
+      const iaAndTeamAssignmentIds = allAssignments
+        ?.filter(a => {
+          const nodeData = a.node_data as any;
+          const isIAByNodeData = nodeData?.is_ai === true;
+          const isIAByProfile = iaProfileIds.includes(a.profile_id);
+          const isTeamMember = nodeData?.is_team_member === true;
+
+          return isIAByNodeData || isIAByProfile || isTeamMember;
+        })
+        .map(a => a.id) || [];
+
+      // Mettre à jour SEULEMENT les ressources humaines (non-IA, non-équipe) en statut 'recherche'
+      const humanAssignments = allAssignments?.filter(a => {
+        const nodeData = a.node_data as any;
+        const isHuman = !nodeData?.is_ai && !nodeData?.is_team_member;
+        const needsSearch = a.booking_status === 'draft' || a.booking_status === 'recherche';
+        return isHuman && needsSearch;
+      }) || [];
+
+      if (humanAssignments.length > 0) {
+        const humanAssignmentIds = humanAssignments.map(a => a.id);
+        const { error: updateError } = await supabase
+          .from('hr_resource_assignments')
+          .update({ booking_status: 'recherche' })
+          .in('id', humanAssignmentIds);
+
+        if (updateError) {
+          console.error('Error updating booking status:', updateError);
+          throw updateError;
+        }
+      }
+
+      // S'assurer que les ressources IA et équipe sont bien marquées comme 'accepted' (auto-booking)
+      if (iaAndTeamAssignmentIds.length > 0) {
+        const { error: iaUpdateError } = await supabase
+          .from('hr_resource_assignments')
+          .update({ booking_status: 'accepted' })
+          .in('id', iaAndTeamAssignmentIds)
+          .neq('booking_status', 'accepted'); // Ne mettre à jour que si pas déjà accepted
+
+        if (iaUpdateError) {
+          console.error('Error updating IA/team booking status:', iaUpdateError);
+          // Ne pas faire échouer la requête pour ça
+        }
       }
 
       // Then call the resource booking function
@@ -453,7 +539,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
       // Mark booking as requested
       setIsBookingRequested(true);
-      
+
       toast.success(data.message || "Recherche d'équipe lancée");
       // Refresh resource assignments to update status
       await fetchResourceAssignments();
@@ -472,15 +558,12 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   const startProject = async (kickoffISO: string) => {
     try {
-      console.log('🚀 startProject called with kickoffISO:', kickoffISO);
       setIsSyncing(true);
       
       // Trigger the project setup with kickoff
       if (onStart) {
-        console.log('✅ Calling onStart with:', { id: project.id, title: project.title, kickoffISO });
         await onStart({ id: project.id, title: project.title, kickoffISO });
       } else {
-        console.error('❌ onStart is not defined!');
         toast.error('Fonction de démarrage non définie');
       }
       
@@ -501,7 +584,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   // Calculer la progression des ressources avec useMemo pour mise à jour réactive
   const bookingProgress = useMemo(() => {
-    console.log('📊 Recalculating booking progress with', resourceAssignments.length, 'assignments');
     if (resourceAssignments.length === 0) return { percentage: 0, text: 'Aucune ressource' };
     
     // Vérifier les statuts de booking
@@ -510,7 +592,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     ).length;
     const percentage = (bookedCount / resourceAssignments.length) * 100;
     
-    console.log('✅ Booking progress:', bookedCount, '/', resourceAssignments.length, '=', percentage + '%');
     
     return {
       percentage,
@@ -523,14 +604,16 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     return resourceAssignments.some(assignment => assignment.booking_status === 'recherche');
   };
 
-  // Check if resources exist but no booking has been requested yet (in 'draft' status)
-  // NOUVEAU: Aussi vérifier s'il y a des hr_resources sans assignments
-  const hasResourcesInDraft = () => {
-    // Vérifier s'il y a des assignments en draft
-    const hasDraftAssignments = resourceAssignments.some(assignment => assignment.booking_status === 'draft');
+  // Check if resources exist but need booking (in 'draft' or 'recherche' status)
+  const hasResourcesNeedingBooking = () => {
+    // Vérifier s'il y a des assignments en draft ou recherche
+    const needsBooking = resourceAssignments.some(assignment =>
+      assignment.booking_status === 'draft' ||
+      assignment.booking_status === 'recherche'
+    );
     // Ou s'il n'y a aucune assignment (mais il pourrait y avoir des hr_resources)
     const hasNoAssignments = resourceAssignments.length === 0;
-    return hasDraftAssignments || hasNoAssignments;
+    return needsBooking || hasNoAssignments;
   };
 
   const allResourcesBooked = resourceAssignments.every(assignment => 
@@ -554,20 +637,6 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   
   const canStartProject = ((project.status === 'pause' || project.status === 'attente-team') || isPlayWithoutKickoff) && 
     allResourcesAccepted;
-  
-  console.log('🎯 Project', project.id, 'start conditions:');
-  console.log('  - Status:', project.status);
-  console.log('  - Planning shared:', project.planning_shared);
-  console.log('  - Is play without kickoff:', isPlayWithoutKickoff);
-  console.log('  - All resources accepted:', allResourcesAccepted);
-  console.log('  - Has resources:', resourceAssignments.length > 0, '(count:', resourceAssignments.length, ')');
-  console.log('  - Can start:', canStartProject);
-  console.log('  - Resource details:', resourceAssignments.map(r => ({
-    id: r.id,
-    profile: r.hr_profiles?.name,
-    status: r.booking_status
-  })));
-
   const formatCurrency = (n?: number | null) => {
     if (typeof n !== 'number') return '—';
     try {
@@ -867,7 +936,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                 ) : (
                   <>
                     {/* Si les ressources ne sont pas encore bookées, afficher Booker les équipes */}
-                    {!canStartProject && hasResourcesInDraft() && (
+                    {!canStartProject && hasResourcesNeedingBooking() && (
                       <Button
                         onClick={handleBookingTeam}
                         disabled={isBookingTeam || isBookingRequested}
@@ -912,7 +981,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                     )}
                     
                     {/* Si le booking est en cours sans être en draft */}
-                    {!canStartProject && !hasResourcesInDraft() && (
+                    {!canStartProject && !hasResourcesNeedingBooking() && (
                       <Button
                         disabled={true}
                         className="h-11 px-5 bg-[#F7F8FA] text-[#6B7280] rounded-full font-medium cursor-not-allowed"

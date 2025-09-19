@@ -175,7 +175,8 @@ useEffect(() => {
     const { data: projectsData, error } = await supabase
       .from('projects')
       .select('*')
-      .eq('owner_id', user.id);
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: false });
 
     if (!error && projectsData) {
       console.log('Projects loaded:', projectsData.length, 'projects');
@@ -1072,7 +1073,8 @@ return (
           const { data: projectsData } = await supabase
             .from('projects')
             .select('*')
-            .eq('owner_id', user.id);
+            .eq('owner_id', user.id)
+            .order('created_at', { ascending: false });
 
           if (projectsData) {
             const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);

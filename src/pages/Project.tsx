@@ -23,8 +23,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/ui/components/Card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Download, Upload, Users, Network, Euro } from 'lucide-react';
-import AIGraphGenerator from '@/components/AIGraphGenerator';
+import { ArrowLeft, Save, Download, Upload, Users, Network, Euro, Sparkles } from 'lucide-react';
+import { ThemeToggle } from '@/ui/components/ThemeToggle';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
 import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
@@ -130,12 +132,13 @@ const Project = () => {
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
   const { toast } = useToast();
-  
+
   const [project, setProject] = useState<Project | null>(null);
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [isArchived, setIsArchived] = useState(false);
   const [showReactFlow, setShowReactFlow] = useState(false);
+  const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
 
   // Vérifier si on doit ouvrir ReactFlow automatiquement (depuis l'IA)
   useEffect(() => {
@@ -173,8 +176,8 @@ const Project = () => {
     // Bloquer les modifications si le projet est archivé
     if (isArchived) {
       // Autoriser uniquement les changements de sélection et de position pour navigation
-      const allowedChanges = changes.filter(change => 
-        change.type === 'select' || 
+      const allowedChanges = changes.filter(change =>
+        change.type === 'select' ||
         (change.type === 'position' && 'dragging' in change && !change.dragging)
       );
       if (allowedChanges.length > 0) {
@@ -182,23 +185,47 @@ const Project = () => {
       }
       return;
     }
-    
+
+    // Filtrer les changements pour empêcher la suppression du nœud client
+    const filteredChanges = changes.filter(change => {
+      if (change.type === 'remove' && 'id' in change && change.id === 'client-node') {
+        return false; // Ne pas supprimer le nœud client
+      }
+      return true;
+    });
+
     // Handle node removals separately to clean up resources
-    changes.forEach(change => {
+    filteredChanges.forEach(change => {
       if (change.type === 'remove' && 'id' in change) {
+        const nodeId = change.id;
+        console.log('Removing node:', nodeId);
+
         // Remove from hrResources when node is deleted
         setHrResources(prev => {
           const newMap = new Map(prev);
-          newMap.delete(change.id);
+          newMap.delete(nodeId);
+          console.log('Removed from hrResources:', nodeId);
           return newMap;
         });
+
         // Clear selection if the removed node was selected
-        setSelectedResource(prev => prev?.id === change.id ? null : prev);
+        setSelectedResource(prev => {
+          if (prev?.id === nodeId) {
+            console.log('Clearing selected resource');
+            return null;
+          }
+          return prev;
+        });
+
+        // Also remove any edges connected to this node
+        setEdges(edges => edges.filter(edge =>
+          edge.source !== nodeId && edge.target !== nodeId
+        ));
       }
     });
-    
+
     // Apply all changes using ReactFlow's utility function
-    setNodes((nds) => applyNodeChanges(changes, nds));
+    setNodes((nds) => applyNodeChanges(filteredChanges, nds));
   }, [isArchived]);
 
   // Handler pour les changements d'edges
@@ -1102,51 +1129,6 @@ const Project = () => {
     event.dataTransfer.dropEffect = 'copy';
   }, []);
 
-  const handleGraphGenerated = useCallback((newNodes: Node[], newEdges: Edge[]) => {
-    // Process nodes and create proper HRResource objects
-    const processedNodes = newNodes.map(node => {
-      const validatedNode = {
-        ...node,
-        position: ensureValidPosition(node.position)
-      };
-
-      // Create HRResource from the node data
-      if (validatedNode.data?.hrResource) {
-        const hrResourceData = validatedNode.data.hrResource as any;
-        const newResource: HRResource = {
-          id: hrResourceData.id || generateUUID(),
-          profile_id: hrResourceData.profileId || '',
-          seniority: hrResourceData.seniority || 'junior',
-          languages: hrResourceData.languages || [],
-          expertises: hrResourceData.expertises || [],
-          calculated_price: hrResourceData.calculatedPrice || 50
-        };
-
-        // Add to resources map
-        setHrResources(prev => new Map(prev).set(newResource.id, newResource));
-
-        // Update node data for display
-        validatedNode.data = {
-          id: newResource.id,
-          profileName: hrResourceData.profile?.name || 'Profil inconnu',
-          seniority: newResource.seniority,
-          languages: newResource.languages,
-          expertises: newResource.expertises,
-          languageNames: hrResourceData.languageNames || [],
-          expertiseNames: hrResourceData.expertiseNames || [],
-          calculatedPrice: hrResourceData.calculatedPrice || newResource.calculated_price,
-          selected: false,
-        };
-        validatedNode.id = newResource.id;
-      }
-
-      return validatedNode;
-    });
-
-    // Add generated nodes to existing ones
-    setNodes(currentNodes => [...currentNodes, ...processedNodes]);
-    setEdges(currentEdges => [...currentEdges, ...newEdges]);
-  }, [setNodes, setEdges]);
 
   // Fonction d'export JSON pour les admins
   const exportJSON = () => {
@@ -1475,15 +1457,20 @@ const Project = () => {
         // Determine booking status: AI resources are always 'booké' (available), others start as 'draft'
         const existingResource = existingResources?.find(r => r.id === assignmentId);
         let bookingStatus = existingResource?.booking_status || 'draft';
-        
-        // Les ressources IA sont toujours disponibles
-        if (resource.is_ai && !existingResource) {
+
+        // Les ressources IA sont TOUJOURS disponibles (même lors des mises à jour)
+        if (resource.is_ai) {
           bookingStatus = 'booké';
         }
-        
-        // Les membres d'équipe sont toujours disponibles
-        if (resource.is_team_member && !existingResource) {
+
+        // Les membres d'équipe sont TOUJOURS disponibles (même lors des mises à jour)
+        if (resource.is_team_member) {
           bookingStatus = 'booké';
+        }
+
+        // Pour les ressources humaines, conserver le statut existant ou utiliser 'draft'
+        if (!resource.is_ai && !resource.is_team_member && existingResource) {
+          bookingStatus = existingResource.booking_status;
         }
         
         return {
@@ -1870,6 +1857,17 @@ const Project = () => {
                 
                 {/* Droite: Actions */}
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsVoiceAssistantOpen(true)}
+                    className="hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                    title="Assistant IA"
+                  >
+                    <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  </Button>
+                  <NotificationBell />
+                  <ThemeToggle />
                   {isAdmin && (
                     <>
                       <Button 
@@ -1940,7 +1938,7 @@ const Project = () => {
               panOnDrag={[1, 2]}
               selectionOnDrag={false}
               elementsSelectable={true} // Permettre la sélection pour voir les détails
-              deleteKeyCode={isArchived ? null : 'Delete'} // Désactiver la suppression si archivé
+              deleteKeyCode={isArchived ? null : ['Delete', 'Backspace']} // Désactiver la suppression si archivé, support Mac et PC
               minZoom={0.1} // Permettre de dézoomer plus
               maxZoom={2} // Limiter le zoom max
               defaultViewport={{ x: 0, y: 0, zoom: 1 }} // Vue par défaut
@@ -1992,19 +1990,27 @@ const Project = () => {
         </div>
         
         {/* Panel droit - Configuration ressource */}
-        <HRResourcePanel 
+        <HRResourcePanel
           selectedResource={selectedResource}
           onResourceUpdate={handleResourceUpdate}
+          onResourceDelete={selectedResource ? () => {
+            if (selectedResource && selectedResource.id !== 'client-node' && !isArchived) {
+              // Déclencher la suppression du nœud
+              const changes = [{
+                type: 'remove' as const,
+                id: selectedResource.id
+              }];
+              onNodesChange(changes);
+            }
+          } : undefined}
         />
       </div>
-      
-      {/* AI Graph Generator Footer - reserved space */}
-      <div style={{ height: '70px' }}>
-        <AIGraphGenerator 
-          onGraphGenerated={handleGraphGenerated} 
-          projectId={id}
-        />
-      </div>
+
+      {/* Assistant IA Fullscreen */}
+      <EnhancedVoiceAssistant
+        isOpen={isVoiceAssistantOpen}
+        onClose={() => setIsVoiceAssistantOpen(false)}
+      />
     </div>
   );
 };

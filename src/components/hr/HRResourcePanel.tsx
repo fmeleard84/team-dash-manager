@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/ui/components/Card';
-import { X, TrendingUp, Globe, Code, Info, AlertCircle, Euro, Users } from 'lucide-react';
+import { X, TrendingUp, Globe, Code, Info, AlertCircle, Euro, Users, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Language {
@@ -40,9 +40,10 @@ interface HRResource {
 interface HRResourcePanelProps {
   selectedResource: HRResource | null;
   onResourceUpdate: (resource: HRResource) => void;
+  onResourceDelete?: () => void;
 }
 
-const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanelProps) => {
+const HRResourcePanel = ({ selectedResource, onResourceUpdate, onResourceDelete }: HRResourcePanelProps) => {
   const [languages, setLanguages] = useState<Language[]>([]);
   const [expertises, setExpertises] = useState<Expertise[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
@@ -457,7 +458,20 @@ const HRResourcePanel = ({ selectedResource, onResourceUpdate }: HRResourcePanel
       <div className="bg-gradient-to-br from-purple-200 via-pink-200 to-blue-200 dark:from-purple-600 dark:via-pink-600 dark:to-blue-600 p-[1px]">
         <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-[#0f172a] dark:via-[#1e1b4b] dark:to-[#312e81]">
           <div className="p-4">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Configuration</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Configuration</h3>
+              {onResourceDelete && (
+                <Button
+                  onClick={onResourceDelete}
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  title="Supprimer la ressource (ou utilisez Backspace/Delete)"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
             {/* Prix calculé avec design néon */}
             <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
               <div className="flex items-center justify-between">
