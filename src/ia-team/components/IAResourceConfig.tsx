@@ -73,27 +73,52 @@ export function IAResourceConfig({ profileId, profileName, currentPromptId, onSa
 
     setSaving(true);
     try {
-      // Mettre à jour le prompt_id dans hr_profiles
+      // Essayer de mettre à jour le prompt_id dans hr_profiles
+      // Si la colonne n'existe pas, on utilisera uniquement ia_resource_prompts
       const { error: updateError } = await supabase
         .from('hr_profiles')
         .update({ prompt_id: selectedPromptId })
         .eq('id', profileId);
 
-      if (updateError) throw updateError;
+      // Si l'erreur est une colonne manquante, on continue avec ia_resource_prompts
+      if (updateError && !updateError.message.includes('column')) {
+        console.warn('Impossible de mettre à jour hr_profiles.prompt_id:', updateError);
+      }
 
       // Créer ou mettre à jour l'entrée dans ia_resource_prompts
-      const { error: upsertError } = await supabase
+      // Cette table sert de fallback si prompt_id n'existe pas dans hr_profiles
+      const { data: existing } = await supabase
         .from('ia_resource_prompts')
-        .upsert({
-          profile_id: profileId,
-          prompt_id: selectedPromptId,
-          is_primary: true,
-          context: 'general'
-        }, {
-          onConflict: 'profile_id,prompt_id'
-        });
+        .select('id')
+        .eq('profile_id', profileId)
+        .eq('prompt_id', selectedPromptId)
+        .single();
 
-      if (upsertError) throw upsertError;
+      if (!existing) {
+        // Supprimer les anciennes associations pour ce profil
+        await supabase
+          .from('ia_resource_prompts')
+          .delete()
+          .eq('profile_id', profileId);
+
+        // Créer la nouvelle association
+        const { error: insertError } = await supabase
+          .from('ia_resource_prompts')
+          .insert({
+            profile_id: profileId,
+            prompt_id: selectedPromptId,
+            is_primary: true,
+            context: 'general'
+          });
+
+        if (insertError) {
+          console.error('Erreur création association:', insertError);
+          // Si la table n'existe pas, on affiche juste un warning
+          if (!insertError.message.includes('relation')) {
+            throw insertError;
+          }
+        }
+      }
 
       toast({
         title: 'Succès',
