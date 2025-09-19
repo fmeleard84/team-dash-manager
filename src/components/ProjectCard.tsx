@@ -681,7 +681,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                     className="hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
-                    Désarchiver
+                    {t('projects.actions.unarchive')}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

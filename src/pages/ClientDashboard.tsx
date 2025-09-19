@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
+import { LanguageSelector } from "@/components/ui/language-selector";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -91,6 +93,7 @@ const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 const { user, logout } = useAuth();
 const navigate = useNavigate();
 const { toast } = useToast();
+const { t } = useTranslation();
 
 // Projects state
 type DbProject = { 
@@ -845,7 +848,7 @@ const sidebarContent = (
                 isActive={activeSection === 'start'}
               >
                 <FolderOpen className="h-4 w-4" />
-                <span>Projets</span>
+                <span>{t('navigation.projects')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
@@ -855,7 +858,7 @@ const sidebarContent = (
                 isActive={activeSection === 'templates'}
               >
                 <Rocket className="h-4 w-4" />
-                <span>Templates</span>
+                <span>{t('navigation.templates')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
@@ -865,7 +868,7 @@ const sidebarContent = (
                 isActive={activeSection === 'kanban'}
               >
                 <Kanban className="h-4 w-4" />
-                <span>Kanban</span>
+                <span>{t('navigation.kanban')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
@@ -875,7 +878,7 @@ const sidebarContent = (
                 isActive={activeSection === 'planning'}
               >
                 <Calendar className="h-4 w-4" />
-                <span>Planning</span>
+                <span>{t('navigation.calendar')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
@@ -885,7 +888,7 @@ const sidebarContent = (
                 isActive={activeSection === 'messages'}
               >
                 <MessageSquare className="h-4 w-4" />
-                <span>Messages</span>
+                <span>{t('navigation.messages')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
@@ -895,7 +898,7 @@ const sidebarContent = (
                 isActive={activeSection === 'drive'}
               >
                 <Cloud className="h-4 w-4" />
-                <span>Drive</span>
+                <span>{t('navigation.drive')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
@@ -905,7 +908,7 @@ const sidebarContent = (
                 isActive={activeSection === 'wiki'}
               >
                 <BookOpen className="h-4 w-4" />
-                <span>Wiki</span>
+                <span>{t('navigation.wiki')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
@@ -915,7 +918,7 @@ const sidebarContent = (
                 isActive={activeSection === 'invoices'}
               >
                 <Receipt className="h-4 w-4" />
-                <span>Factures</span>
+                <span>{t('navigation.invoices')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
 
@@ -925,7 +928,7 @@ const sidebarContent = (
                 isActive={activeSection === 'metrics'}
               >
                 <Activity className="h-4 w-4" />
-                <span>Métriques</span>
+                <span>{t('navigation.reports')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -933,20 +936,20 @@ const sidebarContent = (
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel>Compte</SidebarGroupLabel>
+        <SidebarGroupLabel>{t('settings.account')}</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton onClick={() => navigateToSection('settings')}>
                 <Settings className="h-4 w-4" />
-                <span>Paramètres</span>
+                <span>{t('navigation.settings')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             
             <SidebarMenuItem>
               <SidebarMenuButton onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
-                <span>Déconnexion</span>
+                <span>{t('navigation.logout')}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -960,7 +963,7 @@ const headerContent = (
   <header className="h-16 px-6 flex items-center justify-between bg-card/80 backdrop-blur-md border-b border-border sticky top-0 z-40">
     <div className="flex items-center gap-4">
       <SidebarTrigger />
-      <h1 className="text-xl font-semibold">Dashboard Client</h1>
+      <h1 className="text-xl font-semibold">{t('dashboard.client.title')}</h1>
     </div>
     <div className="flex items-center gap-4">
       {/* Affichage du solde de crédits */}
@@ -1002,6 +1005,7 @@ const headerContent = (
         </div>
       </Button>
       <NotificationBell />
+      <LanguageSelector />
       <ThemeToggle />
     </div>
   </header>

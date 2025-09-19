@@ -4,20 +4,21 @@ import { Badge } from '@/components/ui/badge';
 // import { RadixProjectCard } from '@/components/RadixProjectCard'; // Remplacé par UnifiedProjectCard
 import { ClientProjectCard as RadixProjectCard } from '@/components/UnifiedProjectCard';
 import { PageHeaderNeon } from '@/components/ui/page-header-neon';
-import { 
-  Plus, 
-  Rocket, 
-  FolderOpen, 
-  Play, 
-  Pause, 
-  Clock, 
-  Users, 
+import {
+  Plus,
+  Rocket,
+  FolderOpen,
+  Play,
+  Pause,
+  Clock,
+  Users,
   CheckCircle2,
   Archive,
   Filter,
   X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface DbProject {
   id: string;
@@ -47,45 +48,7 @@ interface ProjectsSectionProps {
   refreshTrigger?: number;
 }
 
-// Configuration des statuts avec leurs styles
-const statusConfig = {
-  'en-cours': {
-    label: 'En cours',
-    icon: Play,
-    color: 'bg-green-100 text-green-700 border-green-200',
-    dotColor: 'bg-green-500',
-  },
-  'nouveau': {
-    label: 'Nouveau',
-    icon: Plus,
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
-    dotColor: 'bg-blue-500',
-  },
-  'attente-team': {
-    label: 'Attente équipe',
-    icon: Users,
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    dotColor: 'bg-yellow-500',
-  },
-  'pause': {
-    label: 'En pause',
-    icon: Pause,
-    color: 'bg-gray-100 text-gray-700 border-gray-200',
-    dotColor: 'bg-gray-500',
-  },
-  'completed': {
-    label: 'Terminé',
-    icon: CheckCircle2,
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
-    dotColor: 'bg-purple-500',
-  },
-  'archived': {
-    label: 'Archivé',
-    icon: Archive,
-    color: 'bg-orange-100 text-orange-700 border-orange-200',
-    dotColor: 'bg-orange-500',
-  },
-};
+// Configuration moved into component to use translation
 
 export function ProjectsSection({
   projects = [],
@@ -102,6 +65,47 @@ export function ProjectsSection({
   onProjectEdited = () => {},
   refreshTrigger = 0,
 }: ProjectsSectionProps) {
+  const { t } = useTranslation();
+
+  // Configuration des statuts avec leurs styles (avec traduction)
+  const statusConfig = {
+    'en-cours': {
+      label: t('projects.status.inProgress'),
+      icon: Play,
+      color: 'bg-green-100 text-green-700 border-green-200',
+      dotColor: 'bg-green-500',
+    },
+    'nouveau': {
+      label: t('projects.status.new'),
+      icon: Plus,
+      color: 'bg-blue-100 text-blue-700 border-blue-200',
+      dotColor: 'bg-blue-500',
+    },
+    'attente-team': {
+      label: t('projects.status.waitingTeam'),
+      icon: Users,
+      color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      dotColor: 'bg-yellow-500',
+    },
+    'pause': {
+      label: t('projects.status.pause'),
+      icon: Pause,
+      color: 'bg-gray-100 text-gray-700 border-gray-200',
+      dotColor: 'bg-gray-500',
+    },
+    'completed': {
+      label: t('projects.status.completed'),
+      icon: CheckCircle2,
+      color: 'bg-purple-100 text-purple-700 border-purple-200',
+      dotColor: 'bg-purple-500',
+    },
+    'archived': {
+      label: t('projects.status.archived'),
+      icon: Archive,
+      color: 'bg-orange-100 text-orange-700 border-orange-200',
+      dotColor: 'bg-orange-500',
+    },
+  };
   // État pour les filtres - inclure 'archived' s'il y a des projets archivés
   const initialFilters = ['en-cours', 'nouveau', 'attente-team', 'pause'];
   if (archivedProjects && archivedProjects.length > 0) {
@@ -188,8 +192,8 @@ export function ProjectsSection({
       {/* Header avec design Neon cohérent */}
       <PageHeaderNeon
         icon={FolderOpen}
-        title="Mes projets"
-        subtitle={`${filteredProjects.length} projet${filteredProjects.length > 1 ? 's' : ''}${selectedFilters.length > 0 ? ` • Filtré${filteredProjects.length > 1 ? 's' : ''}` : ''}`}
+        title={t('projects.title')}
+        subtitle={`${filteredProjects.length} ${t('common.projects').toLowerCase()}${selectedFilters.length > 0 ? ` • ${t('projects.filtered')}` : ''}`}
         showProjectSelector={false}
       >
         <div className="flex gap-3">
@@ -199,29 +203,29 @@ export function ProjectsSection({
             onClick={() => setShowFilters(!showFilters)}
           >
             <Filter className="w-4 h-4 mr-2" />
-            Filtres
+            {t('common.filter')}
             {selectedFilters.length > 0 && (
               <Badge className="ml-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white">
                 {selectedFilters.length}
               </Badge>
             )}
           </Button>
-          
-          <Button 
+
+          <Button
             className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium shadow-lg"
             onClick={onCreateProject}
           >
             <Plus className="w-4 h-4 mr-2" />
-            Créer un projet
+            {t('projects.createProject')}
           </Button>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             className="border-gray-300 dark:border-gray-600"
             onClick={onViewTemplates}
           >
             <Rocket className="w-4 h-4 mr-2" />
-            Explorer les templates
+            {t('common.templates')}
           </Button>
         </div>
       </PageHeaderNeon>
@@ -230,23 +234,23 @@ export function ProjectsSection({
       {showFilters && (
         <div className="bg-muted/50 dark:bg-muted/20 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">Filtrer par statut</span>
+            <span className="text-sm font-medium text-foreground">{t('projects.filterByStatus')}</span>
             <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={selectAllFilters}
                 className="text-xs"
               >
-                Tout sélectionner
+                {t('common.selectAll')}
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={clearAllFilters}
                 className="text-xs"
               >
-                Tout désélectionner
+                {t('common.deselectAll')}
               </Button>
             </div>
           </div>
@@ -297,24 +301,24 @@ export function ProjectsSection({
               <FolderOpen className="w-8 h-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">
-              Aucun projet trouvé
+              {t('projects.empty.title')}
             </h3>
             <p className="text-muted-foreground mb-4">
-              {selectedFilters.length > 0 
-                ? "Aucun projet ne correspond aux filtres sélectionnés"
-                : "Vous n'avez pas encore de projet"}
+              {selectedFilters.length > 0
+                ? t('projects.empty.noMatchingProjects')
+                : t('projects.empty.description')}
             </p>
             {selectedFilters.length > 0 ? (
               <Button 
                 variant="outline"
                 onClick={clearAllFilters}
               >
-                Réinitialiser les filtres
+                {t('projects.filters.reset')}
               </Button>
             ) : (
               <Button onClick={onCreateProject}>
                 <Plus className="w-4 h-4 mr-2" />
-                Créer votre premier projet
+                {t('projects.empty.createButton')}
               </Button>
             )}
           </div>
