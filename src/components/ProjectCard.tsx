@@ -19,6 +19,7 @@ import {
 import EditProjectModal from "@/components/EditProjectModal";
 import { useClientCredits } from '@/hooks/useClientCredits';
 import { StripePaymentModal } from './payment/StripePaymentModal';
+import { useTranslation } from 'react-i18next';
 
 interface Project {
   id: string;
