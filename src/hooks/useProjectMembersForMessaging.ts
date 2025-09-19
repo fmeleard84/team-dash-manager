@@ -9,9 +9,11 @@ export interface ProjectMember {
   name: string;
   firstName?: string;
   jobTitle?: string; // métier
-  role: 'client' | 'candidate' | 'admin';
+  role: 'client' | 'candidate' | 'admin' | 'ia';
   avatar?: string;
   isOnline?: boolean;
+  isAI?: boolean; // Indicateur pour les ressources IA
+  promptId?: string; // ID du prompt pour les IA
 }
 
 export const useProjectMembersForMessaging = (projectId: string) => {
@@ -111,7 +113,29 @@ export const useProjectMembersForMessaging = (projectId: string) => {
               booking_status: assignment.booking_status
             });
             
-            if (assignment.candidate_id) {
+            // Vérifier d'abord si c'est une ressource IA
+            const { data: hrProfile } = await supabase
+              .from('hr_profiles')
+              .select('id, name, is_ai, prompt_id')
+              .eq('id', assignment.profile_id)
+              .single();
+
+            if (hrProfile?.is_ai) {
+              // C'est une ressource IA, l'ajouter directement sans candidate_id
+              allMembers.push({
+                id: `ia_${hrProfile.id}`, // ID unique pour l'IA
+                userId: `ia_${hrProfile.id}`, // Même ID pour tracking
+                email: `${hrProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
+                name: hrProfile.name,
+                firstName: hrProfile.name,
+                jobTitle: hrProfile.name,
+                role: 'ia',
+                isOnline: true, // Les IA sont toujours "en ligne"
+                isAI: true,
+                promptId: hrProfile.prompt_id
+              });
+              console.log('[MESSAGING] Added AI resource:', hrProfile.name, 'ID:', hrProfile.id);
+            } else if (assignment.candidate_id) {
               // With unified IDs, candidate_id = profiles.id
               const { data: userProfile } = await supabase
                 .from('profiles')
@@ -122,29 +146,34 @@ export const useProjectMembersForMessaging = (projectId: string) => {
               if (userProfile) {
                 // Get the job title from hr_profiles separately
                 let jobTitle = 'Ressource';
+                let isAI = false;
+                let promptId = undefined;
+
                 if (assignment.profile_id) {
                   console.log('[MESSAGING] Fetching hr_profile for profile_id:', assignment.profile_id);
                   const { data: hrProfile, error: hrError } = await supabase
                     .from('hr_profiles')
-                    .select('name')
+                    .select('name, is_ai, prompt_id')
                     .eq('id', assignment.profile_id)
                     .single();
-                  
+
                   if (hrError) {
                     console.error('[MESSAGING] Error fetching hr_profile:', hrError);
                   }
-                  
+
                   if (hrProfile) {
                     console.log('[MESSAGING] Found hr_profile:', hrProfile);
                     jobTitle = hrProfile.name || 'Ressource';
-                    console.log('[MESSAGING] Job title set to:', jobTitle);
+                    isAI = hrProfile.is_ai || false;
+                    promptId = hrProfile.prompt_id;
+                    console.log('[MESSAGING] Job title set to:', jobTitle, 'Is AI:', isAI);
                   } else {
                     console.log('[MESSAGING] No hr_profile found for profile_id:', assignment.profile_id);
                   }
                 } else {
                   console.log('[MESSAGING] No profile_id in assignment');
                 }
-                
+
                 allMembers.push({
                   id: userProfile.id,
                   userId: userProfile.user_id || userProfile.id,
@@ -152,8 +181,10 @@ export const useProjectMembersForMessaging = (projectId: string) => {
                   name: userProfile.first_name || 'Candidat',
                   firstName: userProfile.first_name,
                   jobTitle: jobTitle,
-                  role: 'candidate',
-                  isOnline: false
+                  role: isAI ? 'ia' : 'candidate',
+                  isOnline: false,
+                  isAI: isAI,
+                  promptId: promptId
                 });
                 
                 console.log('[MESSAGING] Added candidate:', userProfile.first_name, 'ID:', userProfile.id, 'Job:', jobTitle);

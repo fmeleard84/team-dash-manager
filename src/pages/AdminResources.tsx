@@ -10,15 +10,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { 
+import {
   ArrowLeft, Plus, Edit, Trash2, MessageSquare, Cloud, Receipt, FolderOpen,
   Briefcase, Code, Palette, Megaphone, Users, Target, Zap, Star, Heart,
   Settings, Globe, Shield, Rocket, Camera, Music, Book, Lightbulb,
   TrendingUp, Award, Coffee, Gamepad2, Headphones, Monitor, Smartphone,
-  Database, Lock, Wifi, Mail, Phone, MapPin, Calendar, Clock, DollarSign
+  Database, Lock, Wifi, Mail, Phone, MapPin, Calendar, Clock, DollarSign, Bot
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { IAResourceConfig } from '@/ia-team/components/IAResourceConfig';
 
 // Interfaces
 interface HRCategory {
@@ -34,6 +35,7 @@ interface HRProfile {
   category_id: string;
   base_price: number;
   is_ai?: boolean;
+  prompt_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -119,7 +121,9 @@ const AdminResources = () => {
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '' });
-  const [profileForm, setProfileForm] = useState({ name: '', category_id: '', base_price: 50, is_ai: false });
+  const [profileForm, setProfileForm] = useState({ name: '', category_id: '', base_price: 50, is_ai: false, prompt_id: '' });
+  const [showIAConfig, setShowIAConfig] = useState(false);
+  const [selectedIAProfile, setSelectedIAProfile] = useState<HRProfile | null>(null);
   const [languageForm, setLanguageForm] = useState({ name: '', code: '', cost_percentage: 5 });
   const [expertiseForm, setExpertiseForm] = useState({ name: '', category_id: '', cost_percentage: 10 });
   const [templateCategoryForm, setTemplateCategoryForm] = useState({ 
@@ -276,7 +280,7 @@ const AdminResources = () => {
         toast({ title: "Succès", description: "Profil créé avec succès." });
       }
       setProfileDialog({ open: false, edit: false, data: null });
-      setProfileForm({ name: '', category_id: '', base_price: 50, is_ai: false });
+      setProfileForm({ name: '', category_id: '', base_price: 50, is_ai: false, prompt_id: '' });
       fetchAllData();
     } catch (error: any) {
       toast({
@@ -673,23 +677,37 @@ const AdminResources = () => {
                          </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
+                        {profile.is_ai && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedIAProfile(profile);
+                              setShowIAConfig(true);
+                            }}
+                            className="text-primary hover:text-primary"
+                          >
+                            <Bot className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => {
-                            setProfileForm({ 
+                            setProfileForm({
                               name: profile.name,
                               category_id: profile.category_id,
                               base_price: profile.base_price,
-                              is_ai: profile.is_ai || false
+                              is_ai: profile.is_ai || false,
+                              prompt_id: profile.prompt_id || ''
                             });
                             setProfileDialog({ open: true, edit: true, data: profile });
                           }}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => deleteProfile(profile.id)}
                         >
@@ -702,6 +720,29 @@ const AdminResources = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Dialog de configuration IA */}
+          <Dialog open={showIAConfig} onOpenChange={setShowIAConfig}>
+            <DialogContent className="max-w-2xl" aria-describedby="ia-config-description">
+              <DialogHeader>
+                <DialogTitle>Configuration de la ressource IA</DialogTitle>
+              </DialogHeader>
+              <p id="ia-config-description" className="text-sm text-muted-foreground mb-4">
+                Configurez le prompt système et le comportement de cette ressource IA.
+              </p>
+              {selectedIAProfile && (
+                <IAResourceConfig
+                  profileId={selectedIAProfile.id}
+                  profileName={selectedIAProfile.name}
+                  currentPromptId={selectedIAProfile.prompt_id}
+                  onSave={() => {
+                    setShowIAConfig(false);
+                    fetchAllData();
+                  }}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
 
           {/* Langues */}
           {activeTab === 'languages' && (
