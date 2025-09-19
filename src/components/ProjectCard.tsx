@@ -783,29 +783,36 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             )}
           </div>
 
-          {/* Team progress */}
+          {/* Team progress - Design amélioré comme dans la popup */}
           {resourceAssignments.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600 dark:text-gray-400">{bookingProgress.text}</span>
+            <div className="space-y-3">
+              <div className="bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 rounded-lg p-3 border border-primary-500/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-primary-600 dark:text-primary-400">{t('team.progress')}</p>
+                    <p className="text-sm font-semibold text-neutral-900 dark:text-white mt-0.5">{bookingProgress.text}</p>
+                  </div>
+                  <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                    {Math.round(bookingProgress.percentage)}%
+                  </div>
+                </div>
+                <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-1.5 mt-2">
+                  <div
+                    className="h-1.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full transition-all duration-300"
+                    style={{ width: `${bookingProgress.percentage}%` }}
+                  />
+                </div>
               </div>
-              
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                <div 
-                  className="h-1.5 bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
-                  style={{ width: `${bookingProgress.percentage}%` }}
-                />
-              </div>
-              
+
               <div className="flex flex-wrap gap-1.5">
                 {[...new Set(resourceAssignments.map(a => a.profile_id).filter(Boolean))].map((profileId) => {
                   const profileAssignments = resourceAssignments.filter(a => a.profile_id === profileId);
                   const hasBooked = profileAssignments.some(a => a.booking_status === 'accepted');
                   const profileName = profileNames[profileId] || 'Métier';
-                  
+
                   return (
                     <span
-                      key={profileId} 
+                      key={profileId}
                       className={`text-xs px-2 py-1 rounded transition-colors ${
                         hasBooked
                           ? 'bg-green-500/10 text-green-600 dark:text-green-400 font-medium border border-green-500/20'
@@ -965,14 +972,14 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       <FullScreenModal
         isOpen={showTeamModal}
         onClose={() => setShowTeamModal(false)}
-        title="Constitution de l'équipe"
-        description={`Équipe du projet "${project.title}"`}
+        title={t('team.title')}
+        description={`${t('team.projectTeam')} "${project.title}"`}
       >
         <div className="space-y-4">
           {resourceAssignments.length === 0 ? (
             <div className="text-center py-12 bg-neutral-50 dark:bg-neutral-900/50 rounded-lg">
               <Users className="h-12 w-12 mx-auto text-neutral-400 dark:text-neutral-600 mb-4" />
-              <p className="text-neutral-600 dark:text-neutral-400">Aucune ressource définie pour ce projet</p>
+              <p className="text-neutral-600 dark:text-neutral-400">{t('team.noResourcesDefined')}</p>
               <Button
                 onClick={() => {
                   setShowTeamModal(false);
@@ -980,7 +987,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                 }}
                 className="mt-4"
               >
-                Définir l'équipe
+                {t('team.defineTeam')}
               </Button>
             </div>
           ) : (
@@ -988,7 +995,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               <div className="bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 rounded-lg p-4 mb-6 border border-primary-500/20">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-primary-600 dark:text-primary-400">Progression de l'équipe</p>
+                    <p className="text-sm text-primary-600 dark:text-primary-400">{t('team.progress')}</p>
                     <p className="text-lg font-semibold text-neutral-900 dark:text-white mt-1">{bookingProgress.text}</p>
                   </div>
                   <div className="text-3xl font-bold text-primary-600 dark:text-primary-400">
@@ -1012,32 +1019,32 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                       </div>
                       <div>
                         <h4 className="font-semibold text-neutral-900 dark:text-white">
-                          {profileNames[assignment.profile_id] || 'Poste non défini'}
+                          {profileNames[assignment.profile_id] || t('team.positionUndefined')}
                         </h4>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">{assignment.seniority || 'Séniorité non définie'}</p>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">{assignment.seniority || t('team.seniorityUndefined')}</p>
                         {assignment.languages && assignment.languages.length > 0 && (
                           <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
-                            <span className="font-medium">Langues:</span> {assignment.languages.join(', ')}
+                            <span className="font-medium">{t('team.languages')}:</span> {assignment.languages.join(', ')}
                           </p>
                         )}
                         {assignment.expertises && assignment.expertises.length > 0 && (
                           <p className="text-xs text-neutral-500 dark:text-neutral-500">
-                            <span className="font-medium">Expertises:</span> {assignment.expertises.join(', ')}
+                            <span className="font-medium">{t('team.skills')}:</span> {assignment.expertises.join(', ')}
                           </p>
                         )}
                       </div>
                     </div>
                     {assignment.booking_status === 'accepted' ? (
                       <Badge className="bg-green-100 text-green-700 border-green-200">
-                        ✓ Confirmé
+                        ✓ {t('team.booking.accepted')}
                       </Badge>
                     ) : assignment.booking_status === 'recherche' ? (
                       <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
-                        En recherche
+                        {t('team.booking.searchingTeam')}
                       </Badge>
                     ) : (
                       <Badge variant="secondary">
-                        Brouillon
+                        {t('common.draft')}
                       </Badge>
                     )}
                   </div>
@@ -1069,7 +1076,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                   {assignment.candidate_profiles?.daily_rate && (
                     <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Tarif</span>
+                        <span className="text-gray-500">{t('team.rate')}</span>
                         <span className="font-semibold text-gray-900">
                           {(assignment.candidate_profiles.daily_rate / 8).toFixed(0)}€/h
                         </span>
@@ -1081,7 +1088,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               
               <div className="mt-6 pt-6 border-t">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Prix total par minute</span>
+                  <span className="text-gray-600">{t('projects.totalPricePerMinute')}</span>
                   <span className="text-xl font-bold text-purple-700">
                     {calculateTotalPricePerMinute().toFixed(2)}€/min
                   </span>
@@ -1097,25 +1104,25 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         isOpen={showProjectDetailsModal}
         onClose={() => setShowProjectDetailsModal(false)}
         title={project.title}
-        description="Détails complets du projet"
+        description={t('projects.fullDetails')}
       >
         <div className="space-y-6">
           {/* Description */}
           {project.description && (
             <div>
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Description</h3>
+              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">{t('common.description')}</h3>
               <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">{project.description}</p>
             </div>
           )}
 
           {/* Informations */}
           <div>
-            <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Informations</h3>
+            <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">{t('common.info')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
                   <Calendar className="h-4 w-4" />
-                  <span>Date de début</span>
+                  <span>{t('projects.startDate')}</span>
                 </div>
                 <p className="font-semibold text-neutral-900 dark:text-white">
                   {formatDate(project.date)}
@@ -1123,10 +1130,10 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               </div>
 
               {project.dueDate && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
                     <Calendar className="h-4 w-4" />
-                    <span>Date de fin</span>
+                    <span>{t('projects.projectDeadline')}</span>
                   </div>
                   <p className="font-semibold text-neutral-900 dark:text-white">
                     {formatDate(project.dueDate)}
@@ -1138,7 +1145,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                 <div className="bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 mb-1">
                     <Euro className="h-4 w-4" />
-                    <span>Budget du projet</span>
+                    <span>{t('projects.projectBudget')}</span>
                   </div>
                   <p className="font-semibold text-primary-700 dark:text-primary-300">
                     {formatCurrency(project.clientBudget)}
@@ -1149,13 +1156,13 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
                   <Info className="h-4 w-4" />
-                  <span>Statut</span>
+                  <span>{t('common.status')}</span>
                 </div>
                 <Badge variant={project.status === 'play' ? 'default' : 'secondary'}>
-                  {project.status === 'play' ? 'En cours' : 
-                   project.status === 'pause' ? 'En pause' : 
-                   project.status === 'attente-team' ? 'En attente' : 
-                   project.status === 'completed' ? 'Terminé' : project.status}
+                  {project.status === 'play' ? t('projects.status.inProgress') :
+                   project.status === 'pause' ? t('projects.status.pause') :
+                   project.status === 'attente-team' ? t('projects.status.waitingTeam') :
+                   project.status === 'completed' ? t('projects.status.completed') : project.status}
                 </Badge>
               </div>
             </div>
@@ -1165,7 +1172,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           {projectFiles.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">
-                Fichiers attachés ({projectFiles.length})
+                {t('projects.card.attachments')} ({projectFiles.length})
               </h3>
               <div className="space-y-2">
                 {projectFiles.map((file, index) => (
