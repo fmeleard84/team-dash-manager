@@ -110,6 +110,7 @@ const [resourceAssignments, setResourceAssignments] = useState<any[]>([]);
 const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 const [projectToDelete, setProjectToDelete] = useState<DbProject | null>(null);
+const [archiveMode, setArchiveMode] = useState(false); // true si on veut archiver, false si on veut supprimer
 const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
 // const [showTextChat, setShowTextChat] = useState(false); // Removed - using EnhancedVoiceAssistant instead
 
@@ -177,7 +178,7 @@ useEffect(() => {
     if (!error && projectsData) {
       console.log('Projects loaded:', projectsData.length, 'projects');
       const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);
-      const archived = projectsData.filter(p => p.archived_at || p.deleted_at);
+      const archived = projectsData.filter(p => p.archived_at && !p.deleted_at);
       setProjects(active);
       setArchivedProjects(archived);
     }
@@ -194,7 +195,7 @@ useEffect(() => {
   };
 
   loadProjects();
-}, [user?.id]);
+}, [user?.id, refreshTrigger]);
 
 // Use realtime hook for projects
 useRealtimeProjectsFixed({
@@ -202,7 +203,7 @@ useRealtimeProjectsFixed({
     const currentProjects = [...projects, ...archivedProjects];
     const allProjects = typeof updater === 'function' ? updater(currentProjects) : updater;
     const active = allProjects?.filter(p => !p.archived_at && !p.deleted_at) || [];
-    const archived = allProjects?.filter(p => p.archived_at || p.deleted_at) || [];
+    const archived = allProjects?.filter(p => p.archived_at && !p.deleted_at) || [];
     setProjects(active);
     setArchivedProjects(archived);
   },
@@ -297,44 +298,23 @@ const handleProjectStart = async (project: { id: string; title: string; kickoffI
   }
 };
 
-const handleProjectArchive = async (projectId: string) => {
-  if (!user?.id) return;
-  
-  try {
-    const { error } = await supabase
-      .from('projects')
-      .update({ 
-        archived_at: new Date().toISOString(),
-        status: 'completed'
-      })
-      .eq('id', projectId)
-      .eq('owner_id', user.id);
-
-    if (error) throw error;
-
-    toast({
-      title: "Projet archivé",
-      description: "Le projet a été archivé avec succès",
-    });
-    
-    setRefreshTrigger(prev => prev + 1);
-  } catch (error) {
-    console.error('Error archiving project:', error);
-    toast({
-      title: "Erreur",
-      description: "Impossible d'archiver le projet",
-      variant: "destructive",
-    });
+const handleProjectArchive = (projectId: string) => {
+  // Ouvrir la popup en mode archivage
+  const project = projects.find(p => p.id === projectId);
+  if (project) {
+    setProjectToDelete(project);
+    setArchiveMode(true);
+    setDeleteDialogOpen(true);
   }
 };
 
 const handleProjectUnarchive = async (projectId: string) => {
   if (!user?.id) return;
-  
+
   try {
     const { error } = await supabase
       .from('projects')
-      .update({ 
+      .update({
         archived_at: null,
         status: 'pause'
       })
@@ -343,11 +323,18 @@ const handleProjectUnarchive = async (projectId: string) => {
 
     if (error) throw error;
 
+    // Trouver le projet archivé et le déplacer immédiatement vers les projets actifs
+    const projectToUnarchive = archivedProjects.find(p => p.id === projectId);
+    if (projectToUnarchive) {
+      setArchivedProjects(prev => prev.filter(p => p.id !== projectId));
+      setProjects(prev => [...prev, { ...projectToUnarchive, archived_at: null, status: 'pause' }]);
+    }
+
     toast({
       title: "Projet restauré",
       description: "Le projet a été restauré avec succès",
     });
-    
+
     setRefreshTrigger(prev => prev + 1);
   } catch (error) {
     console.error('Error unarchiving project:', error);
@@ -359,36 +346,11 @@ const handleProjectUnarchive = async (projectId: string) => {
   }
 };
 
-const handleProjectDelete = async (project: DbProject) => {
-  if (!user?.id) return;
-  
-  try {
-    // Archive the project instead of hard delete
-    const { error } = await supabase
-      .from('projects')
-      .update({ 
-        archived_at: new Date().toISOString(),
-        status: 'completed'
-      })
-      .eq('id', project.id)
-      .eq('owner_id', user.id);
-
-    if (error) throw error;
-
-    toast({
-      title: "Projet archivé",
-      description: "Le projet a été archivé avec succès",
-    });
-    
-    setRefreshTrigger(prev => prev + 1);
-  } catch (error) {
-    console.error('Error archiving project:', error);
-    toast({
-      title: "Erreur",
-      description: "Impossible d'archiver le projet",
-      variant: "destructive",
-    });
-  }
+const handleProjectDelete = (project: DbProject) => {
+  // Ouvrir la popup en mode suppression
+  setProjectToDelete(project);
+  setArchiveMode(false);
+  setDeleteDialogOpen(true);
 };
 
 const renderStartContent = () => {
@@ -444,27 +406,6 @@ const renderStartContent = () => {
         onProjectEdited={() => setRefreshTrigger(prev => prev + 1)}
         refreshTrigger={refreshTrigger}
       />
-
-      {/* Archived Projects */}
-      {archivedProjects && archivedProjects.length > 0 && (
-        <PageSection title="Projets archivés">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {archivedProjects.map((project) => (
-              <Card key={project.id} className="opacity-75">
-                <CardHeader>
-                  <CardTitle>{project.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {project.description || 'Pas de description'}
-                  </p>
-                  <Badge variant="secondary" className="mt-2">Archivé</Badge>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </PageSection>
-      )}
       </div>
     </div>
   );
@@ -1095,12 +1036,36 @@ return (
     {projectToDelete && (
       <DeleteProjectDialog
         project={projectToDelete}
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        onDelete={() => {
-          handleProjectDelete(projectToDelete);
+        isOpen={deleteDialogOpen}
+        onClose={() => {
           setDeleteDialogOpen(false);
           setProjectToDelete(null);
+          setArchiveMode(false);
+        }}
+        onProjectDeleted={() => {
+          // Retirer immédiatement le projet supprimé de la liste
+          setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+          setArchivedProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+          setDeleteDialogOpen(false);
+          setProjectToDelete(null);
+          setArchiveMode(false);
+          setRefreshTrigger(prev => prev + 1);
+        }}
+        onProjectArchived={() => {
+          // Déplacer le projet vers les archives
+          const projectToArchive = projects.find(p => p.id === projectToDelete.id);
+          if (projectToArchive) {
+            setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+            setArchivedProjects(prev => [...prev, {
+              ...projectToArchive,
+              archived_at: new Date().toISOString(),
+              status: 'completed'
+            }]);
+          }
+          setDeleteDialogOpen(false);
+          setProjectToDelete(null);
+          setArchiveMode(false);
+          setRefreshTrigger(prev => prev + 1);
         }}
       />
     )}
@@ -1120,7 +1085,7 @@ return (
 
           if (projectsData) {
             const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);
-            const archived = projectsData.filter(p => p.archived_at || p.deleted_at);
+            const archived = projectsData.filter(p => p.archived_at && !p.deleted_at);
             setProjects(active);
             setArchivedProjects(archived);
           }

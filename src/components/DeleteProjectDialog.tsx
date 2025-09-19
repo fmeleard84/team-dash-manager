@@ -126,8 +126,8 @@ export function DeleteProjectDialog({
           return;
         }
         
-        // Utiliser la nouvelle edge function qui contourne le problème de contrainte
-        const { data, error } = await supabase.functions.invoke('fix-project-delete', {
+        // Utiliser la nouvelle edge function de suppression profonde qui nettoie toutes les données
+        const { data, error } = await supabase.functions.invoke('deep-delete-project', {
           body: {
             project_id: project.id,
             user_id: user.id,
@@ -138,8 +138,9 @@ export function DeleteProjectDialog({
         if (error) throw error;
         
         if (data?.success) {
-          toast.success('Projet supprimé', {
-            description: `${data.affected_users || 0} utilisateurs ont été notifiés`
+          const summary = data.cleanup_summary;
+          toast.success('Projet supprimé complètement', {
+            description: `${summary?.messages_deleted || 0} messages, ${summary?.kanban_cards_deleted || 0} cartes, ${summary?.files_deleted || 0} fichiers supprimés. Factures et paiements conservés.`
           });
           onProjectDeleted?.();
           onClose();

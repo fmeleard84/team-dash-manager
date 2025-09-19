@@ -4,7 +4,7 @@ import pkg from 'pg';
 const { Client } = pkg;
 
 // Configuration de la connexion
-const connectionString = 'postgresql://postgres.egdelmcijszuapcpglsy:R@ymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+const connectionString = 'postgresql://postgres.egdelmcijszuapcpglsy:Raymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
 
 async function applyMigration() {
   const client = new Client({ connectionString });

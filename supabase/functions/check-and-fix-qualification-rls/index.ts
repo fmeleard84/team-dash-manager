@@ -16,7 +16,7 @@ serve(async (req) => {
     const { Client } = await import('https://deno.land/x/postgres@v0.17.0/mod.ts')
     const client = new Client({
       user: 'postgres.egdelmcijszuapcpglsy',
-      password: 'R@ymonde7510_2a',
+      password: 'Raymonde7510_2a',
       database: 'postgres',
       hostname: 'aws-0-eu-central-1.pooler.supabase.com',
       port: 6543,

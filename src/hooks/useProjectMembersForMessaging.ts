@@ -113,38 +113,17 @@ export const useProjectMembersForMessaging = (projectId: string) => {
               booking_status: assignment.booking_status
             });
             
-            // Vérifier d'abord si c'est une ressource IA
-            const { data: hrProfile } = await supabase
-              .from('hr_profiles')
-              .select('id, name, is_ai, prompt_id')
-              .eq('id', assignment.profile_id)
-              .single();
-
-            if (hrProfile?.is_ai) {
-              // C'est une ressource IA, l'ajouter directement sans candidate_id
-              allMembers.push({
-                id: `ia_${hrProfile.id}`, // ID unique pour l'IA
-                userId: `ia_${hrProfile.id}`, // Même ID pour tracking
-                email: `${hrProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
-                name: hrProfile.name,
-                firstName: hrProfile.name,
-                jobTitle: hrProfile.name,
-                role: 'ia',
-                isOnline: true, // Les IA sont toujours "en ligne"
-                isAI: true,
-                promptId: hrProfile.prompt_id
-              });
-              console.log('[MESSAGING] Added AI resource:', hrProfile.name, 'ID:', hrProfile.id);
-            } else if (assignment.candidate_id) {
+            // Avec l'architecture unifiée, les IA ont aussi un candidate_id
+            if (assignment.candidate_id) {
               // With unified IDs, candidate_id = profiles.id
               const { data: userProfile } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', assignment.candidate_id)
                 .single();
-              
+
               if (userProfile) {
-                // Get the job title from hr_profiles separately
+                // Get the job title and AI status from hr_profiles
                 let jobTitle = 'Ressource';
                 let isAI = false;
                 let promptId = undefined;
@@ -175,14 +154,14 @@ export const useProjectMembersForMessaging = (projectId: string) => {
                 }
 
                 allMembers.push({
-                  id: userProfile.id,
-                  userId: userProfile.user_id || userProfile.id,
+                  id: isAI ? `ia_${userProfile.id}` : userProfile.id,
+                  userId: isAI ? `ia_${userProfile.id}` : (userProfile.user_id || userProfile.id),
                   email: userProfile.email,
                   name: userProfile.first_name || 'Candidat',
                   firstName: userProfile.first_name,
                   jobTitle: jobTitle,
                   role: isAI ? 'ia' : 'candidate',
-                  isOnline: false,
+                  isOnline: isAI ? true : false, // Les IA sont toujours "en ligne"
                   isAI: isAI,
                   promptId: promptId
                 });

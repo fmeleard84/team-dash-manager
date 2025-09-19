@@ -102,23 +102,45 @@ export function ProjectsSection({
   onProjectEdited = () => {},
   refreshTrigger = 0,
 }: ProjectsSectionProps) {
-  // État pour les filtres
-  const [selectedFilters, setSelectedFilters] = useState<string[]>(['en-cours', 'nouveau', 'attente-team', 'pause']);
+  // État pour les filtres - inclure 'archived' s'il y a des projets archivés
+  const initialFilters = ['en-cours', 'nouveau', 'attente-team', 'pause'];
+  if (archivedProjects && archivedProjects.length > 0) {
+    initialFilters.push('archived');
+  }
+  const [selectedFilters, setSelectedFilters] = useState<string[]>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
 
   // Fusionner tous les projets avec leur catégorie et mapper les noms de propriétés
   const allProjects = [
-    ...(projects || []).map(p => ({ 
-      ...p, 
-      // Mapper les noms de propriétés pour ProjectCard
-      date: p.project_date,
-      clientBudget: p.client_budget,
-      dueDate: p.due_date,
-      category: p.status === 'play' ? 'en-cours' : 
-                p.status === 'attente-team' ? 'attente-team' : 
-                p.status === 'pause' ? 'pause' : 
-                p.status === 'completed' ? 'completed' : 'nouveau' 
-    })),
+    ...(projects || []).map(p => {
+      // Vérifier si le projet a des ressources en recherche
+      const hasResourcesInSearch = (resourceAssignments || []).some(
+        a => a.project_id === p.id && a.booking_status === 'recherche'
+      );
+
+      // Déterminer la catégorie en fonction du status ET des ressources
+      let category = 'nouveau';
+      if (p.status === 'play') {
+        category = 'en-cours';
+      } else if (p.status === 'attente-team') {
+        category = 'attente-team';
+      } else if (p.status === 'completed') {
+        category = 'completed';
+      } else if (p.status === 'pause') {
+        // Un projet en pause avec des ressources en recherche = "pause"
+        // Un projet en pause sans ressources = "nouveau"
+        category = hasResourcesInSearch ? 'pause' : 'nouveau';
+      }
+
+      return {
+        ...p,
+        // Mapper les noms de propriétés pour ProjectCard
+        date: p.project_date,
+        clientBudget: p.client_budget,
+        dueDate: p.due_date,
+        category
+      };
+    }),
     ...(archivedProjects || []).map(p => ({ 
       ...p, 
       // Mapper les noms de propriétés pour ProjectCard
@@ -321,9 +343,9 @@ export function ProjectsSection({
                   onView={() => onViewProject(project.id)}
                   onStatusToggle={(id, _) => onToggleStatus(id, project.status)}
                   onStart={(projectWithKickoff) => onStartProject(projectWithKickoff)}
-                  onDelete={() => onDeleteRequest(project)}
-                  onArchive={() => onArchiveProject(project.id)}
-                  onUnarchive={() => onUnarchiveProject(project.id)}
+                  onDelete={(id) => onDeleteRequest(project)}
+                  onArchive={(id) => onArchiveProject(id)}
+                  onUnarchive={(id) => onUnarchiveProject(id)}
                   onEdit={onProjectEdited}
                   refreshTrigger={refreshTrigger}
                 />

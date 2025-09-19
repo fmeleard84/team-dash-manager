@@ -8,7 +8,7 @@ PGHOST="aws-0-eu-west-3.pooler.supabase.com"
 PGPORT="6543"
 PGUSER="postgres.egdelmcijszuapcpglsy"
 PGDATABASE="postgres"
-export PGPASSWORD="R@ymonde7510_2a"
+export PGPASSWORD="Raymonde7510_2a"
 
 # Couleurs pour l'output
 RED='\033[0;31m'

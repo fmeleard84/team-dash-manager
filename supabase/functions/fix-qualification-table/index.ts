@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const dbUrl = 'postgresql://postgres.egdelmcijszuapcpglsy:R@ymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
+    const dbUrl = 'postgresql://postgres.egdelmcijszuapcpglsy:Raymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
 
     console.log('🔧 Désactivation complète de RLS sur candidate_qualification_results...')
 

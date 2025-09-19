@@ -4,7 +4,7 @@ import pg from 'pg';
 const { Client } = pg;
 
 const client = new Client({
-  connectionString: "postgresql://postgres.egdelmcijszuapcpglsy:R@ymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
+  connectionString: "postgresql://postgres.egdelmcijszuapcpglsy:Raymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
 });
 
 console.log("🔧 Application des corrections RLS pour les candidats\n");

@@ -412,6 +412,106 @@ booking_status: 'draft' | 'recherche' | 'accepted' | 'declined'
 - **accepted**: Candidat a accepté la mission
 - **declined**: Candidat a refusé
 
+## 🤖 ARCHITECTURE IA TEAM (19/09/2025)
+
+### Principe : IA = Candidat Spécial
+Les ressources IA sont traitées comme des candidats normaux pour garantir la compatibilité totale avec le système existant (Kanban, Drive, Messages, etc.).
+
+### Structure Unifiée
+```typescript
+// Ressource IA dans hr_profiles
+hr_profiles {
+  id: UUID
+  name: string // Ex: "IA Rédacteur"
+  is_ai: boolean = true
+  prompt_id?: string // Référence vers prompts_ia
+}
+
+// Profil candidat pour l'IA (même ID)
+candidate_profiles {
+  id: UUID // MÊME ID que hr_profiles.id
+  first_name: "IA"
+  last_name: string // Ex: "Rédacteur"
+  email: string // Ex: "ia_redacteur@ia.team"
+  status: 'disponible' // TOUJOURS disponible
+  daily_rate: number
+}
+
+// Association automatique
+hr_resource_assignments {
+  profile_id: UUID // hr_profiles.id
+  candidate_id: UUID // MÊME que profile_id pour IA
+  booking_status: 'accepted' // AUTO-ACCEPTÉ pour IA
+}
+```
+
+### Comportements Spécifiques IA
+
+1. **Auto-acceptation des missions**
+   - Trigger PostgreSQL `auto_accept_ia_bookings`
+   - Dès qu'une IA est assignée (`booking_status = 'recherche'`)
+   - Passage automatique à `booking_status = 'accepted'`
+   - `candidate_id = profile_id` (même UUID)
+
+2. **Disponibilité permanente**
+   - `status = 'disponible'` toujours
+   - Pas de période d'indisponibilité
+   - Peut être assignée à plusieurs projets simultanément
+
+3. **Intégration Messagerie**
+   - Apparaît dans la liste des membres d'équipe
+   - ID préfixé : `ia_${profile_id}`
+   - Marqueur `isAI: true` dans l'interface
+   - Peut recevoir des messages directs
+
+4. **Intégration Kanban/Drive**
+   - Accès complet en lecture/écriture
+   - Peut créer des cartes Kanban
+   - Peut uploader des fichiers dans le Drive
+   - Actions trackées avec son ID
+
+### Configuration des Prompts IA
+
+1. **Table prompts_ia**
+   ```sql
+   prompts_ia {
+     id: TEXT PRIMARY KEY
+     name: TEXT
+     context: TEXT // 'general', 'project-management', etc.
+     prompt: TEXT // Instructions système
+     active: BOOLEAN
+     priority: INTEGER
+   }
+   ```
+
+2. **Association via AdminResources**
+   - Interface dédiée : `IAResourceConfig`
+   - Sélection du prompt système
+   - Stockage dans `hr_profiles.prompt_id`
+
+### Migration Applied
+
+```sql
+-- Edge Function: create-ia-candidate-profiles
+-- Crée automatiquement un profil candidat pour chaque ressource IA
+-- Garantit: candidate_profiles.id = hr_profiles.id pour les IA
+```
+
+### Avantages de cette Architecture
+
+✅ **Simplicité** : Un seul flux pour humains et IA
+✅ **Compatibilité** : Tous les outils existants fonctionnent sans modification
+✅ **Performance** : Jointures simples, pas de conditions
+✅ **Évolutivité** : Facile d'ajouter des capacités IA
+✅ **Maintenabilité** : Pas de code conditionnel `if (is_ai)`
+
+### Points d'Attention
+
+⚠️ Les IA ont des profils candidats "fictifs" mais cohérents
+⚠️ L'email IA suit le pattern : `nom_ia@ia.team`
+⚠️ Le trigger auto-accept doit rester actif en base
+⚠️ Les IA apparaissent dans les listes de candidats (filtrables si besoin)
+
 ## 🔄 Flux Métier Principal
 
 ### 1. Création Projet
@@ -596,6 +696,21 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 **IMPORTANT : Ne jamais exposer la clé SERVICE_ROLE dans le code client !**
 
+## 🔐 Informations de Connexion Base de Données (Mise à jour 19/09/2025)
+
+**Mot de passe PostgreSQL actuel** : `Raymonde7510_2a`
+
+⚠️ **Note importante** : Le mot de passe a été changé le 19/09/2025 pour supprimer le caractère `@` qui causait des problèmes avec les URLs PostgreSQL.
+- **Ancien mot de passe** : `R@ymonde7510_2a` (avec @)
+- **Nouveau mot de passe** : `Raymonde7510_2a` (sans @)
+
+Ce mot de passe est utilisé pour :
+- Les connexions directes PostgreSQL (psql)
+- Les scripts de migration
+- Les Edge Functions qui font des connexions directes
+
+**Rappel** : Les Edge Functions utilisant les clés API (ANON/SERVICE_ROLE) ne sont PAS affectées par ce changement.
+
 ## 🚀 Commandes Utiles
 
 ```bash
@@ -607,7 +722,7 @@ pkill -f vite && npm run dev
 
 # Déployer une fonction Supabase
 SUPABASE_ACCESS_TOKEN="sbp_b8ec67e2a4f3a7922f6cfea023b2cf81a00a7d9e" \
-SUPABASE_DB_PASSWORD="R@ymonde7510_2a" \
+SUPABASE_DB_PASSWORD="Raymonde7510_2a" \
 npx supabase functions deploy [function-name] --project-ref egdelmcijszuapcpglsy
 
 # Voir les logs d'une fonction
@@ -844,7 +959,7 @@ fetch('https://api.brevo.com/v3/smtp/email', {
 ```bash
 # Déployer une fonction email
 SUPABASE_ACCESS_TOKEN="sbp_b8ec67e2a4f3a7922f6cfea023b2cf81a00a7d9e" \
-SUPABASE_DB_PASSWORD="R@ymonde7510_2a" \
+SUPABASE_DB_PASSWORD="Raymonde7510_2a" \
 npx supabase functions deploy send-validation-email --project-ref egdelmcijszuapcpglsy
 ```
 

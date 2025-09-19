@@ -1,5 +1,5 @@
 -- Script pour vérifier et créer un utilisateur admin
--- Connexion: postgresql://postgres.egdelmcijszuapcpglsy:R@ymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+-- Connexion: postgresql://postgres.egdelmcijszuapcpglsy:Raymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
 
 -- 1. Vérifier les utilisateurs existants
 SELECT 

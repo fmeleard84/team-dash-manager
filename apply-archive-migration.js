@@ -22,7 +22,7 @@ async function applyMigration() {
     console.log('2. Collez et exécutez le contenu du fichier apply-archive-migration.sql');
     console.log('3. Ou exécutez cette commande avec psql:\n');
     
-    console.log(`PGPASSWORD="R@ymonde7510_2a" psql \\
+    console.log(`PGPASSWORD="Raymonde7510_2a" psql \\
   -h aws-0-eu-central-1.pooler.supabase.com \\
   -p 6543 \\
   -d postgres \\

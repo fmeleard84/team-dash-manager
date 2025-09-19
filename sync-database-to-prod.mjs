@@ -20,7 +20,7 @@ const config = {
   dev: {
     url: 'https://egdelmcijszuapcpglsy.supabase.co',
     serviceKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDE2MjIwMCwiZXhwIjoyMDY5NzM4MjAwfQ.K3m7mUvhUJcSmuMQs-yXnhXQRMBc_CJwmz-dIX6bU1Q',
-    dbUrl: 'postgresql://postgres.egdelmcijszuapcpglsy:R@ymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
+    dbUrl: 'postgresql://postgres.egdelmcijszuapcpglsy:Raymonde7510_2a@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
   },
   prod: {
     url: 'https://nlesrzepybeeghghjafc.supabase.co',
@@ -59,7 +59,7 @@ class DatabaseSync {
 
     try {
       // Export du schéma complet avec pg_dump
-      const cmd = `PGPASSWORD="R@ymonde7510_2a" pg_dump "${config.dev.dbUrl}" \
+      const cmd = `PGPASSWORD="Raymonde7510_2a" pg_dump "${config.dev.dbUrl}" \
         --schema=public \
         --no-owner \
         --no-privileges \

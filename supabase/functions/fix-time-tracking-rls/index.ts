@@ -107,7 +107,7 @@ serve(async (req) => {
       "",
       "2. OPTION B - Via Supabase CLI:",
       "   SUPABASE_ACCESS_TOKEN=\"sbp_b8ec67e2a4f3a7922f6cfea023b2cf81a00a7d9e\" \\",
-      "   SUPABASE_DB_PASSWORD=\"R@ymonde7510_2a\" \\",
+      "   SUPABASE_DB_PASSWORD=\"Raymonde7510_2a\" \\",
       "   npx supabase db push --project-ref egdelmcijszuapcpglsy",
       "",
       "3. RÉSULTAT ATTENDU:",
