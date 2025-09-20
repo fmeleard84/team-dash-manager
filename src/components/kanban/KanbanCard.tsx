@@ -58,9 +58,6 @@ const getPriorityIcon = (priority: 'low' | 'medium' | 'high') => {
 // Status functions moved to utils/kanbanStatus.ts
 
 export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete }: KanbanCardProps) => {
-  // Log for debugging
-  console.log('KanbanCard render - card:', card.id, 'index:', index);
-
   // Derive status from column title
   const status = columnTitle ? getStatusFromColumnTitle(columnTitle) : card.status;
   const isOverdue = card.dueDate && new Date(card.dueDate) < new Date();
@@ -129,23 +126,19 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
 
   return (
     <Draggable draggableId={card.id} index={index}>
-      {(provided, snapshot) => {
-        // Log drag state for debugging
-        if (snapshot.isDragging) {
-          console.log('DRAGGING - full style:', provided.draggableProps.style);
-          console.log('DRAGGING - transform:', provided.draggableProps.style?.transform);
-        }
-
-        return (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            style={provided.draggableProps.style}
-            className="mb-3"
-          >
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          className={`mb-3 ${snapshot.isDragging ? 'rotate-1' : ''}`}
+        >
             <Card
-              className="cursor-pointer bg-card rounded-xl border border-border hover:border-primary/50"
+              className={`cursor-pointer bg-card rounded-xl border ${
+                snapshot.isDragging
+                  ? 'shadow-2xl ring-2 ring-primary opacity-90 scale-105'
+                  : 'border-border hover:border-primary/50'
+              }`}
               onClick={onClick}
             >
             <CardHeader className="p-4 pb-2">
@@ -310,8 +303,7 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
             </CardContent>
             </Card>
           </div>
-        );
-      }}
+      )}
     </Draggable>
   );
 };
