@@ -131,16 +131,19 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className="mb-3 group"
           style={{
             ...provided.draggableProps.style,
+            // Forcer l'opacité et transformer pendant le drag
+            opacity: snapshot.isDragging ? 0.9 : 1,
+            transform: provided.draggableProps.style?.transform || undefined,
           }}
+          className="mb-3 group"
         >
           <Card
-            className={`cursor-pointer transition-all duration-200 bg-card rounded-xl ${
+            className={`cursor-pointer bg-card rounded-xl border ${
               snapshot.isDragging
-                ? 'shadow-2xl ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 rotate-1 scale-105'
-                : 'border border-border hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-1 hover:bg-gradient-to-br hover:from-card hover:to-primary/5'
+                ? 'shadow-2xl ring-2 ring-primary opacity-90'
+                : 'border-border hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 transition-all duration-200 hover:-translate-y-1 hover:bg-gradient-to-br hover:from-card hover:to-primary/5'
             }`}
             onClick={onClick}
           >
