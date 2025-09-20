@@ -94,12 +94,11 @@ export const KanbanColumn = ({
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-1 min-h-[200px] rounded-xl transition-all duration-300 p-2 relative ${
+            className={`flex-1 min-h-[200px] rounded-xl transition-all duration-300 p-2 ${
               snapshot.isDraggingOver
                 ? 'bg-primary/10 border-2 border-primary/50 border-dashed shadow-inner ring-2 ring-primary/20'
                 : 'bg-accent/30'
             }`}
-            style={{ position: 'relative', zIndex: snapshot.isDraggingOver ? 1 : 0 }}
           >
             {cards.map((card, index) => (
               <KanbanCard
