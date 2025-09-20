@@ -140,6 +140,10 @@ export function RadixProjectCard({
           first_name,
           last_name,
           daily_rate
+        ),
+        hr_profiles (
+          id,
+          name
         )
       `)
       .eq('project_id', project.id);
@@ -151,24 +155,16 @@ export function RadixProjectCard({
 
     if (assignments) {
       setResourceAssignments(assignments);
-      
+
       if (assignments.length > 0) {
-        const profileIds = [...new Set(assignments.map(a => a.profile_id).filter(Boolean))];
-        
-        if (profileIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('hr_profiles')
-            .select('id, name')
-            .in('id', profileIds);
-          
-          if (profiles) {
-            const names: Record<string, string> = {};
-            profiles.forEach(p => {
-              names[p.id] = p.name;
-            });
-            setProfileNames(names);
+        // Utiliser les données hr_profiles de la jointure directe
+        const names: Record<string, string> = {};
+        assignments.forEach(assignment => {
+          if (assignment.hr_profiles?.name) {
+            names[assignment.profile_id] = assignment.hr_profiles.name;
           }
-        }
+        });
+        setProfileNames(names);
       }
     }
   };

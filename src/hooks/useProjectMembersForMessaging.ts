@@ -85,34 +85,42 @@ export const useProjectMembersForMessaging = (projectId: string) => {
           }
         }
 
-        // 2. Get candidates from hr_resource_assignments - WITHOUT JOIN
+        // 2. Get candidates from hr_resource_assignments - WITH DIRECT JOIN
         console.log('[MESSAGING] Fetching assignments for project:', projectId);
-        
+
         const { data: assignments, error: assignError } = await supabase
           .from('hr_resource_assignments')
-          .select('*')
+          .select(`
+            *,
+            hr_profiles (
+              name,
+              is_ai,
+              prompt_id
+            )
+          `)
           .eq('project_id', projectId)
           .in('booking_status', ['accepted', 'completed']);
-        
+
         if (assignError) {
           console.error('[MESSAGING] ❌ Error fetching assignments:', assignError);
         }
-        
+
         console.log('[MESSAGING] ✅ Assignments query result:', {
           found: assignments?.length || 0,
           assignments: assignments
         });
-        
+
         if (assignments && assignments.length > 0) {
           console.log('[MESSAGING] Processing assignments...');
-          
+
           for (const assignment of assignments) {
             console.log('[MESSAGING] Assignment:', {
               id: assignment.id,
               candidate_id: assignment.candidate_id,
-              booking_status: assignment.booking_status
+              booking_status: assignment.booking_status,
+              hr_profile: assignment.hr_profiles
             });
-            
+
             // Avec l'architecture unifiée, les IA ont aussi un candidate_id
             if (assignment.candidate_id) {
               // With unified IDs, candidate_id = profiles.id
@@ -123,34 +131,19 @@ export const useProjectMembersForMessaging = (projectId: string) => {
                 .single();
 
               if (userProfile) {
-                // Get the job title and AI status from hr_profiles
+                // Get the job title and AI status from hr_profiles (now via direct join)
                 let jobTitle = 'Ressource';
                 let isAI = false;
                 let promptId = undefined;
 
-                if (assignment.profile_id) {
-                  console.log('[MESSAGING] Fetching hr_profile for profile_id:', assignment.profile_id);
-                  const { data: hrProfile, error: hrError } = await supabase
-                    .from('hr_profiles')
-                    .select('name, is_ai, prompt_id')
-                    .eq('id', assignment.profile_id)
-                    .single();
-
-                  if (hrError) {
-                    console.error('[MESSAGING] Error fetching hr_profile:', hrError);
-                  }
-
-                  if (hrProfile) {
-                    console.log('[MESSAGING] Found hr_profile:', hrProfile);
-                    jobTitle = hrProfile.name || 'Ressource';
-                    isAI = hrProfile.is_ai || false;
-                    promptId = hrProfile.prompt_id;
-                    console.log('[MESSAGING] Job title set to:', jobTitle, 'Is AI:', isAI);
-                  } else {
-                    console.log('[MESSAGING] No hr_profile found for profile_id:', assignment.profile_id);
-                  }
+                if (assignment.hr_profiles) {
+                  console.log('[MESSAGING] Found hr_profile via join:', assignment.hr_profiles);
+                  jobTitle = assignment.hr_profiles.name || 'Ressource';
+                  isAI = assignment.hr_profiles.is_ai || false;
+                  promptId = assignment.hr_profiles.prompt_id;
+                  console.log('[MESSAGING] Job title set to:', jobTitle, 'Is AI:', isAI);
                 } else {
-                  console.log('[MESSAGING] No profile_id in assignment');
+                  console.log('[MESSAGING] No hr_profile found in join for assignment:', assignment.id);
                 }
 
                 allMembers.push({
@@ -165,52 +158,44 @@ export const useProjectMembersForMessaging = (projectId: string) => {
                   isAI: isAI,
                   promptId: promptId
                 });
-                
+
                 console.log('[MESSAGING] Added candidate:', userProfile.first_name, 'ID:', userProfile.id, 'Job:', jobTitle);
               } else {
                 console.error('[MESSAGING] Could not find profile for candidate_id:', assignment.candidate_id);
               }
             }
-            // Fallback: try to get candidate from profile in assignment
+            // Fallback: try to get candidate from profile in assignment (simplified)
             else {
               console.log('No candidate_id, checking for other identifiers...');
-              
+
               // Try to find candidate by profile_id and seniority
               if (assignment.profile_id && assignment.seniority) {
                 console.log('Searching by profile_id:', assignment.profile_id, 'and seniority:', assignment.seniority);
-                
+
                 const { data: candidates } = await supabase
                   .from('candidate_profiles')
                   .select('*')
                   .eq('profile_id', assignment.profile_id)
                   .eq('seniority', assignment.seniority);
-                
+
                 if (candidates && candidates.length > 0) {
                   const candidate = candidates[0];
                   console.log('Found candidate by profile/seniority:', candidate.first_name);
-                  
+
                   // Get the user profile
                   const { data: userProfile } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', candidate.id) // Using unified ID
                     .single();
-                  
+
                   if (userProfile) {
-                    // Get job title from hr_profiles separately
+                    // Use hr_profiles data from direct join (already available)
                     let jobTitle = candidate.position || 'Ressource';
-                    if (assignment.profile_id) {
-                      const { data: hrProfile } = await supabase
-                        .from('hr_profiles')
-                        .select('name')
-                        .eq('id', assignment.profile_id)
-                        .single();
-                      
-                      if (hrProfile) {
-                        jobTitle = hrProfile.name || jobTitle;
-                      }
+                    if (assignment.hr_profiles) {
+                      jobTitle = assignment.hr_profiles.name || jobTitle;
                     }
-                    
+
                     allMembers.push({
                       id: userProfile.id,
                       userId: userProfile.user_id || userProfile.id,

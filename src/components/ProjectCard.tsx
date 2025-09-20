@@ -148,7 +148,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       intervalId = setInterval(async () => {
         attemptCount++;
 
-        // Utiliser la même logique que fetchResourceAssignments
+        // Utiliser la même logique que fetchResourceAssignments avec jointure directe
         const { data } = await supabase
           .from('hr_resource_assignments')
           .select(`
@@ -164,39 +164,28 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               first_name,
               last_name,
               daily_rate
+            ),
+            hr_profiles (
+              id,
+              name,
+              base_price,
+              is_ai
             )
           `)
           .eq('project_id', project.id);
 
         if (data && data.length > 0) {
-          // Récupérer les hr_profiles séparément
-          const profileIds = [...new Set(data.map(a => a.profile_id).filter(Boolean))];
+          // Les données sont déjà enrichies grâce à la jointure directe
+          setResourceAssignments([...data]);
 
-          if (profileIds.length > 0) {
-            const { data: profiles } = await supabase
-              .from('hr_profiles')
-              .select('id, name, base_price, is_ai')
-              .in('id', profileIds);
-
-            if (profiles) {
-              const profileMap = new Map(profiles.map(p => [p.id, p]));
-              const enrichedData = data.map(assignment => ({
-                ...assignment,
-                hr_profiles: profileMap.get(assignment.profile_id) || null
-              }));
-
-              setResourceAssignments([...enrichedData]);
-
-              // Remplir profileNames
-              const names: Record<string, string> = {};
-              enrichedData.forEach((assignment: any) => {
-                if (assignment.hr_profiles?.name) {
-                  names[assignment.profile_id] = assignment.hr_profiles.name;
-                }
-              });
-              setProfileNames(names);
+          // Remplir profileNames
+          const names: Record<string, string> = {};
+          data.forEach((assignment: any) => {
+            if (assignment.hr_profiles?.name) {
+              names[assignment.profile_id] = assignment.hr_profiles.name;
             }
-          }
+          });
+          setProfileNames(names);
         }
 
         // Stop polling after finding resources or max attempts
@@ -318,7 +307,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   const fetchResourceAssignments = async () => {
     try {
-      // D'abord récupérer les assignments sans la jointure hr_profiles
+      // Récupérer les assignments AVEC la jointure hr_profiles directe
       const { data, error } = await supabase
         .from('hr_resource_assignments')
         .select(`
@@ -333,6 +322,12 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             first_name,
             last_name,
             daily_rate
+          ),
+          hr_profiles (
+            id,
+            name,
+            base_price,
+            is_ai
           )
         `)
         .eq('project_id', project.id);
@@ -342,27 +337,8 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         return;
       }
 
-      // Ensuite récupérer les hr_profiles séparément
-      let enrichedData = data || [];
-      if (data && data.length > 0) {
-        const profileIds = [...new Set(data.map(a => a.profile_id).filter(Boolean))];
-
-        if (profileIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('hr_profiles')
-            .select('id, name, base_price, is_ai')
-            .in('id', profileIds);
-
-          // Enrichir les données avec hr_profiles
-          if (profiles) {
-            const profileMap = new Map(profiles.map(p => [p.id, p]));
-            enrichedData = data.map(assignment => ({
-              ...assignment,
-              hr_profiles: profileMap.get(assignment.profile_id) || null
-            }));
-          }
-        }
-      }
+      // Les données sont déjà enrichies grâce à la jointure directe
+      const enrichedData = data || [];
 
       // Mettre à jour les ressources
       setResourceAssignments([...enrichedData]);
