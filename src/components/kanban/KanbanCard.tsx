@@ -137,14 +137,17 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
         }
 
         return (
-          <Card
+          <div
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
             style={provided.draggableProps.style}
-            className="mb-3 cursor-pointer bg-card rounded-xl border border-border hover:border-primary/50"
-            onClick={onClick}
+            className="mb-3"
           >
+            <Card
+              className="cursor-pointer bg-card rounded-xl border border-border hover:border-primary/50"
+              onClick={onClick}
+            >
             <CardHeader className="p-4 pb-2">
               <div className="flex items-start justify-between gap-2">
                 <h4 className="font-medium text-sm text-card-foreground line-clamp-2 flex-1">
@@ -305,7 +308,8 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
                 </div>
               </div>
             </CardContent>
-          </Card>
+            </Card>
+          </div>
         );
       }}
     </Draggable>
