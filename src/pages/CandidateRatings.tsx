@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
+import { useTranslation } from "react-i18next";
 
 interface Rating {
   id: string;
@@ -35,6 +36,7 @@ interface Comment {
 }
 
 export default function CandidateRatings() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -111,8 +113,8 @@ export default function CandidateRatings() {
         } else {
           // Charger les titres des tâches et projets séparément
           const formattedRatings = await Promise.all((ratingsData || []).map(async (r) => {
-            let task_title = 'Tâche';
-            let project_title = 'Projet';
+            let task_title = t('dashboard.candidate.task');
+            let project_title = t('common.projects');
             
             // Obtenir le titre de la tâche
             if (r.task_id) {
@@ -148,7 +150,7 @@ export default function CandidateRatings() {
         setComments([]);
       } catch (error) {
         console.error('Error loading data:', error);
-        toast.error('Erreur lors du chargement des données');
+        toast.error(t('dashboard.candidate.errorLoadingData'));
       } finally {
         setLoading(false);
       }
@@ -185,11 +187,11 @@ export default function CandidateRatings() {
 
   const getRatingLabel = (value: number) => {
     switch (value) {
-      case 1: return "Insuffisant";
-      case 2: return "Moyen";
-      case 3: return "Bien";
-      case 4: return "Très bien";
-      case 5: return "Excellent";
+      case 1: return t('dashboard.candidate.insufficient');
+      case 2: return t('dashboard.candidate.average');
+      case 3: return t('dashboard.candidate.good');
+      case 4: return t('dashboard.candidate.veryGood');
+      case 5: return t('dashboard.candidate.excellent');
       default: return "";
     }
   };
@@ -209,7 +211,7 @@ export default function CandidateRatings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Chargement...</div>
+        <div className="text-muted-foreground">{t('dashboard.candidate.loading')}</div>
       </div>
     );
   }
@@ -219,13 +221,13 @@ export default function CandidateRatings() {
       {/* Header with unified modern design - Using Messages style selector */}
       <PageHeaderNeon
         icon={Star}
-        title="Évaluations"
-        subtitle="Vos performances et retours clients"
+        title={t('dashboard.candidate.ratingsTitle')}
+        subtitle={t('dashboard.candidate.ratingsSubtitle')}
         projects={projects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
         selectedProjectId={selectedProjectId === "all" ? "" : selectedProjectId}
         onProjectChange={(id) => setSelectedProjectId(id || "all")}
         projectSelectorConfig={{
-          placeholder: "Tous les projets",
+          placeholder: t('dashboard.candidate.allProjects'),
           showStatus: true,
           showDates: true,
           showTeamProgress: false,
@@ -239,9 +241,9 @@ export default function CandidateRatings() {
       {/* Liste des notes et commentaires */}
       {combinedItems.length === 0 ? (
         <Card className="p-8 text-center">
-          <h3 className="text-lg font-semibold mb-2">Aucune évaluation</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('dashboard.candidate.noEvaluations')}</h3>
           <p className="text-muted-foreground">
-            Vous n'avez pas encore reçu d'évaluations ou de commentaires.
+            {t('dashboard.candidate.noEvaluationsDescription')}
           </p>
         </Card>
       ) : (
@@ -262,7 +264,7 @@ export default function CandidateRatings() {
                     )}
                     <div>
                       <CardTitle className="text-base">
-                        {item.type === 'rating' ? 'Évaluation reçue' : 'Commentaire reçu'}
+                        {item.type === 'rating' ? t('dashboard.candidate.evaluationReceived') : t('dashboard.candidate.commentReceived')}
                       </CardTitle>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                         <Calendar className="w-3 h-3" />
@@ -282,8 +284,8 @@ export default function CandidateRatings() {
                   <div className="space-y-3">
                     {/* Tâche évaluée */}
                     <div className="text-sm">
-                      <span className="text-muted-foreground">Tâche :</span>
-                      <span className="ml-2 font-medium">{item.task_title || 'Tâche'}</span>
+                      <span className="text-muted-foreground">{t('dashboard.candidate.task')} :</span>
+                      <span className="ml-2 font-medium">{item.task_title || t('dashboard.candidate.task')}</span>
                     </div>
                     
                     {/* Note */}
@@ -317,13 +319,13 @@ export default function CandidateRatings() {
                   <div className="space-y-2">
                     {/* Carte commentée */}
                     <div className="text-sm">
-                      <span className="text-muted-foreground">Sur la carte :</span>
-                      <span className="ml-2 font-medium">{item.card_title || 'Carte'}</span>
+                      <span className="text-muted-foreground">{t('dashboard.candidate.onCard')} :</span>
+                      <span className="ml-2 font-medium">{item.card_title || t('dashboard.candidate.card')}</span>
                     </div>
                     
                     {/* Auteur */}
                     <div className="text-sm">
-                      <span className="text-muted-foreground">De :</span>
+                      <span className="text-muted-foreground">{t('dashboard.candidate.from')} :</span>
                       <span className="ml-2 font-medium">{item.author_name}</span>
                     </div>
                     

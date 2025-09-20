@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
 
 // Design System Components
 import { AppShell, PageSection, Container } from "@/ui/layout";
@@ -47,6 +48,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
 import { PageHeaderNeon } from "@/components/ui/page-header-neon";
+import { LanguageSelector } from "@/components/ui/language-selector";
 import { useProjectSelector } from "@/hooks/useProjectSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -78,6 +80,7 @@ import { AnimatedBackground } from "@/components/ui/animated-background";
 import { TimeTrackerSimple } from "@/components/time-tracking/TimeTrackerSimple";
 
 const CandidateDashboard = () => {
+  const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState('projects');
   const [isAvailable, setIsAvailable] = useState(true);
   const [candidateProjects, setCandidateProjects] = useState<any[]>([]);
@@ -241,8 +244,8 @@ const CandidateDashboard = () => {
     if (!candidateId) {
       console.error('No candidateId available');
       toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour votre disponibilité. Veuillez recharger la page.",
+        title: t('dashboard.candidate.error'),
+        description: t('dashboard.candidate.cannotUpdateAvailability'),
         variant: "destructive"
       });
       return;
@@ -260,8 +263,8 @@ const CandidateDashboard = () => {
       if (error) {
         console.error('Error updating availability:', error);
         toast({
-          title: "Erreur",
-          description: error.message || "Impossible de mettre à jour votre statut",
+          title: t('dashboard.candidate.error'),
+          description: error.message || t('dashboard.candidate.cannotUpdateStatus'),
           variant: "destructive",
         });
         // Revert the UI state on error
@@ -271,8 +274,8 @@ const CandidateDashboard = () => {
 
       setIsAvailable(available);
       toast({
-        title: "Statut mis à jour",
-        description: `Vous êtes maintenant ${available ? 'disponible' : 'en pause'}`,
+        title: t('dashboard.candidate.statusUpdated'),
+        description: available ? t('dashboard.candidate.youAreNowAvailable') : t('dashboard.candidate.youAreNowOnPause'),
       });
 
       // Refetch identity to update local state
@@ -280,8 +283,8 @@ const CandidateDashboard = () => {
     } catch (error) {
       console.error('Error updating availability:', error);
       toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour votre statut",
+        title: t('dashboard.candidate.error'),
+        description: t('dashboard.candidate.cannotUpdateStatus'),
         variant: "destructive",
       });
       // Revert the UI state on error
@@ -326,13 +329,13 @@ const CandidateDashboard = () => {
                   <TrendingUp className="w-5 h-5 text-white" />
                 </div>
               </div>
-              Vue d'ensemble
+              {t('dashboard.candidate.overview')}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Projets actifs</p>
+                    <p className="text-gray-400 text-sm">{t('dashboard.candidate.activeProjects')}</p>
                     <p className="text-2xl font-bold text-white">{metrics.activeProjects}</p>
                   </div>
                   <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
@@ -343,7 +346,7 @@ const CandidateDashboard = () => {
               <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Demandes en attente</p>
+                    <p className="text-gray-400 text-sm">{t('dashboard.candidate.pendingRequests')}</p>
                     <p className="text-2xl font-bold text-white">{metrics.pendingRequests}</p>
                   </div>
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
@@ -354,7 +357,7 @@ const CandidateDashboard = () => {
               <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Heures hebdo</p>
+                    <p className="text-gray-400 text-sm">{t('dashboard.candidate.weeklyHours')}</p>
                     <p className="text-2xl font-bold text-white">{metrics.totalHours}h</p>
                   </div>
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
@@ -365,7 +368,7 @@ const CandidateDashboard = () => {
               <div className="bg-neutral-900/50 backdrop-blur-xl rounded-2xl p-6 border border-primary-500/20 hover:border-primary-500/40 transition-all duration-300 hover:shadow-neon-purple group/card">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">TJM moyen</p>
+                    <p className="text-gray-400 text-sm">{t('dashboard.candidate.averageRate')}</p>
                     <p className="text-2xl font-bold text-white">{Math.round(metrics.avgRate)}€</p>
                     <div className="flex items-center gap-1 mt-1">
                       <span className="text-xs text-green-400">+5%</span>
@@ -385,26 +388,26 @@ const CandidateDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5" />
-              Mes projets
+              {t('dashboard.candidate.myProjects')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {(identityLoading || activeProjectsLoading || onboardingLoading) ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                Chargement des projets...
+                {t('common.loading')}
               </div>
             ) : (!activeProjects || activeProjects.length === 0) && (!resourceAssignments || resourceAssignments.length === 0) ? (
               <div className="border rounded-lg p-12 text-center">
                 <FolderOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">Aucun projet pour le moment</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('dashboard.candidate.noProjectsAtTheMoment')}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Les nouvelles opportunités de mission apparaîtront ici
+                  {t('dashboard.candidate.newMissionOpportunities')}
                 </p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Pour avoir des projets visibles ici, vous devez :
-                  <br />1. Avoir des missions en statut "recherche" (invitations)
-                  <br />2. Ou avoir accepté des missions qui sont en statut "play" (projets actifs)
+                  {t('dashboard.candidate.toSeeProjectsYouNeed')}
+                  <br />{t('dashboard.candidate.haveMissionsInSearchStatus')}
+                  <br />{t('dashboard.candidate.orAcceptedMissionsInPlayStatus')}
                 </p>
                 <Button
                   variant="outline"
@@ -412,12 +415,12 @@ const CandidateDashboard = () => {
                     // Créer des données de test pour la démo
                     console.log('🎯 Création de données de démonstration...');
                     toast({
-                      title: "Mode démonstration",
-                      description: "Pour voir des projets, demandez à un client de créer un projet et de vous inviter.",
+                      title: t('dashboard.candidate.demoMode'),
+                      description: t('dashboard.candidate.askClientToCreateProject'),
                     });
                   }}
                 >
-                  Comment voir des projets ?
+                  {t('dashboard.candidate.howToSeeProjects')}
                 </Button>
               </div>
             ) : (
@@ -457,8 +460,8 @@ const CandidateDashboard = () => {
                     if (response.error) throw response.error;
 
                     toast({
-                      title: "Mission acceptée",
-                      description: "Vous avez accepté cette mission avec succès."
+                      title: t('dashboard.candidate.missionAccepted'),
+                      description: t('dashboard.candidate.missionAcceptedSuccessfully')
                     });
 
                     // Rafraîchir les données
@@ -505,8 +508,8 @@ const CandidateDashboard = () => {
                     console.error('Error accepting mission:', error);
                     toast({
                       variant: "destructive",
-                      title: "Erreur",
-                      description: "Impossible d'accepter la mission."
+                      title: t('dashboard.candidate.error'),
+                      description: t('dashboard.candidate.cannotAcceptMission')
                     });
                   }
                 }}
@@ -531,8 +534,8 @@ const CandidateDashboard = () => {
                     if (response.error) throw response.error;
 
                     toast({
-                      title: "Mission refusée",
-                      description: "Vous avez refusé cette mission."
+                      title: t('dashboard.candidate.missionDeclined'),
+                      description: t('dashboard.candidate.missionDeclinedSuccessfully')
                     });
 
                     // Rafraîchir les données
@@ -541,8 +544,8 @@ const CandidateDashboard = () => {
                     console.error('Error declining mission:', error);
                     toast({
                       variant: "destructive",
-                      title: "Erreur",
-                      description: "Impossible de refuser la mission."
+                      title: t('dashboard.candidate.error'),
+                      description: t('dashboard.candidate.cannotDeclineMission')
                     });
                   }
                 }}
@@ -587,9 +590,9 @@ const CandidateDashboard = () => {
       return (
         <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
           <Trello className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
           <p className="text-sm text-gray-300">
-            Acceptez une mission pour accéder au tableau Kanban
+            {t('dashboard.candidate.acceptMissionToAccess')}
           </p>
         </div>
       );
@@ -600,13 +603,13 @@ const CandidateDashboard = () => {
         {/* Header unifié avec design néon */}
         <PageHeaderNeon
           icon={Trello}
-          title="Tableau Kanban"
-          subtitle="Gérez vos tâches et suivez l'avancement du projet"
+          title={t('dashboard.candidate.kanbanBoard')}
+          subtitle={t('dashboard.candidate.manageTasksAndProgress')}
           projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
           selectedProjectId={selectedKanbanProjectId}
           onProjectChange={setSelectedKanbanProjectId}
           projectSelectorConfig={{
-            placeholder: "Sélectionner un projet",
+            placeholder: t('dashboard.candidate.selectProject'),
             showStatus: true,
             showDates: false,
             showTeamProgress: false,
@@ -627,9 +630,9 @@ const CandidateDashboard = () => {
         <Card>
           <CardContent className="p-12 text-center">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('dashboard.candidate.noActiveProject')}</h3>
             <p className="text-sm text-muted-foreground">
-              Acceptez une mission pour accéder au planning
+              {t('dashboard.candidate.acceptMissionToAccess')}
             </p>
           </CardContent>
         </Card>
@@ -644,9 +647,9 @@ const CandidateDashboard = () => {
       return (
         <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
           <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
           <p className="text-sm text-gray-300">
-            Acceptez une mission pour accéder à la messagerie
+            {t('dashboard.candidate.acceptMissionToAccess')}
           </p>
         </div>
       );
@@ -657,14 +660,14 @@ const CandidateDashboard = () => {
         {/* Header unifié avec design néon */}
         <PageHeaderNeon
           icon={MessageSquare}
-          title="Messagerie"
-          subtitle="Communication en temps réel avec votre équipe"
-          badge={{ text: "En ligne", animate: true }}
+          title={t('dashboard.candidate.messages')}
+          subtitle={t('dashboard.candidate.realtimeCommunication')}
+          badge={{ text: t('dashboard.candidate.online'), animate: true }}
           projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
           selectedProjectId={selectedMessagesProjectId}
           onProjectChange={setSelectedMessagesProjectId}
           projectSelectorConfig={{
-            placeholder: "Sélectionner un projet",
+            placeholder: t('dashboard.candidate.selectProject'),
             showStatus: true,
             showDates: true,
             showTeamProgress: false,
@@ -687,9 +690,9 @@ const CandidateDashboard = () => {
       return (
         <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
           <Cloud className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
           <p className="text-sm text-gray-300">
-            Acceptez une mission pour accéder au Drive
+            {t('dashboard.candidate.acceptMissionToAccess')}
           </p>
         </div>
       );
@@ -700,13 +703,13 @@ const CandidateDashboard = () => {
         {/* Header unifié avec design néon */}
         <PageHeaderNeon
           icon={Cloud}
-          title="Drive"
-          subtitle="Stockage et partage de fichiers pour votre équipe"
+          title={t('dashboard.candidate.drive')}
+          subtitle={t('dashboard.candidate.fileStorageAndSharing')}
           projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
           selectedProjectId={selectedDriveProjectId}
           onProjectChange={setSelectedDriveProjectId}
           projectSelectorConfig={{
-            placeholder: "Sélectionner un projet",
+            placeholder: t('dashboard.candidate.selectProject'),
             showStatus: true,
             showDates: false,
             showTeamProgress: false,
@@ -728,9 +731,9 @@ const CandidateDashboard = () => {
       return (
         <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
           <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
+          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
           <p className="text-sm text-gray-300">
-            Acceptez une mission pour accéder au Wiki
+            {t('dashboard.candidate.acceptMissionToAccess')}
           </p>
         </div>
       );
@@ -741,13 +744,13 @@ const CandidateDashboard = () => {
         {/* Header unifié avec design néon */}
         <PageHeaderNeon
           icon={BookOpen}
-          title="Wiki"
-          subtitle="Documentation et ressources du projet"
+          title={t('dashboard.candidate.wiki')}
+          subtitle={t('dashboard.candidate.projectDocumentation')}
           projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
           selectedProjectId={selectedWikiProjectId}
           onProjectChange={setSelectedWikiProjectId}
           projectSelectorConfig={{
-            placeholder: "Sélectionner un projet",
+            placeholder: t('dashboard.candidate.selectProject'),
             showStatus: true,
             showDates: false,
             showTeamProgress: false,
@@ -760,7 +763,7 @@ const CandidateDashboard = () => {
                 onClick={() => setIsWikiFullscreen(!isWikiFullscreen)}
                 className="border-primary-500/30 text-white hover:bg-primary-500/10"
               >
-                {isWikiFullscreen ? 'Réduire' : 'Plein écran'}
+                {isWikiFullscreen ? t('dashboard.candidate.reduce') : t('dashboard.candidate.fullscreen')}
               </Button>
             )
           }
@@ -778,7 +781,7 @@ const CandidateDashboard = () => {
                   onClick={() => setIsWikiFullscreen(false)}
                   className="border-primary-500/30 text-white hover:bg-primary-500/10"
                 >
-                  Fermer
+                  {t('dashboard.candidate.close')}
                 </Button>
               </div>
             )}
@@ -819,8 +822,8 @@ const CandidateDashboard = () => {
             {/* Header unifié avec design néon */}
             <PageHeaderNeon
               icon={Settings}
-              title="Paramètres"
-              subtitle="Configuration de votre profil candidat"
+              title={t('dashboard.candidate.settings')}
+              subtitle={t('dashboard.candidate.candidateProfileConfiguration')}
             />
 
             <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border border-primary-500/30 rounded-xl p-6">
@@ -855,7 +858,7 @@ const CandidateDashboard = () => {
           <div className="mt-4 p-3 rounded-xl bg-neutral-800/50 border border-neutral-700/50">
             <div className="flex items-center justify-between">
               <Label htmlFor="availability" className="text-sm font-medium text-neutral-300">
-                Statut
+                {t('dashboard.candidate.status')}
               </Label>
               <Switch
                 id="availability"
@@ -868,7 +871,7 @@ const CandidateDashboard = () => {
         </div>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="text-neutral-400 text-xs uppercase tracking-wider px-2">Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-neutral-400 text-xs uppercase tracking-wider px-2">{t('navigation.home')}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -881,7 +884,7 @@ const CandidateDashboard = () => {
                   }`}
                 >
                   <FolderOpen className="h-4 w-4" />
-                  <span>Projets</span>
+                  <span>{t('navigation.projects')}</span>
                   {activeSection === 'projects' && (
                     <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 animate-shimmer" />
                   )}
@@ -894,7 +897,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'kanban'}
                 >
                   <Trello className="h-4 w-4" />
-                  <span>Kanban</span>
+                  <span>{t('navigation.kanban')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
@@ -904,7 +907,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'planning'}
                 >
                   <Calendar className="h-4 w-4" />
-                  <span>Planning</span>
+                  <span>{t('navigation.calendar')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
@@ -914,7 +917,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'messages'}
                 >
                   <MessageSquare className="h-4 w-4" />
-                  <span>Messages</span>
+                  <span>{t('navigation.messages')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
@@ -924,7 +927,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'drive'}
                 >
                   <Cloud className="h-4 w-4" />
-                  <span>Drive</span>
+                  <span>{t('navigation.drive')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -934,7 +937,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'wiki'}
                 >
                   <BookOpen className="h-4 w-4" />
-                  <span>Wiki</span>
+                  <span>{t('navigation.wiki')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -942,7 +945,7 @@ const CandidateDashboard = () => {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Gestion</SidebarGroupLabel>
+          <SidebarGroupLabel>{t('common.dashboard')}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -951,7 +954,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'invoices'}
                 >
                   <FileText className="h-4 w-4" />
-                  <span>Paiements</span>
+                  <span>{t('navigation.payments')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
@@ -961,7 +964,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'ratings'}
                 >
                   <Star className="h-4 w-4" />
-                  <span>Évaluations</span>
+                  <span>{t('dashboard.candidate.ratings')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
@@ -971,7 +974,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'activities'}
                 >
                   <Layout className="h-4 w-4" />
-                  <span>Activités</span>
+                  <span>{t('dashboard.candidate.activities')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
@@ -981,7 +984,7 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'notes'}
                 >
                   <FileText className="h-4 w-4" />
-                  <span>Notes</span>
+                  <span>{t('dashboard.candidate.notes')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -989,7 +992,7 @@ const CandidateDashboard = () => {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Compte</SidebarGroupLabel>
+          <SidebarGroupLabel>{t('navigation.profile')}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -998,14 +1001,18 @@ const CandidateDashboard = () => {
                   isActive={activeSection === 'settings'}
                 >
                   <Settings className="h-4 w-4" />
-                  <span>Paramètres</span>
+                  <span>{t('navigation.settings')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              
+
+              <SidebarMenuItem>
+                <LanguageSelector variant="sidebar" />
+              </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={handleLogout}>
                   <LogOut className="h-4 w-4" />
-                  <span>Déconnexion</span>
+                  <span>{t('navigation.logout')}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -1020,7 +1027,7 @@ const CandidateDashboard = () => {
       <div className="flex items-center gap-4">
         <SidebarTrigger className="hover:scale-105 transition-transform duration-200" />
         <h1 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text">
-          Dashboard Candidat
+          {t('dashboard.candidate.title')}
         </h1>
       </div>
       <div className="flex items-center gap-4">
@@ -1032,7 +1039,7 @@ const CandidateDashboard = () => {
         }`}>
           <span className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full animate-pulse ${isAvailable ? 'bg-white' : 'bg-white/70'}`} />
-            {isAvailable ? "Disponible" : "En pause"}
+            {isAvailable ? t('dashboard.candidate.available') : t('dashboard.candidate.onPause')}
           </span>
         </div>
         {/* Removed CandidateEventNotifications from header - was causing overflow */}

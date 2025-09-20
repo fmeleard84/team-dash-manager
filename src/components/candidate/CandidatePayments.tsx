@@ -26,8 +26,10 @@ import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export const CandidatePayments = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +185,7 @@ export const CandidatePayments = () => {
         <CardContent className="flex items-center justify-center h-48">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-gray-600">Chargement des paiements...</p>
+            <p className="text-gray-600">{t('dashboard.candidate.loadingPayments')}</p>
           </div>
         </CardContent>
       </Card>
@@ -195,13 +197,13 @@ export const CandidatePayments = () => {
       {/* Header with unified modern design - Using Messages style selector */}
       <PageHeaderNeon
         icon={Euro}
-        title="Mes Paiements"
-        subtitle="Suivi de vos revenus et paiements validés"
+        title={t('dashboard.candidate.paymentsTitle')}
+        subtitle={t('dashboard.candidate.paymentsSubtitle')}
         projects={projects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
         selectedProjectId={selectedProjectId}
         onProjectChange={setSelectedProjectId}
         projectSelectorConfig={{
-          placeholder: "Tous les projets",
+          placeholder: t('dashboard.candidate.allProjects'),
           showStatus: true,
           showDates: true,
           showTeamProgress: false,
@@ -218,7 +220,7 @@ export const CandidatePayments = () => {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-green-400 mb-1">Revenus totaux</p>
+                  <p className="text-sm text-green-400 mb-1">{t('dashboard.candidate.totalRevenue')}</p>
                   <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                     {formatCurrency(candidateEarnings)}
                   </p>
@@ -238,7 +240,7 @@ export const CandidatePayments = () => {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-400 mb-1">Heures facturées</p>
+                  <p className="text-sm text-blue-400 mb-1">{t('dashboard.candidate.billedHours')}</p>
                   <p className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                     {formatMinutesToHours(totalMinutesWorked)}
                   </p>
@@ -258,7 +260,7 @@ export const CandidatePayments = () => {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-purple-400 mb-1">Paiements reçus</p>
+                  <p className="text-sm text-purple-400 mb-1">{t('dashboard.candidate.paymentsReceived')}</p>
                   <p className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                     {totalPayments}
                   </p>
@@ -278,7 +280,7 @@ export const CandidatePayments = () => {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-orange-400 mb-1">Taux horaire</p>
+                  <p className="text-sm text-orange-400 mb-1">{t('dashboard.candidate.hourlyRate')}</p>
                   <p className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
                     {candidateHourlyRate}€/h
                   </p>
@@ -297,27 +299,27 @@ export const CandidatePayments = () => {
         <Card>
           <CardContent className="text-center py-12">
             <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-600 mb-2">Aucun paiement pour cette période</p>
+            <p className="text-gray-600 mb-2">{t('dashboard.candidate.noPaymentsForPeriod')}</p>
             <p className="text-sm text-gray-500">
-              Les paiements apparaîtront ici une fois validés par le client
+              {t('dashboard.candidate.paymentsWillAppearHere')}
             </p>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Historique des paiements</CardTitle>
+            <CardTitle>{t('dashboard.candidate.paymentHistory')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Projet</TableHead>
-                  <TableHead>Période</TableHead>
-                  <TableHead>Heures travaillées</TableHead>
-                  <TableHead>Montant gagné</TableHead>
-                  <TableHead>Date de paiement</TableHead>
-                  <TableHead>Statut</TableHead>
+                  <TableHead>{t('dashboard.candidate.project')}</TableHead>
+                  <TableHead>{t('dashboard.candidate.period')}</TableHead>
+                  <TableHead>{t('dashboard.candidate.hoursWorked')}</TableHead>
+                  <TableHead>{t('dashboard.candidate.amountEarned')}</TableHead>
+                  <TableHead>{t('dashboard.candidate.paymentDate')}</TableHead>
+                  <TableHead>{t('dashboard.candidate.status')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -363,7 +365,7 @@ export const CandidatePayments = () => {
                       <TableCell>
                         <Badge className="bg-green-100 text-green-700">
                           <CheckCircle className="w-3 h-3 mr-1" />
-                          Payé
+                          {t('dashboard.candidate.paid')}
                         </Badge>
                       </TableCell>
                     </TableRow>
