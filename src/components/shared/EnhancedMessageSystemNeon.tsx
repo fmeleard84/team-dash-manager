@@ -273,16 +273,34 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
       // Les fichiers uploadés ont déjà toutes les infos nécessaires
       // Pas besoin de transformer, juste passer directement
       const sentMessage = await sendMessage(selectedThread.id, newMessage, uploadedFiles);
-      
+
       if (sentMessage) {
         // Add the message immediately to the local state
+        // Don't wait for realtime subscription, update immediately
+        const messageWithAttachments = {
+          ...sentMessage,
+          message_attachments: uploadedFiles.map(file => ({
+            file_name: file.name,
+            file_path: file.path,
+            file_type: file.type,
+            file_size: file.size
+          }))
+        };
+
         setMessages(prev => {
+          // Check if message already exists (from realtime)
           const exists = prev.some(msg => msg.id === sentMessage.id);
-          if (exists) return prev;
-          return [...prev, sentMessage];
+          if (exists) {
+            // Update existing message with attachments if needed
+            return prev.map(msg =>
+              msg.id === sentMessage.id ? messageWithAttachments : msg
+            );
+          }
+          // Add new message
+          return [...prev, messageWithAttachments];
         });
       }
-      
+
       setNewMessage('');
       setAttachedFiles([]);
       setUploadedFiles([]);
