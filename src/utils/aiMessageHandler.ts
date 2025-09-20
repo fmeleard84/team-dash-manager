@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { generateDocxBuffer, arrayBufferToBlob } from './docxGenerator';
 
 export interface AIConversationContext {
   memberId: string;
@@ -184,47 +185,65 @@ export const saveAIContentToDrive = async (
     }
 
     const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const fileName = `${timestamp}_${detection.contentType}_${aiMemberName.replace(/\s+/g, '_')}.md`;
+    const fileName = `${timestamp}_${detection.contentType}_${aiMemberName.replace(/\s+/g, '_')}.docx`;
 
-    // Préparer le contenu formaté
-    const formattedContent = `# ${detection.title || 'Contenu généré par IA'}
+    console.log('📄 Génération du document DOCX pour le contenu IA...');
 
-**Généré par:** ${aiMemberName}
-**Date:** ${new Date().toLocaleDateString('fr-FR')}
-**Type:** ${detection.contentType}
-**Projet:** ${projectId}
-
----
-
-${content}
-
----
-*Document généré automatiquement par l'IA de l'équipe*
-`;
-
-    console.log('💾 Sauvegarde contenu IA dans Drive:', fileName);
-
-    const { data, error } = await supabase.functions.invoke('save-ai-content-to-drive', {
-      body: {
-        projectId: projectId,
-        fileName: fileName,
-        content: formattedContent,
-        contentType: detection.contentType,
-        aiMemberName: aiMemberName
-      }
+    // Générer le document DOCX
+    const docxBuffer = await generateDocxBuffer({
+      title: detection.title || 'Contenu généré par IA',
+      author: aiMemberName,
+      projectId: projectId,
+      contentType: detection.contentType,
+      content: content
     });
 
-    if (error) {
-      console.error('❌ Erreur sauvegarde Drive:', error);
+    // Convertir en Blob pour l'upload
+    const docxBlob = arrayBufferToBlob(docxBuffer);
+
+    console.log('💾 Sauvegarde document DOCX dans Drive:', fileName);
+
+    // Upload direct dans le storage Supabase
+    const folderPath = `projects/${projectId}/IA/`;
+    const fullPath = `${folderPath}${fileName}`;
+
+    // Créer le dossier IA s'il n'existe pas
+    const { error: uploadError } = await supabase.storage
+      .from('project_files')
+      .upload(fullPath, docxBlob, {
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError && uploadError.message.includes('duplicate')) {
+      // Si le fichier existe déjà, ajouter un timestamp unique
+      const uniqueFileName = `${timestamp}_${Date.now()}_${detection.contentType}_${aiMemberName.replace(/\s+/g, '_')}.docx`;
+      const uniqueFullPath = `${folderPath}${uniqueFileName}`;
+
+      const { error: retryError } = await supabase.storage
+        .from('project_files')
+        .upload(uniqueFullPath, docxBlob, {
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (retryError) {
+        console.error('❌ Erreur upload DOCX:', retryError);
+        return false;
+      }
+
+      console.log('✅ Document DOCX sauvegardé avec nom unique:', uniqueFullPath);
+      return true;
+    }
+
+    if (uploadError) {
+      console.error('❌ Erreur upload DOCX:', uploadError);
       return false;
     }
 
-    if (!data.success) {
-      console.error('❌ Sauvegarde Drive échouée:', data.error);
-      return false;
-    }
-
-    console.log('✅ Contenu IA sauvegardé:', data.filePath);
+    console.log('✅ Document DOCX sauvegardé:', fullPath);
     return true;
 
   } catch (error) {
@@ -285,19 +304,24 @@ export const handleAIConversation = async (
 
     // 4. Envoyer la réponse IA dans le thread
     const aiMember = projectMembers.find(m => m.id === selectedConversation.id);
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const docxFileName = `${timestamp}_${detection.contentType}_${aiMember.name.replace(/\s+/g, '_')}.docx`;
+
     const { error: messageError } = await supabase
       .from('messages')
       .insert({
         thread_id: threadId,
-        content: aiResponse,
+        content: saved
+          ? `${aiResponse}\n\n📄 *Document sauvegardé dans le Drive du projet : ${docxFileName}*`
+          : aiResponse,
         sender_id: aiMember.id,
         sender_email: aiMember.email,
         sender_name: aiMember.name,
         message_attachments: saved ? [{
-          file_name: `contenu_${detection.contentType}_sauvegarde.md`,
+          file_name: docxFileName,
           file_path: `projects/${projectId}/IA/`,
           file_size: aiResponse.length,
-          file_type: 'text/markdown'
+          file_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         }] : undefined
       });
 

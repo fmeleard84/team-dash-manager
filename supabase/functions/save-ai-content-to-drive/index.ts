@@ -12,20 +12,21 @@ serve(async (req) => {
   }
 
   try {
-    const { projectId, fileName, content, contentType, aiMemberName } = await req.json()
+    const { projectId, fileName, content, contentType, aiMemberName, isDocx, docxBuffer } = await req.json()
 
     console.log('💾 Sauvegarde contenu IA:', {
       projectId,
       fileName,
       contentType,
       aiMemberName,
+      isDocx: !!isDocx,
       contentLength: content?.length || 0
     })
 
-    if (!projectId || !fileName || !content) {
+    if (!projectId || !fileName || (!content && !docxBuffer)) {
       return new Response(JSON.stringify({
         success: false,
-        error: 'Paramètres manquants: projectId, fileName, content requis'
+        error: 'Paramètres manquants: projectId, fileName, content ou docxBuffer requis'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -43,12 +44,37 @@ serve(async (req) => {
     console.log('📂 Chemin Drive:', driveFilePath)
 
     // 2. Uploader le fichier dans le storage Supabase
-    const { data: uploadData, error: uploadError } = await supabaseClient.storage
-      .from('kanban-files')
-      .upload(driveFilePath, content, {
-        contentType: 'text/markdown',
-        upsert: true // Remplacer si existe déjà
-      })
+    let uploadData, uploadError;
+
+    if (isDocx && docxBuffer) {
+      // Convertir le buffer base64 en Uint8Array pour DOCX
+      const binaryString = atob(docxBuffer);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const uploadResult = await supabaseClient.storage
+        .from('kanban-files')
+        .upload(driveFilePath, bytes, {
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          upsert: true
+        });
+
+      uploadData = uploadResult.data;
+      uploadError = uploadResult.error;
+    } else {
+      // Upload standard pour contenu texte
+      const uploadResult = await supabaseClient.storage
+        .from('kanban-files')
+        .upload(driveFilePath, content, {
+          contentType: 'text/markdown',
+          upsert: true
+        });
+
+      uploadData = uploadResult.data;
+      uploadError = uploadResult.error;
+    }
 
     if (uploadError) {
       console.error('❌ Erreur upload storage:', uploadError)
@@ -66,12 +92,16 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     const userId = user?.id || 'ai-system'
 
+    const fileSize = isDocx && docxBuffer
+      ? new Blob([atob(docxBuffer)]).size
+      : new Blob([content]).size;
+
     const driveEntry = {
       project_id: projectId,
       file_name: fileName,
       file_path: driveFilePath,
-      file_type: 'text/markdown',
-      file_size: new Blob([content]).size,
+      file_type: isDocx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'text/markdown',
+      file_size: fileSize,
       uploaded_by: userId,
       uploaded_at: new Date().toISOString(),
       folder_path: `projects/${projectId}/IA`,
@@ -126,11 +156,12 @@ serve(async (req) => {
         fileName: fileName,
         filePath: driveFilePath,
         fileUrl: urlData.publicUrl,
-        fileSize: new Blob([content]).size,
+        fileSize: fileSize,
         contentType: contentType,
         aiMemberName: aiMemberName,
         fileId: fileRecord?.id,
-        driveIntegrated: !!fileRecord
+        driveIntegrated: !!fileRecord,
+        isDocx: !!isDocx
       }
     }
 
