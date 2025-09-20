@@ -131,21 +131,17 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          style={{
-            ...provided.draggableProps.style,
-            // Forcer l'opacité et transformer pendant le drag
-            opacity: snapshot.isDragging ? 0.9 : 1,
-            transform: provided.draggableProps.style?.transform || undefined,
-          }}
+          style={provided.draggableProps.style}
           className="mb-3 group"
         >
           <Card
             className={`cursor-pointer bg-card rounded-xl border ${
               snapshot.isDragging
-                ? 'shadow-2xl ring-2 ring-primary opacity-90'
+                ? 'shadow-2xl ring-2 ring-primary opacity-90 relative z-[9999]'
                 : 'border-border hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 transition-all duration-200 hover:-translate-y-1 hover:bg-gradient-to-br hover:from-card hover:to-primary/5'
             }`}
             onClick={onClick}
+            style={snapshot.isDragging ? { position: 'relative', zIndex: 9999 } : {}}
           >
             <CardHeader className="p-4 pb-2">
               <div className="flex items-start justify-between gap-2">
