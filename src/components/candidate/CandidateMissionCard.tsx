@@ -5,6 +5,7 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Separator } from "@/components/ui/separator";
 import { Award, Building, Calendar, Check, CheckCircle, DollarSign, Info, Languages, Loader2, Timer, X } from "lucide-react";
+import { PriceCalculator } from "@/services/PriceCalculator";
 
 interface MissionRequest {
   id: string;
@@ -86,7 +87,7 @@ export function CandidateMissionCard({
             </div>
             <div>
               <p className="text-xs text-gray-600">Tarif mission</p>
-              <p className="font-semibold text-gray-900">{request.calculated_price.toLocaleString('fr-FR')}€/mn</p>
+              <p className="font-semibold text-gray-900">{PriceCalculator.formatMinuteRate(request.calculated_price)}</p>
             </div>
           </div>
           
@@ -136,7 +137,7 @@ export function CandidateMissionCard({
                       <span className="font-medium">Client:</span> {request.client_name}
                     </div>
                     <div>
-                      <span className="font-medium">Budget total:</span> {request.project_budget.toLocaleString('fr-FR')}€
+                      <span className="font-medium">Budget total:</span> {PriceCalculator.formatPrice(request.project_budget)}
                     </div>
                     <div>
                       <span className="font-medium">Début:</span> {new Date(request.start_date).toLocaleDateString('fr-FR')}

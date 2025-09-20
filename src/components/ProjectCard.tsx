@@ -10,6 +10,8 @@ import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 import { useAuth } from "@/contexts/AuthContext";
 import { KickoffDialog } from "@/components/KickoffDialog";
 import { buildFunctionHeaders } from "@/lib/functionAuth";
+import { PriceCalculator } from "@/services/PriceCalculator";
+import { CandidateFormatter } from "@/services/CandidateFormatter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -838,7 +840,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
               <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20 border border-green-500/20">
                 <Euro className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {calculateTotalPricePerMinute().toFixed(2)}€/min
+                  {PriceCalculator.formatMinuteRate(calculateTotalPricePerMinute())}
                 </span>
               </div>
             )}
@@ -1126,13 +1128,17 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                         user={{
                           id: assignment.candidate_profiles.id,
                           firstName: assignment.candidate_profiles.first_name,
-                          lastName: assignment.candidate_profiles.last_name,
+                          lastName: '', // Ne jamais afficher le nom de famille
+                          name: CandidateFormatter.formatCandidateTitle({
+                            first_name: assignment.candidate_profiles.first_name,
+                            hr_profile: { name: profileNames[assignment.profile_id] || assignment.candidate_profiles.position }
+                          }),
                           jobTitle: profileNames[assignment.profile_id] || assignment.candidate_profiles.position,
                           seniority: assignment.seniority,
                           status: 'online',
                           isValidated: true,
                           hourlyRate: assignment.candidate_profiles?.daily_rate ?
-                            (assignment.candidate_profiles.daily_rate / 8) : undefined
+                            PriceCalculator.getDailyToHourlyRate(assignment.candidate_profiles.daily_rate) : undefined
                         }}
                         size="sm"
                         variant="detailed"
@@ -1149,7 +1155,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-500">{t('team.rate')}</span>
                         <span className="font-semibold text-gray-900">
-                          {(assignment.candidate_profiles.daily_rate / 8).toFixed(0)}€/h
+                          {PriceCalculator.formatPrice(PriceCalculator.getDailyToHourlyRate(assignment.candidate_profiles.daily_rate))}/h
                         </span>
                       </div>
                     </div>
@@ -1161,7 +1167,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">{t('projects.totalPricePerMinute')}</span>
                   <span className="text-xl font-bold text-purple-700">
-                    {calculateTotalPricePerMinute().toFixed(2)}€/min
+                    {PriceCalculator.formatMinuteRate(calculateTotalPricePerMinute())}
                   </span>
                 </div>
               </div>
