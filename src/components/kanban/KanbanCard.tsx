@@ -58,6 +58,9 @@ const getPriorityIcon = (priority: 'low' | 'medium' | 'high') => {
 // Status functions moved to utils/kanbanStatus.ts
 
 export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete }: KanbanCardProps) => {
+  // Log for debugging
+  console.log('KanbanCard render - card:', card.id, 'index:', index);
+
   // Derive status from column title
   const status = columnTitle ? getStatusFromColumnTitle(columnTitle) : card.status;
   const isOverdue = card.dueDate && new Date(card.dueDate) < new Date();
@@ -126,13 +129,19 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
 
   return (
     <Draggable draggableId={card.id} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          style={provided.draggableProps.style}
-        >
+      {(provided, snapshot) => {
+        // Log drag state for debugging
+        if (snapshot.isDragging) {
+          console.log('DRAGGING - style:', provided.draggableProps.style);
+        }
+
+        return (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            style={provided.draggableProps.style}
+          >
           <Card
             className="mb-3 cursor-pointer bg-card rounded-xl border border-border hover:border-primary/50"
             onClick={onClick}
@@ -299,7 +308,8 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
             </CardContent>
           </Card>
         </div>
-      )}
+        );
+      }}
     </Draggable>
   );
 };
