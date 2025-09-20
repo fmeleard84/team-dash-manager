@@ -231,9 +231,9 @@ export const KanbanBoard = ({
       </div>
 
       {/* Board Content - Scrollable area */}
-      <div className="flex-1 overflow-x-auto overflow-y-visible max-w-full bg-gradient-to-br from-background via-background to-accent/20">
+      <div className="flex-1 overflow-x-auto overflow-y-visible max-w-full bg-gradient-to-br from-background via-background to-accent/20 relative">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-4 p-4 min-h-full w-max relative">
+          <div className="flex gap-4 p-4 min-h-full w-max">
             {board.columns
               .sort((a, b) => a.position - b.position)
               .map((column) => (

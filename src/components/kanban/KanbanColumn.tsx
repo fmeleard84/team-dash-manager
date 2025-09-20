@@ -73,7 +73,7 @@ export const KanbanColumn = ({
                 <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
+            <DropdownMenuContent align="end" className="bg-background border shadow-lg z-[100]">
               <DropdownMenuItem onClick={onEditColumn} className="cursor-pointer">
                 Modifier la colonne
               </DropdownMenuItem>

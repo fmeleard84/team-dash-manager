@@ -131,17 +131,20 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`mb-3 group relative ${snapshot.isDragging ? 'rotate-1' : ''}`}
+          className="mb-3 group"
+          style={{
+            ...provided.draggableProps.style,
+          }}
         >
-          <Card 
-            className={`cursor-pointer transition-all duration-300 bg-card rounded-xl relative overflow-hidden ${
-              snapshot.isDragging 
-                ? 'shadow-2xl ring-2 ring-primary scale-105 bg-gradient-to-br from-primary/10 to-primary/5' 
+          <Card
+            className={`cursor-pointer transition-all duration-200 bg-card rounded-xl ${
+              snapshot.isDragging
+                ? 'shadow-2xl ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 rotate-1 scale-105'
                 : 'border border-border hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-1 hover:bg-gradient-to-br hover:from-card hover:to-primary/5'
-            } before:absolute before:inset-0 before:rounded-xl before:p-[1px] before:bg-gradient-to-br before:from-transparent before:via-primary/0 before:to-transparent hover:before:from-primary/50 hover:before:via-primary/30 hover:before:to-primary/50 before:transition-all before:duration-500 before:-z-10 before:opacity-0 hover:before:opacity-100 after:absolute after:inset-0 after:rounded-xl after:bg-card after:-z-10`}
+            }`}
             onClick={onClick}
           >
-            <CardHeader className="p-4 pb-2 relative z-10">
+            <CardHeader className="p-4 pb-2">
               <div className="flex items-start justify-between gap-2">
                 <h4 className="font-medium text-sm text-card-foreground line-clamp-2 flex-1">
                   {card.title}
@@ -153,7 +156,7 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
                       <MoreHorizontal className="w-3 h-3 text-gray-500" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-32 bg-background border shadow-lg z-50">
+                  <DropdownMenuContent align="end" className="w-32 bg-background border shadow-lg z-[100]">
                     <DropdownMenuItem onClick={(e) => {
                       e.stopPropagation();
                       onEdit?.();
@@ -206,7 +209,7 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
               </div>
             </CardHeader>
 
-            <CardContent className="p-4 pt-2 space-y-3 relative z-10">
+            <CardContent className="p-4 pt-2 space-y-3">
               {/* Description preview */}
               {card.description && (
                 <p className="text-xs text-muted-foreground line-clamp-2">
