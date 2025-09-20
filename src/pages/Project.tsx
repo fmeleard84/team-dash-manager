@@ -31,7 +31,7 @@ import HRCategoriesPanel from '@/components/hr/HRCategoriesPanel';
 import HRResourcePanel from '@/components/hr/HRResourcePanel';
 import HRResourceNode from '@/components/hr/HRResourceNode';
 import ClientNode from '@/components/hr/ClientNode';
-import SimpleXyflowEdge from '@/components/hr/SimpleXyflowEdge';
+import UniversalEdge from '@/components/hr/UniversalEdge';
 import { EdgeDetails } from '@/components/hr/EdgeDetails';
 import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 
@@ -82,7 +82,7 @@ const nodeTypes = {
 };
 
 const edgeTypes = {
-  custom: SimpleXyflowEdge,
+  custom: UniversalEdge,
 };
 
 // Helper function to generate UUID v4 compatible with all browsers
