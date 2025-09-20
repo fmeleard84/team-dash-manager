@@ -132,17 +132,16 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
       {(provided, snapshot) => {
         // Log drag state for debugging
         if (snapshot.isDragging) {
-          console.log('DRAGGING - style:', provided.draggableProps.style);
+          console.log('DRAGGING - full style:', provided.draggableProps.style);
+          console.log('DRAGGING - transform:', provided.draggableProps.style?.transform);
         }
 
         return (
-          <div
+          <Card
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
             style={provided.draggableProps.style}
-          >
-          <Card
             className="mb-3 cursor-pointer bg-card rounded-xl border border-border hover:border-primary/50"
             onClick={onClick}
           >
@@ -307,7 +306,6 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
               </div>
             </CardContent>
           </Card>
-        </div>
         );
       }}
     </Draggable>
