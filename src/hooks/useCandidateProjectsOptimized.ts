@@ -15,6 +15,7 @@ interface CandidateProject {
 
 export const useCandidateProjectsOptimized = () => {
   const [projects, setProjects] = useState<CandidateProject[]>([]);
+  const [allAcceptedProjects, setAllAcceptedProjects] = useState<CandidateProject[]>([]);
   const [loading, setLoading] = useState(true);
   const { candidateProfile, isCandidate, loading: profileLoading } = useUserProfile();
 
@@ -53,18 +54,21 @@ export const useCandidateProjectsOptimized = () => {
           return;
         }
 
-        // Extract projects from assignments - ONLY include projects with status 'play'
-        // This ensures candidates only see planning/kanban/drive/messages for active projects
-        const allAcceptedProjects = (assignments || [])
+        // Extract ALL accepted projects (not just status='play')
+        const acceptedProjects = (assignments || [])
           .filter(assignment => assignment.projects)
           .map(assignment => assignment.projects)
           .filter(Boolean) as CandidateProject[];
-        
-        const activeProjects = allAcceptedProjects.filter(p => p.status === 'play');
-        
-        // console.log(`[useCandidateProjectsOptimized] Found ${allAcceptedProjects.length} accepted projects, ${activeProjects.length} are active (status=play)`);
-        
-        setProjects(activeProjects);
+
+        // Separate active projects (status='play') from all accepted
+        const activeProjects = acceptedProjects.filter(p => p.status === 'play');
+
+        // console.log(`[useCandidateProjectsOptimized] Found ${acceptedProjects.length} accepted projects, ${activeProjects.length} are active (status=play)`);
+        // console.log('[useCandidateProjectsOptimized] Accepted projects:', acceptedProjects);
+        // console.log('[useCandidateProjectsOptimized] Assignments:', assignments);
+
+        setAllAcceptedProjects(acceptedProjects);  // Store ALL accepted projects
+        setProjects(activeProjects);  // Keep active projects for backward compatibility
       } catch (error) {
         console.error('Error:', error);
         toast.error('Erreur de connexion');
@@ -80,7 +84,8 @@ export const useCandidateProjectsOptimized = () => {
   }, [candidateProfile?.id, isCandidate, profileLoading]);
 
   return {
-    projects,
+    projects,  // Active projects (status='play')
+    allAcceptedProjects,  // ALL accepted projects regardless of status
     loading: loading || profileLoading,
     candidateId: candidateProfile?.id || null,
     refetch: () => {

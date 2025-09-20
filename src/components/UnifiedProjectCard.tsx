@@ -121,7 +121,9 @@ export const UnifiedProjectCard: React.FC<UnifiedProjectCardProps> = ({
   return (
     <BaseProjectCard
       {...props}
-      // Les props spécifiques seront gérées dans les prochaines itérations
+      // Passer les props d'optimisation pour éviter les requêtes redondantes
+      preLoadedAssignments={props.resourceAssignments}
+      skipDataFetching={false} // On laisse false pour garder la compatibilité
     />
   );
 };

@@ -96,7 +96,7 @@ const CandidateDashboard = () => {
   const [acceptedProjects, setAcceptedProjects] = useState<any[]>([]);
   const { user, logout } = useAuth();
   const { getCandidateProjects, projects: userProjects } = useUserProjects();
-  const { projects: activeProjects, loading: activeProjectsLoading } = useCandidateProjectsOptimized();
+  const { projects: activeProjects, allAcceptedProjects, loading: activeProjectsLoading } = useCandidateProjectsOptimized();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -208,23 +208,24 @@ const CandidateDashboard = () => {
     loadInitialData();
   }, [candidateId]);
 
-  // Set default Drive and Wiki projects when activeProjects change
+  // Set default Drive and Wiki projects when allAcceptedProjects change
   useEffect(() => {
-    if (activeProjects && activeProjects.length > 0) {
+    const projectsToUse = allAcceptedProjects || activeProjects || [];
+    if (projectsToUse.length > 0) {
       if (!selectedDriveProjectId) {
-        setSelectedDriveProjectId(activeProjects[0].id);
+        setSelectedDriveProjectId(projectsToUse[0].id);
       }
       if (!selectedWikiProjectId) {
-        setSelectedWikiProjectId(activeProjects[0].id);
+        setSelectedWikiProjectId(projectsToUse[0].id);
       }
       if (!selectedKanbanProjectId) {
-        setSelectedKanbanProjectId(activeProjects[0].id);
+        setSelectedKanbanProjectId(projectsToUse[0].id);
       }
       if (!selectedMessagesProjectId) {
-        setSelectedMessagesProjectId(activeProjects[0].id);
+        setSelectedMessagesProjectId(projectsToUse[0].id);
       }
     }
-  }, [activeProjects]);
+  }, [allAcceptedProjects, activeProjects]);
 
   // Use realtime hook for candidate projects
   useRealtimeProjectsFixed({
@@ -586,17 +587,7 @@ const CandidateDashboard = () => {
   };
 
   const renderKanbanContent = () => {
-    if (!activeProjects || activeProjects.length === 0) {
-      return (
-        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
-          <Trello className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
-          <p className="text-sm text-gray-300">
-            {t('dashboard.candidate.acceptMissionToAccess')}
-          </p>
-        </div>
-      );
-    }
+    const projectsToShow = allAcceptedProjects || [];
 
     return (
       <div className="space-y-6">
@@ -605,7 +596,9 @@ const CandidateDashboard = () => {
           icon={Trello}
           title={t('dashboard.candidate.kanbanBoard')}
           subtitle={t('dashboard.candidate.manageTasksAndProgress')}
-          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          projects={projectsToShow
+            .map(p => ({ ...p, created_at: p.project_date || p.created_at }))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
           selectedProjectId={selectedKanbanProjectId}
           onProjectChange={setSelectedKanbanProjectId}
           projectSelectorConfig={{
@@ -643,17 +636,7 @@ const CandidateDashboard = () => {
   };
 
   const renderMessagesContent = () => {
-    if (!activeProjects || activeProjects.length === 0) {
-      return (
-        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
-          <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
-          <p className="text-sm text-gray-300">
-            {t('dashboard.candidate.acceptMissionToAccess')}
-          </p>
-        </div>
-      );
-    }
+    const projectsToShow = allAcceptedProjects || [];
 
     return (
       <div className="space-y-6">
@@ -663,7 +646,9 @@ const CandidateDashboard = () => {
           title={t('dashboard.candidate.messages')}
           subtitle={t('dashboard.candidate.realtimeCommunication')}
           badge={{ text: t('dashboard.candidate.online'), animate: true }}
-          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          projects={projectsToShow
+            .map(p => ({ ...p, created_at: p.project_date || p.created_at }))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
           selectedProjectId={selectedMessagesProjectId}
           onProjectChange={setSelectedMessagesProjectId}
           projectSelectorConfig={{
@@ -678,7 +663,7 @@ const CandidateDashboard = () => {
         {/* Zone de messagerie */}
         {selectedMessagesProjectId && (
           <div className="h-[700px]">
-            <CandidateMessagesView projects={[activeProjects.find(p => p.id === selectedMessagesProjectId)].filter(Boolean)} />
+            <CandidateMessagesView projects={[projectsToShow.find(p => p.id === selectedMessagesProjectId)].filter(Boolean)} />
           </div>
         )}
       </div>
@@ -686,17 +671,7 @@ const CandidateDashboard = () => {
   };
 
   const renderDriveContent = () => {
-    if (!activeProjects || activeProjects.length === 0) {
-      return (
-        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
-          <Cloud className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
-          <p className="text-sm text-gray-300">
-            {t('dashboard.candidate.acceptMissionToAccess')}
-          </p>
-        </div>
-      );
-    }
+    const projectsToShow = allAcceptedProjects || [];
 
     return (
       <div className="space-y-6">
@@ -705,7 +680,9 @@ const CandidateDashboard = () => {
           icon={Cloud}
           title={t('dashboard.candidate.drive')}
           subtitle={t('dashboard.candidate.fileStorageAndSharing')}
-          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          projects={projectsToShow
+            .map(p => ({ ...p, created_at: p.project_date || p.created_at }))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
           selectedProjectId={selectedDriveProjectId}
           onProjectChange={setSelectedDriveProjectId}
           projectSelectorConfig={{
@@ -727,17 +704,7 @@ const CandidateDashboard = () => {
   };
 
   const renderWikiContent = () => {
-    if (!activeProjects || activeProjects.length === 0) {
-      return (
-        <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-primary-500/30">
-          <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-semibold mb-2 text-white">{t('dashboard.candidate.noActiveProject')}</h3>
-          <p className="text-sm text-gray-300">
-            {t('dashboard.candidate.acceptMissionToAccess')}
-          </p>
-        </div>
-      );
-    }
+    const projectsToShow = allAcceptedProjects || [];
 
     return (
       <div className="space-y-6">
@@ -746,7 +713,9 @@ const CandidateDashboard = () => {
           icon={BookOpen}
           title={t('dashboard.candidate.wiki')}
           subtitle={t('dashboard.candidate.projectDocumentation')}
-          projects={activeProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+          projects={projectsToShow
+            .map(p => ({ ...p, created_at: p.project_date || p.created_at }))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
           selectedProjectId={selectedWikiProjectId}
           onProjectChange={setSelectedWikiProjectId}
           projectSelectorConfig={{
@@ -774,7 +743,7 @@ const CandidateDashboard = () => {
             {isWikiFullscreen && (
               <div className="mb-4 flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">
-                  Wiki - {activeProjects.find(p => p.id === selectedWikiProjectId)?.title}
+                  Wiki - {(allAcceptedProjects || []).find(p => p.id === selectedWikiProjectId)?.title}
                 </h2>
                 <Button
                   variant="outline"

@@ -66,12 +66,12 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectsSection } from '@/components/client/ProjectsSection';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useProjectsWithResources } from "@/hooks/useProjectsWithResources";
 import ClientKanbanView from "@/components/client/ClientKanbanView";
 import { EnhancedMessageSystemNeon } from "@/components/shared/EnhancedMessageSystemNeon";
 import { InvoiceList } from "@/components/invoicing/InvoiceList";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
-import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { useProjectSort, type ProjectWithDate } from "@/hooks/useProjectSort";
 import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
 import { useProjectSelector } from "@/hooks/useProjectSelector";
@@ -105,9 +105,32 @@ type DbProject = {
   archived_at?: string | null;
   deleted_at?: string | null;
 };
-const [projects, setProjects] = useState<DbProject[]>([]);
-const [archivedProjects, setArchivedProjects] = useState<DbProject[]>([]);
-const [resourceAssignments, setResourceAssignments] = useState<any[]>([]);
+// Utiliser le hook centralisé pour récupérer les projets et les ressources
+const {
+  projects: enrichedProjects,
+  archivedProjects,
+  loading: projectsLoading,
+  refresh: refreshProjects,
+  stats: projectStats
+} = useProjectsWithResources(user?.id, 'client');
+
+// Convertir les projets enrichis au format attendu par ProjectsSection
+const projects = useMemo(() => enrichedProjects.map(p => ({
+  id: p.id,
+  title: p.title,
+  description: p.description,
+  status: p.status,
+  project_date: p.project_date,
+  due_date: p.due_date,
+  client_budget: p.client_budget,
+  archived_at: p.archived_at,
+  deleted_at: p.deleted_at
+})), [enrichedProjects]);
+
+// Extraire tous les resourceAssignments des projets enrichis
+const resourceAssignments = useMemo(() => {
+  return enrichedProjects.flatMap(p => p.resourceAssignments || []);
+}, [enrichedProjects]);
 const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 const [projectToDelete, setProjectToDelete] = useState<DbProject | null>(null);
@@ -166,65 +189,22 @@ useEffect(() => {
   }
 }, [sortedKanbanProjects]);
 
-// Load initial projects
+// Déclencher le refresh quand refreshTrigger change
 useEffect(() => {
-  const loadProjects = async () => {
-    if (!user?.id) return;
+  if (refreshTrigger > 0) {
+    refreshProjects();
+  }
+}, [refreshTrigger]);
 
-    const { data: projectsData, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!error && projectsData) {
-      console.log('Projects loaded:', projectsData.length, 'projects');
-      const active = projectsData.filter(p => !p.archived_at && !p.deleted_at);
-      const archived = projectsData.filter(p => p.archived_at && !p.deleted_at);
-      setProjects(active);
-      setArchivedProjects(archived);
-    }
-
-    // Load resource assignments
-    const { data: assignmentsData } = await supabase
-      .from('hr_resource_assignments')
-      .select('*')
-      .in('project_id', projectsData?.map(p => p.id) || []);
-
-    if (assignmentsData) {
-      setResourceAssignments(assignmentsData);
-    }
-  };
-
-  loadProjects();
-}, [user?.id, refreshTrigger]);
-
-// Use realtime hook for projects
-useRealtimeProjectsFixed({
-  setProjects: (updater) => {
-    const currentProjects = [...projects, ...archivedProjects];
-    const allProjects = typeof updater === 'function' ? updater(currentProjects) : updater;
-    const active = allProjects?.filter(p => !p.archived_at && !p.deleted_at) || [];
-    const archived = allProjects?.filter(p => p.archived_at && !p.deleted_at) || [];
-    setProjects(active);
-    setArchivedProjects(archived);
-  },
-  setResourceAssignments,
-  userId: user?.id,
-  userType: 'client',
-  candidateProfile: null
-});
-
-// Calculate metrics
+// Calculate metrics - utiliser les stats du hook centralisé
 const projectsMetrics = useMemo(() => {
-  const activeProjects = projects.filter(p => p.status === 'play');
-  const totalBudget = projects.reduce((sum, p) => sum + (p.client_budget || 0), 0);
-  const avgBudget = projects.length > 0 ? totalBudget / projects.length : 0;
-  
+  const totalBudget = enrichedProjects.reduce((sum, p) => sum + (p.client_budget || 0), 0);
+  const avgBudget = enrichedProjects.length > 0 ? totalBudget / enrichedProjects.length : 0;
+
   return {
-    total: projects.length,
-    active: activeProjects.length,
-    completed: projects.filter(p => p.status === 'completed').length,
+    total: projectStats.total,
+    active: projectStats.inProgress,
+    completed: projectStats.completed,
     totalBudget,
     avgBudget
   };

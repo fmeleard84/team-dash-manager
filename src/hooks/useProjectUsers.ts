@@ -100,13 +100,20 @@ export const useProjectUsers = (projectId: string | null) => {
           }
         }
 
-        // 2. Candidats - requête simple puis récupération séparée du hr_profile
+        // 2. Candidats - AVEC jointure directe à hr_profiles
         const { data: assignments, error: assignError } = await supabase
           .from('hr_resource_assignments')
-          .select('*')
+          .select(`
+            *,
+            hr_profiles (
+              id,
+              name,
+              is_ai
+            )
+          `)
           .eq('project_id', projectId)
           .eq('booking_status', 'accepted');
-        
+
         // Log simplifié
         if (assignError) {
           console.error('Error loading assignments:', assignError);
@@ -125,22 +132,14 @@ export const useProjectUsers = (projectId: string | null) => {
               if (candError) {
                 // FALLBACK: Si le candidate n'existe pas, créer un utilisateur temporaire
                 const tempEmail = `user_${assignment.candidate_id.substring(0, 8)}@temp.com`;
-                // Récupérer le hr_profile séparément si profile_id existe
+                // Utiliser les données hr_profiles de la jointure directe
                 let jobTitle = assignment.job_title || 'Consultant';
                 let tempName = 'Candidat';
 
-                if (assignment.profile_id) {
-                  const { data: hrProfile } = await supabase
-                    .from('hr_profiles')
-                    .select('id, name')
-                    .eq('id', assignment.profile_id)
-                    .single();
-
-                  if (hrProfile) {
-                    // name contient le nom du métier (ex: "Chef de projet")
-                    jobTitle = hrProfile.name || assignment.job_title || 'Consultant';
-                    tempName = hrProfile.name?.split(' ')[0] || 'Candidat';
-                  }
+                if (assignment.hr_profiles) {
+                  // name contient le nom du métier (ex: "Chef de projet")
+                  jobTitle = assignment.hr_profiles.name || assignment.job_title || 'Consultant';
+                  tempName = assignment.hr_profiles.name?.split(' ')[0] || 'Candidat';
                 }
 
                 usersList.push({
@@ -156,20 +155,12 @@ export const useProjectUsers = (projectId: string | null) => {
                                  candidate.email?.split('@')[0]?.split('.')[0] ||
                                  'Candidat';
 
-                // Récupérer le hr_profile si profile_id existe
+                // Utiliser le hr_profile de la jointure directe
                 let jobTitle = assignment.job_title || candidate.job_title || 'Consultant';
 
-                if (assignment.profile_id) {
-                  const { data: hrProfile } = await supabase
-                    .from('hr_profiles')
-                    .select('id, name')
-                    .eq('id', assignment.profile_id)
-                    .single();
-
-                  if (hrProfile?.name) {
-                    // name contient le nom du métier (ex: "Chef de projet")
-                    jobTitle = hrProfile.name;
-                  }
+                if (assignment.hr_profiles?.name) {
+                  // name contient le nom du métier (ex: "Chef de projet")
+                  jobTitle = assignment.hr_profiles.name;
                 }
 
                 usersList.push({
@@ -185,35 +176,26 @@ export const useProjectUsers = (projectId: string | null) => {
               }
             }
             // Si pas de candidate_id mais un profile_id (ancien système)
-            else if (assignment.profile_id) {
-              const { data: hrProfile, error: hrError } = await supabase
-                .from('hr_profiles')
-                .select('*')  // Utiliser * pour éviter les problèmes de syntaxe
-                .eq('id', assignment.profile_id)
-                .single();
-              
-              if (hrError) {
-                console.error('Error fetching hr_profile:', hrError);
-              }
+            else if (assignment.profile_id && assignment.hr_profiles) {
+              // Utiliser les données hr_profiles de la jointure directe
+              const hrProfile = assignment.hr_profiles;
 
-              if (hrProfile) {
-                // name contient le nom complet du métier
-                const jobTitle = hrProfile.name ||
-                                assignment.job_title ||
-                                'Consultant';
-                const displayName = hrProfile.name?.split(' ')[0] || 'Ressource';
+              // name contient le nom complet du métier
+              const jobTitle = hrProfile.name ||
+                              assignment.job_title ||
+                              'Consultant';
+              const displayName = hrProfile.name?.split(' ')[0] || 'Ressource';
 
-                usersList.push({
-                  user_id: assignment.profile_id,
-                  email: `${displayName.toLowerCase()}@temp.com`,
-                  display_name: displayName,
-                  job_title: jobTitle,
-                  role: 'candidate',
-                  joined_at: assignment.created_at
-                });
-                
-                // Profil HR ajouté (ancien système)
-              }
+              usersList.push({
+                user_id: assignment.profile_id,
+                email: `${displayName.toLowerCase()}@temp.com`,
+                display_name: displayName,
+                job_title: jobTitle,
+                role: 'candidate',
+                joined_at: assignment.created_at
+              });
+
+              // Profil HR ajouté (ancien système) via jointure
             }
           }
         }

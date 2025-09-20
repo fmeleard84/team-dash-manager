@@ -559,27 +559,35 @@ const Project = () => {
         });
       }
 
-      // Fetch HR resource assignments
-      console.log('Fetching hr_resource_assignments for project_id:', id);
+      // Fetch HR resource assignments WITH direct join to hr_profiles
+      console.log('Fetching hr_resource_assignments with hr_profiles for project_id:', id);
       const { data: resourceAssignments, error: resourceError } = await supabase
         .from('hr_resource_assignments')
-        .select('*')
+        .select(`
+          *,
+          hr_profiles (
+            id,
+            name,
+            base_price,
+            inputs,
+            outputs,
+            is_ai
+          )
+        `)
         .eq('project_id', id);
-      
+
       console.log('hr_resource_assignments query result:', { resourceAssignments, resourceError, count: resourceAssignments?.length });
 
-      const resourcesMap = new Map<string, HRResource>();
-      const reconstructedNodes: Node[] = [];
-      let profileMap = new Map<string, any>();  // Declare at the outer scope
-      
-      // Always fetch ALL profiles for proper mapping
+      // Also fetch ALL profiles for the profiles state (needed for the profile selector)
       const { data: allProfilesDataFetch } = await supabase
         .from('hr_profiles')
         .select('*, inputs, outputs');
-      
+
       const allProfilesData = allProfilesDataFetch || [];
       setProfiles(allProfilesData);
-      profileMap = new Map(allProfilesData.map(p => [p.id, p]));
+
+      const resourcesMap = new Map<string, HRResource>();
+      const reconstructedNodes: Node[] = [];
 
       if (!resourceError && resourceAssignments) {
         // Fetch additional data needed for reconstruction
@@ -597,7 +605,7 @@ const Project = () => {
 
         // Reconstruct resources and nodes
         for (const assignment of resourceAssignments) {
-          const profile = profileMap.get(assignment.profile_id);
+          const profile = assignment.hr_profiles;
           if (!profile) continue;
 
           // Check if this is an AI resource
@@ -735,7 +743,7 @@ const Project = () => {
                 if (profileName) {
                   // Find resource that matches this profile name
                   for (const [resId, resource] of resourcesMap.entries()) {
-                    const profile = profileMap.get(resource.profile_id);
+                    const profile = allProfilesData.find(p => p.id === resource.profile_id);
                     if (profile && profile.name === profileName) {
                       existingResource = resource;
                       break;

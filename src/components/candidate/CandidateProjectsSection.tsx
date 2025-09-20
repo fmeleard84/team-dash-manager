@@ -283,11 +283,11 @@ export function CandidateProjectsSection({
   const getCandidateRole = (project: CandidateProject) => {
     const assignment = project.hr_resource_assignments?.[0];
     if (!assignment) return null;
-    
+
     return (
       <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
         <Briefcase className="w-4 h-4 text-primary-500" />
-        <span>{assignment.hr_profiles?.label || 'Non défini'}</span>
+        <span>{assignment.hr_profiles?.name || assignment.hr_profiles?.label || 'Non défini'}</span>
         {assignment.seniority && (
           <>
             <span className="text-neutral-400 dark:text-neutral-500">•</span>

@@ -678,7 +678,7 @@ hr_resource_assignments {
 - Toujours vérifier `owner_id` pour les clients
 - Toujours vérifier `candidate_id` pour les candidats
 
-## 🔑 Clés API Supabase (IMPORTANTES)
+## 🔑 Clés API Supabase (IMPORTANTES - Mise à jour 20/09/2025)
 
 **⚠️ TOUJOURS utiliser ces clés officielles (depuis src/integrations/supabase/client.ts) :**
 
@@ -686,15 +686,17 @@ hr_resource_assignments {
 // URL Supabase
 const SUPABASE_URL = "https://egdelmcijszuapcpglsy.supabase.co";
 
-// Clé ANON (publique - pour le client/frontend)
+// Clé ANON (publique - pour le client/frontend) - CLÉ OFFICIELLE VÉRIFIÉE
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxNjIyMDAsImV4cCI6MjA2OTczODIwMH0.JYV-JxosrfE7kMtFw3XLs27PGf3Fn-rDyJLDWeYXF_U";
 
 // Clé SERVICE ROLE (privée - NE PAS STOCKER dans le code client)
-// ⚠️ La clé service_role doit être gardée secrète et utilisée uniquement côté serveur
-// Elle se trouve dans les variables d'environnement Supabase, pas dans le code source
+const SUPABASE_SERVICE_ROLE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDE2MjIwMCwiZXhwIjoyMDY5NzM4MjAwfQ.K3m7mUvhUJcSmuMQs-yXnhXQRMBc_CJwmz-dIX6bU1Q";
+// ⚠️ La clé service_role doit être gardée secrète et utilisée uniquement côté serveur (Edge Functions, scripts serveur)
 ```
 
 **IMPORTANT : Ne jamais exposer la clé SERVICE_ROLE dans le code client !**
+
+**Note** : Toutes les autres clés API trouvées dans le code doivent être remplacées par ces clés officielles.
 
 ## 🔐 Informations de Connexion Base de Données (Mise à jour 19/09/2025)
 

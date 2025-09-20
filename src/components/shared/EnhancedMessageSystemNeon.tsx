@@ -47,6 +47,7 @@ import { useUserPresence } from '@/hooks/useUserPresence';
 import { useToast } from '@/hooks/use-toast';
 import { initializeProjectMessaging, sendMessage } from '@/utils/messageSetup';
 import { uploadMultipleFiles, syncMessageFilesToDrive, UploadedFile } from '@/utils/fileUpload';
+import { handleAIConversation } from '@/utils/aiMessageHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -299,6 +300,33 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
           // Add new message
           return [...prev, messageWithAttachments];
         });
+
+        // 🤖 Gestion IA : Traiter automatiquement si le message est envoyé à une IA
+        try {
+          const aiResult = await handleAIConversation(
+            selectedConversation,
+            newMessage,
+            projectId,
+            projectMembers,
+            selectedThread.id
+          );
+
+          if (aiResult.success) {
+            console.log('✅ Réponse IA générée et envoyée');
+
+            // Afficher notification de sauvegarde si nécessaire
+            if (aiResult.saved) {
+              toast({
+                title: "📄 Contenu sauvegardé",
+                description: "Le contenu généré par l'IA a été sauvegardé dans le Drive",
+                variant: "default",
+              });
+            }
+          }
+        } catch (aiError) {
+          console.error('⚠️ Erreur IA (non bloquante):', aiError);
+          // Ne pas bloquer l'envoi du message utilisateur en cas d'erreur IA
+        }
       }
 
       setNewMessage('');
@@ -369,30 +397,51 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                     key={member.id}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setSelectedConversation({ 
-                      type: 'user', 
-                      id: member.id, 
-                      name: member.name 
+                    onClick={() => setSelectedConversation({
+                      type: 'user',
+                      id: member.id,
+                      name: member.name
                     })}
                     className={cn(
-                      "p-3 rounded-xl cursor-pointer transition-all duration-200",
+                      "p-3 rounded-xl cursor-pointer transition-all duration-200 relative",
                       selectedConversation.id === member.id
-                        ? "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 shadow-lg shadow-purple-500/20"
-                        : "bg-white/5 hover:bg-white/10 border border-transparent hover:border-purple-500/30"
+                        ? member.isAI
+                          ? "bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border border-cyan-400/50 shadow-lg shadow-cyan-500/20"
+                          : "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 shadow-lg shadow-purple-500/20"
+                        : member.isAI
+                          ? "bg-cyan-500/10 hover:bg-cyan-500/20 border border-transparent hover:border-cyan-400/30"
+                          : "bg-white/5 hover:bg-white/10 border border-transparent hover:border-purple-500/30"
                     )}
                   >
-                    <UserAvatarNeon
-                      user={{
-                        id: member.id,
-                        name: member.name,
-                        role: member.role,
-                        status: isUserOnline(member.id) ? 'online' : 'offline'
-                      }}
-                      size="sm"
-                      variant="list"
-                      showStatus={true}
-                      className="flex-1"
-                    />
+                    <div className="flex items-center gap-3">
+                      <UserAvatarNeon
+                        user={{
+                          id: member.id,
+                          name: member.name,
+                          role: member.role,
+                          status: member.isAI ? 'online' : (isUserOnline(member.id) ? 'online' : 'offline')
+                        }}
+                        size="sm"
+                        variant="list"
+                        showStatus={true}
+                        className={cn(
+                          "flex-1",
+                          member.isAI && "ring-2 ring-cyan-400/50"
+                        )}
+                      />
+
+                      {/* Badge IA */}
+                      {member.isAI && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/30"
+                        >
+                          <Zap className="h-3 w-3 text-white" />
+                          <span className="text-xs font-medium text-white">IA</span>
+                        </motion.div>
+                      )}
+                    </div>
                   </motion.div>
                 ))}
               </div>
@@ -493,7 +542,8 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                 {filteredMessages().map((message, index) => {
                   const isOwnMessage = message.sender_email === user?.email;
                   const sender = projectMembers.find(m => m.email === message.sender_email);
-                  
+                  const isAIMessage = sender?.isAI || false;
+
                   return (
                     <motion.div
                       key={message.id}
@@ -515,23 +565,38 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                           }}
                           size="md"
                           variant="compact"
-                          className="shadow-lg shadow-purple-500/20"
+                          className={cn(
+                            "shadow-lg",
+                            isAIMessage
+                              ? "shadow-cyan-500/30 ring-2 ring-cyan-400/50"
+                              : "shadow-purple-500/20"
+                          )}
                         />
                       )}
-                      
+
                       <div className={cn(
                         "max-w-[70%] space-y-1",
                         isOwnMessage ? "items-end" : "items-start"
                       )}>
                         {!isOwnMessage && (
-                          <p className="text-xs text-gray-400 px-3">{sender?.name || 'Inconnu'}</p>
+                          <div className="flex items-center gap-2 px-3">
+                            <p className="text-xs text-gray-400">{sender?.name || 'Inconnu'}</p>
+                            {isAIMessage && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full">
+                                <Zap className="h-2.5 w-2.5 text-white" />
+                                <span className="text-xs font-medium text-white">IA</span>
+                              </div>
+                            )}
+                          </div>
                         )}
                         <div
                           className={cn(
                             "px-4 py-3 rounded-2xl backdrop-blur-sm",
                             isOwnMessage
                               ? "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 shadow-lg shadow-purple-500/20"
-                              : "bg-white/10 border border-white/20"
+                              : isAIMessage
+                                ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/40 shadow-lg shadow-cyan-500/20"
+                                : "bg-white/10 border border-white/20"
                           )}
                         >
                           <p className="text-sm text-white whitespace-pre-wrap">{message.content}</p>

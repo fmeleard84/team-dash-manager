@@ -66,21 +66,50 @@ interface ProjectCardProps {
   onUnarchive?: (id: string) => void;
   isArchived?: boolean;
   refreshTrigger?: number; // Optional prop to force refresh
+  // Props pour l'optimisation des performances
+  preLoadedAssignments?: ResourceAssignment[]; // Si fourni, utilise ces données au lieu de faire une requête
+  skipDataFetching?: boolean; // Si true, désactive toutes les requêtes et le polling
 }
 
 interface PlankaProject {
   planka_url: string;
 }
 
-export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart, onEdit, onArchive, onUnarchive, isArchived = false, refreshTrigger }: ProjectCardProps) {
+export function ProjectCard({
+  project,
+  onStatusToggle,
+  onDelete,
+  onView,
+  onStart,
+  onEdit,
+  onArchive,
+  onUnarchive,
+  isArchived = false,
+  refreshTrigger,
+  preLoadedAssignments,
+  skipDataFetching = false
+}: ProjectCardProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { checkCreditsForAction, formatBalance } = useClientCredits();
   const [plankaProject, setPlankaProject] = useState<PlankaProject | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
-  const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>([]);
-  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+  // Utiliser les données pré-chargées si disponibles
+  const [resourceAssignments, setResourceAssignments] = useState<ResourceAssignment[]>(preLoadedAssignments || []);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>(() => {
+    // Si on a des données pré-chargées, extraire les noms tout de suite
+    if (preLoadedAssignments) {
+      const names: Record<string, string> = {};
+      preLoadedAssignments.forEach((assignment) => {
+        if (assignment.hr_profiles?.name) {
+          names[assignment.profile_id] = assignment.hr_profiles.name;
+        }
+      });
+      return names;
+    }
+    return {};
+  });
   const [isBookingTeam, setIsBookingTeam] = useState(false);
   const [showKickoff, setShowKickoff] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -115,16 +144,21 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   };
 
   useEffect(() => {
-    fetchResourceAssignments();
+    // Ne pas faire de requête si on a déjà les données ou si on doit skipper
+    if (!skipDataFetching && !preLoadedAssignments) {
+      fetchResourceAssignments();
+    }
   }, [project.id, refreshTrigger]);
 
   // Also refresh when component mounts
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchResourceAssignments();
-      fetchProjectFiles();
-    }, 100);
-    return () => clearTimeout(timer);
+    if (!skipDataFetching && !preLoadedAssignments) {
+      const timer = setTimeout(() => {
+        fetchResourceAssignments();
+        fetchProjectFiles();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   // Check if booking is in progress based on resource assignment status
@@ -138,10 +172,15 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
 
   // Reload resource assignments when page regains focus (useful when returning from ReactFlow)
   useEffect(() => {
+    // Pas de polling si on utilise des données pré-chargées
+    if (skipDataFetching || preLoadedAssignments) {
+      return;
+    }
+
     let intervalId: NodeJS.Timeout | null = null;
     let attemptCount = 0;
     const maxAttempts = 10;
-    
+
     const startPolling = () => {
       attemptCount = 0;
 
@@ -195,7 +234,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             intervalId = null;
           }
         }
-      }, 500);
+      }, 3000); // Réduit de 500ms à 3s pour éviter la surcharge
     };
     
     const handleVisibilityChange = () => {
@@ -308,6 +347,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
   const fetchResourceAssignments = async () => {
     try {
       // Récupérer les assignments AVEC la jointure hr_profiles directe
+      // Ajout d'un timeout pour éviter les blocages
       const { data, error } = await supabase
         .from('hr_resource_assignments')
         .select(`
@@ -333,7 +373,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
         .eq('project_id', project.id);
 
       if (error) {
-        console.error('❌ Error fetching resource assignments:', error);
+        console.error('Error fetching resource assignments:', error);
         return;
       }
 
