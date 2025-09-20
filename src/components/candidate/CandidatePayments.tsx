@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DatePicker } from '@/components/ui/date-picker';
 import { PageHeaderNeon } from '@/components/ui/page-header-neon';
 import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { cn } from '@/lib/utils';
@@ -193,45 +192,22 @@ export const CandidatePayments = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with unified filters */}
+      {/* Header with unified modern design - Using Messages style selector */}
       <PageHeaderNeon
-        title="Mes Paiements"
-        description="Suivi de vos revenus et paiements validés"
         icon={Euro}
-        iconColor="from-green-500 to-emerald-500"
-      >
-        <div className="flex items-center gap-4">
-          {/* Date filters with modern calendar */}
-          <div className="flex items-center gap-3">
-            <DatePicker
-              value={startDate}
-              onChange={setStartDate}
-              placeholder="Date de début"
-              className="w-44 bg-black/40 backdrop-blur-xl border-purple-500/30 text-white hover:bg-white/10 hover:border-purple-400"
-              maxDate={endDate}
-            />
-            <span className="text-gray-400 font-medium">→</span>
-            <DatePicker
-              value={endDate}
-              onChange={setEndDate}
-              placeholder="Date de fin"
-              className="w-44 bg-black/40 backdrop-blur-xl border-purple-500/30 text-white hover:bg-white/10 hover:border-purple-400"
-              minDate={startDate}
-            />
-          </div>
-
-          {/* Universal project selector (same as other pages) */}
-          <ProjectSelectorNeon
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-            onProjectChange={setSelectedProjectId}
-            placeholder="Tous les projets"
-            className="w-64"
-            showStatus={false}
-            showDates={false}
-          />
-        </div>
-      </PageHeaderNeon>
+        title="Mes Paiements"
+        subtitle="Suivi de vos revenus et paiements validés"
+        projects={projects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+        selectedProjectId={selectedProjectId}
+        onProjectChange={setSelectedProjectId}
+        projectSelectorConfig={{
+          placeholder: "Tous les projets",
+          showStatus: true,
+          showDates: true,
+          showTeamProgress: false,
+          className: "w-[350px]"
+        }}
+      />
 
       {/* Stats cards with neon design */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

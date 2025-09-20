@@ -40,6 +40,7 @@ export const useProjectSort = (projects: ProjectWithDate[]): SortedProjectOption
         });
         
         return {
+          ...project, // Conserver TOUTES les propriétés originales
           id: project.id,
           title: project.title,
           created_at: project.created_at,

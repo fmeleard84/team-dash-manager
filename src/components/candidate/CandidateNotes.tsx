@@ -54,24 +54,22 @@ export function CandidateNotes({ currentCandidateId }: CandidateNotesProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with unified modern design */}
+      {/* Header with unified modern design - Using Messages style selector */}
       <PageHeaderNeon
-        title="Notes clients"
-        description="Avis et évaluations de vos missions"
         icon={FileText}
-        iconColor="from-purple-500 to-pink-500"
-      >
-        {/* Universal project selector */}
-        <ProjectSelectorNeon
-          projects={projects}
-          selectedProjectId={selectedProjectId}
-          onProjectChange={setSelectedProjectId}
-          placeholder="Tous les projets"
-          className="w-64"
-          showStatus={false}
-          showDates={false}
-        />
-      </PageHeaderNeon>
+        title="Notes clients"
+        subtitle="Avis et évaluations de vos missions"
+        projects={projects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+        selectedProjectId={selectedProjectId}
+        onProjectChange={setSelectedProjectId}
+        projectSelectorConfig={{
+          placeholder: "Sélectionner un projet",
+          showStatus: true,
+          showDates: true,
+          showTeamProgress: false,
+          className: "w-[350px]"
+        }}
+      />
 
       {/* Content */}
       {!reviews || reviews.length === 0 ? (

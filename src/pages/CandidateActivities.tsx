@@ -313,11 +313,8 @@ export default function CandidateActivities() {
   };
 
   // Use candidate projects from the optimized hook (same as Drive and Planning)
-  // This ensures consistency across all sections
-  const uniqueProjects = candidateProjects.map(project => ({
-    id: project.id,
-    title: project.title
-  }));
+  // Keep ALL project properties for the selector to work properly
+  const uniqueProjects = candidateProjects;
 
   if (loading) {
     return (
@@ -332,47 +329,22 @@ export default function CandidateActivities() {
 
   return (
     <div className="space-y-6">
-      {/* Header with unified modern design */}
+      {/* Header with unified modern design - Using Messages style selector */}
       <PageHeaderNeon
-        title="Activités"
-        description="Suivi de votre temps et activités"
         icon={Activity}
-        iconColor="from-blue-500 to-cyan-500"
-      >
-        <div className="flex items-center gap-4">
-          {/* Universal project selector */}
-          <ProjectSelectorNeon
-            projects={uniqueProjects}
-            selectedProjectId={selectedProjectId === "all" ? "" : selectedProjectId}
-            onProjectChange={(id) => setSelectedProjectId(id || "all")}
-            placeholder="Tous les projets"
-            className="w-64"
-            showStatus={false}
-            showDates={false}
-          />
-
-          {/* Date range selector with modern design */}
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as 'week' | 'month' | 'all')}
-            className="w-48 h-10 px-3 bg-black/40 backdrop-blur-xl border border-purple-500/30 text-white rounded-lg hover:bg-white/10 hover:border-purple-400 transition-all duration-300 focus:outline-none focus:border-purple-400"
-          >
-            <option value="week" className="bg-gray-900">Cette semaine</option>
-            <option value="month" className="bg-gray-900">Ce mois</option>
-            <option value="all" className="bg-gray-900">Tout</option>
-          </select>
-
-          {/* Export button with neon style */}
-          <Button
-            onClick={exportToCSV}
-            variant="ghost"
-            className="bg-black/40 backdrop-blur-xl border border-purple-500/30 text-white hover:bg-white/10 hover:border-purple-400"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Exporter CSV
-          </Button>
-        </div>
-      </PageHeaderNeon>
+        title="Activités"
+        subtitle="Suivi de votre temps et activités"
+        projects={candidateProjects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+        selectedProjectId={selectedProjectId === "all" ? "" : selectedProjectId}
+        onProjectChange={(id) => setSelectedProjectId(id || "all")}
+        projectSelectorConfig={{
+          placeholder: "Tous les projets",
+          showStatus: true,
+          showDates: true,
+          showTeamProgress: false,
+          className: "w-[350px]"
+        }}
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

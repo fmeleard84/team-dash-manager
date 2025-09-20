@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
-import { 
-  TrendingUp, 
-  Users, 
-  Clock, 
+import {
+  TrendingUp,
+  Users,
+  Clock,
   DollarSign,
   Activity,
   Pause,
@@ -28,6 +28,8 @@ import { useProjectSort, type ProjectWithDate } from '@/hooks/useProjectSort';
 import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { UserSelectNeon } from '@/components/ui/user-select-neon';
 import { PageHeaderNeon } from '@/components/ui/page-header-neon';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AreaChart,
   Area,
@@ -43,27 +45,83 @@ const COLORS = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'
 
 const ClientMetricsDashboard = () => {
   const { metrics, loading, refresh } = useDashboardMetrics();
+  const { user } = useAuth();
   const [animatedCost, setAnimatedCost] = useState(0);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedCandidateId, setSelectedCandidateId] = useState<string>('all');
+  const [allProjects, setAllProjects] = useState<any[]>([]);
+
+  // Load client projects directly with real-time updates
+  useEffect(() => {
+    const loadProjects = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error loading projects:', error);
+          return;
+        }
+
+        console.log('[ClientMetrics] Projects loaded:', data?.map(p => ({
+          id: p.id,
+          title: p.title,
+          status: p.status,
+          created_at: p.created_at
+        })));
+        setAllProjects(data || []);
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    };
+
+    loadProjects();
+
+    // Setup real-time subscription
+    const channel = supabase
+      .channel(`client-projects-${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'projects',
+          filter: `owner_id=eq.${user?.id}`
+        },
+        () => {
+          // Reload projects when changes occur
+          loadProjects();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // Filter metrics based on selected project and candidate
   const filteredMetrics = useMemo(() => {
     let filtered = { ...metrics };
-    
+
     // Filter active candidates
     if (selectedProjectId !== 'all') {
       filtered.activeCandidates = metrics.activeCandidates.filter(
         c => c.projectId === selectedProjectId
       );
     }
-    
+
     if (selectedCandidateId !== 'all') {
       filtered.activeCandidates = filtered.activeCandidates.filter(
         c => c.id === selectedCandidateId
       );
     }
-    
+
     // Recalculate counts and costs based on filtered data
     filtered.activeCandidatesCount = filtered.activeCandidates.filter(c => c.status === 'active').length;
     filtered.pausedCandidatesCount = filtered.activeCandidates.filter(c => c.status === 'paused').length;
@@ -71,50 +129,36 @@ const ClientMetricsDashboard = () => {
       .filter(c => c.status === 'active')
       .reduce((sum, c) => sum + c.hourlyRate, 0);
     filtered.totalCurrentCost = filtered.activeCandidates.reduce((sum, c) => sum + c.currentCost, 0);
-    
+
     // Filter recent activities
     if (selectedProjectId !== 'all') {
       filtered.recentActivities = metrics.recentActivities.filter(
         a => a.projectId === selectedProjectId
       );
     }
-    
+
     if (selectedCandidateId !== 'all') {
       filtered.recentActivities = filtered.recentActivities.filter(
         a => a.candidateId === selectedCandidateId
       );
     }
-    
+
     return filtered;
   }, [metrics, selectedProjectId, selectedCandidateId]);
-  
-  // Get unique projects and candidates for filters
-  const uniqueProjects = useMemo(() => {
-    const projects = new Map();
-    metrics.activeCandidates.forEach(c => {
-      if (!projects.has(c.projectId)) {
-        projects.set(c.projectId, {
-          id: c.projectId,
-          title: c.projectName,
-          created_at: c.projectCreatedAt || new Date().toISOString()
-        });
-      }
-    });
-    metrics.recentActivities.forEach(a => {
-      if (a.projectId && !projects.has(a.projectId)) {
-        projects.set(a.projectId, {
-          id: a.projectId,
-          title: a.projectName,
-          created_at: a.projectCreatedAt || new Date().toISOString()
-        });
-      }
-    });
-    return Array.from(projects.values()) as ProjectWithDate[];
-  }, [metrics]);
-  
+
   // Sort projects using the universal hook
-  const sortedProjects = useProjectSort(uniqueProjects);
-  
+  const sortedProjects = useProjectSort(allProjects);
+
+  // Debug: Log sorted projects
+  useEffect(() => {
+    console.log('[ClientMetrics] Sorted projects:', sortedProjects?.map(p => ({
+      id: p.id,
+      title: p.title,
+      status: p.status,
+      hasStatus: !!p.status
+    })));
+  }, [sortedProjects]);
+
   const uniqueCandidates = useMemo(() => {
     const candidates = new Map();
     
@@ -169,57 +213,56 @@ const ClientMetricsDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header unifié avec design néon */}
+      {/* Header unifié avec design néon - Using Messages style selector */}
       <PageHeaderNeon
         icon={Activity}
         title="Métriques en temps réel"
         subtitle="Suivi des coûts et de l'activité"
         badge={{ text: "Temps réel", animate: true }}
-        showProjectSelector={false}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <ProjectSelectorNeon
-            projects={[{ id: 'all', title: 'Tous les projets', created_at: '' }, ...sortedProjects.map(p => ({ ...p, created_at: p.created_at }))]}
-            selectedProjectId={selectedProjectId}
-            onProjectChange={setSelectedProjectId}
-            placeholder="Tous les projets"
-            className="w-[280px]"
-            showStatus={false}
-            showDates={true}
-            showTeamProgress={false}
-          />
-          
-          <UserSelectNeon
-            users={uniqueCandidates.map(candidate => ({
-              id: candidate.id,
-              name: candidate.name,
-              role: 'Candidat'
-            }))}
-            selectedUserId={selectedCandidateId}
-            onUserChange={setSelectedCandidateId}
-            placeholder="Toute l'équipe"
-            showAll={true}
-            allLabel="Toute l'équipe"
-            className="w-[220px]"
-            disabled={uniqueCandidates.length === 0}
-          />
+        projects={[{ id: 'all', title: 'Tous les projets', status: 'play', created_at: new Date().toISOString() }, ...sortedProjects]}
+        selectedProjectId={selectedProjectId}
+        onProjectChange={setSelectedProjectId}
+        projectSelectorConfig={{
+          placeholder: "Tous les projets",
+          showStatus: true,
+          showDates: true,
+          showTeamProgress: false,
+          className: "w-[350px]"
+        }}
+      />
 
-          {(selectedProjectId !== 'all' || selectedCandidateId !== 'all') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="bg-white/10 hover:bg-white/20 text-white border border-purple-500/30"
-              onClick={() => {
-                setSelectedProjectId('all');
-                setSelectedCandidateId('all');
-              }}
-            >
-              <Filter className="w-3 h-3 mr-1" />
-              Réinitialiser
-            </Button>
-          )}
-        </div>
-      </PageHeaderNeon>
+      {/* Filtres additionnels */}
+      <div className="flex gap-3">
+        <UserSelectNeon
+          users={uniqueCandidates.map(candidate => ({
+            id: candidate.id,
+            name: candidate.name,
+            role: 'Candidat'
+          }))}
+          selectedUserId={selectedCandidateId}
+          onUserChange={setSelectedCandidateId}
+          placeholder="Toute l'équipe"
+          showAll={true}
+          allLabel="Toute l'équipe"
+          className="w-[220px]"
+          disabled={uniqueCandidates.length === 0}
+        />
+
+        {(selectedProjectId !== 'all' || selectedCandidateId !== 'all') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="bg-white/10 hover:bg-white/20 text-white border border-purple-500/30"
+            onClick={() => {
+              setSelectedProjectId('all');
+              setSelectedCandidateId('all');
+            }}
+          >
+            <Filter className="w-3 h-3 mr-1" />
+            Réinitialiser
+          </Button>
+        )}
+      </div>
 
       {/* Main Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

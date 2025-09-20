@@ -216,24 +216,22 @@ export default function CandidateRatings() {
 
   return (
     <div className="space-y-6">
-      {/* Header with unified modern design */}
+      {/* Header with unified modern design - Using Messages style selector */}
       <PageHeaderNeon
-        title="Évaluations"
-        description="Vos performances et retours clients"
         icon={Star}
-        iconColor="from-yellow-500 to-amber-500"
-      >
-        {/* Universal project selector */}
-        <ProjectSelectorNeon
-          projects={projects}
-          selectedProjectId={selectedProjectId === "all" ? "" : selectedProjectId}
-          onProjectChange={(id) => setSelectedProjectId(id || "all")}
-          placeholder="Tous les projets"
-          className="w-64"
-          showStatus={false}
-          showDates={false}
-        />
-      </PageHeaderNeon>
+        title="Évaluations"
+        subtitle="Vos performances et retours clients"
+        projects={projects.map(p => ({ ...p, created_at: p.project_date || p.created_at }))}
+        selectedProjectId={selectedProjectId === "all" ? "" : selectedProjectId}
+        onProjectChange={(id) => setSelectedProjectId(id || "all")}
+        projectSelectorConfig={{
+          placeholder: "Tous les projets",
+          showStatus: true,
+          showDates: true,
+          showTeamProgress: false,
+          className: "w-[350px]"
+        }}
+      />
 
       {/* Contenu */}
       <div className="space-y-4">
