@@ -1092,5 +1092,68 @@ npx supabase functions deploy [function-name] --project-ref nlesrzepybeeghghjafc
 #### Tables HR manquantes
 **Solution** : Exécuter `node execute-hr-migration-prod.mjs`
 
+## 🎯 ARCHITECTURE UNIFIÉE DES SERVICES (20/09/2025)
+
+### Services Centralisés
+
+Nous avons créé une architecture de services unifiée pour gérer les candidats et les prix de manière cohérente dans toute l'application.
+
+#### 1. **CandidateService** (`src/services/CandidateService.ts`)
+Service centralisé pour toutes les opérations sur les candidats :
+- `getCandidateFullProfile()` : Récupération complète avec jointures
+- `searchCandidates()` : Recherche unifiée avec critères
+- `updateCandidateStatus()` : Mise à jour du statut
+- `canReceiveMissions()` : Vérification des permissions
+
+#### 2. **PriceCalculator** (`src/services/PriceCalculator.ts`)
+Gestion unifiée des prix - **TOUJOURS À LA MINUTE** :
+```typescript
+// Conversion principale (utilisée partout)
+PriceCalculator.getDailyToMinuteRate(dailyRate)
+
+// Format d'affichage standard
+PriceCalculator.formatMinuteRate(minuteRate) // "XX €/min"
+
+// SEULE EXCEPTION : Paramètres candidat
+PriceCalculator.formatDailyRate(dailyRate) // "XXX €/jour"
+```
+
+#### 3. **CandidateFormatter** (`src/services/CandidateFormatter.ts`)
+Formatage unifié pour l'affichage :
+```typescript
+// RÈGLE ABSOLUE : Prénom + Métier (JAMAIS le nom de famille)
+CandidateFormatter.formatCandidateTitle(candidate) // "Jean - Développeur"
+CandidateFormatter.formatCandidateName(candidate) // "Jean" (prénom uniquement)
+```
+
+#### 4. **Hook Unifié** (`src/hooks/useCandidate.ts`)
+Remplace tous les hooks fragmentés :
+```typescript
+const {
+  profile,           // Données complètes
+  displayName,       // "Jean"
+  displayTitle,      // "Jean - Développeur"
+  minuteRate,        // Prix à la minute
+  formattedMinuteRate, // "1.50 €/min"
+  canReceiveMissions,
+  updateStatus,
+  updateDailyRate
+} = useCandidate();
+```
+
+### Règles d'Or
+
+1. **Prix** : TOUJOURS affichés à la minute (sauf paramètres candidat)
+2. **Noms** : JAMAIS le nom de famille, TOUJOURS Prénom + Métier
+3. **Services** : TOUJOURS utiliser les services centralisés, JAMAIS de requêtes directes
+
+### Migration Progressive
+
+Pour migrer le code existant :
+1. Remplacer les imports fragmentés par `import { CandidateService, PriceCalculator, CandidateFormatter } from '@/services'`
+2. Remplacer `useCandidateIdentity()` par `useCandidate()`
+3. Remplacer les calculs de prix manuels par `PriceCalculator`
+4. Remplacer les formatages manuels par `CandidateFormatter`
+
 ## 📚 Pour Plus d'Infos
 Consulter `/llm` dans l'application pour la documentation complète et éditable.
