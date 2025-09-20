@@ -108,7 +108,7 @@ export const KanbanBoard = ({
   return (
     <div className="flex flex-col h-full bg-background max-w-full">
       {/* Board Header - Fixed width */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm p-4 space-y-4 flex-shrink-0 overflow-hidden">
+      <div className="border-b border-border bg-card/50 backdrop-blur-sm p-4 space-y-4 flex-shrink-0">
         {!hideTitle && (
           <div className="flex items-center justify-between">
             <div>
@@ -231,9 +231,9 @@ export const KanbanBoard = ({
       </div>
 
       {/* Board Content - Scrollable area */}
-      <div className="flex-1 overflow-x-auto overflow-y-visible max-w-full bg-gradient-to-br from-background via-background to-accent/20">
+      <div className="flex-1 overflow-x-auto overflow-y-visible max-w-full bg-gradient-to-br from-background via-background to-accent/20 relative">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-4 p-4 min-h-full w-max">
+          <div className="flex gap-4 p-4 min-h-full w-max relative" style={{ minHeight: '700px' }}>
             {board.columns
               .sort((a, b) => a.position - b.position)
               .map((column) => (

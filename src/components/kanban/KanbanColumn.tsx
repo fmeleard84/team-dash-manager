@@ -36,7 +36,7 @@ export const KanbanColumn = ({
   const isOverLimit = column.limit && cards.length > column.limit;
 
   return (
-    <div className="flex flex-col w-80 min-h-[600px] bg-card rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-border/50 backdrop-blur-sm p-4 flex-shrink-0 hover:border-primary/30 group">
+    <div className="flex flex-col w-80 min-h-[600px] bg-card rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-border/50 backdrop-blur-sm p-4 flex-shrink-0 hover:border-primary/30 group relative" style={{ zIndex: 1 }}>
       {/* Column Header */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-border">
         <div className="flex items-center gap-3">
