@@ -131,7 +131,12 @@ export const KanbanCard = ({ card, index, columnTitle, onClick, onEdit, onDelete
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`mb-3 ${snapshot.isDragging ? 'rotate-1 z-[9999]' : ''}`}
+          style={{
+            ...provided.draggableProps.style,
+            zIndex: snapshot.isDragging ? 9999 : 'auto',
+            position: snapshot.isDragging ? 'fixed' : 'relative'
+          }}
+          className="mb-3"
         >
             <Card
               className={`cursor-pointer bg-card rounded-xl border ${

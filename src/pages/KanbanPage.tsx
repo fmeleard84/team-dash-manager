@@ -390,7 +390,7 @@ const KanbanPage = () => {
       </div>
 
       {/* Kanban Board */}
-      <div className="h-[calc(100vh-73px)]">
+      <div>
         <KanbanBoard
           board={board}
           onDragEnd={handleDragEnd}
