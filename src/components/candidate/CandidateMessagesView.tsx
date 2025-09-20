@@ -1,10 +1,13 @@
-import { UnifiedMessageSystem, messageSystemPresets } from "@/components/messaging/UnifiedMessageSystem";
+import { EnhancedMessageSystemNeon } from "@/components/shared/EnhancedMessageSystemNeon";
+import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
 
 interface CandidateMessagesViewProps {
   projects: any[];
 }
 
 export default function CandidateMessagesView({ projects }: CandidateMessagesViewProps) {
+  const { candidateId } = useCandidateIdentity();
+
   // Si un seul projet est passé, l'utiliser directement
   if (!projects || projects.length === 0) {
     return null;
@@ -13,10 +16,10 @@ export default function CandidateMessagesView({ projects }: CandidateMessagesVie
   const selectedProject = projects[0];
 
   return (
-    <UnifiedMessageSystem
+    <EnhancedMessageSystemNeon
       projectId={selectedProject.id}
-      userType="candidate"
-      config={messageSystemPresets.candidate}
+      userRole="candidate"
+      userId={candidateId || ''}
     />
   );
 }
