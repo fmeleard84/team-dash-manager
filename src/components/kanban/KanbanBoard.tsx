@@ -7,10 +7,9 @@ import {
   Plus, 
   Search, 
   Filter, 
-  Users, 
+  Users,
   Calendar,
-  Settings,
-  FolderKanban
+  Settings
 } from 'lucide-react';
 import { KanbanBoard as KanbanBoardType, KanbanCard, KanbanColumn as KanbanColumnType } from '@/types/kanban';
 import { KanbanColumn } from './KanbanColumn';
@@ -21,13 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { UserSelectNeon } from '@/components/ui/user-select-neon';
 import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 
@@ -157,24 +150,13 @@ export const KanbanBoard = ({
 
           {/* Project Filter */}
           {availableProjects && availableProjects.length > 0 && (
-            <Select
-              value={projectFilter || ''}
-              onValueChange={(value) => onProjectFilterChange?.(value)}
-            >
-              <SelectTrigger className="w-48">
-                <div className="flex items-center gap-2">
-                  <FolderKanban className="w-4 h-4" />
-                  <SelectValue placeholder="Sélectionner un projet" />
-                </div>
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
-                {availableProjects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectSelectorNeon
+              projects={availableProjects}
+              selectedProjectId={projectFilter || ''}
+              onProjectChange={(value) => onProjectFilterChange?.(value || '')}
+              placeholder="Sélectionner un projet"
+              className="w-48"
+            />
           )}
 
           <Button 

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink, Check, X, Video, FolderOpen, CalendarPlus, Briefcase, Clock, MapPin, Users } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -670,16 +671,12 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                     <Briefcase className="w-4 h-4" />
                     Projet
                   </label>
-                  <Select value={projectId} onValueChange={setProjectId}>
-                    <SelectTrigger className="border-purple-200 focus:border-purple-400 bg-white">
-                      <SelectValue placeholder="Sélectionner un projet" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ProjectSelectorNeon
+                    projects={projects}
+                    selectedProjectId={projectId}
+                    onProjectChange={setProjectId}
+                    placeholder="Sélectionner un projet"
+                  />
                 </div>
 
                 {/* Titre de l'événement */}
@@ -857,16 +854,12 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
         <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Projet</label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un projet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ProjectSelectorNeon
+                projects={projects}
+                selectedProjectId={projectId}
+                onProjectChange={setProjectId}
+                placeholder="Sélectionner un projet"
+              />
             </div>
 
             <div className="space-y-2">

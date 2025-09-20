@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProjectSelectorNeon } from '@/components/ui/project-selector-neon';
 import { useToast } from "@/hooks/use-toast";
 import {
   FolderPlus, Upload, Folder, File as FileIcon, Download, Trash2,
@@ -515,18 +515,13 @@ export default function OptimizedDriveView({ projects, userType = 'client' }: Sh
               <Cloud className="w-6 h-6 text-white" />
             </div>
             
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger className="w-64 bg-white border-purple-200 focus:border-purple-400">
-                <SelectValue placeholder="Sélectionner un projet" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectSelectorNeon
+              projects={projects}
+              selectedProjectId={projectId}
+              onProjectChange={setProjectId}
+              placeholder="Sélectionner un projet"
+              className="w-64"
+            />
           </div>
           
           {projectId && (
