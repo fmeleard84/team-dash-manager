@@ -67,8 +67,7 @@ import { ProjectsSection } from '@/components/client/ProjectsSection';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import ClientKanbanView from "@/components/client/ClientKanbanView";
-import { EnhancedMessageSystem } from "@/components/shared/EnhancedMessageSystem";
-import { EnhancedMessageSystemNeon } from "@/components/shared/EnhancedMessageSystemNeon";
+import { UnifiedMessageSystem, messageSystemPresets } from "@/components/messaging/UnifiedMessageSystem";
 import { InvoiceList } from "@/components/invoicing/InvoiceList";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
@@ -491,7 +490,11 @@ const renderMessagesContent = () => {
       {/* Zone de messagerie */}
       {selectedMessagesProjectId && (
         <div className="h-[700px]">
-          <EnhancedMessageSystemNeon projectId={selectedMessagesProjectId} userType="client" />
+          <UnifiedMessageSystem
+            projectId={selectedMessagesProjectId}
+            userType="client"
+            config={messageSystemPresets.client}
+          />
         </div>
       )}
     </div>

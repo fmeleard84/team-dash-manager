@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SharedMessageSystem } from '@/components/shared/SharedMessageSystem';
+import { UnifiedMessageSystem, messageSystemPresets } from '@/components/messaging/UnifiedMessageSystem';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   MessageSquare, 
@@ -147,11 +147,17 @@ const MessagingDemo = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <SharedMessageSystem 
+                <UnifiedMessageSystem
                   projectId={demoProjectId}
-                  onNewMessage={(message) => {
-                    console.log('Nouveau message:', message);
-                    // Trigger notification update
+                  userType="user"
+                  config={{
+                    ...messageSystemPresets.minimal,
+                    callbacks: {
+                      onMessageSent: (message) => {
+                        console.log('Nouveau message:', message);
+                        // Trigger notification update
+                      }
+                    }
                   }}
                 />
               </CardContent>
@@ -170,7 +176,11 @@ const MessagingDemo = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SharedMessageSystem projectId={demoProjectId} userType="client" />
+                <UnifiedMessageSystem
+                  projectId={demoProjectId}
+                  userType="client"
+                  config={messageSystemPresets.client}
+                />
               </CardContent>
             </Card>
           </TabsContent>

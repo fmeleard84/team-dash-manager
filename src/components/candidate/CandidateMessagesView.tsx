@@ -1,4 +1,4 @@
-import { EnhancedMessageSystemNeon } from "@/components/shared/EnhancedMessageSystemNeon";
+import { UnifiedMessageSystem, messageSystemPresets } from "@/components/messaging/UnifiedMessageSystem";
 
 interface CandidateMessagesViewProps {
   projects: any[];
@@ -13,9 +13,10 @@ export default function CandidateMessagesView({ projects }: CandidateMessagesVie
   const selectedProject = projects[0];
 
   return (
-    <EnhancedMessageSystemNeon
+    <UnifiedMessageSystem
       projectId={selectedProject.id}
       userType="candidate"
+      config={messageSystemPresets.candidate}
     />
   );
 }
