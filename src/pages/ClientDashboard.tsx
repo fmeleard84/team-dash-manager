@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from 'react-i18next';
 import { Badge } from "@/components/ui/badge";
@@ -60,29 +60,32 @@ import { ThemeToggle } from "@/ui/components/ThemeToggle";
 import { IallaLogo } from "@/components/IallaLogo";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useTemplates } from "@/hooks/useTemplates";
-import SimpleDriveView from "@/components/drive/SimpleDriveView";
 import CreateProjectModal from "@/components/CreateProjectModal";
 import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectsSection } from '@/components/client/ProjectsSection';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectsWithResources } from "@/hooks/useProjectsWithResources";
-import ClientKanbanView from "@/components/client/ClientKanbanView";
-import { EnhancedMessageSystemNeon } from "@/components/shared/EnhancedMessageSystemNeon";
-import { InvoiceList } from "@/components/invoicing/InvoiceList";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { useProjectOrchestrator } from "@/hooks/useProjectOrchestrator";
 import { useProjectSort, type ProjectWithDate } from "@/hooks/useProjectSort";
 import { ProjectSelectorNeon } from "@/components/ui/project-selector-neon";
 import { useProjectSelector } from "@/hooks/useProjectSelector";
 import { useClientCredits } from "@/hooks/useClientCredits";
-import ClientMetricsDashboard from "./ClientMetricsDashboard";
-import PlanningPage from "./PlanningPage";
-import WikiView from "@/components/wiki/WikiView";
+
+// Lazy load heavy components
+const SimpleDriveView = lazy(() => import("@/components/drive/SimpleDriveView"));
+const ClientKanbanView = lazy(() => import("@/components/client/ClientKanbanView"));
+const EnhancedMessageSystemNeon = lazy(() => import("@/components/shared/EnhancedMessageSystemNeon").then(module => ({ default: module.EnhancedMessageSystemNeon })));
+const InvoiceList = lazy(() => import("@/components/invoicing/InvoiceList").then(module => ({ default: module.InvoiceList })));
+const ClientMetricsDashboard = lazy(() => import("./ClientMetricsDashboard"));
+const PlanningPage = lazy(() => import("./PlanningPage"));
+const WikiView = lazy(() => import("@/components/wiki/WikiView"));
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { PageHeaderNeon } from "@/components/ui/page-header-neon";
 import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
 import { ClientSettings } from '@/components/client/ClientSettings';
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 const ClientDashboard = () => {
 const [searchParams, setSearchParams] = useSearchParams();
@@ -426,7 +429,9 @@ const renderKanbanContent = () => {
       />
       
       {selectedKanbanProjectId && (
-        <ClientKanbanView projectId={selectedKanbanProjectId} />
+        <Suspense fallback={<LoadingSpinner message="Chargement du Kanban..." />}>
+          <ClientKanbanView projectId={selectedKanbanProjectId} />
+        </Suspense>
       )}
     </div>
   );
@@ -470,11 +475,13 @@ const renderMessagesContent = () => {
       {/* Zone de messagerie */}
       {selectedMessagesProjectId && (
         <div className="h-[700px]">
-          <EnhancedMessageSystemNeon
-            projectId={selectedMessagesProjectId}
-            userRole="client"
+          <Suspense fallback={<LoadingSpinner message="Chargement des messages..." />}>
+            <EnhancedMessageSystemNeon
+              projectId={selectedMessagesProjectId}
+              userRole="client"
             userId={user?.id || ''}
-          />
+            />
+          </Suspense>
         </div>
       )}
     </div>
@@ -517,7 +524,9 @@ const renderDriveContent = () => {
       
       {selectedDriveProjectId && (
         <Card noPadding>
-          <SimpleDriveView projectId={selectedDriveProjectId} />
+          <Suspense fallback={<LoadingSpinner message="Chargement du Drive..." />}>
+            <SimpleDriveView projectId={selectedDriveProjectId} />
+          </Suspense>
         </Card>
       )}
     </div>
@@ -776,7 +785,9 @@ const renderWikiContent = () => {
             </div>
           )}
           <Card noPadding className={isWikiFullscreen ? 'h-[calc(100vh-120px)]' : ''}>
-            <WikiView projectId={selectedWikiProjectId} />
+            <Suspense fallback={<LoadingSpinner message="Chargement du Wiki..." />}>
+              <WikiView projectId={selectedWikiProjectId} />
+            </Suspense>
           </Card>
         </div>
       )}
@@ -793,7 +804,11 @@ const renderContent = () => {
     case 'kanban':
       return renderKanbanContent();
     case 'planning':
-      return <PlanningPage projects={projects.filter(p => p.status === 'play')} />;
+      return (
+        <Suspense fallback={<LoadingSpinner message="Chargement du planning..." />}>
+          <PlanningPage projects={projects.filter(p => p.status === 'play')} />
+        </Suspense>
+      );
     case 'messages':
       return renderMessagesContent();
     case 'drive':
@@ -801,9 +816,17 @@ const renderContent = () => {
     case 'wiki':
       return renderWikiContent();
     case 'invoices':
-      return <InvoiceList userRole="client" />;
+      return (
+        <Suspense fallback={<LoadingSpinner message="Chargement des factures..." />}>
+          <InvoiceList userRole="client" />
+        </Suspense>
+      );
     case 'metrics':
-      return <ClientMetricsDashboard />;
+      return (
+        <Suspense fallback={<LoadingSpinner message="Chargement des métriques..." />}>
+          <ClientMetricsDashboard />
+        </Suspense>
+      );
     case 'settings':
       return <ClientSettings defaultTab={searchParams.get('tab') as 'profile' | 'payments' || 'profile'} />;
     default:

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from 'react-i18next';
 
@@ -60,24 +60,27 @@ import { ValidationPromoBanner } from "@/components/candidate/ValidationPromoBan
 import CandidateOnboarding from "@/components/candidate/CandidateOnboarding";
 import { useCandidateOnboarding } from "@/hooks/useCandidateOnboarding";
 import { CandidateProjectsSection } from "@/components/candidate/CandidateProjectsSection";
-import SimpleDriveView from "@/components/drive/SimpleDriveView";
-import CandidateKanbanView from "@/components/candidate/CandidateKanbanView";
 import { CandidateNotes } from "@/components/candidate/CandidateNotes";
 import { CandidateSettings } from "@/components/candidate/CandidateSettings";
 import { useUserProjects } from "@/hooks/useUserProjects";
 import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
 import CandidateEventNotifications from "@/components/candidate/CandidateEventNotifications";
 import { CandidateMissionRequests } from "@/components/candidate/CandidateMissionRequests";
-import CandidateMessagesView from "@/components/candidate/CandidateMessagesView";
 import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
-import { CandidatePayments } from "@/components/candidate/CandidatePayments";
-import CandidateRatings from "@/pages/CandidateRatings";
-import CandidateActivities from "@/pages/CandidateActivities";
 import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
-import PlanningPage from "./PlanningPage";
-import WikiView from "@/components/wiki/WikiView";
+
+// Lazy load heavy components
+const SimpleDriveView = lazy(() => import("@/components/drive/SimpleDriveView"));
+const CandidateKanbanView = lazy(() => import("@/components/candidate/CandidateKanbanView"));
+const CandidateMessagesView = lazy(() => import("@/components/candidate/CandidateMessagesView"));
+const CandidatePayments = lazy(() => import("@/components/candidate/CandidatePayments").then(module => ({ default: module.CandidatePayments })));
+const CandidateRatings = lazy(() => import("@/pages/CandidateRatings"));
+const CandidateActivities = lazy(() => import("@/pages/CandidateActivities"));
+const PlanningPage = lazy(() => import("./PlanningPage"));
+const WikiView = lazy(() => import("@/components/wiki/WikiView"));
 import { AnimatedBackground } from "@/components/ui/animated-background";
 import { TimeTrackerSimple } from "@/components/time-tracking/TimeTrackerSimple";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 const CandidateDashboard = () => {
   const { t } = useTranslation();

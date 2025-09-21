@@ -25,7 +25,17 @@ export interface EnrichedProject {
  * Hook centralisé pour récupérer tous les projets avec leurs ressources
  * Réduit le nombre de requêtes de N*3 à 2 requêtes totales
  */
-export const useProjectsWithResources = (userId: string | undefined, userRole: 'client' | 'candidate') => {
+export const useProjectsWithResources = (
+  userId: string | undefined,
+  userRole: 'client' | 'candidate',
+  options?: {
+    enablePolling?: boolean; // Désactivé par défaut pour performance
+    pollingInterval?: number; // En ms, par défaut 30000
+    enableRealtime?: boolean; // Activé par défaut
+    limit?: number; // Nombre de projets à charger (défaut: 10)
+    offset?: number; // Offset pour la pagination
+  }
+) => {
   const [projects, setProjects] = useState<EnrichedProject[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<EnrichedProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,11 +58,15 @@ export const useProjectsWithResources = (userId: string | undefined, userRole: '
       }
 
       try {
-        // 1. Récupérer les projets selon le rôle
+        // 1. Récupérer les projets selon le rôle avec pagination
+        const limit = options?.limit || 10;
+        const offset = options?.offset || 0;
+
         let projectsQuery = supabase
           .from('projects')
-          .select('*')
-          .order('created_at', { ascending: false });
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
 
         if (userRole === 'client') {
           projectsQuery = projectsQuery.eq('owner_id', userId);
@@ -170,7 +184,7 @@ export const useProjectsWithResources = (userId: string | undefined, userRole: '
     fetchProjectsAndResources();
 
     // Configuration du realtime - UN SEUL channel pour tous les projets
-    if (userId) {
+    if (userId && options?.enableRealtime !== false) {
       // Écouter les changements sur les projets
       const projectsChannel = supabase
         .channel('all-projects-changes')
@@ -202,10 +216,12 @@ export const useProjectsWithResources = (userId: string | undefined, userRole: '
 
       channel = projectsChannel;
 
-      // Polling léger toutes les 30 secondes (au lieu de 3s par card)
-      pollInterval = setInterval(() => {
-        fetchProjectsAndResources();
-      }, 30000);
+      // Polling optionnel (désactivé par défaut pour performance)
+      if (options?.enablePolling) {
+        pollInterval = setInterval(() => {
+          fetchProjectsAndResources();
+        }, options.pollingInterval || 30000);
+      }
     }
 
     // Cleanup
