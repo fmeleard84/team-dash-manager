@@ -1157,5 +1157,80 @@ Pour migrer le code existant :
 3. Remplacer les calculs de prix manuels par `PriceCalculator`
 4. Remplacer les formatages manuels par `CandidateFormatter`
 
+## 🔍 COMMENT RECHERCHER DES PROJETS (IMPORTANT - 21/09/2025)
+
+### Pour retrouver des projets dans la base de données
+
+**TOUJOURS utiliser des jointures directes** comme dans l'application :
+
+```javascript
+// ✅ BONNE méthode - avec jointures
+const { data } = await supabase
+  .from('hr_resource_assignments')
+  .select(`
+    *,
+    projects!inner (
+      id,
+      title,
+      status
+    ),
+    hr_profiles!inner (
+      name,
+      is_ai
+    ),
+    candidate_profiles (
+      first_name,
+      last_name
+    )
+  `)
+  .eq('projects.status', 'play')
+  .eq('hr_profiles.is_ai', true);
+
+// ❌ MAUVAISE méthode - requêtes séparées
+const projects = await supabase.from('projects').select('*');
+const assignments = await supabase.from('hr_resource_assignments').select('*');
+// Ne pas faire ça !
+```
+
+### Structure des relations
+
+```
+projects (id, title, status, owner_id)
+    ↓
+hr_resource_assignments (project_id, profile_id, candidate_id, booking_status)
+    ↓                           ↓
+hr_profiles                 candidate_profiles
+(id, name, is_ai)          (id, first_name, last_name, email)
+
+Pour les IA : candidate_id = profile_id (même UUID)
+```
+
+### Exemples de requêtes utiles
+
+```javascript
+// Trouver un projet avec IA
+const projectWithIA = await supabase
+  .from('projects')
+  .select(`
+    *,
+    hr_resource_assignments!inner (
+      *,
+      hr_profiles!inner (
+        name,
+        is_ai
+      )
+    )
+  `)
+  .eq('hr_resource_assignments.hr_profiles.is_ai', true)
+  .single();
+
+// Obtenir l'équipe complète d'un projet
+const team = await supabase
+  .from('hr_resource_assignments')
+  .select('*, hr_profiles(*), candidate_profiles(*)')
+  .eq('project_id', projectId)
+  .eq('booking_status', 'accepted');
+```
+
 ## 📚 Pour Plus d'Infos
 Consulter `/llm` dans l'application pour la documentation complète et éditable.

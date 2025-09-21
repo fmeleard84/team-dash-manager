@@ -166,13 +166,29 @@ export const sendMessage = async (
 
     if (profileError) throw profileError;
     
-    // Removed position query - column doesn't exist in database
+    // Get job title/position from candidate_profiles (only for candidates)
+    let jobTitle = '';
+    // Utiliser l'ID universel au lieu de l'email
+    // Essayer de récupérer le profil candidat (peut ne pas exister pour les clients)
+    try {
+      // Removed - position column doesn't exist
+      const candidateProfiles = null;
+
+      // Si on trouve un profil candidat, prendre sa position
+      if (candidateProfiles && candidateProfiles.length > 0) {
+        jobTitle = candidateProfiles[0].position || '';
+      }
+    } catch (error) {
+      // Ignorer l'erreur - c'est probablement un client sans profil candidat
+      console.log('No candidate profile found (normal for clients)');
+    }
 
     // Use only first name for sender_name (job title will be shown separately in UI)
     const senderName = profile.first_name || profile.email.split('@')[0];
 
-    // Créer le message sans job_title
-    const displayName = senderName;
+    // Créer le message - pour l'instant sans job_title car la colonne n'existe pas encore
+    // On inclut le métier dans sender_name temporairement
+    const displayName = jobTitle ? `${senderName} (${jobTitle})` : senderName;
     
     const { data: message, error: messageError } = await supabase
       .from('messages')
@@ -182,8 +198,8 @@ export const sendMessage = async (
         sender_name: displayName, // Inclut le métier temporairement
         sender_email: profile.email,
         content: content,
-        is_edited: false
-        // Removed metadata field - not supported by database schema
+        is_edited: false,
+        metadata: recipientId ? { recipient_id: recipientId } : undefined
       })
       .select()
       .single();

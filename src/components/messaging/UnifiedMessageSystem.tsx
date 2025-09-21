@@ -252,7 +252,14 @@ export const UnifiedMessageSystem = ({
         attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       };
 
-      const sentMessage = await sendMessage(messageData);
+      // Appeler sendMessage avec les paramètres adaptés
+      const sentMessage = await sendMessage(
+        messageData.thread_id || selectedThreadId || '',
+        messageData.content,
+        messageData.attachments || [],
+        messageData.recipient_id,
+        projectId
+      );
 
       // Callbacks
       if (finalConfig.callbacks.onMessageSent) {

@@ -11,182 +11,116 @@ const supabase = createClient(supabaseUrl, serviceKey, {
 });
 
 async function createIAResource() {
-  console.log('🤖 Création d\'une ressource IA Rédacteur...\n');
+  console.log('🤖 Création d\'une ressource IA de test...\n');
 
-  try {
-    // 1. Trouver la catégorie Marketing/Communication
-    let { data: category } = await supabase
+  // 1. Récupérer la catégorie Content
+  const { data: categories } = await supabase
+    .from('hr_categories')
+    .select('*')
+    .ilike('name', '%content%');
+
+  let categoryId;
+  if (categories && categories.length > 0) {
+    categoryId = categories[0].id;
+    console.log(`✅ Catégorie trouvée: ${categories[0].name}`);
+  } else {
+    // Créer la catégorie Content
+    const { data: newCategory } = await supabase
       .from('hr_categories')
-      .select('*')
-      .ilike('name', '%marketing%')
-      .single();
-
-    if (!category) {
-      // Créer la catégorie si elle n'existe pas
-      const { data: newCategory, error } = await supabase
-        .from('hr_categories')
-        .insert({
-          name: 'Marketing & Communication'
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Erreur création catégorie:', error);
-        return;
-      }
-      category = newCategory;
-    }
-
-    console.log('✅ Catégorie:', category.name);
-
-    // 2. Créer un prompt IA si nécessaire
-    const { data: existingPrompt } = await supabase
-      .from('prompts_ia')
-      .select('*')
-      .eq('id', 'redacteur_contenu')
-      .single();
-
-    if (!existingPrompt) {
-      const { error: promptError } = await supabase
-        .from('prompts_ia')
-        .insert({
-          id: 'redacteur_contenu',
-          name: 'IA Rédacteur de Contenu',
-          context: 'content-creation',
-          prompt: `Tu es un rédacteur professionnel spécialisé dans la création de contenu marketing et éditorial.
-Tu maîtrises parfaitement le français et tu adaptes ton style selon les besoins du projet.
-Tes compétences incluent :
-- Rédaction d'articles de blog et de pages web
-- Création de contenus SEO optimisés
-- Rédaction de newsletters et emails marketing
-- Conception de supports de communication
-- Storytelling et copywriting
-
-Tu fournis toujours un contenu structuré, engageant et adapté à la cible visée.`,
-          active: true,
-          priority: 1
-        });
-
-      if (promptError) {
-        console.error('❌ Erreur création prompt:', promptError);
-        return;
-      }
-      console.log('✅ Prompt IA créé');
-    }
-
-    // 3. Créer le profil hr_profiles pour l'IA
-    const iaProfileId = crypto.randomUUID();
-
-    const { data: hrProfile, error: hrError } = await supabase
-      .from('hr_profiles')
-      .insert({
-        id: iaProfileId,
-        name: 'IA Rédacteur',
-        category_id: category.id,
-        is_ai: true,
-        prompt_id: 'redacteur_contenu',
-        base_price: 350 // Prix journalier IA
-      })
+      .insert({ name: 'Content' })
       .select()
       .single();
 
-    if (hrError) {
-      console.error('❌ Erreur création hr_profile:', hrError);
-      return;
-    }
+    categoryId = newCategory.id;
+    console.log('✅ Catégorie Content créée');
+  }
 
-    console.log('✅ Profil HR créé:', hrProfile.name, '(ID:', hrProfile.id, ')');
+  // 2. Créer une ressource IA
+  const { data: iaProfile, error } = await supabase
+    .from('hr_profiles')
+    .insert({
+      name: 'Rédacteur IA',
+      category_id: categoryId,
+      base_price: 1.5, // €/min
+      is_ai: true
+    })
+    .select()
+    .single();
 
-    // 4. Créer le profil candidat associé (même ID)
-    const { error: candidateError } = await supabase
-      .from('candidate_profiles')
-      .insert({
-        id: iaProfileId, // MÊME ID que hr_profiles
-        first_name: 'IA',
-        last_name: 'Rédacteur',
-        email: 'ia_redacteur@ia.team',
-        phone: '+33000000000',
-        status: 'disponible',
-        qualification_status: 'qualified',
-        daily_rate: 350,
-        technical_skills: ['Rédaction', 'SEO', 'Marketing', 'Storytelling'],
-        soft_skills: ['Créativité', 'Adaptation', 'Synthèse'],
-        languages: ['Français', 'Anglais'],
-        seniority: 'expert'
-      });
+  if (error) {
+    console.error('❌ Erreur lors de la création:', error);
+    return;
+  }
 
-    if (candidateError) {
-      console.error('❌ Erreur création candidate_profile:', candidateError);
-      // Nettoyer hr_profile créé
-      await supabase.from('hr_profiles').delete().eq('id', iaProfileId);
-      return;
-    }
+  console.log(`\n✅ Ressource IA créée: ${iaProfile.name}`);
+  console.log(`   ID: ${iaProfile.id}`);
+  console.log(`   Prix: ${iaProfile.base_price}€/min`);
 
-    console.log('✅ Profil candidat IA créé');
+  // 3. Vérifier si le profil candidat a été créé par le trigger
+  const { data: candidateProfile } = await supabase
+    .from('candidate_profiles')
+    .select('*')
+    .eq('id', iaProfile.id)
+    .single();
 
-    // 5. Créer aussi un profil utilisateur (profiles) pour la compatibilité
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        id: iaProfileId, // MÊME ID
-        email: 'ia_redacteur@ia.team',
-        first_name: 'IA Rédacteur',
-        role: 'candidate'
-      });
+  if (candidateProfile) {
+    console.log('\n✅ Profil candidat IA créé automatiquement:');
+    console.log(`   Nom: ${candidateProfile.first_name} ${candidateProfile.last_name}`);
+    console.log(`   Email: ${candidateProfile.email}`);
+    console.log(`   Statut: ${candidateProfile.status}`);
+    console.log(`   Tarif journalier: ${candidateProfile.daily_rate}€/jour`);
+  } else {
+    console.log('\n⚠️ Le profil candidat n\'a pas été créé automatiquement');
+  }
 
-    if (profileError && !profileError.message.includes('duplicate')) {
-      console.log('⚠️ Profil utilisateur non créé (peut déjà exister):', profileError.message);
-    } else {
-      console.log('✅ Profil utilisateur créé');
-    }
+  // 4. Assigner cette IA au projet "Projet new key"
+  const { data: project } = await supabase
+    .from('projects')
+    .select('*')
+    .ilike('title', '%new%key%')
+    .single();
 
-    // 6. Trouver le projet "Projet New key"
-    const { data: project } = await supabase
-      .from('projects')
-      .select('*')
-      .ilike('title', '%new%key%')
-      .single();
+  if (project) {
+    console.log(`\n📋 Projet trouvé: "${project.title}"`);
 
-    if (!project) {
-      console.log('⚠️ Projet "New key" non trouvé - IA créée mais non assignée');
-      return;
-    }
-
-    console.log('📁 Projet trouvé:', project.title);
-
-    // 7. Assigner l'IA au projet
+    // Créer une assignation
     const { data: assignment, error: assignError } = await supabase
       .from('hr_resource_assignments')
       .insert({
         project_id: project.id,
-        profile_id: iaProfileId,
-        candidate_id: iaProfileId, // Pour les IA, candidate_id = profile_id
-        booking_status: 'accepted', // Auto-accepté pour les IA
-        seniority: 'expert',
-        languages: ['Français', 'Anglais'],
-        expertises: ['Rédaction', 'Marketing']
+        profile_id: iaProfile.id,
+        booking_status: 'recherche',
+        seniority: 'senior'
       })
       .select()
       .single();
 
     if (assignError) {
-      console.error('❌ Erreur assignation au projet:', assignError);
-      return;
+      console.error('❌ Erreur lors de l\'assignation:', assignError);
+    } else {
+      console.log('✅ IA assignée au projet');
+
+      // Attendre un peu pour que le trigger s'exécute
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Vérifier si l'auto-acceptation a fonctionné
+      const { data: updatedAssignment } = await supabase
+        .from('hr_resource_assignments')
+        .select('*')
+        .eq('id', assignment.id)
+        .single();
+
+      if (updatedAssignment?.booking_status === 'accepted' && updatedAssignment?.candidate_id) {
+        console.log('✅ Auto-acceptation réussie!');
+        console.log(`   Statut: ${updatedAssignment.booking_status}`);
+        console.log(`   Candidate ID: ${updatedAssignment.candidate_id}`);
+      } else {
+        console.log('⚠️ L\'auto-acceptation n\'a pas fonctionné');
+        console.log(`   Statut: ${updatedAssignment?.booking_status}`);
+        console.log(`   Candidate ID: ${updatedAssignment?.candidate_id || 'NULL'}`);
+      }
     }
-
-    console.log('✅ IA assignée au projet avec succès!');
-    console.log('\n📊 Résumé:');
-    console.log('  - Ressource IA:', hrProfile.name);
-    console.log('  - ID:', iaProfileId);
-    console.log('  - Email:', 'ia_redacteur@ia.team');
-    console.log('  - Projet:', project.title);
-    console.log('  - Statut:', assignment.booking_status);
-    console.log('\n✨ L\'IA devrait maintenant apparaître dans la messagerie du projet!');
-
-  } catch (error) {
-    console.error('❌ Erreur globale:', error);
   }
 }
 
-createIAResource();
+createIAResource().catch(console.error);

@@ -1462,29 +1462,38 @@ const Project = () => {
         
         const expertiseNames = resource.expertiseNames || [];
         
-        // Determine booking status: AI resources are always 'booké' (available), others start as 'draft'
+        // Determine booking status: AI resources are always 'accepted' (auto-accepted), others start as 'draft'
         const existingResource = existingResources?.find(r => r.id === assignmentId);
         let bookingStatus = existingResource?.booking_status || 'draft';
 
-        // Les ressources IA sont TOUJOURS disponibles (même lors des mises à jour)
+        // Les ressources IA sont TOUJOURS acceptées (auto-acceptées selon CLAUDE.md)
         if (resource.is_ai) {
-          bookingStatus = 'booké';
+          bookingStatus = 'accepted';
         }
 
-        // Les membres d'équipe sont TOUJOURS disponibles (même lors des mises à jour)
+        // Les membres d'équipe sont TOUJOURS disponibles (accepted)
         if (resource.is_team_member) {
-          bookingStatus = 'booké';
+          bookingStatus = 'accepted';
         }
 
         // Pour les ressources humaines, conserver le statut existant ou utiliser 'draft'
         if (!resource.is_ai && !resource.is_team_member && existingResource) {
           bookingStatus = existingResource.booking_status;
         }
-        
+
+        // Pour les ressources IA, candidate_id = profile_id selon l'architecture CLAUDE.md
+        let candidateId = undefined;
+        if (resource.is_ai) {
+          candidateId = finalProfileId; // Pour les IA : candidate_id = profile_id
+        } else if (existingResource?.candidate_id) {
+          candidateId = existingResource.candidate_id; // Conserver le candidate_id existant pour les ressources humaines
+        }
+
         return {
           id: assignmentId,
           project_id: projectId,
           profile_id: finalProfileId, // Utiliser le profile_id corrigé
+          candidate_id: candidateId, // IMPORTANT: Définir le candidate_id pour les IA
           seniority: resource.seniority,
           languages: languageNames, // Store names as text[], not UUIDs
           expertises: expertiseNames, // Store names as text[], not UUIDs
@@ -1555,6 +1564,7 @@ const Project = () => {
           const cleanAssignment = {
             project_id: assignment.project_id,
             profile_id: assignment.profile_id,
+            candidate_id: assignment.candidate_id, // IMPORTANT: Inclure candidate_id pour les IA
             seniority: assignment.seniority,
             languages: assignment.languages,
             expertises: assignment.expertises,

@@ -48,6 +48,7 @@ import { useToast } from '@/hooks/use-toast';
 import { initializeProjectMessaging, sendMessage } from '@/utils/messageSetup';
 import { uploadMultipleFiles, syncMessageFilesToDrive, UploadedFile } from '@/utils/fileUpload';
 import { handleAIConversation } from '@/utils/aiMessageHandler';
+import { PrivateThreadManager } from '@/utils/privateThreadManager';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -56,6 +57,8 @@ import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
 interface EnhancedMessageSystemProps {
   projectId: string;
   userType?: 'client' | 'candidate' | 'admin';
+  userRole?: string;
+  userId?: string;
 }
 
 type ConversationType = 'all' | 'user' | 'group';
@@ -67,13 +70,28 @@ interface SelectedConversation {
   members?: string[];
 }
 
-export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: EnhancedMessageSystemProps) => {
+export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRole, userId }: EnhancedMessageSystemProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { members: projectMembers, loading: membersLoading } = useProjectMembersForMessaging(projectId);
   const { groups, createGroup, deleteGroup } = useMessageGroups(projectId);
   const { threads, messages, loading, refreshThreads, refreshMessages, selectedThread: selectedThreadId, setSelectedThread: setSelectedThreadId, setMessages, setThreads } = useMessages(projectId);
   const { isUserOnline } = useUserPresence();
+
+  // Debug: Log des membres récupérés
+  useEffect(() => {
+    console.log('🎯 [EnhancedMessageSystemNeon] Members received:', {
+      count: projectMembers.length,
+      members: projectMembers.map(m => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        isAI: m.isAI
+      })),
+      userRole,
+      userId
+    });
+  }, [projectMembers, userRole, userId]);
   
   const [isInitializing, setIsInitializing] = useState(false);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
@@ -90,25 +108,44 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [lastAIResponse, setLastAIResponse] = useState<{ [key: string]: string }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Filter messages based on selected conversation
   const filteredMessages = useCallback(() => {
+    // Si on a un thread privé IA sélectionné, les messages sont déjà filtrés par thread_id
+    // donc on affiche tous les messages du thread
+    if (selectedThread && selectedConversation.type === 'user' && selectedConversation.id?.startsWith('ia_')) {
+      // Pour les conversations privées avec l'IA, on affiche tous les messages du thread
+      // car le thread est déjà privé entre l'utilisateur et l'IA
+      return messages;
+    }
+
     if (selectedConversation.type === 'all') {
       return messages;
     } else if (selectedConversation.type === 'user' && selectedConversation.id) {
-      return messages.filter(msg => 
-        msg.sender_id === selectedConversation.id || 
-        msg.recipient_id === selectedConversation.id
-      );
+      // Pour les conversations humain-humain
+      const currentUserId = user?.id;
+      const targetId = selectedConversation.id.startsWith('ia_')
+        ? selectedConversation.id.replace('ia_', '')
+        : selectedConversation.id;
+
+      return messages.filter(msg => {
+        const isSentByMe = msg.sender_id === currentUserId;
+        const isSentByTarget = msg.sender_id === targetId;
+
+        // Conversation normale entre humains: on voit tous les messages entre les 2
+        return isSentByMe || isSentByTarget;
+      });
     } else if (selectedConversation.type === 'group' && selectedConversation.members) {
-      return messages.filter(msg => 
+      return messages.filter(msg =>
         selectedConversation.members?.includes(msg.sender_id || '')
       );
     }
     return messages;
-  }, [messages, selectedConversation]);
+  }, [messages, selectedConversation, user?.id, selectedThread]);
 
   // Callbacks for realtime updates
   const onNewMessage = useCallback((newMessage: any) => {
@@ -271,9 +308,23 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
 
     setIsSending(true);
     try {
+      // Déterminer le destinataire si conversation privée
+      let recipientId = undefined;
+      if (selectedConversation.type === 'user' && selectedConversation.id) {
+        // Pour une conversation privée, passer l'ID du destinataire
+        recipientId = selectedConversation.id.startsWith('ia_')
+          ? selectedConversation.id.replace('ia_', '')
+          : selectedConversation.id;
+      }
+
       // Les fichiers uploadés ont déjà toutes les infos nécessaires
-      // Pas besoin de transformer, juste passer directement
-      const sentMessage = await sendMessage(selectedThread.id, newMessage, uploadedFiles);
+      const sentMessage = await sendMessage(
+        selectedThread.id,
+        newMessage,
+        uploadedFiles,
+        recipientId,  // Passer le destinataire pour les conversations privées
+        projectId     // Passer le projectId pour le contexte IA
+      );
 
       if (sentMessage) {
         // Add the message immediately to the local state
@@ -301,31 +352,63 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
           return [...prev, messageWithAttachments];
         });
 
-        // 🤖 Gestion IA : Traiter automatiquement si le message est envoyé à une IA
-        try {
-          const aiResult = await handleAIConversation(
+        // 🤖 Gestion IA : Traiter de manière asynchrone si le message est envoyé à une IA
+        // Ne pas attendre la réponse pour débloquer l'UI
+        const isMessageToIA = selectedConversation.type === 'user' &&
+          projectMembers.some(m => m.id === selectedConversation.id && m.isAI);
+
+        if (isMessageToIA) {
+          setIsAIProcessing(true);
+
+          // Récupérer la dernière réponse IA si elle existe (pour les choix)
+          const aiId = selectedConversation.id?.replace('ia_', '');
+          const previousResponse = aiId ? lastAIResponse[aiId] : undefined;
+
+          handleAIConversation(
             selectedConversation,
             newMessage,
             projectId,
             projectMembers,
-            selectedThread.id
-          );
+            selectedThread.id,
+            previousResponse,
+            user?.id  // Passer l'ID de l'utilisateur pour les réponses privées
+          ).then(aiResult => {
+            setIsAIProcessing(false);
+            if (aiResult.success) {
+              console.log('✅ Réponse IA générée et envoyée');
 
-          if (aiResult.success) {
-            console.log('✅ Réponse IA générée et envoyée');
+              // Stocker la réponse IA si elle contient des choix
+              if (aiResult.aiResponse && aiId) {
+                // Détecter si c'est une réponse avec choix
+                if (aiResult.aiResponse.includes('Comment souhaitez-vous recevoir')) {
+                  // Extraire la vraie réponse (avant le menu de choix)
+                  const responseMatch = aiResult.aiResponse.match(/^([\s\S]*?)(\n\n---|\n\n\*\*Comment)/);
+                  const realResponse = responseMatch ? responseMatch[1] : aiResult.aiResponse;
+                  setLastAIResponse(prev => ({ ...prev, [aiId]: realResponse }));
+                } else {
+                  // Effacer la dernière réponse si ce n'est pas un choix
+                  setLastAIResponse(prev => {
+                    const newState = { ...prev };
+                    delete newState[aiId];
+                    return newState;
+                  });
+                }
+              }
 
-            // Afficher notification de sauvegarde si nécessaire
-            if (aiResult.saved) {
-              toast({
-                title: "📄 Contenu sauvegardé",
-                description: "Le contenu généré par l'IA a été sauvegardé dans le Drive",
-                variant: "default",
-              });
+              // Afficher notification de sauvegarde si nécessaire
+              if (aiResult.saved) {
+                toast({
+                  title: "📄 Contenu sauvegardé",
+                  description: "Le contenu généré par l'IA a été sauvegardé dans le Drive",
+                  variant: "default",
+                });
+              }
             }
-          }
-        } catch (aiError) {
-          console.error('⚠️ Erreur IA (non bloquante):', aiError);
-          // Ne pas bloquer l'envoi du message utilisateur en cas d'erreur IA
+          }).catch(aiError => {
+            setIsAIProcessing(false);
+            console.error('⚠️ Erreur IA (non bloquante):', aiError);
+            // Ne pas bloquer l'envoi du message utilisateur en cas d'erreur IA
+          });
         }
       }
 
@@ -365,7 +448,17 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedConversation({ type: 'all', name: 'Équipe complète' })}
+                onClick={() => {
+                  // Pour l'équipe complète, utiliser le thread principal (non privé)
+                  const mainThread = threads.find(t => !t.title?.includes('Conversation privée'));
+                  if (mainThread) {
+                    setSelectedThreadId(mainThread.id);
+                    setSelectedThread(mainThread);
+                    // Recharger les messages du thread principal
+                    refreshMessages();
+                  }
+                  setSelectedConversation({ type: 'all', name: 'Équipe complète' });
+                }}
                 className={cn(
                   "p-4 rounded-xl cursor-pointer transition-all duration-200 mb-3",
                   selectedConversation.type === 'all'
@@ -397,11 +490,80 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                     key={member.id}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setSelectedConversation({
-                      type: 'user',
-                      id: member.id,
-                      name: member.name
-                    })}
+                    onClick={async () => {
+                      // Créer/récupérer un thread privé pour toute conversation 1-to-1
+                      if (user?.id) {
+                        // Préparer les informations de l'utilisateur courant
+                        const { data: currentUserProfile } = await supabase
+                          .from('profiles')
+                          .select('email, first_name, last_name')
+                          .eq('id', user.id)
+                          .single();
+
+                        const currentUser = {
+                          id: user.id,
+                          name: currentUserProfile
+                            ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || currentUserProfile.email
+                            : user.email || '',
+                          email: user.email || ''
+                        };
+
+                        // Préparer les informations de l'autre participant
+                        const otherParticipant = {
+                          id: member.isAI ? member.id.replace('ia_', '') : member.id,
+                          name: member.firstName || member.name,
+                          email: member.isAI
+                            ? `${(member.firstName || member.name).toLowerCase().replace(/\s+/g, '_')}@ia.team`
+                            : member.email || '',
+                          isAI: member.isAI || false
+                        };
+
+                        const privateThreadId = await PrivateThreadManager.getOrCreatePrivateThread(
+                          projectId,
+                          currentUser,
+                          otherParticipant
+                        );
+
+                        if (privateThreadId) {
+                          // Mettre à jour le thread sélectionné
+                          setSelectedThreadId(privateThreadId);
+
+                          // IMPORTANT: Récupérer et définir le thread complet
+                          const { data: privateThread } = await supabase
+                            .from('message_threads')
+                            .select('*')
+                            .eq('id', privateThreadId)
+                            .single();
+
+                          if (privateThread) {
+                            setSelectedThread(privateThread);
+                          }
+
+                          // Récupérer les messages de ce thread privé
+                          const { data: threadMessages } = await supabase
+                            .from('messages')
+                            .select('*')
+                            .eq('thread_id', privateThreadId)
+                            .order('created_at', { ascending: true });
+
+                          if (threadMessages) {
+                            setMessages(threadMessages);
+                          }
+                        }
+                      } else {
+                        // Pour les conversations humain-humain, utiliser le thread principal
+                        if (threads.length > 0 && !threads[0].title?.includes('Conversation privée')) {
+                          setSelectedThreadId(threads[0].id);
+                          setSelectedThread(threads[0]);
+                        }
+                      }
+
+                      setSelectedConversation({
+                        type: 'user',
+                        id: member.id,
+                        name: member.name
+                      });
+                    }}
                     className={cn(
                       "p-3 rounded-xl cursor-pointer transition-all duration-200 relative",
                       selectedConversation.id === member.id
@@ -411,26 +573,30 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                         : member.isAI
                           ? "bg-cyan-500/10 hover:bg-cyan-500/20 border border-transparent hover:border-cyan-400/30"
                           : "bg-white/5 hover:bg-white/10 border border-transparent hover:border-purple-500/30"
+                      // Animation retirée de la carte complète
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <UserAvatarNeon
-                        user={{
-                          id: member.id,
-                          name: member.name,
-                          role: member.role,
-                          status: member.isAI ? 'online' : (isUserOnline(member.id) ? 'online' : 'offline')
-                        }}
-                        size="sm"
-                        variant="list"
-                        showStatus={true}
-                        className={cn(
-                          "flex-1",
-                          member.isAI && "ring-2 ring-cyan-400/50"
+                      <div className="relative">
+                        <UserAvatarNeon
+                          user={{
+                            id: member.id,
+                            name: member.name,
+                            role: member.role,
+                            status: member.isAI ? 'online' : (isUserOnline(member.id) ? 'online' : 'offline')
+                          }}
+                          size="sm"
+                          variant="list"
+                          showStatus={true}
+                          className="flex-1"
+                        />
+                        {/* Animation sur l'avatar uniquement pour l'IA en traitement */}
+                        {isAIProcessing && selectedConversation.id === member.id && member.isAI && (
+                          <div className="absolute inset-0 rounded-full animate-pulse bg-cyan-400/20" />
                         )}
-                      />
+                      </div>
 
-                      {/* Badge IA */}
+                      {/* Badge IA avec indicateur de traitement */}
                       {member.isAI && (
                         <motion.div
                           initial={{ scale: 0 }}
@@ -438,10 +604,18 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                           className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/30"
                         >
                           <Zap className="h-3 w-3 text-white" />
-                          <span className="text-xs font-medium text-white">IA</span>
+                          <span className="text-xs font-medium text-white">
+                            {isAIProcessing && selectedConversation.id === member.id ? "..." : "IA"}
+                          </span>
                         </motion.div>
                       )}
                     </div>
+                    {/* Indicateur "En train d'écrire..." */}
+                    {isAIProcessing && selectedConversation.id === member.id && member.isAI && (
+                      <div className="text-xs text-cyan-400 mt-1 animate-pulse">
+                        En train d'écrire...
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </div>
@@ -599,7 +773,9 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user' }: Enha
                                 : "bg-white/10 border border-white/20"
                           )}
                         >
-                          <p className="text-sm text-white whitespace-pre-wrap">{message.content}</p>
+                          <p className="text-sm text-white whitespace-pre-wrap">
+                            {message.content?.replace(/^\[TO:[a-f0-9-]+\]/, '')}
+                          </p>
                           
                           {message.message_attachments && message.message_attachments.length > 0 && (
                             <div className="mt-3 space-y-2">

@@ -258,7 +258,7 @@ const AdminResources = () => {
       if (profileDialog.edit && profileDialog.data) {
         const { error } = await supabase
           .from('hr_profiles')
-          .update({ 
+          .update({
             name: profileForm.name,
             category_id: profileForm.category_id,
             base_price: profileForm.base_price,
@@ -266,18 +266,72 @@ const AdminResources = () => {
           })
           .eq('id', profileDialog.data.id);
         if (error) throw error;
-        toast({ title: "Succès", description: "Profil modifié avec succès." });
+
+        // Si on active is_ai sur un profil existant, juste informer l'utilisateur
+        if (profileForm.is_ai && !profileDialog.data.is_ai) {
+          toast({
+            title: "Succès",
+            description: "Profil converti en ressource IA. Elle sera auto-acceptée lors des assignations."
+          });
+        } else {
+          toast({ title: "Succès", description: "Profil modifié avec succès." });
+        }
       } else {
-        const { error } = await supabase
+        const { data: newProfile, error } = await supabase
           .from('hr_profiles')
-          .insert({ 
+          .insert({
             name: profileForm.name,
             category_id: profileForm.category_id,
             base_price: profileForm.base_price,
             is_ai: profileForm.is_ai
-          });
+          })
+          .select()
+          .single();
         if (error) throw error;
-        toast({ title: "Succès", description: "Profil créé avec succès." });
+
+        // Si c'est une ressource IA, créer aussi les profils associés
+        if (profileForm.is_ai && newProfile) {
+          // Créer le profil principal (table profiles)
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: newProfile.id,
+              email: `${profileForm.name.toLowerCase().replace(/ /g, '_')}@ia.team`,
+              first_name: 'IA',
+              last_name: profileForm.name,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (profileError && !profileError.message.includes('duplicate')) {
+            console.error('Erreur création profil principal:', profileError);
+          }
+
+          // Créer le profil candidat (table candidate_profiles)
+          const { error: candidateError } = await supabase
+            .from('candidate_profiles')
+            .insert({
+              id: newProfile.id,
+              first_name: 'IA',
+              last_name: profileForm.name,
+              email: `${profileForm.name.toLowerCase().replace(/ /g, '_')}@ia.team`,
+              status: 'disponible',
+              daily_rate: profileForm.base_price * 60 * 8, // Convertir de €/min en €/jour
+              seniority: 'senior',
+              is_email_verified: true
+            });
+
+          if (candidateError && !candidateError.message.includes('duplicate')) {
+            console.error('Erreur création profil candidat:', candidateError);
+          }
+
+          toast({
+            title: "Succès",
+            description: "Ressource IA créée avec tous ses profils. Elle sera auto-acceptée lors des assignations."
+          });
+        } else {
+          toast({ title: "Succès", description: "Profil créé avec succès." });
+        }
       }
       setProfileDialog({ open: false, edit: false, data: null });
       setProfileForm({ name: '', category_id: '', base_price: 50, is_ai: false, prompt_id: '' });
@@ -419,7 +473,7 @@ const AdminResources = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex">
       {/* Sidebar */}
       <AdminSidebar 
         activeTab={activeTab} 
@@ -430,15 +484,15 @@ const AdminResources = () => {
       {/* Main content */}
       <div className="flex-1 px-8 py-6 overflow-y-auto">
         {/* Header avec design Ialla */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-purple-50 border border-gray-100 mb-6">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-900 to-secondary-900 shadow-2xl shadow-primary-500/20 mb-6">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-600/20 to-secondary-600/20" />
           <div className="relative p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
                   variant="outline"
                   onClick={() => navigate('/dashboard')}
-                  className="bg-white/80 backdrop-blur-sm border-gray-200 hover:bg-white"
+                  className="bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white border-white/20 hover:bg-white/20 transition-all duration-200"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Retour
@@ -448,10 +502,10 @@ const AdminResources = () => {
                     <Settings className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                    <h1 className="text-2xl font-bold text-white">
                       Gestion des Ressources
                     </h1>
-                    <p className="text-gray-600">
+                    <p className="text-white/80">
                       Administration des catégories, profils, langues et expertises
                     </p>
                   </div>
@@ -570,7 +624,7 @@ const AdminResources = () => {
                   <CardTitle>Profils par Catégorie</CardTitle>
                   <Dialog open={profileDialog.open} onOpenChange={(open) => {
                     setProfileDialog({ open, edit: false, data: null });
-                    setProfileForm({ name: '', category_id: '', base_price: 50 });
+                    setProfileForm({ name: '', category_id: '', base_price: 50, is_ai: false, prompt_id: '' });
                   }}>
                     <DialogTrigger asChild>
                       <Button>

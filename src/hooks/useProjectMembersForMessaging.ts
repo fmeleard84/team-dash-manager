@@ -85,21 +85,12 @@ export const useProjectMembersForMessaging = (projectId: string) => {
           }
         }
 
-        // 2. Get candidates from hr_resource_assignments - WITH DIRECT JOIN
+        // 2. Get candidates from hr_resource_assignments - USING SECURE FUNCTION
         console.log('[MESSAGING] Fetching assignments for project:', projectId);
 
+        // Utiliser la fonction sécurisée qui contourne les RLS
         const { data: assignments, error: assignError } = await supabase
-          .from('hr_resource_assignments')
-          .select(`
-            *,
-            hr_profiles (
-              name,
-              is_ai,
-              prompt_id
-            )
-          `)
-          .eq('project_id', projectId)
-          .in('booking_status', ['accepted', 'completed']);
+          .rpc('get_team_assignments', { p_project_id: projectId });
 
         if (assignError) {
           console.error('[MESSAGING] ❌ Error fetching assignments:', assignError);
@@ -114,101 +105,74 @@ export const useProjectMembersForMessaging = (projectId: string) => {
           console.log('[MESSAGING] Processing assignments...');
 
           for (const assignment of assignments) {
+            // Les données JSONB sont déjà parsées par Supabase
+            const hrProfile = assignment.hr_profile || null;
+            const candidateProfile = assignment.candidate_profile || null;
+
             console.log('[MESSAGING] Assignment:', {
               id: assignment.id,
               candidate_id: assignment.candidate_id,
               booking_status: assignment.booking_status,
-              hr_profile: assignment.hr_profiles
+              hr_profile: hrProfile
             });
 
-            // Avec l'architecture unifiée, les IA ont aussi un candidate_id
-            if (assignment.candidate_id) {
-              // With unified IDs, candidate_id = profiles.id
-              const { data: userProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', assignment.candidate_id)
-                .single();
+            // Check if this is an AI resource first
+            const isAI = hrProfile?.is_ai || false;
 
-              if (userProfile) {
-                // Get the job title and AI status from hr_profiles (now via direct join)
-                let jobTitle = 'Ressource';
-                let isAI = false;
-                let promptId = undefined;
+            if (isAI) {
+              // For AI resources, we don't have a real user profile
+              // Create a virtual member entry
+              const jobTitle = hrProfile?.name || 'IA';
+              const promptId = hrProfile?.prompt_id;
 
-                if (assignment.hr_profiles) {
-                  console.log('[MESSAGING] Found hr_profile via join:', assignment.hr_profiles);
-                  jobTitle = assignment.hr_profiles.name || 'Ressource';
-                  isAI = assignment.hr_profiles.is_ai || false;
-                  promptId = assignment.hr_profiles.prompt_id;
-                  console.log('[MESSAGING] Job title set to:', jobTitle, 'Is AI:', isAI);
-                } else {
-                  console.log('[MESSAGING] No hr_profile found in join for assignment:', assignment.id);
-                }
+              allMembers.push({
+                id: `ia_${assignment.profile_id}`,
+                userId: `ia_${assignment.profile_id}`,
+                email: `${jobTitle.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
+                name: `${jobTitle} (IA)`,
+                firstName: jobTitle,
+                jobTitle: jobTitle,
+                role: 'ia',
+                isOnline: true, // Les IA sont toujours "en ligne"
+                isAI: true,
+                promptId: promptId
+              });
+              console.log('[MESSAGING] Added AI resource:', jobTitle, 'ID:', `ia_${assignment.profile_id}`);
+            } else if (assignment.candidate_id) {
+              // For human candidates, we have the profile in candidateProfile
+              if (candidateProfile) {
+                const { data: userProfile } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', assignment.candidate_id)
+                  .single();
+
+                if (userProfile) {
+                  // Get the job title from hrProfile
+                  let jobTitle = 'Ressource';
+
+                  if (hrProfile) {
+                    console.log('[MESSAGING] Found hr_profile via function:', hrProfile);
+                    jobTitle = hrProfile.name || 'Ressource';
+                    console.log('[MESSAGING] Job title set to:', jobTitle);
+                  }
 
                 allMembers.push({
-                  id: isAI ? `ia_${userProfile.id}` : userProfile.id,
-                  userId: isAI ? `ia_${userProfile.id}` : (userProfile.user_id || userProfile.id),
+                  id: userProfile.id,
+                  userId: userProfile.user_id || userProfile.id,
                   email: userProfile.email,
                   name: userProfile.first_name || 'Candidat',
                   firstName: userProfile.first_name,
                   jobTitle: jobTitle,
-                  role: isAI ? 'ia' : 'candidate',
-                  isOnline: isAI ? true : false, // Les IA sont toujours "en ligne"
-                  isAI: isAI,
-                  promptId: promptId
+                  role: 'candidate',
+                  isOnline: false,
+                  isAI: false
                 });
 
                 console.log('[MESSAGING] Added candidate:', userProfile.first_name, 'ID:', userProfile.id, 'Job:', jobTitle);
+                }
               } else {
                 console.error('[MESSAGING] Could not find profile for candidate_id:', assignment.candidate_id);
-              }
-            }
-            // Fallback: try to get candidate from profile in assignment (simplified)
-            else {
-              console.log('No candidate_id, checking for other identifiers...');
-
-              // Try to find candidate by profile_id and seniority
-              if (assignment.profile_id && assignment.seniority) {
-                console.log('Searching by profile_id:', assignment.profile_id, 'and seniority:', assignment.seniority);
-
-                const { data: candidates } = await supabase
-                  .from('candidate_profiles')
-                  .select('*')
-                  .eq('profile_id', assignment.profile_id)
-                  .eq('seniority', assignment.seniority);
-
-                if (candidates && candidates.length > 0) {
-                  const candidate = candidates[0];
-                  console.log('Found candidate by profile/seniority:', candidate.first_name);
-
-                  // Get the user profile
-                  const { data: userProfile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', candidate.id) // Using unified ID
-                    .single();
-
-                  if (userProfile) {
-                    // Use hr_profiles data from direct join (already available)
-                    let jobTitle = candidate.position || 'Ressource';
-                    if (assignment.hr_profiles) {
-                      jobTitle = assignment.hr_profiles.name || jobTitle;
-                    }
-
-                    allMembers.push({
-                      id: userProfile.id,
-                      userId: userProfile.user_id || userProfile.id,
-                      email: userProfile.email,
-                      name: userProfile.first_name || candidate.first_name || 'Candidat',
-                      firstName: userProfile.first_name || candidate.first_name,
-                      jobTitle: jobTitle,
-                      role: 'candidate',
-                      isOnline: false
-                    });
-                    console.log('Added candidate (fallback):', userProfile.first_name, 'ID:', userProfile.id);
-                  }
-                }
               }
             }
           }
@@ -264,7 +228,15 @@ export const useProjectMembersForMessaging = (projectId: string) => {
         
         // Remove current user from the list - filter by ID not email!
         // But keep everyone else (including all team members)
+        // IMPORTANT: Always show AI resources regardless of user
         const filteredMembers = allMembers.filter(m => {
+          // Les ressources IA doivent toujours être visibles pour tous
+          if (m.isAI) {
+            console.log('[MESSAGING] Keeping AI resource:', m.name, 'ID:', m.id);
+            return true;
+          }
+
+          // Pour les humains, filtrer l'utilisateur actuel
           const shouldKeep = m.id !== user?.id;
           if (!shouldKeep) {
             console.log('[MESSAGING] Filtering out current user:', m.name, 'ID:', m.id, 'Role:', m.role);
