@@ -1,243 +1,204 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 
-export interface DocxGeneratorOptions {
-  title: string;
-  author: string;
-  projectId: string;
-  contentType: string;
-  content: string;
+/**
+ * Génère un document DOCX à partir de contenu markdown
+ */
+export async function generateDocxFromMarkdown(
+  content: string,
+  title: string,
+  author: string = 'IA Team'
+): Promise<string> {
+  try {
+    // Parser le markdown en sections
+    const sections = parseMarkdownToSections(content);
+
+    // Créer le document
+    const doc = new Document({
+      creator: author,
+      title: title,
+      description: `Document généré par ${author}`,
+      sections: [{
+        properties: {},
+        children: [
+          // Titre principal
+          new Paragraph({
+            text: title,
+            heading: HeadingLevel.TITLE,
+            alignment: AlignmentType.CENTER,
+            spacing: {
+              after: 400,
+            },
+          }),
+
+          // Auteur
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Généré par ${author}`,
+                italics: true,
+                size: 20,
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: {
+              after: 600,
+            },
+          }),
+
+          // Contenu parsé
+          ...sections.map(section => createParagraphFromSection(section)),
+        ],
+      }],
+    });
+
+    // Convertir en buffer
+    const buffer = await Packer.toBuffer(doc);
+
+    // Convertir en base64
+    const base64 = btoa(
+      new Uint8Array(buffer)
+        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+
+    return base64;
+  } catch (error) {
+    console.error('Erreur génération DOCX:', error);
+    // Fallback : retourner le contenu en texte brut encodé
+    return btoa(content);
+  }
 }
 
 /**
- * Convertit du contenu texte/markdown en document DOCX
+ * Parse le markdown en sections structurées
  */
-export const generateDocxBuffer = async (options: DocxGeneratorOptions): Promise<ArrayBuffer> => {
-  const { title, author, projectId, contentType, content } = options;
+function parseMarkdownToSections(markdown: string): any[] {
+  const lines = markdown.split('\n');
+  const sections = [];
 
-  // Parser le contenu markdown basique
-  const lines = content.split('\n');
-  const paragraphs: Paragraph[] = [];
-
-  // Ajouter le titre principal
-  paragraphs.push(
-    new Paragraph({
-      text: title,
-      heading: HeadingLevel.TITLE,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 400 }
-    })
-  );
-
-  // Métadonnées
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: `Généré par: ${author}`,
-          size: 20,
-          italics: true
-        })
-      ],
-      spacing: { after: 200 }
-    })
-  );
-
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: `Date: ${new Date().toLocaleDateString('fr-FR')}`,
-          size: 20,
-          italics: true
-        })
-      ],
-      spacing: { after: 200 }
-    })
-  );
-
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: `Type: ${contentType}`,
-          size: 20,
-          italics: true
-        })
-      ],
-      spacing: { after: 400 }
-    })
-  );
-
-  // Traiter le contenu ligne par ligne
   for (const line of lines) {
-    const trimmedLine = line.trim();
-
-    if (!trimmedLine) {
-      // Ligne vide = nouveau paragraphe
-      paragraphs.push(new Paragraph({ text: '' }));
-      continue;
-    }
-
-    // Détection des titres markdown
-    if (trimmedLine.startsWith('### ')) {
-      paragraphs.push(
-        new Paragraph({
-          text: trimmedLine.replace('### ', ''),
-          heading: HeadingLevel.HEADING_3,
-          spacing: { before: 300, after: 200 }
-        })
-      );
-    } else if (trimmedLine.startsWith('## ')) {
-      paragraphs.push(
-        new Paragraph({
-          text: trimmedLine.replace('## ', ''),
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 400, after: 300 }
-        })
-      );
-    } else if (trimmedLine.startsWith('# ')) {
-      paragraphs.push(
-        new Paragraph({
-          text: trimmedLine.replace('# ', ''),
-          heading: HeadingLevel.HEADING_1,
-          spacing: { before: 500, after: 400 }
-        })
-      );
-    }
-    // Détection des listes
-    else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-      paragraphs.push(
-        new Paragraph({
-          text: trimmedLine.substring(2),
-          bullet: { level: 0 },
-          spacing: { after: 100 }
-        })
-      );
-    }
-    // Détection des listes numérotées
-    else if (/^\d+\.\s/.test(trimmedLine)) {
-      const text = trimmedLine.replace(/^\d+\.\s/, '');
-      paragraphs.push(
-        new Paragraph({
-          text: text,
-          numbering: {
-            reference: "default-numbering",
-            level: 0
-          },
-          spacing: { after: 100 }
-        })
-      );
-    }
-    // Paragraphe normal avec mise en forme
-    else {
-      const children: TextRun[] = [];
-
-      // Gestion basique du bold et italic markdown
-      let processedLine = trimmedLine;
-
-      // Remplacer **text** par du bold
-      const boldRegex = /\*\*(.*?)\*\*/g;
-      const boldMatches = processedLine.matchAll(boldRegex);
-      let lastIndex = 0;
-
-      for (const match of boldMatches) {
-        if (match.index !== undefined) {
-          // Ajouter le texte avant le bold
-          if (match.index > lastIndex) {
-            children.push(new TextRun({
-              text: processedLine.substring(lastIndex, match.index),
-              size: 24
-            }));
-          }
-          // Ajouter le texte en bold
-          children.push(new TextRun({
-            text: match[1],
-            bold: true,
-            size: 24
-          }));
-          lastIndex = match.index + match[0].length;
-        }
-      }
-
-      // Ajouter le reste du texte
-      if (lastIndex < processedLine.length) {
-        children.push(new TextRun({
-          text: processedLine.substring(lastIndex),
-          size: 24
-        }));
-      }
-
-      // Si pas de mise en forme, ajouter le texte normal
-      if (children.length === 0) {
-        children.push(new TextRun({
-          text: trimmedLine,
-          size: 24
-        }));
-      }
-
-      paragraphs.push(
-        new Paragraph({
-          children,
-          spacing: { after: 200 }
-        })
-      );
+    if (line.startsWith('# ')) {
+      sections.push({
+        type: 'h1',
+        text: line.replace(/^# /, ''),
+      });
+    } else if (line.startsWith('## ')) {
+      sections.push({
+        type: 'h2',
+        text: line.replace(/^## /, ''),
+      });
+    } else if (line.startsWith('### ')) {
+      sections.push({
+        type: 'h3',
+        text: line.replace(/^### /, ''),
+      });
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      sections.push({
+        type: 'bullet',
+        text: line.replace(/^[-*] /, ''),
+      });
+    } else if (line.startsWith('1. ')) {
+      sections.push({
+        type: 'number',
+        text: line.replace(/^\d+\. /, ''),
+      });
+    } else if (line.trim() !== '') {
+      sections.push({
+        type: 'paragraph',
+        text: line,
+      });
     }
   }
 
-  // Ajouter un pied de page
-  paragraphs.push(
-    new Paragraph({
-      text: '',
-      spacing: { before: 800 }
-    })
-  );
-
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: '---',
-          size: 20
-        })
-      ],
-      alignment: AlignmentType.CENTER
-    })
-  );
-
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: 'Document généré automatiquement par l\'IA de l\'équipe',
-          italics: true,
-          size: 18,
-          color: '666666'
-        })
-      ],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 200 }
-    })
-  );
-
-  // Créer le document
-  const doc = new Document({
-    creator: author,
-    title: title,
-    description: `Contenu généré par IA - ${contentType}`,
-    sections: [{
-      properties: {},
-      children: paragraphs
-    }]
-  });
-
-  // Générer le buffer
-  const buffer = await Packer.toBuffer(doc);
-  return buffer.buffer as ArrayBuffer;
-};
+  return sections;
+}
 
 /**
- * Convertit un buffer ArrayBuffer en Blob pour upload
+ * Crée un paragraphe Word à partir d'une section
  */
-export const arrayBufferToBlob = (buffer: ArrayBuffer, mimeType: string = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'): Blob => {
-  return new Blob([buffer], { type: mimeType });
-};
+function createParagraphFromSection(section: any): Paragraph {
+  const { type, text } = section;
+
+  // Traiter les styles inline (gras, italique)
+  const runs = parseInlineStyles(text);
+
+  switch (type) {
+    case 'h1':
+      return new Paragraph({
+        children: runs,
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 200 },
+      });
+
+    case 'h2':
+      return new Paragraph({
+        children: runs,
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 150 },
+      });
+
+    case 'h3':
+      return new Paragraph({
+        children: runs,
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 200, after: 100 },
+      });
+
+    case 'bullet':
+      return new Paragraph({
+        children: runs,
+        bullet: {
+          level: 0,
+        },
+        spacing: { after: 100 },
+      });
+
+    case 'number':
+      return new Paragraph({
+        children: runs,
+        numbering: {
+          reference: "default-numbering",
+          level: 0,
+        },
+        spacing: { after: 100 },
+      });
+
+    default:
+      return new Paragraph({
+        children: runs,
+        spacing: { after: 200 },
+      });
+  }
+}
+
+/**
+ * Parse les styles inline (gras, italique)
+ */
+function parseInlineStyles(text: string): TextRun[] {
+  const runs: TextRun[] = [];
+
+  // Regex pour détecter les patterns **bold** et *italic*
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/);
+
+  for (const part of parts) {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      // Gras
+      runs.push(new TextRun({
+        text: part.slice(2, -2),
+        bold: true,
+      }));
+    } else if (part.startsWith('*') && part.endsWith('*')) {
+      // Italique
+      runs.push(new TextRun({
+        text: part.slice(1, -1),
+        italics: true,
+      }));
+    } else if (part) {
+      // Texte normal
+      runs.push(new TextRun({
+        text: part,
+      }));
+    }
+  }
+
+  return runs.length > 0 ? runs : [new TextRun(text)];
+}

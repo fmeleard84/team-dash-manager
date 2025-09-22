@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { generateDocxFromMarkdown } from '@/utils/docxGenerator';
 
 export type ThreadType = 'public' | 'private';
 
@@ -403,6 +404,28 @@ export class MessageService {
       const isPrivate = thread?.metadata?.type === 'private' || false;
       const participants = thread?.metadata?.participants?.map((p: any) => p.id) || null;
 
+      // Vérifier si la réponse contient une commande de sauvegarde
+      const responseContent = aiResponse?.response || "Je n'ai pas pu générer de réponse.";
+      const saveMatch = responseContent.match(/\[SAVE_TO_DRIVE:\s*(.+?\.docx)\]/);
+
+      if (saveMatch) {
+        // L'IA veut sauvegarder un document
+        const fileName = saveMatch[1];
+        const contentToSave = responseContent.replace(/\[SAVE_TO_DRIVE:.*?\]/, '').trim();
+
+        console.log('💾 Sauvegarde Drive demandée:', fileName);
+
+        // Appeler la fonction de sauvegarde
+        this.saveAIContentToDrive(
+          projectId,
+          fileName,
+          contentToSave,
+          iaProfile.name
+        ).catch(error => {
+          console.error('❌ Erreur sauvegarde Drive:', error);
+        });
+      }
+
       // Envoyer la réponse de l'IA DANS LE MÊME THREAD
       await supabase
         .from('messages')
@@ -411,13 +434,14 @@ export class MessageService {
           sender_id: iaProfile.id,
           sender_name: `${iaProfile.name}`,
           sender_email: `${iaProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
-          content: aiResponse?.response || "Je n'ai pas pu générer de réponse.",
+          content: responseContent.replace(/\[SAVE_TO_DRIVE:.*?\]/, '').trim(), // Retirer la commande du message visible
           metadata: {
             is_private: isPrivate,
             participants: participants,
             thread_type: thread?.metadata?.type || 'team',
             is_ai_response: true,
-            tokens_used: aiResponse?.tokensUsed
+            tokens_used: aiResponse?.tokensUsed,
+            file_saved: saveMatch ? fileName : null
           }
         });
 
@@ -442,6 +466,51 @@ export class MessageService {
         });
     }
   }
+
+  /**
+   * Sauvegarde le contenu IA dans le Drive
+   */
+  private static async saveAIContentToDrive(
+    projectId: string,
+    fileName: string,
+    content: string,
+    aiMemberName: string
+  ): Promise<void> {
+    try {
+      console.log('📁 Sauvegarde dans Drive:', { projectId, fileName });
+
+      // Extraire le titre du nom de fichier (sans l'extension)
+      const title = fileName.replace(/\.docx$/i, '');
+
+      // Générer le DOCX avec la vraie librairie
+      const docxBuffer = await generateDocxFromMarkdown(content, title, aiMemberName);
+
+      // Appeler l'Edge Function de sauvegarde
+      const { data, error } = await supabase.functions.invoke('save-ai-content-to-drive', {
+        body: {
+          projectId,
+          fileName,
+          content: content, // Garder le markdown original
+          contentType: 'document',
+          aiMemberName,
+          isDocx: true,
+          docxBuffer // Le buffer DOCX en base64
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('✅ Document sauvé dans Drive:', data);
+
+      // Envoyer un message de confirmation dans le thread
+      // (Optionnel - on peut aussi juste logger)
+
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde Drive:', error);
+      throw error;
+    }
+  }
+
 
   /**
    * Attache des fichiers à un message

@@ -75,7 +75,15 @@ Instructions:
 - Tenez compte de l'historique de conversation
 - Soyez cohérent avec vos réponses précédentes
 - Si vous produisez un contenu long (article, document), structurez-le clairement
-- Gardez un ton professionnel mais personnalisé selon le contexte`
+- Gardez un ton professionnel mais personnalisé selon le contexte
+
+IMPORTANT - Gestion des livrables:
+Si l'utilisateur demande un livrable (article, planning, guide, rapport, documentation, etc.):
+1. Produisez le contenu demandé de manière complète et structurée
+2. À la fin, demandez TOUJOURS : "📁 Souhaitez-vous que je sauvegarde ce document dans votre Drive projet (dossier IA) au format Word (.docx) ?"
+3. Si l'utilisateur répond oui/ok/d'accord, ajoutez à la fin de votre message:
+   [SAVE_TO_DRIVE: nom_du_fichier.docx]
+   où nom_du_fichier est un nom descriptif basé sur le contenu (ex: article_marketing_digital.docx, planning_projet_2025.docx)`
 
     // 4. Appel à OpenAI (simulé pour l'instant)
     // TODO: Remplacer par un vrai appel OpenAI avec la clé API configurée
