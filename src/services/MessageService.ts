@@ -361,13 +361,13 @@ export class MessageService {
     try {
       console.log('🤖 Génération réponse IA dans thread:', threadId);
 
-      // Récupérer l'historique de conversation
+      // Récupérer l'historique de conversation (10 derniers messages pour plus de contexte)
       const { data: history } = await supabase
         .from('messages')
-        .select('content, sender_name, created_at')
+        .select('content, sender_name, sender_email, created_at')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
 
       // Appeler l'Edge Function pour générer la réponse
       console.log('📤 Appel Edge Function ai-conversation-handler avec:', {

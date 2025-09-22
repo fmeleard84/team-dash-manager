@@ -107,6 +107,7 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAIGenerating, setIsAIGenerating] = useState<string | null>(null); // ID de l'IA qui génère
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -121,6 +122,23 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Détecter quand l'IA a répondu
+  useEffect(() => {
+    if (isAIGenerating && messages.length > 0) {
+      // Chercher si un message récent vient de l'IA
+      const lastMessages = messages.slice(-2); // Les 2 derniers messages
+      const aiResponse = lastMessages.find(msg => {
+        const sender = projectMembers.find(m => m.email === msg.sender_email);
+        return sender?.isAI === true;
+      });
+
+      if (aiResponse) {
+        // L'IA a répondu, arrêter le loader
+        setIsAIGenerating(null);
+      }
+    }
+  }, [messages, isAIGenerating, projectMembers]);
 
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,6 +195,18 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
     }
 
     try {
+      // Vérifier si on envoie à une IA dans un thread privé
+      const currentThread = threads.find(t => t.id === selectedThreadId);
+      const isPrivateWithAI = currentThread?.metadata?.type === 'private' &&
+                              currentThread?.metadata?.participants?.some((p: any) => p.isAI === true);
+
+      if (isPrivateWithAI) {
+        const aiParticipant = currentThread?.metadata?.participants?.find((p: any) => p.isAI === true);
+        if (aiParticipant) {
+          setIsAIGenerating(aiParticipant.id);
+        }
+      }
+
       // Envoyer le message via le hook simplifié
       await sendMessageToThread(newMessage, uploadedFiles);
 
@@ -332,6 +362,35 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           showStatus={true}
                           className="flex-1"
                         />
+                        {/* Loader pour l'IA qui génère */}
+                        {member.isAI && isAIGenerating === member.id.replace('ia_', '') && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <motion.div
+                              className="absolute inset-0 rounded-full border-2 border-cyan-400"
+                              animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [1, 0.5, 1],
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            />
+                            <motion.div
+                              className="absolute inset-0 rounded-full border-2 border-blue-400"
+                              animate={{
+                                scale: [1.2, 1, 1.2],
+                                opacity: [0.5, 1, 0.5],
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
 
                       {/* Badge IA */}
@@ -342,7 +401,9 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/30"
                         >
                           <Zap className="h-3 w-3 text-white" />
-                          <span className="text-xs font-medium text-white">IA</span>
+                          <span className="text-xs font-medium text-white">
+                            {isAIGenerating === member.id.replace('ia_', '') ? 'Génère...' : 'IA'}
+                          </span>
                         </motion.div>
                       )}
                     </div>

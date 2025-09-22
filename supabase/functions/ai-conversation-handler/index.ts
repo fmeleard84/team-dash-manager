@@ -46,27 +46,36 @@ serve(async (req) => {
 
     console.log('✅ Prompt IA trouvé:', prompt.name)
 
-    // 2. Construire le contexte de conversation
+    // 2. Construire le contexte de conversation avec mémoire complète
     const historyText = conversationHistory
-      ?.slice(0, 3) // Limiter à 3 derniers messages pour le contexte
-      ?.map(msg => `${msg.sender_email || 'Utilisateur'}: ${msg.content}`)
+      ?.slice(0, 8) // Utiliser jusqu'à 8 messages pour plus de contexte
+      ?.map(msg => {
+        const senderName = msg.sender_name || msg.sender_email?.split('@')[0] || 'Utilisateur'
+        return `${senderName}: ${msg.content}`
+      })
       ?.join('\n') || ''
 
-    // 3. Construire le prompt complet
+    // 3. Construire le prompt complet avec mémoire de conversation
     const systemPrompt = `${prompt.prompt}
 
-Contexte du projet: ${projectId}
-Historique récent de conversation:
+IMPORTANT - Mémoire de conversation:
+Vous avez une conversation continue avec cet utilisateur. Vous devez :
+- Vous souvenir du contexte et des sujets précédemment discutés
+- Faire référence aux échanges précédents quand c'est pertinent
+- Maintenir la cohérence dans vos réponses
+- Adapter votre ton en fonction de la relation établie
+
+Historique de la conversation (du plus ancien au plus récent):
 ${historyText}
 
-Message utilisateur: ${userMessage}
+Nouveau message de l'utilisateur: ${userMessage}
 
-Instructions spéciales:
+Instructions:
 - Répondez en français
-- Soyez professionnel et utile
+- Tenez compte de l'historique de conversation
+- Soyez cohérent avec vos réponses précédentes
 - Si vous produisez un contenu long (article, document), structurez-le clairement
-- Indiquez le type de contenu que vous produisez (article, guide, rapport, etc.)
-- Gardez un ton approprié au contexte métier`
+- Gardez un ton professionnel mais personnalisé selon le contexte`
 
     // 4. Appel à OpenAI (simulé pour l'instant)
     // TODO: Remplacer par un vrai appel OpenAI avec la clé API configurée
