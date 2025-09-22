@@ -366,7 +366,7 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                         {member.isAI && isAIGenerating === member.id.replace('ia_', '') && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-cyan-400"
+                              className="absolute inset-0 rounded-full border-2 border-red-500"
                               animate={{
                                 scale: [1, 1.2, 1],
                                 opacity: [1, 0.5, 1],
@@ -378,10 +378,22 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                               }}
                             />
                             <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-blue-400"
+                              className="absolute inset-0 rounded-full border-2 border-orange-500"
                               animate={{
                                 scale: [1.2, 1, 1.2],
                                 opacity: [0.5, 1, 0.5],
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            />
+                            <motion.div
+                              className="absolute inset-0 rounded-full bg-red-500/20"
+                              animate={{
+                                scale: [0.8, 1.1, 0.8],
+                                opacity: [0.3, 0.6, 0.3],
                               }}
                               transition={{
                                 duration: 1.5,
