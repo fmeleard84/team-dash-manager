@@ -61,9 +61,9 @@ export const initializeProjectMessaging = async (projectId: string): Promise<str
     // 4. Vérifier s'il existe déjà un thread principal pour ce projet
     const { data: existingThread, error: threadCheckError } = await supabase
       .from('message_threads')
-      .select('id')
+      .select('id, metadata')
       .eq('project_id', projectId)
-      .eq('title', `Équipe ${project.title}`)
+      .or('metadata->type.eq.team,metadata.is.null') // Thread principal seulement
       .single();
 
     if (threadCheckError && threadCheckError.code !== 'PGRST116') {
@@ -85,7 +85,8 @@ export const initializeProjectMessaging = async (projectId: string): Promise<str
           description: 'Conversation principale de l\'équipe du projet',
           created_by: ownerProfile.id,
           last_message_at: new Date().toISOString(),
-          is_active: true
+          is_active: true,
+          metadata: { type: 'team' } // Marquer explicitement comme thread principal
         })
         .select()
         .single();
@@ -173,7 +174,26 @@ export const sendMessage = async (
 
     // Créer le message sans job_title
     const displayName = senderName;
-    
+
+    // Préparer les métadonnées pour les messages privés
+    const messageMetadata: any = {};
+
+    // Si c'est un message privé (recipientId défini), marquer comme privé
+    if (recipientId) {
+      // Pour les messages privés, stocker les participants
+      const realRecipientId = recipientId.startsWith('ia_')
+        ? recipientId.replace('ia_', '')
+        : recipientId;
+
+      messageMetadata.is_private = true;
+      messageMetadata.participants = [user.id, realRecipientId];
+      messageMetadata.thread_type = 'private';
+    } else {
+      // Message d'équipe
+      messageMetadata.is_private = false;
+      messageMetadata.thread_type = 'team';
+    }
+
     const { data: message, error: messageError } = await supabase
       .from('messages')
       .insert({
@@ -182,8 +202,8 @@ export const sendMessage = async (
         sender_name: displayName, // Inclut le métier temporairement
         sender_email: profile.email,
         content: content,
-        is_edited: false
-        // Removed metadata field - not supported by database schema
+        is_edited: false,
+        metadata: messageMetadata // Ajouter les métadonnées pour l'isolation
       })
       .select()
       .single();
@@ -216,23 +236,96 @@ export const sendMessage = async (
 
     console.log('✅ Message sent successfully');
 
-    // Vérifier si le destinataire est une IA
-    if (recipientId && recipientId.startsWith('ia_') && projectId) {
-      console.log('🤖 Message destiné à une IA, préparation de la réponse...');
+    // Vérifier si le message doit déclencher une réponse IA
+    // 1. Si recipientId est défini (conversation privée) → l'IA répond toujours
+    // 2. Si pas de recipientId (canal général) → vérifier si l'IA est mentionnée
+
+    let shouldAIRespond = false;
+    let targetIAProfile = null;
+
+    if (recipientId && recipientId.startsWith('ia_')) {
+      // Conversation privée avec l'IA
+      shouldAIRespond = true;
+      const realProfileId = recipientId.replace('ia_', '');
+
+      const { data: iaProfile } = await supabase
+        .from('hr_profiles')
+        .select('id, name, prompt_id')  // Ajouter 'id' dans le select
+        .eq('id', realProfileId)
+        .eq('is_ai', true)
+        .single();
+
+      targetIAProfile = iaProfile;
+
+      // S'assurer que l'ID est bien défini
+      if (targetIAProfile) {
+        targetIAProfile.id = realProfileId;  // Forcer l'ID si nécessaire
+      }
+    } else if (!recipientId) {
+      // Canal général - vérifier si l'IA est mentionnée
+      const contentLower = content.toLowerCase();
+
+      // Récupérer toutes les IA du projet
+      const { data: projectIA } = await supabase
+        .from('hr_resource_assignments')
+        .select(`
+          profile_id,
+          hr_profiles!inner (
+            id,
+            name,
+            prompt_id,
+            is_ai
+          )
+        `)
+        .eq('project_id', projectId)
+        .eq('hr_profiles.is_ai', true);
+
+      // Vérifier si une IA est mentionnée
+      for (const assignment of projectIA || []) {
+        const iaName = assignment.hr_profiles.name.toLowerCase();
+
+        // Patterns pour détecter une mention
+        if (
+          contentLower.includes(`@${iaName}`) ||
+          contentLower.includes(`@ia`) ||
+          contentLower.startsWith(`${iaName},`) ||
+          contentLower.includes(`bonjour ${iaName}`) ||
+          contentLower.includes(`salut ${iaName}`) ||
+          (contentLower.includes('ia') && contentLower.includes('?')) // Question directe à l'IA
+        ) {
+          shouldAIRespond = true;
+          targetIAProfile = assignment.hr_profiles;
+          recipientId = `ia_${assignment.hr_profiles.id}`; // Pour le traitement
+          break;
+        }
+      }
+    }
+
+    // Si l'IA doit répondre
+    if (shouldAIRespond && targetIAProfile && projectId) {
+      console.log('🤖 L\'IA doit répondre:', {
+        iaName: targetIAProfile.name,
+        inPrivate: !!recipientId,
+        message: content.substring(0, 50)
+      });
 
       try {
-        // Récupérer l'ID de profil IA réel (sans le préfixe ia_)
-        const realProfileId = recipientId.replace('ia_', '');
+        // Extraire l'ID réel du profil IA depuis recipientId
+        const realProfileId = recipientId?.startsWith('ia_')
+          ? recipientId.replace('ia_', '')
+          : targetIAProfile?.id;
 
-        // Récupérer les informations de l'IA
-        const { data: iaProfile } = await supabase
-          .from('hr_profiles')
-          .select('name, prompt_id')
-          .eq('id', realProfileId)
-          .eq('is_ai', true)
-          .single();
+        // Vérifier que realProfileId est bien défini
+        if (!realProfileId) {
+          console.error('❌ Profile ID de l\'IA non défini', {
+            targetIAProfile,
+            recipientId,
+            targetIAProfileId: targetIAProfile?.id
+          });
+          return message; // Retourner le message envoyé même si l'IA ne peut pas répondre
+        }
 
-        if (iaProfile?.prompt_id) {
+        if (targetIAProfile?.prompt_id) {
           // Vérifier d'abord si c'est une réponse à un choix précédent
           const { data: lastMessages } = await supabase
             .from('messages')
@@ -260,19 +353,33 @@ export const sendMessage = async (
                 ? '📄 Parfait ! Je vais créer un document Word et le sauvegarder dans votre Drive. Un instant...'
                 : '💬 Très bien ! Je vais vous répondre directement ici. Un instant...';
 
+              // Préparer les métadonnées pour le message de confirmation
+              const confirmMetadata: any = {};
+              if (recipientId) {
+                confirmMetadata.is_private = true;
+                confirmMetadata.participants = [realProfileId, user.id];
+                confirmMetadata.thread_type = 'private';
+              } else {
+                confirmMetadata.is_private = false;
+                confirmMetadata.thread_type = 'team';
+              }
+
               await supabase
                 .from('messages')
                 .insert({
                   thread_id: threadId,
                   sender_id: realProfileId,
-                  sender_name: `${iaProfile.name} (IA)`,
-                  sender_email: `${iaProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
+                  sender_name: `${targetIAProfile.name} (IA)`,
+                  sender_email: `${targetIAProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
                   content: confirmMessage,
-                  is_edited: false
+                  is_edited: false,
+                  metadata: confirmMetadata
                 });
 
               // Traiter la demande originale
-              await handleAIResponse(threadId, realProfileId, iaProfile, originalMessage, projectId, wantsDocument);
+              // Passer l'info que c'est une conversation privée
+              const isPrivate = !!recipientId;
+              await handleAIResponse(threadId, realProfileId, targetIAProfile, originalMessage, projectId, wantsDocument, isPrivate, user.id);
             } else {
               // Réponse non valide, redemander
               await supabase
@@ -280,8 +387,8 @@ export const sendMessage = async (
                 .insert({
                   thread_id: threadId,
                   sender_id: realProfileId,
-                  sender_name: `${iaProfile.name} (IA)`,
-                  sender_email: `${iaProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
+                  sender_name: `${targetIAProfile.name} (IA)`,
+                  sender_email: `${targetIAProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
                   content: '❓ Je n\'ai pas compris votre choix. Veuillez répondre avec "1" ou "livrable" pour un document, ou "2" ou "direct" pour une réponse immédiate.',
                   is_edited: false,
                   metadata: lastMessage.metadata // Conserver les métadonnées pour le prochain essai
@@ -303,14 +410,14 @@ export const sendMessage = async (
                 .insert({
                   thread_id: threadId,
                   sender_id: realProfileId,
-                  sender_name: `${iaProfile.name} (IA)`,
-                  sender_email: `${iaProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
+                  sender_name: `${targetIAProfile.name} (IA)`,
+                  sender_email: `${targetIAProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
                   content: `📝 Je détecte une demande de création de contenu.\n\nComment souhaitez-vous recevoir le résultat ?\n\n1️⃣ **Livrable** : Je créerai un document Word dans votre Drive (dossier IA)\n2️⃣ **Réponse immédiate** : Je vous réponds directement ici\n\nRépondez avec "1" ou "livrable" pour un document, ou "2" ou "direct" pour une réponse immédiate.`,
                   is_edited: false,
                   metadata: {
                     type: 'ai_choice_request',
                     original_message: content,
-                    prompt_id: iaProfile.prompt_id,
+                    prompt_id: targetIAProfile.prompt_id,
                     project_id: projectId
                   }
                 })
@@ -320,7 +427,8 @@ export const sendMessage = async (
               console.log('🤖 Message de choix envoyé');
             } else {
               // Pour les messages simples, répondre directement
-              await handleAIResponse(threadId, realProfileId, iaProfile, content, projectId, false);
+              const isPrivate = !!recipientId;
+              await handleAIResponse(threadId, realProfileId, targetIAProfile, content, projectId, false, isPrivate, user.id);
             }
           }
         }
@@ -346,7 +454,9 @@ async function handleAIResponse(
   iaProfile: any,
   userMessage: string,
   projectId: string,
-  createDocument: boolean
+  createDocument: boolean,
+  isPrivateConversation: boolean = false,
+  originalSenderId?: string
 ) {
   try {
     // Récupérer l'historique de conversation (3 derniers messages)
@@ -386,6 +496,22 @@ async function handleAIResponse(
         ? `📄 Document créé avec succès !\n\nVotre document a été sauvegardé dans le Drive du projet (dossier IA).\n\n[Télécharger le document](${saveResult.fileUrl})\n\n---\n\n${aiResponse.response.substring(0, 500)}...`
         : `📄 Document créé :\n\n${aiResponse.response}`;
 
+      // Préparer les métadonnées avec info de conversation privée
+      const responseMetadata: any = {
+        type: 'ai_document_response',
+        document_url: saveResult?.fileUrl,
+        tokens_used: aiResponse.tokensUsed
+      };
+
+      if (isPrivateConversation && originalSenderId) {
+        responseMetadata.is_private = true;
+        responseMetadata.participants = [iaProfileId, originalSenderId];
+        responseMetadata.thread_type = 'private';
+      } else {
+        responseMetadata.is_private = false;
+        responseMetadata.thread_type = 'team';
+      }
+
       await supabase
         .from('messages')
         .insert({
@@ -395,14 +521,25 @@ async function handleAIResponse(
           sender_email: `${iaProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
           content: documentMessage,
           is_edited: false,
-          metadata: {
-            type: 'ai_document_response',
-            document_url: saveResult?.fileUrl,
-            tokens_used: aiResponse.tokensUsed
-          }
+          metadata: responseMetadata
         });
     } else {
       // Réponse directe dans la conversation
+      // Préparer les métadonnées avec info de conversation privée
+      const responseMetadata: any = {
+        type: 'ai_response',
+        tokens_used: aiResponse?.tokensUsed
+      };
+
+      if (isPrivateConversation && originalSenderId) {
+        responseMetadata.is_private = true;
+        responseMetadata.participants = [iaProfileId, originalSenderId];
+        responseMetadata.thread_type = 'private';
+      } else {
+        responseMetadata.is_private = false;
+        responseMetadata.thread_type = 'team';
+      }
+
       await supabase
         .from('messages')
         .insert({
@@ -412,10 +549,7 @@ async function handleAIResponse(
           sender_email: `${iaProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
           content: aiResponse?.response || 'Je suis désolé, je n\'ai pas pu générer une réponse.',
           is_edited: false,
-          metadata: {
-            type: 'ai_response',
-            tokens_used: aiResponse?.tokensUsed
-          }
+          metadata: responseMetadata
         });
     }
 

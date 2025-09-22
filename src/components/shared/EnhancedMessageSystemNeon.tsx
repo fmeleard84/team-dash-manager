@@ -38,17 +38,13 @@ import {
   Sparkles,
   Zap
 } from 'lucide-react';
-import { useMessages, MessageThread, Message } from '@/hooks/useMessages';
-import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { useMessagesSimplified } from '@/hooks/useMessagesSimplified';
+import { MessageService } from '@/services/MessageService';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProjectMembersForMessaging, ProjectMember } from '@/hooks/useProjectMembersForMessaging';
-import { useMessageGroups, MessageGroup } from '@/hooks/useMessageGroups';
+import { useProjectMembersForMessaging } from '@/hooks/useProjectMembersForMessaging';
 import { useUserPresence } from '@/hooks/useUserPresence';
 import { useToast } from '@/hooks/use-toast';
-import { initializeProjectMessaging, sendMessage } from '@/utils/messageSetup';
-import { uploadMultipleFiles, syncMessageFilesToDrive, UploadedFile } from '@/utils/fileUpload';
-import { handleAIConversation } from '@/utils/aiMessageHandler';
-import { PrivateThreadManager } from '@/utils/privateThreadManager';
+import { uploadMultipleFiles, UploadedFile } from '@/utils/fileUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -74,8 +70,17 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
   const { user } = useAuth();
   const { toast } = useToast();
   const { members: projectMembers, loading: membersLoading } = useProjectMembersForMessaging(projectId);
-  const { groups, createGroup, deleteGroup } = useMessageGroups(projectId);
-  const { threads, messages, loading, refreshThreads, refreshMessages, selectedThread: selectedThreadId, setSelectedThread: setSelectedThreadId, setMessages, setThreads } = useMessages(projectId);
+  const {
+    threads,
+    messages,
+    selectedThreadId,
+    loading,
+    sending: isSending,
+    setSelectedThreadId,
+    sendMessage: sendMessageToThread,
+    getOrCreatePrivateThread,
+    setMessages
+  } = useMessagesSimplified(projectId);
   const { isUserOnline } = useUserPresence();
 
   // Debug: Log des membres récupérés
@@ -93,163 +98,28 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
     });
   }, [projectMembers, userRole, userId]);
   
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<SelectedConversation>({
     type: 'all',
     name: 'Équipe complète'
   });
   
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [selectedMembersForGroup, setSelectedMembersForGroup] = useState<string[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isAIProcessing, setIsAIProcessing] = useState(false);
-  const [lastAIResponse, setLastAIResponse] = useState<{ [key: string]: string }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Filter messages based on selected conversation
-  const filteredMessages = useCallback(() => {
-    // Si on a un thread privé IA sélectionné, les messages sont déjà filtrés par thread_id
-    // donc on affiche tous les messages du thread
-    if (selectedThread && selectedConversation.type === 'user' && selectedConversation.id?.startsWith('ia_')) {
-      // Pour les conversations privées avec l'IA, on affiche tous les messages du thread
-      // car le thread est déjà privé entre l'utilisateur et l'IA
-      return messages;
-    }
+  // Les messages sont déjà filtrés par thread via le hook
+  const filteredMessages = useCallback(() => messages, [messages]);
 
-    if (selectedConversation.type === 'all') {
-      return messages;
-    } else if (selectedConversation.type === 'user' && selectedConversation.id) {
-      // Pour les conversations humain-humain
-      const currentUserId = user?.id;
-      const targetId = selectedConversation.id.startsWith('ia_')
-        ? selectedConversation.id.replace('ia_', '')
-        : selectedConversation.id;
+  // Notification pour les nouveaux messages (géré par le hook)
 
-      return messages.filter(msg => {
-        const isSentByMe = msg.sender_id === currentUserId;
-        const isSentByTarget = msg.sender_id === targetId;
-
-        // Conversation normale entre humains: on voit tous les messages entre les 2
-        return isSentByMe || isSentByTarget;
-      });
-    } else if (selectedConversation.type === 'group' && selectedConversation.members) {
-      return messages.filter(msg =>
-        selectedConversation.members?.includes(msg.sender_id || '')
-      );
-    }
-    return messages;
-  }, [messages, selectedConversation, user?.id, selectedThread]);
-
-  // Callbacks for realtime updates
-  const onNewMessage = useCallback((newMessage: any) => {
-    console.log('🔔 New message received!', newMessage);
-    
-    if (newMessage.sender_email !== user?.email) {
-      toast({
-        title: "Nouveau message",
-        description: `💬 Message de ${newMessage.sender_name}`,
-      });
-    }
-    
-    setMessages(prev => {
-      const exists = prev.some(msg => msg.id === newMessage.id);
-      if (exists) {
-        console.log('Message already exists, skipping duplicate');
-        return prev;
-      }
-      return [...prev, newMessage];
-    });
-  }, [user?.email, setMessages, toast]);
-
-  const onThreadUpdate = useCallback((updatedThread: any) => {
-    console.log('🔔 Thread updated!', updatedThread);
-    refreshThreads();
-  }, [refreshThreads]);
-
-  // Subscribe to realtime updates
-  useRealtimeMessages({
-    projectId,
-    selectedThread: selectedThread?.id || null,
-    onNewMessage,
-    onMessageUpdate: (updatedMessage: any) => {
-      console.log('🔔 Message updated!', updatedMessage);
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
-        )
-      );
-    },
-    onThreadUpdate,
-    setMessages,
-    setThreads
-  });
-
-  // Initialize messaging if no threads exist
-  useEffect(() => {
-    const initializeMessaging = async () => {
-      if (!projectId || loading || isInitializing) return;
-      if (threads.length > 0) {
-        if (!selectedThreadId && threads.length > 0 && threads[0].project_id === projectId) {
-          setSelectedThreadId(threads[0].id);
-        }
-        return;
-      }
-
-      try {
-        setIsInitializing(true);
-        console.log('🔄 Initializing messaging for project:', projectId);
-        
-        const threadId = await initializeProjectMessaging(projectId);
-        
-        if (threadId) {
-          console.log('✅ Messaging initialized with thread:', threadId);
-          await refreshThreads();
-          setSelectedThreadId(threadId);
-        }
-      } catch (error) {
-        console.error('❌ Error initializing messaging:', error);
-        toast({
-          title: "Erreur",
-          description: "Impossible d'initialiser la messagerie",
-          variant: "destructive",
-        });
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    initializeMessaging();
-  }, [projectId, threads, loading, isInitializing, refreshThreads, setSelectedThreadId, selectedThreadId]);
-
-  // Sync selectedThread when ID changes
-  useEffect(() => {
-    if (selectedThreadId && threads.length > 0) {
-      const thread = threads.find(t => t.id === selectedThreadId);
-      if (thread && thread.project_id === projectId) {
-        setSelectedThread(thread);
-      } else {
-        setSelectedThread(null);
-        setSelectedThreadId(null);
-      }
-    } else {
-      setSelectedThread(null);
-    }
-  }, [selectedThreadId, threads, projectId, setSelectedThreadId]);
+  // Initialisation automatique gérée par le hook
 
   // Auto scroll to bottom
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   // Handle file upload
@@ -294,10 +164,10 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
     }
   };
 
-  // Handle send message
+  // Handle send message - SIMPLIFIÉ
   const handleSendMessage = async () => {
     if (!newMessage.trim() && uploadedFiles.length === 0) return;
-    if (!selectedThread) {
+    if (!selectedThreadId) {
       toast({
         title: "Erreur",
         description: "Aucune conversation sélectionnée",
@@ -306,112 +176,11 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
       return;
     }
 
-    setIsSending(true);
     try {
-      // Déterminer le destinataire si conversation privée
-      let recipientId = undefined;
-      if (selectedConversation.type === 'user' && selectedConversation.id) {
-        // Pour une conversation privée, passer l'ID du destinataire
-        recipientId = selectedConversation.id.startsWith('ia_')
-          ? selectedConversation.id.replace('ia_', '')
-          : selectedConversation.id;
-      }
+      // Envoyer le message via le hook simplifié
+      await sendMessageToThread(newMessage, uploadedFiles);
 
-      // Les fichiers uploadés ont déjà toutes les infos nécessaires
-      const sentMessage = await sendMessage(
-        selectedThread.id,
-        newMessage,
-        uploadedFiles,
-        recipientId,  // Passer le destinataire pour les conversations privées
-        projectId     // Passer le projectId pour le contexte IA
-      );
-
-      if (sentMessage) {
-        // Add the message immediately to the local state
-        // Don't wait for realtime subscription, update immediately
-        const messageWithAttachments = {
-          ...sentMessage,
-          message_attachments: uploadedFiles.map(file => ({
-            file_name: file.name,
-            file_path: file.path,
-            file_type: file.type,
-            file_size: file.size
-          }))
-        };
-
-        setMessages(prev => {
-          // Check if message already exists (from realtime)
-          const exists = prev.some(msg => msg.id === sentMessage.id);
-          if (exists) {
-            // Update existing message with attachments if needed
-            return prev.map(msg =>
-              msg.id === sentMessage.id ? messageWithAttachments : msg
-            );
-          }
-          // Add new message
-          return [...prev, messageWithAttachments];
-        });
-
-        // 🤖 Gestion IA : Traiter de manière asynchrone si le message est envoyé à une IA
-        // Ne pas attendre la réponse pour débloquer l'UI
-        const isMessageToIA = selectedConversation.type === 'user' &&
-          projectMembers.some(m => m.id === selectedConversation.id && m.isAI);
-
-        if (isMessageToIA) {
-          setIsAIProcessing(true);
-
-          // Récupérer la dernière réponse IA si elle existe (pour les choix)
-          const aiId = selectedConversation.id?.replace('ia_', '');
-          const previousResponse = aiId ? lastAIResponse[aiId] : undefined;
-
-          handleAIConversation(
-            selectedConversation,
-            newMessage,
-            projectId,
-            projectMembers,
-            selectedThread.id,
-            previousResponse,
-            user?.id  // Passer l'ID de l'utilisateur pour les réponses privées
-          ).then(aiResult => {
-            setIsAIProcessing(false);
-            if (aiResult.success) {
-              console.log('✅ Réponse IA générée et envoyée');
-
-              // Stocker la réponse IA si elle contient des choix
-              if (aiResult.aiResponse && aiId) {
-                // Détecter si c'est une réponse avec choix
-                if (aiResult.aiResponse.includes('Comment souhaitez-vous recevoir')) {
-                  // Extraire la vraie réponse (avant le menu de choix)
-                  const responseMatch = aiResult.aiResponse.match(/^([\s\S]*?)(\n\n---|\n\n\*\*Comment)/);
-                  const realResponse = responseMatch ? responseMatch[1] : aiResult.aiResponse;
-                  setLastAIResponse(prev => ({ ...prev, [aiId]: realResponse }));
-                } else {
-                  // Effacer la dernière réponse si ce n'est pas un choix
-                  setLastAIResponse(prev => {
-                    const newState = { ...prev };
-                    delete newState[aiId];
-                    return newState;
-                  });
-                }
-              }
-
-              // Afficher notification de sauvegarde si nécessaire
-              if (aiResult.saved) {
-                toast({
-                  title: "📄 Contenu sauvegardé",
-                  description: "Le contenu généré par l'IA a été sauvegardé dans le Drive",
-                  variant: "default",
-                });
-              }
-            }
-          }).catch(aiError => {
-            setIsAIProcessing(false);
-            console.error('⚠️ Erreur IA (non bloquante):', aiError);
-            // Ne pas bloquer l'envoi du message utilisateur en cas d'erreur IA
-          });
-        }
-      }
-
+      // Réinitialiser le formulaire
       setNewMessage('');
       setAttachedFiles([]);
       setUploadedFiles([]);
@@ -422,8 +191,6 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
         description: "Erreur lors de l'envoi du message",
         variant: "destructive",
       });
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -448,14 +215,20 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  // Pour l'équipe complète, utiliser le thread principal (non privé)
-                  const mainThread = threads.find(t => !t.title?.includes('Conversation privée'));
-                  if (mainThread) {
-                    setSelectedThreadId(mainThread.id);
-                    setSelectedThread(mainThread);
-                    // Recharger les messages du thread principal
-                    refreshMessages();
+                onClick={async () => {
+                  // Pour l'équipe complète, utiliser le thread public
+                  const publicThread = threads.find(t =>
+                    t.metadata?.type === 'team' || !t.metadata?.type
+                  );
+
+                  if (publicThread) {
+                    setSelectedThreadId(publicThread.id);
+                  } else {
+                    // Créer un thread public (passer null pour participants = public)
+                    const threadId = await getOrCreatePrivateThread(null);
+                    if (threadId) {
+                      setSelectedThreadId(threadId);
+                    }
                   }
                   setSelectedConversation({ type: 'all', name: 'Équipe complète' });
                 }}
@@ -491,70 +264,39 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={async () => {
-                      // Créer/récupérer un thread privé pour toute conversation 1-to-1
+                      // Créer/récupérer un thread privé simplifié
                       if (user?.id) {
-                        // Préparer les informations de l'utilisateur courant
-                        const { data: currentUserProfile } = await supabase
-                          .from('profiles')
-                          .select('email, first_name, last_name')
-                          .eq('id', user.id)
-                          .single();
+                        // Préparer les participants
+                        // Pour l'IA, utiliser l'ID sans le préfixe ia_
+                        const aiRealId = member.isAI && member.id.startsWith('ia_')
+                          ? member.id.replace('ia_', '')
+                          : member.id;
 
-                        const currentUser = {
-                          id: user.id,
-                          name: currentUserProfile
-                            ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || currentUserProfile.email
-                            : user.email || '',
-                          email: user.email || ''
-                        };
+                        const participants = [
+                          {
+                            id: user.id,
+                            name: user.email?.split('@')[0] || 'Moi',
+                            email: user.email || '',
+                            isAI: false
+                          },
+                          {
+                            id: aiRealId,
+                            name: member.name,
+                            email: member.email || `${member.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
+                            isAI: member.isAI === true, // S'assurer que c'est un booléen
+                            promptId: member.isAI ? aiRealId : undefined  // Utiliser l'ID réel pour le promptId
+                          }
+                        ];
 
-                        // Préparer les informations de l'autre participant
-                        const otherParticipant = {
-                          id: member.isAI ? member.id.replace('ia_', '') : member.id,
-                          name: member.firstName || member.name,
-                          email: member.isAI
-                            ? `${(member.firstName || member.name).toLowerCase().replace(/\s+/g, '_')}@ia.team`
-                            : member.email || '',
-                          isAI: member.isAI || false
-                        };
+                        console.log('🚀 Création thread privé avec participants:', participants);
 
-                        const privateThreadId = await PrivateThreadManager.getOrCreatePrivateThread(
-                          projectId,
-                          currentUser,
-                          otherParticipant
-                        );
+                        // Créer ou récupérer le thread privé
+                        const privateThreadId = await getOrCreatePrivateThread(participants);
 
                         if (privateThreadId) {
-                          // Mettre à jour le thread sélectionné
+                          console.log('🔐 Thread privé:', privateThreadId);
+                          setMessages([]); // Vider les messages du thread précédent
                           setSelectedThreadId(privateThreadId);
-
-                          // IMPORTANT: Récupérer et définir le thread complet
-                          const { data: privateThread } = await supabase
-                            .from('message_threads')
-                            .select('*')
-                            .eq('id', privateThreadId)
-                            .single();
-
-                          if (privateThread) {
-                            setSelectedThread(privateThread);
-                          }
-
-                          // Récupérer les messages de ce thread privé
-                          const { data: threadMessages } = await supabase
-                            .from('messages')
-                            .select('*')
-                            .eq('thread_id', privateThreadId)
-                            .order('created_at', { ascending: true });
-
-                          if (threadMessages) {
-                            setMessages(threadMessages);
-                          }
-                        }
-                      } else {
-                        // Pour les conversations humain-humain, utiliser le thread principal
-                        if (threads.length > 0 && !threads[0].title?.includes('Conversation privée')) {
-                          setSelectedThreadId(threads[0].id);
-                          setSelectedThread(threads[0]);
                         }
                       }
 
@@ -590,13 +332,9 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           showStatus={true}
                           className="flex-1"
                         />
-                        {/* Animation sur l'avatar uniquement pour l'IA en traitement */}
-                        {isAIProcessing && selectedConversation.id === member.id && member.isAI && (
-                          <div className="absolute inset-0 rounded-full animate-pulse bg-cyan-400/20" />
-                        )}
                       </div>
 
-                      {/* Badge IA avec indicateur de traitement */}
+                      {/* Badge IA */}
                       {member.isAI && (
                         <motion.div
                           initial={{ scale: 0 }}
@@ -604,70 +342,15 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/30"
                         >
                           <Zap className="h-3 w-3 text-white" />
-                          <span className="text-xs font-medium text-white">
-                            {isAIProcessing && selectedConversation.id === member.id ? "..." : "IA"}
-                          </span>
+                          <span className="text-xs font-medium text-white">IA</span>
                         </motion.div>
                       )}
                     </div>
-                    {/* Indicateur "En train d'écrire..." */}
-                    {isAIProcessing && selectedConversation.id === member.id && member.isAI && (
-                      <div className="text-xs text-cyan-400 mt-1 animate-pulse">
-                        En train d'écrire...
-                      </div>
-                    )}
                   </motion.div>
                 ))}
               </div>
 
-              {/* Groupes */}
-              {groups.length > 0 && (
-                <>
-                  <Separator className="my-4 bg-purple-500/20" />
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Groupes</p>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20"
-                        onClick={() => setIsCreatingGroup(true)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    {groups.map((group) => (
-                      <motion.div
-                        key={group.id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setSelectedConversation({ 
-                          type: 'group', 
-                          id: group.id, 
-                          name: group.name,
-                          members: group.members 
-                        })}
-                        className={cn(
-                          "p-3 rounded-xl cursor-pointer transition-all duration-200",
-                          selectedConversation.id === group.id
-                            ? "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50"
-                            : "bg-white/5 hover:bg-white/10"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg">
-                            <Hash className="h-4 w-4 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-white">{group.name}</p>
-                            <p className="text-xs text-gray-400">{group.members.length} membres</p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </>
-              )}
+              {/* Groupes supprimés - Simplification */}
             </div>
           </div>
 
@@ -686,13 +369,18 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                   )}
                 </div>
                 <div>
-                  <h4 className="font-semibold text-white">{selectedConversation.name}</h4>
+                  <h4 className="font-semibold text-white flex items-center gap-2">
+                    {selectedConversation.name}
+                    {threads.find(t => t.id === selectedThreadId)?.metadata?.type === 'private' && (
+                      <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-400/30">
+                        🔒 Privé
+                      </span>
+                    )}
+                  </h4>
                   <p className="text-xs text-gray-400">
-                    {selectedConversation.type === 'all' 
-                      ? `${projectMembers.length} participants`
-                      : selectedConversation.type === 'group'
-                      ? `${selectedConversation.members?.length || 0} membres`
-                      : 'Conversation privée'
+                    {selectedConversation.type === 'all'
+                      ? `${projectMembers.length} participants - Canal général`
+                      : '🔐 Conversation privée - Seuls vous deux pouvez voir ces messages'
                     }
                   </p>
                 </div>

@@ -14,6 +14,7 @@ export interface MessageThread {
   is_active: boolean;
   unread_count: number;
   participants: MessageParticipant[];
+  metadata?: any; // Ajout du champ metadata pour stocker type, participants, etc.
 }
 
 export interface Message {
@@ -74,11 +75,15 @@ export const useMessages = (projectId?: string) => {
     if (!projectId) return;
 
     try {
+      // Récupérer l'utilisateur actuel
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { data: threadsData, error } = await supabase
         .from('message_threads')
         .select(`
           *,
-          message_participants (*)
+          message_participants (*),
+          metadata
         `)
         .eq('project_id', projectId)
         .eq('is_active', true)
