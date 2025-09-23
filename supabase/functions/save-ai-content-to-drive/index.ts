@@ -268,7 +268,7 @@ serve(async (req) => {
       .from('drive_folders')
       .select('id')
       .eq('project_id', projectId)
-      .eq('path', iaFolderPath)
+      .eq('folder_path', iaFolderPath)
       .single();
 
     if (!existingFolder) {
@@ -279,10 +279,11 @@ serve(async (req) => {
         .from('drive_folders')
         .insert({
           project_id: projectId,
-          name: 'IA',
-          path: iaFolderPath,
-          parent_path: `projects/${projectId}`,
+          folder_name: 'IA',
+          folder_path: iaFolderPath,
+          parent_folder: `projects/${projectId}`,
           created_by: userId || 'ai-system',
+          is_ai_folder: true,
           metadata: {
             description: 'Dossier des livrables générés par l\'IA',
             icon: '🤖',
@@ -345,11 +346,27 @@ serve(async (req) => {
       .single()
 
     if (recordError) {
-      console.error('❌ Erreur création enregistrement:', recordError)
-      console.warn('⚠️ Fichier sauvé mais sans enregistrement Drive')
-    } else {
-      console.log('✅ Enregistrement Drive créé:', fileRecord.id)
+      console.error('❌ Erreur création enregistrement kanban_files:', recordError)
+      console.error('🔍 Détails erreur:', {
+        message: recordError.message,
+        details: recordError.details,
+        hint: recordError.hint,
+        code: recordError.code
+      })
+      console.error('📝 Données tentées:', driveEntry)
+
+      // Retourner une erreur plutôt que de continuer
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Erreur sauvegarde fichier: ${recordError.message}`,
+        details: recordError
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      })
     }
+
+    console.log('✅ Enregistrement Drive créé:', fileRecord.id)
 
     // 6. Créer un dossier IA s'il n'existe pas déjà
     try {

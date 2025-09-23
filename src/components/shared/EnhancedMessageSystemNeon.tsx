@@ -407,7 +407,7 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                                 animate={{ opacity: [1, 0.5, 1] }}
                                 transition={{ duration: 0.8, repeat: Infinity }}
                               >
-                                Génère...
+                                IA
                               </motion.span>
                             </>
                           ) : (
