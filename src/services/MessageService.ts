@@ -471,12 +471,13 @@ export class MessageService {
           aiMemberName: iaProfile.name
         });
 
-        // Appeler la fonction de sauvegarde
+        // Appeler la fonction de sauvegarde avec le userId
         await this.saveAIContentToDrive(
           projectId,
           fileName,
           contentToSave,
-          iaProfile.name
+          iaProfile.name,
+          originalSenderId
         ).catch(error => {
           console.error('❌ Erreur sauvegarde Drive:', error);
         });
@@ -530,35 +531,67 @@ export class MessageService {
     projectId: string,
     fileName: string,
     content: string,
-    aiMemberName: string
+    aiMemberName: string,
+    userId?: string
   ): Promise<void> {
     try {
       console.log('📁 [saveAIContentToDrive] Début sauvegarde:', {
         projectId,
         fileName,
         contentLength: content.length,
-        aiMemberName
+        aiMemberName,
+        userId: userId || 'non fourni'
       });
 
       // Extraire le titre du nom de fichier (sans l'extension)
       const title = fileName.replace(/\.docx$/i, '');
 
-      // Appeler l'Edge Function de sauvegarde qui générera le DOCX côté serveur
-      const { data, error } = await supabase.functions.invoke('save-ai-content-to-drive', {
-        body: {
+      // Récupérer le token de session actuel
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      // Récupérer l'URL de Supabase
+      const supabaseUrl = 'https://egdelmcijszuapcpglsy.supabase.co';
+      const functionUrl = `${supabaseUrl}/functions/v1/save-ai-content-to-drive`;
+
+      console.log('🔗 Appel direct avec fetch vers:', functionUrl);
+      console.log('🔑 Token disponible:', !!accessToken);
+
+      // Appeler directement l'Edge Function avec fetch
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZGVsbWNpanN6dWFwY3BnbHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQxNjIyMDAsImV4cCI6MjA2OTczODIwMH0.JYV-JxosrfE7kMtFw3XLs27PGf3Fn-rDyJLDWeYXF_U'
+        },
+        body: JSON.stringify({
           projectId,
           fileName,
           content: content, // Le markdown original sera converti en DOCX côté serveur
           contentType: 'document',
           aiMemberName,
           title: title, // Ajouter le titre pour la génération DOCX
-          generateDocx: true // Indiquer qu'on veut générer un DOCX côté serveur
-        }
+          generateDocx: true, // Indiquer qu'on veut générer un DOCX côté serveur
+          userId: userId || session?.user?.id // Utiliser le userId passé ou celui de la session
+        })
       });
 
-      if (error) {
-        console.error('❌ [saveAIContentToDrive] Erreur Edge Function:', error);
-        throw error;
+      const responseText = await response.text();
+      console.log('📦 Réponse brute:', responseText);
+
+      if (!response.ok) {
+        console.error('❌ [saveAIContentToDrive] Erreur HTTP:', response.status, response.statusText);
+        console.error('📦 Réponse erreur:', responseText);
+        throw new Error(`Erreur HTTP ${response.status}: ${responseText}`);
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ Erreur parsing JSON:', parseError);
+        throw new Error('Réponse invalide de l\'Edge Function');
       }
 
       console.log('✅ [saveAIContentToDrive] Réponse Edge Function:', data);

@@ -188,12 +188,34 @@ function determineFileType(fileName: string, aiMemberName: string, content: stri
 }
 
 serve(async (req) => {
+  console.log('=== DÉBUT SAVE-AI-CONTENT-TO-DRIVE ===');
+  console.log('📅 Date/Time:', new Date().toISOString());
+  console.log('🌐 Method:', req.method);
+  console.log('🔗 URL:', req.url);
+
+  // Logger TOUS les headers pour debug
+  const allHeaders: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    allHeaders[key] = key.toLowerCase().includes('auth') || key.toLowerCase().includes('key')
+      ? value.substring(0, 20) + '...'
+      : value;
+  });
+  console.log('📋 Headers complets:', JSON.stringify(allHeaders, null, 2));
+
   if (req.method === 'OPTIONS') {
+    console.log('✅ Réponse OPTIONS');
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const { projectId, fileName, content, contentType, aiMemberName, title, generateDocx } = await req.json()
+    console.log('🔍 Tentative de lecture du body JSON...');
+    const requestBody = await req.json();
+    console.log('📦 Body reçu:', JSON.stringify({
+      ...requestBody,
+      content: requestBody.content ? `[CONTENT: ${requestBody.content.length} chars]` : undefined
+    }, null, 2));
+
+    const { projectId, fileName, content, contentType, aiMemberName, title, generateDocx, userId: providedUserId } = requestBody
 
     console.log('💾 Sauvegarde contenu IA:', {
       projectId,
@@ -202,6 +224,7 @@ serve(async (req) => {
       aiMemberName,
       title,
       generateDocx,
+      providedUserId,
       contentLength: content?.length || 0
     })
 
@@ -220,9 +243,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Récupérer l'utilisateur pour l'ID
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-    const userId = user?.id || 'ai-system'
+    // Récupérer l'utilisateur depuis le token d'authentification ou utiliser le userId fourni
+    let userId = providedUserId || null
+
+    if (!userId) {
+      const authHeader = req.headers.get('authorization')
+      console.log('🔍 Auth header présent:', !!authHeader)
+
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '')
+
+        // Utiliser le client Supabase admin pour vérifier le token
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
+
+        if (user) {
+          userId = user.id
+          console.log('✅ Utilisateur récupéré depuis le token:', userId)
+        } else {
+          console.log('⚠️ Impossible de récupérer l\'utilisateur:', userError?.message)
+        }
+      } else {
+        // Si pas de token auth mais un userId fourni, on l'utilise
+        console.log('⚠️ Pas de token Auth, utilisation du userId fourni')
+      }
+    }
+
+    // Pour les IA, on peut accepter sans userId (sera null)
+    console.log('🔑 UserId final:', userId || 'null (OK pour IA)')
 
     // 1. Créer le chemin de fichier dans le Drive
     const driveFilePath = `projects/${projectId}/IA/${fileName}`
@@ -282,7 +329,7 @@ serve(async (req) => {
           folder_name: 'IA',
           folder_path: iaFolderPath,
           parent_folder: `projects/${projectId}`,
-          created_by: userId || 'ai-system',
+          created_by: userId, // Peut être null
           is_ai_folder: true,
           metadata: {
             description: 'Dossier des livrables générés par l\'IA',
@@ -326,7 +373,7 @@ serve(async (req) => {
       file_path: driveFilePath,
       file_type: mimeType,
       file_size: fileContent.length,
-      uploaded_by: userId,
+      uploaded_by: userId || null, // Peut être null pour l'IA
       uploaded_at: new Date().toISOString(),
       folder_path: `projects/${projectId}/IA`,
       is_ai_generated: true,
@@ -338,6 +385,13 @@ serve(async (req) => {
         source: 'ai-conversation'
       }
     }
+
+    console.log('📥 Entrée kanban_files à créer:', {
+      project_id: driveEntry.project_id,
+      file_name: driveEntry.file_name,
+      uploaded_by: driveEntry.uploaded_by,
+      is_ai_generated: driveEntry.is_ai_generated
+    })
 
     const { data: fileRecord, error: recordError } = await supabaseClient
       .from('kanban_files')

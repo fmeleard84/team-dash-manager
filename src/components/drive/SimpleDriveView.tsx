@@ -32,6 +32,7 @@ import {
   Edit3,
   ChevronRight,
   Home,
+  Bot,
 } from 'lucide-react';
 
 interface SimpleDriveViewProps {
@@ -96,16 +97,29 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
           { name: 'Livrables', isVirtual: true, created_at: new Date().toISOString() },
           { name: 'Messagerie', isVirtual: true, created_at: new Date().toISOString() },
           { name: 'Kanban', isVirtual: true, created_at: new Date().toISOString() },
+          { name: 'IA', isVirtual: true, created_at: new Date().toISOString() },
         ];
         
         // Charger le nombre d'éléments dans chaque dossier virtuel
         for (const folder of virtualFolders) {
-          const folderPath = `${prefix}${folder.name}/`;
-          const { data: folderContent } = await supabase.storage
-            .from('project-files')
-            .list(folderPath, { limit: 1000 });
-          
-          folder.itemCount = folderContent?.length || 0;
+          if (folder.name === 'IA') {
+            // Pour le dossier IA, compter depuis la table kanban_files
+            const { count } = await supabase
+              .from('kanban_files')
+              .select('*', { count: 'exact', head: true })
+              .eq('project_id', projectId)
+              .eq('is_ai_generated', true)
+              .eq('folder_path', `projects/${projectId}/IA`);
+
+            folder.itemCount = count || 0;
+          } else {
+            const folderPath = `${prefix}${folder.name}/`;
+            const { data: folderContent } = await supabase.storage
+              .from('project-files')
+              .list(folderPath, { limit: 1000 });
+
+            folder.itemCount = folderContent?.length || 0;
+          }
         }
         
         // Charger aussi les vrais fichiers/dossiers à la racine
@@ -180,6 +194,40 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
         })) || [];
         
         setEntries(entries);
+      } else if (prefix.includes('/IA/') || prefix === `${basePrefix}IA/`) {
+        // Charger les fichiers IA depuis la table kanban_files
+        console.log('🤖 Loading IA files from kanban_files table');
+
+        const { data: iaFiles, error: iaError } = await supabase
+          .from('kanban_files')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('is_ai_generated', true)
+          .eq('folder_path', `projects/${projectId}/IA`);
+
+        if (!iaError && iaFiles) {
+          const iaEntries: FileEntry[] = iaFiles.map(file => ({
+            name: file.file_name,
+            id: file.id,
+            created_at: file.created_at || file.uploaded_at,
+            size: file.file_size,
+            mimeType: file.file_type,
+            fullPath: file.file_path,
+            metadata: {
+              ...file.metadata,
+              ai_member_name: file.ai_member_name,
+              content_type: file.content_type
+            }
+          }));
+
+          setEntries(iaEntries);
+          console.log(`✅ Loaded ${iaEntries.length} IA files`);
+        } else if (iaError) {
+          console.error('❌ Error loading IA files:', iaError);
+          setEntries([]);
+        } else {
+          setEntries([]);
+        }
       } else if (prefix.includes('/Kanban/') || prefix === `${basePrefix}Kanban/`) {
         // Charger les fichiers depuis le dossier Kanban dans project-files
         // Les fichiers sont synchronisés depuis kanban-files vers project-files/projects/{projectId}/Kanban/
@@ -359,7 +407,7 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
       // Déterminer le bon bucket et chemin
       let bucket = 'project-files';
       let downloadPath = `${currentPath}${fileName}`;
-      
+
       if (currentPath.includes('/Messagerie/')) {
         bucket = 'message-files';
         downloadPath = `projects/${projectId}/${fileName}`;
@@ -367,6 +415,10 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
         // Les fichiers Kanban sont maintenant dans project-files
         bucket = 'project-files';
         downloadPath = `projects/${projectId}/Kanban/${fileName}`;
+      } else if (currentPath.includes('/IA/')) {
+        // Pour les fichiers IA, utiliser le bucket kanban-files et le chemin complet
+        bucket = 'kanban-files';
+        downloadPath = entry?.fullPath || `projects/${projectId}/IA/${fileName}`;
       }
 
       const { data, error } = await supabase.storage
@@ -804,6 +856,7 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
     if (isFolder(entry.name)) {
       if (entry.name === 'Messagerie') return <MessageSquare className="h-5 w-5 text-purple-500" />;
       if (entry.name === 'Kanban') return <Trello className="h-5 w-5 text-blue-500" />;
+      if (entry.name === 'IA') return <Bot className="h-5 w-5 text-green-500" />;
       return <Folder className="h-5 w-5 text-yellow-500" />;
     }
     
@@ -863,35 +916,45 @@ export default function SimpleDriveView({ projectId, userType }: SimpleDriveView
             </CardTitle>
             
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowNewFolderDialog(true)}
-              >
-                <FolderPlus className="h-4 w-4 mr-2" />
-                Nouveau dossier
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                Uploader
-              </Button>
-              <input
-                id="file-upload"
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-              />
+              {/* Masquer les boutons dans le dossier IA (réservé à l'IA) */}
+              {!currentPath.includes('/IA/') && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowNewFolderDialog(true)}
+                  >
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    Nouveau dossier
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-2" />
+                    )}
+                    Uploader
+                  </Button>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </>
+              )}
+              {currentPath.includes('/IA/') && (
+                <div className="text-sm text-gray-500">
+                  🤖 Dossier réservé aux contenus générés par l'IA
+                </div>
+              )}
             </div>
           </div>
         

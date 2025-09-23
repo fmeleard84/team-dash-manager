@@ -136,6 +136,13 @@ serve(async (req) => {
       ?.join('\n') || ''
 
     // 4. Construire le prompt complet avec mémoire de conversation et contexte projet
+
+    // Détecter si c'est une confirmation de sauvegarde
+    const confirmWords = ['oui', 'ok', "d'accord", 'bien sûr', 'absolument', 'avec plaisir', 'parfait', 'super', 'yes', 'allez-y', 'go', 'allons-y', 'enregistre', 'sauvegarde'];
+    const isConfirmingSave = confirmWords.some(word => userMessage.toLowerCase().includes(word)) &&
+                             (historyText.includes('Souhaitez-vous que je sauvegarde') ||
+                              historyText.includes('📁'));
+
     const systemPrompt = `${prompt.prompt}${projectContext}
 
 IMPORTANT - Mémoire de conversation:
@@ -149,6 +156,10 @@ Historique de la conversation (du plus ancien au plus récent):
 ${historyText}
 
 Nouveau message de l'utilisateur: ${userMessage}
+
+${isConfirmingSave ? `⚠️ DÉTECTION: L'utilisateur confirme qu'il veut sauvegarder le document.
+NE PAS RÉPÉTER LE CONTENU. Répondez UNIQUEMENT avec une confirmation brève et le tag [SAVE_TO_DRIVE].
+Exemple: "✅ Parfait ! Je sauvegarde votre article dans le Drive.\\n\\n[SAVE_TO_DRIVE: Article_Theme.docx]"` : ''}
 
 Instructions:
 - Répondez en français
@@ -165,11 +176,15 @@ IMPORTANT - Gestion des livrables:
 Si l'utilisateur demande un livrable (article, planning, guide, rapport, documentation, etc.):
 1. Produisez le contenu demandé de manière complète et structurée
 2. À la fin, demandez TOUJOURS : "📁 Souhaitez-vous que je sauvegarde ce document dans votre Drive projet (dossier IA) au format Word (.docx) ?"
-3. Si l'utilisateur répond oui/ok/d'accord/bien sûr/absolument/avec plaisir, votre réponse doit TOUJOURS terminer par:
-   [SAVE_TO_DRIVE: nom_du_fichier.docx]
-   où nom_du_fichier est un nom descriptif basé sur le contenu (ex: article_marketing_digital.docx, planning_projet_2025.docx)
 
-IMPORTANT: Quand l'utilisateur confirme qu'il veut sauvegarder (avec oui, ok, d'accord, etc.), vous DEVEZ obligatoirement ajouter le tag [SAVE_TO_DRIVE: nom_fichier.docx] à la FIN de votre message, après tout le contenu.`
+TRÈS IMPORTANT - Quand l'utilisateur confirme la sauvegarde:
+Si l'utilisateur répond oui/ok/d'accord/bien sûr/absolument/avec plaisir/enregistre/sauvegarde, vous devez UNIQUEMENT:
+1. Répondre avec un message de confirmation COURT et SIMPLE (ex: "✅ Parfait ! Je sauvegarde le document dans votre Drive.")
+2. NE PAS REPRODUIRE LE CONTENU DE L'ARTICLE
+3. Terminer votre message par: [SAVE_TO_DRIVE: nom_descriptif.docx]
+   où nom_descriptif est basé sur le contenu (ex: Article_QRCode_WineLabel.docx, Planning_Projet_2025.docx)
+
+RÈGLE ABSOLUE: Ne JAMAIS répéter le contenu du document lors de la confirmation de sauvegarde. Juste confirmer brièvement et ajouter le tag.`
 
     // 5. Appel à OpenAI
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
