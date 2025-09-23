@@ -287,9 +287,13 @@ function generateSimulatedResponse(userMessage: string, promptName: string, hist
   });
 
   // Vérifier si l'utilisateur confirme la sauvegarde
-  const confirmWords = ['oui', 'ok', "d'accord", 'bien sûr', 'absolument', 'avec plaisir', 'parfait', 'super', 'yes', 'allez-y', 'go', 'allons-y'];
+  const confirmWords = ['oui', 'ok', "d'accord", 'bien sûr', 'absolument', 'avec plaisir', 'parfait', 'super', 'yes', 'allez-y', 'go', 'allons-y', 'enregistre'];
   const isConfirmation = confirmWords.some(word => userMessage.toLowerCase().includes(word));
-  const hasAskedAboutSaving = historyText.includes('Souhaitez-vous que je sauvegarde') || historyText.includes('sauvegarde ce document');
+  const hasAskedAboutSaving = historyText.includes('Souhaitez-vous que je sauvegarde') ||
+                               historyText.includes('sauvegarde ce document') ||
+                               historyText.includes('sauvegarde cet article') ||
+                               historyText.includes('enregistrerai sous le nom') ||
+                               userMessage.toLowerCase().includes('enregistrer');
 
   console.log('✅ [generateSimulatedResponse] Détection confirmation:', {
     isConfirmation,
@@ -320,7 +324,15 @@ function generateSimulatedResponse(userMessage: string, promptName: string, hist
 
     console.log('💾 [generateSimulatedResponse] Génération avec SAVE_TO_DRIVE:', fileName);
 
-    return 'Super ! 🎉 Je m\'occupe de sauvegarder ça pour vous !\n\n📁 Le fichier "' + fileName + '" sera dispo dans quelques secondes dans le dossier IA de votre Drive.\n\nVous pourrez le télécharger, le modifier ou le partager avec l\'équipe. Pratique, non ? 😊\n\n✅ Et voilà, c\'est fait !\n\n[SAVE_TO_DRIVE: ' + fileName + ']';
+    // IMPORTANT: Le tag SAVE_TO_DRIVE doit être à la FIN du message
+    const responseMessage = 'Super ! 🎉 Je m\'occupe de sauvegarder ça pour vous !\n\n' +
+                          '📁 Le fichier "' + fileName + '" est maintenant disponible dans le dossier IA de votre Drive.\n\n' +
+                          'Vous pouvez le télécharger, le modifier ou le partager avec l\'équipe.\n\n' +
+                          '✅ Document sauvegardé avec succès !\n\n' +
+                          '[SAVE_TO_DRIVE: ' + fileName + ']';
+
+    console.log('🔍 [generateSimulatedResponse] Réponse avec tag:', responseMessage.includes('[SAVE_TO_DRIVE:'));
+    return responseMessage;
   }
   // Vérifier si la demande concerne un livrable (article, guide, etc.)
   const isDeliverableRequest = userMessage.toLowerCase().includes('article') ||

@@ -108,6 +108,7 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState<string | null>(null); // ID de l'IA qui génère
+  const [aiGenerationStartTime, setAIGenerationStartTime] = useState<number | null>(null); // Timestamp du début de génération
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -130,14 +131,26 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
       const lastMessages = messages.slice(-3); // Les 3 derniers messages
       const aiResponse = lastMessages.find(msg => {
         const sender = projectMembers.find(m => m.email === msg.sender_email);
-        return sender?.isAI === true;
+        // Vérifier que c'est bien l'IA qui génère actuellement
+        return sender?.isAI === true &&
+               sender.id.replace('ia_', '') === isAIGenerating &&
+               // Le message doit être récent (moins de 30 secondes)
+               new Date(msg.created_at).getTime() > Date.now() - 30000;
       });
 
       if (aiResponse) {
-        // L'IA a répondu, arrêter le loader avec un petit délai pour fluidité
-        setTimeout(() => {
-          setIsAIGenerating(null);
-        }, 500);
+        // Vérifier si le message contient le tag de sauvegarde ou si c'est une réponse complète
+        const isComplete = aiResponse.content.includes('[SAVE_TO_DRIVE:') ||
+                          aiResponse.content.length > 100 ||
+                          (aiGenerationStartTime && Date.now() - aiGenerationStartTime > 3000);
+
+        if (isComplete) {
+          // L'IA a terminé, arrêter le loader avec un délai pour fluidité
+          setTimeout(() => {
+            setIsAIGenerating(null);
+            setAIGenerationStartTime(null);
+          }, 1000); // Délai plus long pour être sûr que l'IA a fini
+        }
       }
     }
   }, [messages, isAIGenerating, projectMembers]);
@@ -205,7 +218,9 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
       if (isPrivateWithAI) {
         const aiParticipant = currentThread?.metadata?.participants?.find((p: any) => p.isAI === true);
         if (aiParticipant) {
+          console.log('🔴 [UI] Début génération IA:', aiParticipant.id);
           setIsAIGenerating(aiParticipant.id);
+          setAIGenerationStartTime(Date.now());
         }
       }
 

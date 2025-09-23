@@ -412,7 +412,9 @@ export class MessageService {
       console.log('🔍 Vérification sauvegarde Drive:', {
         hasMatch: !!saveMatch,
         fileName: saveMatch?.[1],
-        contentLength: responseContent.length
+        contentLength: responseContent.length,
+        containsSaveTag: responseContent.includes('[SAVE_TO_DRIVE:'),
+        last100Chars: responseContent.slice(-100)
       });
 
       let finalContent = responseContent;
@@ -462,6 +464,12 @@ export class MessageService {
 
         console.log('💾 Sauvegarde Drive demandée:', fileName);
         console.log('📄 Longueur du contenu à sauvegarder:', contentToSave.length);
+        console.log('🔨 Appel de saveAIContentToDrive avec:', {
+          projectId,
+          fileName,
+          contentLength: contentToSave.length,
+          aiMemberName: iaProfile.name
+        });
 
         // Appeler la fonction de sauvegarde
         await this.saveAIContentToDrive(
@@ -525,7 +533,12 @@ export class MessageService {
     aiMemberName: string
   ): Promise<void> {
     try {
-      console.log('📁 Sauvegarde dans Drive:', { projectId, fileName });
+      console.log('📁 [saveAIContentToDrive] Début sauvegarde:', {
+        projectId,
+        fileName,
+        contentLength: content.length,
+        aiMemberName
+      });
 
       // Extraire le titre du nom de fichier (sans l'extension)
       const title = fileName.replace(/\.docx$/i, '');
@@ -543,9 +556,13 @@ export class MessageService {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ [saveAIContentToDrive] Erreur Edge Function:', error);
+        throw error;
+      }
 
-      console.log('✅ Document sauvé dans Drive:', data);
+      console.log('✅ [saveAIContentToDrive] Réponse Edge Function:', data);
+      console.log('🎯 Document devrait être sauvé dans Drive');
 
       // Envoyer un message de confirmation dans le thread
       // (Optionnel - on peut aussi juste logger)
