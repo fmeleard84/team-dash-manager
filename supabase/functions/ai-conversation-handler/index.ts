@@ -22,7 +22,13 @@ serve(async (req) => {
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
 
     // 1. Récupérer le prompt IA
@@ -46,7 +52,81 @@ serve(async (req) => {
 
     console.log('✅ Prompt IA trouvé:', prompt.name)
 
-    // 2. Construire le contexte de conversation avec mémoire complète
+    // 2. Récupérer le contexte enrichi du projet si disponible
+    let projectContext = ''
+    let vectorSearchResults = []
+
+    if (projectId) {
+      try {
+        // Récupérer le contexte structuré du projet
+        const { data: contextData, error: contextError } = await supabaseClient
+          .rpc('get_project_context_for_ai', {
+            p_project_id: projectId,
+            p_limit: 10
+          })
+
+        if (contextData && !contextError) {
+          // Construire un résumé du contexte projet
+          const ctx = contextData
+          projectContext = `\n\nCONTEXTE DU PROJET:
+`
+
+          if (ctx.project_info) {
+            projectContext += `Projet: ${ctx.project_info.title}\n`
+            projectContext += `Description: ${ctx.project_info.description || 'Non spécifiée'}\n`
+            projectContext += `Statut: ${ctx.project_info.status}\n`
+          }
+
+          if (ctx.team_members && ctx.team_members.length > 0) {
+            projectContext += `\nÉquipe: ${ctx.team_members.map(m =>
+              m.is_ai ? `${m.profile_name} (IA)` : m.candidate_name
+            ).join(', ')}\n`
+          }
+
+          if (ctx.active_tasks && ctx.active_tasks.length > 0) {
+            projectContext += `\nTâches actives: ${ctx.active_tasks.length}\n`
+            ctx.active_tasks.slice(0, 3).forEach(task => {
+              projectContext += `- ${task.title} (${task.status})\n`
+            })
+          }
+
+          if (ctx.recent_documents && ctx.recent_documents.length > 0) {
+            projectContext += `\nDocuments récents: ${ctx.recent_documents.length} fichiers\n`
+          }
+        }
+
+        // Si OpenAI est configuré, faire une recherche vectorielle
+        if (Deno.env.get('OPENAI_API_KEY') && userMessage.length > 10) {
+          // Générer l'embedding de la question
+          const queryEmbedding = await generateQueryEmbedding(userMessage)
+
+          if (queryEmbedding) {
+            // Rechercher dans les embeddings du projet
+            const { data: searchResults, error: searchError } = await supabaseClient
+              .rpc('search_project_embeddings', {
+                p_project_id: projectId,
+                p_query_embedding: queryEmbedding,
+                p_match_threshold: 0.7,
+                p_match_count: 5
+              })
+
+            if (searchResults && searchResults.length > 0 && !searchError) {
+              vectorSearchResults = searchResults
+              projectContext += `\n\nCONTENU PERTINENT DU PROJET:\n`
+              searchResults.forEach((result, idx) => {
+                projectContext += `\n[${idx + 1}] ${result.content_type}: ${result.content.substring(0, 200)}...\n`
+                projectContext += `(Pertinence: ${(result.similarity * 100).toFixed(1)}%)\n`
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.error('⚠️ Erreur récupération contexte projet:', error)
+        // Continuer sans le contexte projet
+      }
+    }
+
+    // 3. Construire le contexte de conversation avec mémoire complète
     const historyText = conversationHistory
       ?.slice(0, 8) // Utiliser jusqu'à 8 messages pour plus de contexte
       ?.map(msg => {
@@ -55,8 +135,8 @@ serve(async (req) => {
       })
       ?.join('\n') || ''
 
-    // 3. Construire le prompt complet avec mémoire de conversation
-    const systemPrompt = `${prompt.prompt}
+    // 4. Construire le prompt complet avec mémoire de conversation et contexte projet
+    const systemPrompt = `${prompt.prompt}${projectContext}
 
 IMPORTANT - Mémoire de conversation:
 Vous avez une conversation continue avec cet utilisateur. Vous devez :
@@ -91,15 +171,14 @@ Si l'utilisateur demande un livrable (article, planning, guide, rapport, documen
 
 IMPORTANT: Quand l'utilisateur confirme qu'il veut sauvegarder (avec oui, ok, d'accord, etc.), vous DEVEZ obligatoirement ajouter le tag [SAVE_TO_DRIVE: nom_fichier.docx] à la FIN de votre message, après tout le contenu.`
 
-    // 4. Appel à OpenAI (simulé pour l'instant)
-    // TODO: Remplacer par un vrai appel OpenAI avec la clé API configurée
+    // 5. Appel à OpenAI
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
 
     if (!openaiApiKey) {
       console.warn('⚠️ Clé OpenAI non configurée, utilisation d\'une réponse simulée')
 
-      // Réponse simulée pour le développement
-      const simulatedResponse = generateSimulatedResponse(userMessage, prompt.name, historyText)
+      // Réponse simulée pour le développement avec contexte projet
+      const simulatedResponse = generateSimulatedResponse(userMessage, prompt.name, historyText, projectContext)
 
       return new Response(JSON.stringify({
         success: true,
@@ -165,8 +244,42 @@ IMPORTANT: Quand l'utilisateur confirme qu'il veut sauvegarder (avec oui, ok, d'
   }
 })
 
+// Fonction pour générer l'embedding d'une requête
+async function generateQueryEmbedding(text: string): Promise<number[] | null> {
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+
+  if (!openaiApiKey) {
+    return null
+  }
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: text.substring(0, 8000), // Limiter la taille
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('❌ Erreur génération embedding requête')
+      return null
+    }
+
+    const data = await response.json()
+    return data.data?.[0]?.embedding || null
+  } catch (error) {
+    console.error('❌ Erreur embedding:', error)
+    return null
+  }
+}
+
 // Fonction pour générer une réponse simulée pendant le développement
-function generateSimulatedResponse(userMessage: string, promptName: string, historyText: string): string {
+function generateSimulatedResponse(userMessage: string, promptName: string, historyText: string, projectContext: string = ''): string {
   console.log('🔍 [generateSimulatedResponse] Analyse:', {
     userMessage: userMessage.slice(0, 100),
     hasAskedAboutSaving: historyText.includes('Souhaitez-vous que je sauvegarde'),
@@ -222,7 +335,7 @@ function generateSimulatedResponse(userMessage: string, promptName: string, hist
 
   const responses = {
     'Concepteur rédacteur IA': [
-      'Ah, un article sur "' + userMessage.slice(0, 50) + '" ? Avec plaisir ! 😊\n\n# ' + userMessage + '\n\n## Introduction\nAlors, parlons de ça ! ' + userMessage + ', c\'est un sujet vraiment intéressant qui mérite qu\'on s\'y attarde.\n\n## Les points clés\n- 🎯 D\'abord, analysons le contexte\n- 💡 Ensuite, explorons les solutions possibles\n- 🚀 Et enfin, passons à l\'action !\n\n## Pour conclure\nJ\'espère que cet article vous aide ! N\'hésitez pas si vous voulez que j\'approfondisse certains points.\n\n*Rédigé avec enthousiasme le ' + new Date().toLocaleDateString('fr-FR') + '* 🎆\n\n' + (isDeliverableRequest ? '📁 Ça vous dit que je sauvegarde ce document dans votre Drive ? (dossier IA, format Word)' : 'Autre chose ?'),
+      'Ah, un article sur "' + userMessage.slice(0, 50) + '" ? Avec plaisir ! 😊\n\n# ' + userMessage + '\n\n## Introduction\nAlors, parlons de ça ! ' + userMessage + ', c\'est un sujet vraiment intéressant qui mérite qu\'on s\'y attarde.' + (projectContext ? '\n\nDans le contexte de votre projet, j\'ai noté quelques éléments pertinents que je vais intégrer.' : '') + '\n\n## Les points clés\n- 🎯 D\'abord, analysons le contexte\n- 💡 Ensuite, explorons les solutions possibles\n- 🚀 Et enfin, passons à l\'action !\n\n## Pour conclure\nJ\'espère que cet article vous aide ! N\'hésitez pas si vous voulez que j\'approfondisse certains points.\n\n*Rédigé avec enthousiasme le ' + new Date().toLocaleDateString('fr-FR') + '* 🎆\n\n' + (isDeliverableRequest ? '📁 Ça vous dit que je sauvegarde ce document dans votre Drive ? (dossier IA, format Word)' : 'Autre chose ?'),
 
       'OK, let\'s go ! 🚀\n\n# ' + userMessage + '\n\n## Alors, qu\'est-ce qu\'on a là ?\n\n' + userMessage + '... Intéressant ! Laissez-moi vous proposer quelque chose de sympa.\n\n### Voici mon plan d\'attaque :\n1. **D\'abord** : On clarifie l\'objectif 🎯\n2. **Ensuite** : On explore les options 🔍\n3. **Enfin** : On passe à l\'action ! 💪\n\n### En résumé\nJ\'ai hâte de voir ce que ça va donner ! Vous me dites si ça vous convient ?\n\n' + (isDeliverableRequest ? '📁 Je peux sauvegarder tout ça dans votre Drive si vous voulez (format Word, dans le dossier IA) ?' : 'Besoin d\'autre chose ? Je suis là ! 🙂'),
 
