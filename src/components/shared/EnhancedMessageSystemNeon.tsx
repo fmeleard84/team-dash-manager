@@ -379,76 +379,43 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           showStatus={true}
                           className="flex-1"
                         />
-                        {/* Loader pour l'IA qui génère - ROUGE CLIGNOTANT pour visibilité */}
-                        {member.isAI && isAIGenerating === member.id.replace('ia_', '') && (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-red-600"
-                              animate={{
-                                scale: [1, 1.3, 1],
-                                opacity: [1, 0.3, 1],
-                              }}
-                              transition={{
-                                duration: 1,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              }}
-                            />
-                            <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-red-500"
-                              animate={{
-                                scale: [1.3, 1, 1.3],
-                                opacity: [0.3, 1, 0.3],
-                              }}
-                              transition={{
-                                duration: 1,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                                delay: 0.2
-                              }}
-                            />
-                            <motion.div
-                              className="absolute inset-0 rounded-full bg-red-600/50 shadow-lg shadow-red-600/70"
-                              animate={{
-                                scale: [0.9, 1.1, 0.9],
-                                opacity: [0.6, 0.9, 0.6],
-                              }}
-                              transition={{
-                                duration: 0.8,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              }}
-                            />
-                          </div>
-                        )}
+                        {/* Pas d'effet sur l'avatar, seulement sur le badge */}
                       </div>
 
                       {/* Badge IA - Bleu par défaut, Rouge clignotant quand travaille */}
                       {member.isAI && (
                         <motion.div
                           initial={{ scale: 0 }}
-                          animate={{
-                            scale: 1,
-                            ...(isAIGenerating === member.id.replace('ia_', '') && {
-                              opacity: [1, 0.6, 1],
-                              scale: [1, 0.95, 1]
-                            })
-                          }}
-                          transition={isAIGenerating === member.id.replace('ia_', '') ? {
-                            opacity: { duration: 0.8, repeat: Infinity, ease: "easeInOut" },
-                            scale: { duration: 0.8, repeat: Infinity, ease: "easeInOut" }
-                          } : {}}
+                          animate={{ scale: 1 }}
                           className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-full shadow-lg border",
+                            "flex items-center gap-1 px-2 py-1 rounded-full shadow-lg border transition-all duration-300",
                             isAIGenerating === member.id.replace('ia_', '')
-                              ? "bg-gradient-to-r from-red-600 to-red-500 shadow-red-500/50 border-red-400 animate-pulse"
+                              ? "bg-gradient-to-r from-red-600 to-red-500 shadow-red-500/50 border-red-400"
                               : "bg-gradient-to-r from-blue-600 to-blue-500 shadow-blue-500/30 border-blue-400"
                           )}
                         >
-                          <Zap className="h-3 w-3 text-white" />
-                          <span className="text-xs font-medium text-white">
-                            {isAIGenerating === member.id.replace('ia_', '') ? 'Génère...' : 'IA'}
-                          </span>
+                          {isAIGenerating === member.id.replace('ia_', '') ? (
+                            <>
+                              <motion.div
+                                animate={{ opacity: [1, 0.3, 1] }}
+                                transition={{ duration: 0.8, repeat: Infinity }}
+                              >
+                                <Zap className="h-3 w-3 text-white" />
+                              </motion.div>
+                              <motion.span
+                                className="text-xs font-medium text-white"
+                                animate={{ opacity: [1, 0.5, 1] }}
+                                transition={{ duration: 0.8, repeat: Infinity }}
+                              >
+                                Génère...
+                              </motion.span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="h-3 w-3 text-white" />
+                              <span className="text-xs font-medium text-white">IA</span>
+                            </>
+                          )}
                         </motion.div>
                       )}
                     </div>

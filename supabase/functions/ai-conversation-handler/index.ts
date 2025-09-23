@@ -203,6 +203,10 @@ IMPORTANT: Quand l'utilisateur confirme qu'il veut sauvegarder (avec oui, ok, d'
           {
             role: 'system',
             content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: userMessage
           }
         ],
         max_tokens: 1500,
@@ -287,13 +291,18 @@ function generateSimulatedResponse(userMessage: string, promptName: string, hist
   });
 
   // Vérifier si l'utilisateur confirme la sauvegarde
-  const confirmWords = ['oui', 'ok', "d'accord", 'bien sûr', 'absolument', 'avec plaisir', 'parfait', 'super', 'yes', 'allez-y', 'go', 'allons-y', 'enregistre'];
+  const confirmWords = ['oui', 'ok', "d'accord", 'bien sûr', 'absolument', 'avec plaisir', 'parfait', 'super', 'yes', 'allez-y', 'go', 'allons-y', 'enregistre', 'merci'];
   const isConfirmation = confirmWords.some(word => userMessage.toLowerCase().includes(word));
+
+  // Vérifier si on a demandé de sauvegarder dans l'historique ou dans le message actuel
   const hasAskedAboutSaving = historyText.includes('Souhaitez-vous que je sauvegarde') ||
                                historyText.includes('sauvegarde ce document') ||
                                historyText.includes('sauvegarde cet article') ||
                                historyText.includes('enregistrerai sous le nom') ||
-                               userMessage.toLowerCase().includes('enregistrer');
+                               historyText.includes('📁') || // Emoji dossier
+                               userMessage.toLowerCase().includes('enregistre') ||
+                               userMessage.toLowerCase().includes('drive') ||
+                               userMessage.toLowerCase().includes('sauve');
 
   console.log('✅ [generateSimulatedResponse] Détection confirmation:', {
     isConfirmation,
@@ -324,14 +333,15 @@ function generateSimulatedResponse(userMessage: string, promptName: string, hist
 
     console.log('💾 [generateSimulatedResponse] Génération avec SAVE_TO_DRIVE:', fileName);
 
-    // IMPORTANT: Le tag SAVE_TO_DRIVE doit être à la FIN du message
-    const responseMessage = 'Super ! 🎉 Je m\'occupe de sauvegarder ça pour vous !\n\n' +
-                          '📁 Le fichier "' + fileName + '" est maintenant disponible dans le dossier IA de votre Drive.\n\n' +
-                          'Vous pouvez le télécharger, le modifier ou le partager avec l\'équipe.\n\n' +
-                          '✅ Document sauvegardé avec succès !\n\n' +
+    // Message de confirmation simple et clair
+    const responseMessage = '✅ Parfait ! Je sauvegarde le document dans votre Drive.\n\n' +
+                          '📁 Fichier: ' + fileName + '\n' +
+                          '📂 Dossier: /IA\n\n' +
+                          'Le document est maintenant disponible pour toute l\'équipe du projet.\n\n' +
                           '[SAVE_TO_DRIVE: ' + fileName + ']';
 
-    console.log('🔍 [generateSimulatedResponse] Réponse avec tag:', responseMessage.includes('[SAVE_TO_DRIVE:'));
+    console.log('🔍 [generateSimulatedResponse] Génération confirmation avec tag SAVE_TO_DRIVE');
+    console.log('💾 Tag généré:', fileName);
     return responseMessage;
   }
   // Vérifier si la demande concerne un livrable (article, guide, etc.)
