@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { generateDocxFromMarkdown } from '@/utils/docxGenerator';
+// La génération DOCX se fait maintenant côté serveur dans l'Edge Function
 
 export type ThreadType = 'public' | 'private';
 
@@ -408,15 +408,45 @@ export class MessageService {
       const responseContent = aiResponse?.response || "Je n'ai pas pu générer de réponse.";
       const saveMatch = responseContent.match(/\[SAVE_TO_DRIVE:\s*(.+?\.docx)\]/);
 
+      let finalContent = responseContent;
+      let savedFileName = null;
+
       if (saveMatch) {
         // L'IA veut sauvegarder un document
         const fileName = saveMatch[1];
-        const contentToSave = responseContent.replace(/\[SAVE_TO_DRIVE:.*?\]/, '').trim();
+        savedFileName = fileName;
+
+        // Retirer le tag du contenu visible
+        finalContent = responseContent.replace(/\[SAVE_TO_DRIVE:.*?\]/, '').trim();
+
+        // Récupérer le contenu du livrable depuis l'historique
+        // Le contenu devrait être dans le message précédent de l'IA
+        const { data: previousMessages } = await supabase
+          .from('messages')
+          .select('content, sender_id')
+          .eq('thread_id', threadId)
+          .eq('sender_id', iaProfile.id)
+          .order('created_at', { ascending: false })
+          .limit(2);
+
+        let contentToSave = finalContent;
+
+        // Si on trouve un message précédent avec du contenu substantiel (article, guide, etc.)
+        if (previousMessages && previousMessages.length > 0) {
+          for (const msg of previousMessages) {
+            // Si le message contient un article ou document structuré
+            if (msg.content && (msg.content.includes('#') || msg.content.length > 500)) {
+              contentToSave = msg.content;
+              break;
+            }
+          }
+        }
 
         console.log('💾 Sauvegarde Drive demandée:', fileName);
+        console.log('📄 Longueur du contenu à sauvegarder:', contentToSave.length);
 
         // Appeler la fonction de sauvegarde
-        this.saveAIContentToDrive(
+        await this.saveAIContentToDrive(
           projectId,
           fileName,
           contentToSave,
@@ -434,14 +464,14 @@ export class MessageService {
           sender_id: iaProfile.id,
           sender_name: `${iaProfile.name}`,
           sender_email: `${iaProfile.name.toLowerCase().replace(/\s+/g, '_')}@ia.team`,
-          content: responseContent.replace(/\[SAVE_TO_DRIVE:.*?\]/, '').trim(), // Retirer la commande du message visible
+          content: finalContent, // Contenu sans le tag SAVE_TO_DRIVE
           metadata: {
             is_private: isPrivate,
             participants: participants,
             thread_type: thread?.metadata?.type || 'team',
             is_ai_response: true,
             tokens_used: aiResponse?.tokensUsed,
-            file_saved: saveMatch ? fileName : null
+            file_saved: savedFileName
           }
         });
 
@@ -482,19 +512,16 @@ export class MessageService {
       // Extraire le titre du nom de fichier (sans l'extension)
       const title = fileName.replace(/\.docx$/i, '');
 
-      // Générer le DOCX avec la vraie librairie
-      const docxBuffer = await generateDocxFromMarkdown(content, title, aiMemberName);
-
-      // Appeler l'Edge Function de sauvegarde
+      // Appeler l'Edge Function de sauvegarde qui générera le DOCX côté serveur
       const { data, error } = await supabase.functions.invoke('save-ai-content-to-drive', {
         body: {
           projectId,
           fileName,
-          content: content, // Garder le markdown original
+          content: content, // Le markdown original sera converti en DOCX côté serveur
           contentType: 'document',
           aiMemberName,
-          isDocx: true,
-          docxBuffer // Le buffer DOCX en base64
+          title: title, // Ajouter le titre pour la génération DOCX
+          generateDocx: true // Indiquer qu'on veut générer un DOCX côté serveur
         }
       });
 

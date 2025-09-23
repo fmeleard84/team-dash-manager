@@ -340,10 +340,10 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                       "p-3 rounded-xl cursor-pointer transition-all duration-200 relative",
                       selectedConversation.id === member.id
                         ? member.isAI
-                          ? "bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border border-cyan-400/50 shadow-lg shadow-cyan-500/20"
+                          ? "bg-gradient-to-r from-red-500/30 to-red-600/30 border border-red-400/50 shadow-lg shadow-red-500/20"
                           : "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 shadow-lg shadow-purple-500/20"
                         : member.isAI
-                          ? "bg-cyan-500/10 hover:bg-cyan-500/20 border border-transparent hover:border-cyan-400/30"
+                          ? "bg-red-500/10 hover:bg-red-500/20 border border-transparent hover:border-red-400/30"
                           : "bg-white/5 hover:bg-white/10 border border-transparent hover:border-purple-500/30"
                       // Animation retirée de la carte complète
                     )}
@@ -362,41 +362,41 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           showStatus={true}
                           className="flex-1"
                         />
-                        {/* Loader pour l'IA qui génère */}
+                        {/* Loader pour l'IA qui génère - ROUGE VIF pour meilleure visibilité */}
                         {member.isAI && isAIGenerating === member.id.replace('ia_', '') && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-red-500"
+                              className="absolute inset-0 rounded-full border-2 border-red-600"
                               animate={{
-                                scale: [1, 1.2, 1],
-                                opacity: [1, 0.5, 1],
+                                scale: [1, 1.3, 1],
+                                opacity: [1, 0.4, 1],
                               }}
                               transition={{
-                                duration: 1.5,
+                                duration: 1.2,
                                 repeat: Infinity,
                                 ease: "easeInOut",
                               }}
                             />
                             <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-orange-500"
+                              className="absolute inset-0 rounded-full border-2 border-red-400"
                               animate={{
-                                scale: [1.2, 1, 1.2],
-                                opacity: [0.5, 1, 0.5],
+                                scale: [1.3, 1, 1.3],
+                                opacity: [0.4, 1, 0.4],
                               }}
                               transition={{
-                                duration: 1.5,
+                                duration: 1.2,
                                 repeat: Infinity,
                                 ease: "easeInOut",
                               }}
                             />
                             <motion.div
-                              className="absolute inset-0 rounded-full bg-red-500/20"
+                              className="absolute inset-0 rounded-full bg-red-500/40 shadow-lg shadow-red-500/60"
                               animate={{
-                                scale: [0.8, 1.1, 0.8],
-                                opacity: [0.3, 0.6, 0.3],
+                                scale: [0.8, 1.2, 0.8],
+                                opacity: [0.5, 0.8, 0.5],
                               }}
                               transition={{
-                                duration: 1.5,
+                                duration: 1.2,
                                 repeat: Infinity,
                                 ease: "easeInOut",
                               }}
@@ -410,7 +410,12 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                         <motion.div
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
-                          className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/30"
+                          className={cn(
+                            "flex items-center gap-1 px-2 py-1 rounded-full shadow-lg",
+                            isAIGenerating === member.id.replace('ia_', '')
+                              ? "bg-gradient-to-r from-red-600 to-red-500 shadow-red-500/50 border border-red-400/50"
+                              : "bg-gradient-to-r from-red-500 to-red-600 shadow-red-500/30"
+                          )}
                         >
                           <Zap className="h-3 w-3 text-white" />
                           <span className="text-xs font-medium text-white">
@@ -503,7 +508,7 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           className={cn(
                             "shadow-lg",
                             isAIMessage
-                              ? "shadow-cyan-500/30 ring-2 ring-cyan-400/50"
+                              ? "shadow-red-500/30 ring-2 ring-red-400/50"
                               : "shadow-purple-500/20"
                           )}
                         />
@@ -517,7 +522,7 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           <div className="flex items-center gap-2 px-3">
                             <p className="text-xs text-gray-400">{sender?.name || 'Inconnu'}</p>
                             {isAIMessage && (
-                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full">
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-red-500 to-red-600 rounded-full">
                                 <Zap className="h-2.5 w-2.5 text-white" />
                                 <span className="text-xs font-medium text-white">IA</span>
                               </div>
@@ -530,7 +535,7 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                             isOwnMessage
                               ? "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 shadow-lg shadow-purple-500/20"
                               : isAIMessage
-                                ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/40 shadow-lg shadow-cyan-500/20"
+                                ? "bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-400/40 shadow-lg shadow-red-500/20"
                                 : "bg-white/10 border border-white/20"
                           )}
                         >

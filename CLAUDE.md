@@ -1232,5 +1232,43 @@ const team = await supabase
   .eq('booking_status', 'accepted');
 ```
 
+## 🧠 SYSTÈME PGVECTOR POUR IA CANDIDATES (23/09/2025)
+
+### Architecture en 3 phases pour contexte projet
+
+#### Phase 1 : Infrastructure de base
+- Table `project_embeddings` pour stocker les vecteurs par projet
+- Triggers automatiques sur messages, drive et kanban
+- Fonction RPC `search_project_embeddings`
+- RLS pour isolation par projet
+
+#### Phase 2 : Synchronisation automatique
+- Edge Function `process-project-embeddings`
+- Queue de traitement avec retry
+- Génération d'embeddings via OpenAI
+- CRON toutes les 2 minutes
+
+#### Phase 3 : Intégration IA
+- Modification `ai-conversation-handler` pour contexte projet
+- Enrichissement des prompts avec :
+  - Résultats vectoriels pertinents (top 5)
+  - Messages récents de l'équipe
+  - Tâches Kanban actives
+  - Documents Drive liés
+- Mémoire conversationnelle par thread
+
+### Bénéfices
+- ✅ IA comprend l'historique complet du projet
+- ✅ Réponses pertinentes et contextualisées
+- ✅ Mémoire persistante entre sessions
+- ✅ Isolation sécurisée par projet
+- ✅ Performance optimisée avec index HNSW
+
+### Status d'implémentation
+- ✅ Tables Drive créées (kanban_files, drive_folders) - 23/09/2025
+- ⏳ Phase 1 en cours d'implémentation
+- ⏳ Phase 2 préparée
+- ⏳ Phase 3 préparée
+
 ## 📚 Pour Plus d'Infos
 Consulter `/llm` dans l'application pour la documentation complète et éditable.

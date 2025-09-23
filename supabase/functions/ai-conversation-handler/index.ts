@@ -75,15 +75,21 @@ Instructions:
 - Tenez compte de l'historique de conversation
 - Soyez cohérent avec vos réponses précédentes
 - Si vous produisez un contenu long (article, document), structurez-le clairement
-- Gardez un ton professionnel mais personnalisé selon le contexte
+- Adoptez un ton sympathique et décontracté, comme un collègue bienveillant
+- Utilisez le prénom de l'utilisateur naturellement (sans trop insister)
+- Ajoutez des expressions naturelles et chaleureuses
+- Évitez les formulations trop formelles ("Monsieur/Madame")
+- Soyez enthousiaste et positif tout en restant professionnel
 
 IMPORTANT - Gestion des livrables:
 Si l'utilisateur demande un livrable (article, planning, guide, rapport, documentation, etc.):
 1. Produisez le contenu demandé de manière complète et structurée
 2. À la fin, demandez TOUJOURS : "📁 Souhaitez-vous que je sauvegarde ce document dans votre Drive projet (dossier IA) au format Word (.docx) ?"
-3. Si l'utilisateur répond oui/ok/d'accord, ajoutez à la fin de votre message:
+3. Si l'utilisateur répond oui/ok/d'accord/bien sûr/absolument/avec plaisir, votre réponse doit TOUJOURS terminer par:
    [SAVE_TO_DRIVE: nom_du_fichier.docx]
-   où nom_du_fichier est un nom descriptif basé sur le contenu (ex: article_marketing_digital.docx, planning_projet_2025.docx)`
+   où nom_du_fichier est un nom descriptif basé sur le contenu (ex: article_marketing_digital.docx, planning_projet_2025.docx)
+
+IMPORTANT: Quand l'utilisateur confirme qu'il veut sauvegarder (avec oui, ok, d'accord, etc.), vous DEVEZ obligatoirement ajouter le tag [SAVE_TO_DRIVE: nom_fichier.docx] à la FIN de votre message, après tout le contenu.`
 
     // 4. Appel à OpenAI (simulé pour l'instant)
     // TODO: Remplacer par un vrai appel OpenAI avec la clé API configurée
@@ -93,7 +99,7 @@ Si l'utilisateur demande un livrable (article, planning, guide, rapport, documen
       console.warn('⚠️ Clé OpenAI non configurée, utilisation d\'une réponse simulée')
 
       // Réponse simulée pour le développement
-      const simulatedResponse = generateSimulatedResponse(userMessage, prompt.name)
+      const simulatedResponse = generateSimulatedResponse(userMessage, prompt.name, historyText)
 
       return new Response(JSON.stringify({
         success: true,
@@ -126,7 +132,7 @@ Si l'utilisateur demande un livrable (article, planning, guide, rapport, documen
     })
 
     if (!openaiResponse.ok) {
-      throw new Error(`OpenAI API error: ${openaiResponse.statusText}`)
+      throw new Error('OpenAI API error: ' + openaiResponse.statusText)
     }
 
     const openaiData = await openaiResponse.json()
@@ -160,52 +166,71 @@ Si l'utilisateur demande un livrable (article, planning, guide, rapport, documen
 })
 
 // Fonction pour générer une réponse simulée pendant le développement
-function generateSimulatedResponse(userMessage: string, promptName: string): string {
+function generateSimulatedResponse(userMessage: string, promptName: string, historyText: string): string {
+  console.log('🔍 [generateSimulatedResponse] Analyse:', {
+    userMessage: userMessage.slice(0, 100),
+    hasAskedAboutSaving: historyText.includes('Souhaitez-vous que je sauvegarde'),
+    historyLength: historyText.length
+  });
+
+  // Vérifier si l'utilisateur confirme la sauvegarde
+  const confirmWords = ['oui', 'ok', "d'accord", 'bien sûr', 'absolument', 'avec plaisir', 'parfait', 'super', 'yes', 'allez-y', 'go', 'allons-y'];
+  const isConfirmation = confirmWords.some(word => userMessage.toLowerCase().includes(word));
+  const hasAskedAboutSaving = historyText.includes('Souhaitez-vous que je sauvegarde') || historyText.includes('sauvegarde ce document');
+
+  console.log('✅ [generateSimulatedResponse] Détection confirmation:', {
+    isConfirmation,
+    hasAskedAboutSaving,
+    matchedWords: confirmWords.filter(word => userMessage.toLowerCase().includes(word))
+  });
+
+  // Si c'est une confirmation de sauvegarde
+  if (isConfirmation && hasAskedAboutSaving) {
+    const timestamp = Date.now();
+    // Générer un nom de fichier plus descriptif basé sur le contexte
+    let fileName = 'document_ia_' + timestamp + '.docx';
+
+    // Essayer de deviner le type de document depuis l'historique
+    if (historyText.includes('article') || historyText.includes('blog')) {
+      fileName = 'article_' + timestamp + '.docx';
+    } else if (historyText.includes('planning') || historyText.includes('calendrier')) {
+      fileName = 'planning_' + timestamp + '.xlsx'; // Excel pour les plannings
+    } else if (historyText.includes('guide') || historyText.includes('manuel')) {
+      fileName = 'guide_' + timestamp + '.pdf'; // PDF pour les guides
+    } else if (historyText.includes('rapport') || historyText.includes('analyse')) {
+      fileName = 'rapport_' + timestamp + '.pdf'; // PDF pour les rapports
+    } else if (historyText.includes('tableau') || historyText.includes('données') || historyText.includes('statistiques')) {
+      fileName = 'donnees_' + timestamp + '.csv'; // CSV pour les données
+    } else if (historyText.includes('présentation') || historyText.includes('slides')) {
+      fileName = 'presentation_' + timestamp + '.docx'; // Word pour les présentations
+    }
+
+    console.log('💾 [generateSimulatedResponse] Génération avec SAVE_TO_DRIVE:', fileName);
+
+    return 'Super ! 🎉 Je m\'occupe de sauvegarder ça pour vous !\n\n📁 Le fichier "' + fileName + '" sera dispo dans quelques secondes dans le dossier IA de votre Drive.\n\nVous pourrez le télécharger, le modifier ou le partager avec l\'équipe. Pratique, non ? 😊\n\n✅ Et voilà, c\'est fait !\n\n[SAVE_TO_DRIVE: ' + fileName + ']';
+  }
+  // Vérifier si la demande concerne un livrable (article, guide, etc.)
+  const isDeliverableRequest = userMessage.toLowerCase().includes('article') ||
+                               userMessage.toLowerCase().includes('guide') ||
+                               userMessage.toLowerCase().includes('rapport') ||
+                               userMessage.toLowerCase().includes('document') ||
+                               userMessage.toLowerCase().includes('planning') ||
+                               userMessage.toLowerCase().includes('présentation') ||
+                               userMessage.toLowerCase().includes('rédige') ||
+                               userMessage.toLowerCase().includes('écris') ||
+                               userMessage.toLowerCase().includes('crée');
+
   const responses = {
     'Concepteur rédacteur IA': [
-      `# Article de blog : ${userMessage.slice(0, 50)}
+      'Ah, un article sur "' + userMessage.slice(0, 50) + '" ? Avec plaisir ! 😊\n\n# ' + userMessage + '\n\n## Introduction\nAlors, parlons de ça ! ' + userMessage + ', c\'est un sujet vraiment intéressant qui mérite qu\'on s\'y attarde.\n\n## Les points clés\n- 🎯 D\'abord, analysons le contexte\n- 💡 Ensuite, explorons les solutions possibles\n- 🚀 Et enfin, passons à l\'action !\n\n## Pour conclure\nJ\'espère que cet article vous aide ! N\'hésitez pas si vous voulez que j\'approfondisse certains points.\n\n*Rédigé avec enthousiasme le ' + new Date().toLocaleDateString('fr-FR') + '* 🎆\n\n' + (isDeliverableRequest ? '📁 Ça vous dit que je sauvegarde ce document dans votre Drive ? (dossier IA, format Word)' : 'Autre chose ?'),
 
-En tant que concepteur rédacteur IA, je vous propose ce contenu structuré :
+      'OK, let\'s go ! 🚀\n\n# ' + userMessage + '\n\n## Alors, qu\'est-ce qu\'on a là ?\n\n' + userMessage + '... Intéressant ! Laissez-moi vous proposer quelque chose de sympa.\n\n### Voici mon plan d\'attaque :\n1. **D\'abord** : On clarifie l\'objectif 🎯\n2. **Ensuite** : On explore les options 🔍\n3. **Enfin** : On passe à l\'action ! 💪\n\n### En résumé\nJ\'ai hâte de voir ce que ça va donner ! Vous me dites si ça vous convient ?\n\n' + (isDeliverableRequest ? '📁 Je peux sauvegarder tout ça dans votre Drive si vous voulez (format Word, dans le dossier IA) ?' : 'Besoin d\'autre chose ? Je suis là ! 🙂'),
 
-## Introduction
-Votre demande "${userMessage}" soulève des points intéressants que nous allons explorer en détail.
-
-## Développement
-- Point 1 : Analyse de la problématique
-- Point 2 : Solutions proposées
-- Point 3 : Mise en œuvre pratique
-
-## Conclusion
-Ce contenu répond à votre demande en proposant une approche méthodique et professionnelle.
-
-*Article généré par l'IA rédactrice - ${new Date().toLocaleDateString('fr-FR')}*`,
-
-      `Voici ma réponse en tant qu'IA spécialisée en rédaction :
-
-${userMessage}
-
-Je peux vous aider à développer ce sujet plus en détail si vous le souhaitez. N'hésitez pas à me demander des précisions ou des contenus spécifiques comme :
-- Articles de blog
-- Documentation technique
-- Guides utilisateur
-- Rapports d'analyse
-
-Comment puis-je vous assister davantage ?`,
-
-      `📝 **Contenu rédactionnel généré**
-
-Sujet traité : ${userMessage}
-
-Je viens de traiter votre demande. Si vous souhaitez que je produise un document plus complet (guide, article, rapport), merci de me le préciser et je créerai un contenu structuré qui sera automatiquement sauvegardé dans votre Drive.
-
-Types de contenus que je peux créer :
-- Articles de blog optimisés SEO
-- Guides étape par étape
-- Rapports d'analyse
-- Documentation projet
-- Présentations commerciales
-
-Quelle est votre préférence ?`
+      '📝 **Document rédactionnel généré**\n\n# ' + userMessage + '\n\n## Contenu structuré\n\nJe vais créer un contenu professionnel répondant à votre demande :\n\n### Section 1 : Présentation\n- Contexte : ' + userMessage.slice(0, 100) + '\n- Objectifs définis\n- Approche méthodologique\n\n### Section 2 : Développement\n- Analyse approfondie du sujet\n- Solutions pratiques\n- Recommandations d\'experts\n\n### Section 3 : Conclusion\n- Synthèse des points clés\n- Actions recommandées\n- Perspectives d\'évolution\n\n*Document généré par l\'IA rédactrice le ' + new Date().toLocaleDateString('fr-FR') + '*\n\n📁 Souhaitez-vous que je sauvegarde ce document dans votre Drive projet (dossier IA) ?\n' +
+      (userMessage.toLowerCase().includes('planning') || userMessage.toLowerCase().includes('calendrier') ? '\nFormat suggéré: Excel (.xlsx) pour les données structurées' :
+       userMessage.toLowerCase().includes('rapport') || userMessage.toLowerCase().includes('analyse') ? '\nFormat suggéré: PDF (.pdf) pour les rapports formels' :
+       userMessage.toLowerCase().includes('tableau') || userMessage.toLowerCase().includes('données') ? '\nFormat suggéré: CSV (.csv) pour les données' :
+       '\nFormat suggéré: Word (.docx) pour les documents texte')
     ]
   }
 

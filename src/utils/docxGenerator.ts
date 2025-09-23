@@ -54,17 +54,31 @@ export async function generateDocxFromMarkdown(
     // Convertir en buffer
     const buffer = await Packer.toBuffer(doc);
 
-    // Convertir en base64
-    const base64 = btoa(
-      new Uint8Array(buffer)
-        .reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
+    // Convertir en base64 - Solution compatible UTF-8
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
 
     return base64;
   } catch (error) {
     console.error('Erreur génération DOCX:', error);
-    // Fallback : retourner le contenu en texte brut encodé
-    return btoa(content);
+    // Fallback : retourner le contenu en texte brut encodé avec support UTF-8
+    try {
+      // Encoder le contenu en UTF-8 puis en base64
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(content);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    } catch (fallbackError) {
+      console.error('Erreur fallback encoding:', fallbackError);
+      return '';
+    }
   }
 }
 
