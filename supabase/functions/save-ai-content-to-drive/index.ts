@@ -320,20 +320,21 @@ serve(async (req) => {
 
     // 5. Créer l'entrée dans la table kanban_files
     const driveEntry = {
-      name: fileName,
-      path: driveFilePath,
-      file_type: mimeType,
-      size: fileContent.length,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
       project_id: projectId,
+      file_name: fileName,
+      file_path: driveFilePath,
+      file_type: mimeType,
+      file_size: fileContent.length,
+      uploaded_by: userId,
+      uploaded_at: new Date().toISOString(),
+      folder_path: `projects/${projectId}/IA`,
+      is_ai_generated: true,
+      ai_member_name: aiMemberName,
+      content_type: contentType || 'document',
       metadata: {
-        folder_path: `projects/${projectId}/IA`,
-        is_ai_generated: true,
-        ai_member_name: aiMemberName,
-        content_type: contentType || 'document',
-        title: docTitle
+        title: docTitle,
+        generated_at: new Date().toISOString(),
+        source: 'ai-conversation'
       }
     }
 
