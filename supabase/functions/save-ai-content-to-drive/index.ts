@@ -220,6 +220,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Récupérer l'utilisateur pour l'ID
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+    const userId = user?.id || 'ai-system'
+
     // 1. Créer le chemin de fichier dans le Drive
     const driveFilePath = `projects/${projectId}/IA/${fileName}`
     console.log('📂 Chemin Drive:', driveFilePath)
@@ -256,7 +260,45 @@ serve(async (req) => {
       console.log('📝 Document Markdown sauvé, taille:', fileContent.length);
     }
 
-    // 3. Uploader le fichier dans le storage Supabase
+    // 3. Vérifier/créer le dossier IA dans le Drive
+    const iaFolderPath = `projects/${projectId}/IA`;
+
+    // Vérifier si le dossier IA existe
+    const { data: existingFolder } = await supabaseClient
+      .from('drive_folders')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('path', iaFolderPath)
+      .single();
+
+    if (!existingFolder) {
+      // Créer le dossier IA s'il n'existe pas
+      console.log('📁 Création du dossier IA...');
+
+      const { error: folderError } = await supabaseClient
+        .from('drive_folders')
+        .insert({
+          project_id: projectId,
+          name: 'IA',
+          path: iaFolderPath,
+          parent_path: `projects/${projectId}`,
+          created_by: userId || 'ai-system',
+          metadata: {
+            description: 'Dossier des livrables générés par l\'IA',
+            icon: '🤖',
+            color: 'blue'
+          }
+        });
+
+      if (folderError) {
+        console.error('⚠️ Erreur création dossier IA:', folderError);
+        // Continuer même si la création du dossier échoue
+      } else {
+        console.log('✅ Dossier IA créé');
+      }
+    }
+
+    // 4. Uploader le fichier dans le storage Supabase
     const { data: uploadData, error: uploadError } = await supabaseClient.storage
       .from('kanban-files')
       .upload(driveFilePath, fileContent, {
@@ -276,22 +318,23 @@ serve(async (req) => {
       .from('kanban-files')
       .getPublicUrl(driveFilePath)
 
-    // 5. Créer l'entrée dans la table kanban_files pour l'intégration Drive
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-    const userId = user?.id || 'ai-system'
-
+    // 5. Créer l'entrée dans la table kanban_files
     const driveEntry = {
-      project_id: projectId,
-      file_name: fileName,
-      file_path: driveFilePath,
+      name: fileName,
+      path: driveFilePath,
       file_type: mimeType,
-      file_size: fileContent.length,
-      uploaded_by: userId,
-      uploaded_at: new Date().toISOString(),
-      folder_path: `projects/${projectId}/IA`,
-      is_ai_generated: true,
-      ai_member_name: aiMemberName,
-      content_type: contentType
+      size: fileContent.length,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      project_id: projectId,
+      metadata: {
+        folder_path: `projects/${projectId}/IA`,
+        is_ai_generated: true,
+        ai_member_name: aiMemberName,
+        content_type: contentType || 'document',
+        title: docTitle
+      }
     }
 
     const { data: fileRecord, error: recordError } = await supabaseClient

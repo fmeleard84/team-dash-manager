@@ -123,19 +123,21 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Détecter quand l'IA a répondu
+  // Détecter quand l'IA a répondu pour arrêter le loader
   useEffect(() => {
     if (isAIGenerating && messages.length > 0) {
       // Chercher si un message récent vient de l'IA
-      const lastMessages = messages.slice(-2); // Les 2 derniers messages
+      const lastMessages = messages.slice(-3); // Les 3 derniers messages
       const aiResponse = lastMessages.find(msg => {
         const sender = projectMembers.find(m => m.email === msg.sender_email);
         return sender?.isAI === true;
       });
 
       if (aiResponse) {
-        // L'IA a répondu, arrêter le loader
-        setIsAIGenerating(null);
+        // L'IA a répondu, arrêter le loader avec un petit délai pour fluidité
+        setTimeout(() => {
+          setIsAIGenerating(null);
+        }, 500);
       }
     }
   }, [messages, isAIGenerating, projectMembers]);
@@ -340,10 +342,10 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                       "p-3 rounded-xl cursor-pointer transition-all duration-200 relative",
                       selectedConversation.id === member.id
                         ? member.isAI
-                          ? "bg-gradient-to-r from-red-500/30 to-red-600/30 border border-red-400/50 shadow-lg shadow-red-500/20"
+                          ? "bg-gradient-to-r from-blue-500/30 to-blue-600/30 border border-blue-400/50 shadow-lg shadow-blue-500/20"
                           : "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 shadow-lg shadow-purple-500/20"
                         : member.isAI
-                          ? "bg-red-500/10 hover:bg-red-500/20 border border-transparent hover:border-red-400/30"
+                          ? "bg-blue-500/10 hover:bg-blue-500/20 border border-transparent hover:border-blue-400/30"
                           : "bg-white/5 hover:bg-white/10 border border-transparent hover:border-purple-500/30"
                       // Animation retirée de la carte complète
                     )}
@@ -362,41 +364,42 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                           showStatus={true}
                           className="flex-1"
                         />
-                        {/* Loader pour l'IA qui génère - ROUGE VIF pour meilleure visibilité */}
+                        {/* Loader pour l'IA qui génère - ROUGE CLIGNOTANT pour visibilité */}
                         {member.isAI && isAIGenerating === member.id.replace('ia_', '') && (
-                          <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <motion.div
                               className="absolute inset-0 rounded-full border-2 border-red-600"
                               animate={{
                                 scale: [1, 1.3, 1],
-                                opacity: [1, 0.4, 1],
+                                opacity: [1, 0.3, 1],
                               }}
                               transition={{
-                                duration: 1.2,
+                                duration: 1,
                                 repeat: Infinity,
                                 ease: "easeInOut",
                               }}
                             />
                             <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-red-400"
+                              className="absolute inset-0 rounded-full border-2 border-red-500"
                               animate={{
                                 scale: [1.3, 1, 1.3],
-                                opacity: [0.4, 1, 0.4],
+                                opacity: [0.3, 1, 0.3],
                               }}
                               transition={{
-                                duration: 1.2,
+                                duration: 1,
                                 repeat: Infinity,
                                 ease: "easeInOut",
+                                delay: 0.2
                               }}
                             />
                             <motion.div
-                              className="absolute inset-0 rounded-full bg-red-500/40 shadow-lg shadow-red-500/60"
+                              className="absolute inset-0 rounded-full bg-red-600/50 shadow-lg shadow-red-600/70"
                               animate={{
-                                scale: [0.8, 1.2, 0.8],
-                                opacity: [0.5, 0.8, 0.5],
+                                scale: [0.9, 1.1, 0.9],
+                                opacity: [0.6, 0.9, 0.6],
                               }}
                               transition={{
-                                duration: 1.2,
+                                duration: 0.8,
                                 repeat: Infinity,
                                 ease: "easeInOut",
                               }}
@@ -405,16 +408,26 @@ export const EnhancedMessageSystemNeon = ({ projectId, userType = 'user', userRo
                         )}
                       </div>
 
-                      {/* Badge IA */}
+                      {/* Badge IA - Bleu par défaut, Rouge clignotant quand travaille */}
                       {member.isAI && (
                         <motion.div
                           initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
+                          animate={{
+                            scale: 1,
+                            ...(isAIGenerating === member.id.replace('ia_', '') && {
+                              opacity: [1, 0.6, 1],
+                              scale: [1, 0.95, 1]
+                            })
+                          }}
+                          transition={isAIGenerating === member.id.replace('ia_', '') ? {
+                            opacity: { duration: 0.8, repeat: Infinity, ease: "easeInOut" },
+                            scale: { duration: 0.8, repeat: Infinity, ease: "easeInOut" }
+                          } : {}}
                           className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-full shadow-lg",
+                            "flex items-center gap-1 px-2 py-1 rounded-full shadow-lg border",
                             isAIGenerating === member.id.replace('ia_', '')
-                              ? "bg-gradient-to-r from-red-600 to-red-500 shadow-red-500/50 border border-red-400/50"
-                              : "bg-gradient-to-r from-red-500 to-red-600 shadow-red-500/30"
+                              ? "bg-gradient-to-r from-red-600 to-red-500 shadow-red-500/50 border-red-400 animate-pulse"
+                              : "bg-gradient-to-r from-blue-600 to-blue-500 shadow-blue-500/30 border-blue-400"
                           )}
                         >
                           <Zap className="h-3 w-3 text-white" />

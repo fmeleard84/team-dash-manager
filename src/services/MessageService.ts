@@ -406,7 +406,14 @@ export class MessageService {
 
       // Vérifier si la réponse contient une commande de sauvegarde
       const responseContent = aiResponse?.response || "Je n'ai pas pu générer de réponse.";
-      const saveMatch = responseContent.match(/\[SAVE_TO_DRIVE:\s*(.+?\.docx)\]/);
+      // Accepter différentes extensions : .docx, .pdf, .csv, .xlsx
+      const saveMatch = responseContent.match(/\[SAVE_TO_DRIVE:\s*(.+?\.(docx|pdf|csv|xlsx))\]/i);
+
+      console.log('🔍 Vérification sauvegarde Drive:', {
+        hasMatch: !!saveMatch,
+        fileName: saveMatch?.[1],
+        contentLength: responseContent.length
+      });
 
       let finalContent = responseContent;
       let savedFileName = null;
@@ -419,27 +426,38 @@ export class MessageService {
         // Retirer le tag du contenu visible
         finalContent = responseContent.replace(/\[SAVE_TO_DRIVE:.*?\]/, '').trim();
 
-        // Récupérer le contenu du livrable depuis l'historique
-        // Le contenu devrait être dans le message précédent de l'IA
-        const { data: previousMessages } = await supabase
+        // Récupérer le contenu complet depuis l'historique de conversation
+        // Inclure le message actuel ET les messages précédents de l'IA
+        const { data: conversationHistory } = await supabase
           .from('messages')
-          .select('content, sender_id')
+          .select('content, sender_id, created_at')
           .eq('thread_id', threadId)
-          .eq('sender_id', iaProfile.id)
           .order('created_at', { ascending: false })
-          .limit(2);
+          .limit(10);
 
-        let contentToSave = finalContent;
+        let contentToSave = '';
 
-        // Si on trouve un message précédent avec du contenu substantiel (article, guide, etc.)
-        if (previousMessages && previousMessages.length > 0) {
-          for (const msg of previousMessages) {
-            // Si le message contient un article ou document structuré
-            if (msg.content && (msg.content.includes('#') || msg.content.length > 500)) {
-              contentToSave = msg.content;
-              break;
+        // Trouver le dernier message substantiel de l'IA (article, guide, etc.)
+        if (conversationHistory && conversationHistory.length > 0) {
+          // Chercher d'abord dans les messages de l'IA
+          const iaMessages = conversationHistory.filter(msg => msg.sender_id === iaProfile.id);
+
+          for (const msg of iaMessages) {
+            // Si le message contient un document structuré (avec titres markdown)
+            if (msg.content && msg.content !== finalContent) {
+              if (msg.content.includes('# ') || msg.content.includes('## ') || msg.content.length > 800) {
+                contentToSave = msg.content;
+                console.log('📝 Contenu trouvé dans l\'historique:', msg.content.substring(0, 100));
+                break;
+              }
             }
           }
+        }
+
+        // Si on n'a pas trouvé de contenu dans l'historique, utiliser le contenu actuel
+        if (!contentToSave) {
+          contentToSave = finalContent;
+          console.log('📝 Utilisation du contenu actuel');
         }
 
         console.log('💾 Sauvegarde Drive demandée:', fileName);
