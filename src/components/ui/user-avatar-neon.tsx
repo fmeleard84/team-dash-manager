@@ -16,9 +16,10 @@ export interface UserData {
   jobTitle?: string;
   position?: string;
   seniority?: string;
-  status?: 'online' | 'offline' | 'busy' | 'away';
+  status?: 'online' | 'offline' | 'busy' | 'away' | 'ai';
   isTeamLead?: boolean;
   isValidated?: boolean;
+  isAI?: boolean;
   hourlyRate?: number;
   dailyRate?: number;
 }
@@ -49,7 +50,8 @@ const statusColors = {
   online: 'bg-green-500 dark:bg-green-400',
   offline: 'bg-neutral-400 dark:bg-neutral-500',
   busy: 'bg-red-500 dark:bg-red-400',
-  away: 'bg-yellow-500 dark:bg-yellow-400'
+  away: 'bg-yellow-500 dark:bg-yellow-400',
+  ai: 'bg-purple-500 dark:bg-purple-400'
 };
 
 const seniorityColors = {

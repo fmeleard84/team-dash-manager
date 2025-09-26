@@ -39,10 +39,20 @@ export function VisioLauncher({
 
   useEffect(() => {
     const loadUserInfo = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        console.log('🔍 [JITSI] Pas d\'user ID trouvé');
+        return;
+      }
 
-      // Récupérer le prénom depuis user_metadata
-      const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'Participant';
+      console.log('🔍 [JITSI] User trouvé:', {
+        id: user.id,
+        email: user.email,
+        user_metadata: user.user_metadata
+      });
+
+      // Récupérer le prénom depuis user_metadata (firstName avec F majuscule)
+      const firstName = user?.user_metadata?.firstName || user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'Participant';
+      console.log('🔍 [JITSI] Prénom récupéré:', firstName, 'depuis user_metadata:', user?.user_metadata);
 
       // Vérifier si c'est un candidat pour récupérer son expertise
       const { data: candidateProfile } = await supabase
@@ -50,6 +60,8 @@ export function VisioLauncher({
         .select('profile_id')
         .eq('id', user.id)
         .maybeSingle();
+
+      console.log('🔍 [JITSI] Profil candidat:', candidateProfile);
 
       if (candidateProfile?.profile_id) {
         // Récupérer l'expertise depuis hr_profiles
@@ -59,13 +71,19 @@ export function VisioLauncher({
           .eq('id', candidateProfile.profile_id)
           .maybeSingle();
 
+        console.log('🔍 [JITSI] Profil HR trouvé:', hrProfile);
+
         if (hrProfile?.name) {
-          setUserDisplayName(`${firstName} - ${hrProfile.name}`);
+          const finalName = `${firstName} - ${hrProfile.name}`;
+          console.log('🔍 [JITSI] Nom final (candidat avec métier):', finalName);
+          setUserDisplayName(finalName);
         } else {
+          console.log('🔍 [JITSI] Nom final (candidat sans métier):', firstName);
           setUserDisplayName(firstName);
         }
       } else {
         // C'est probablement un client
+        console.log('🔍 [JITSI] Nom final (client):', firstName);
         setUserDisplayName(firstName);
       }
     };
@@ -98,7 +116,7 @@ export function VisioLauncher({
           userName={userDisplayName}
           onClose={() => setIsVisioOpen(false)}
           projectTitle={projectTitle}
-          height="calc(100vh - 80px)"
+          height="calc(100vh - 300px)"
         />
       </div>
     );
@@ -108,7 +126,15 @@ export function VisioLauncher({
     <Button
       variant={buttonVariant}
       size={buttonSize}
-      onClick={() => setIsVisioOpen(true)}
+      onClick={() => {
+        console.log('🎬 [JITSI] Clic sur "Rejoindre la visio":', {
+          roomName: roomName,
+          cleanRoomName: roomName.startsWith('vaya-room:') ? roomName.replace('vaya-room:', '') : roomName,
+          userDisplayName: userDisplayName,
+          projectTitle: projectTitle
+        });
+        setIsVisioOpen(true);
+      }}
       className="gap-2 w-full"
     >
       <Video className="w-4 h-4" />

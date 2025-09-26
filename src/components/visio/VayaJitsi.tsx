@@ -37,6 +37,13 @@ function VayaJitsi({
     const cleanRoomName = roomName.replace(/[^a-zA-Z0-9-_]/g, '');
 
     const domain = "visio.vaya.rip";
+
+    console.log('🎥 [JITSI] Configuration pour Jitsi:', {
+      roomName: cleanRoomName,
+      userName: userName,
+      domain: domain
+    });
+
     const options = {
       roomName: cleanRoomName,
       width: "100%",
@@ -105,7 +112,9 @@ function VayaJitsi({
     };
 
     try {
+      console.log('🚀 [JITSI] Création de l\'instance Jitsi avec options:', options);
       apiRef.current = new window.JitsiMeetExternalAPI(domain, options);
+      console.log('✅ [JITSI] Instance Jitsi créée avec succès');
 
       // Event listeners
       apiRef.current.addListener("readyToClose", () => {

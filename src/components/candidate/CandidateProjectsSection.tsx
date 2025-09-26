@@ -157,6 +157,11 @@ export function CandidateProjectsSection({
             email,
             first_name,
             last_name
+          ),
+          hr_profiles (
+            id,
+            name,
+            is_ai
           )
         `)
         .eq('project_id', projectId)
@@ -169,29 +174,10 @@ export function CandidateProjectsSection({
         setFullTeam([]);
       } else if (assignments && assignments.length > 0) {
         console.log(`✅ [fetchFullTeam] ${assignments.length} membres trouvés`);
-        
-        // Enrichir avec les informations hr_profiles
-        const enrichedAssignments = await Promise.all(assignments.map(async (a) => {
-          // Récupérer le hr_profile pour avoir le label du métier
-          const { data: hrProfile, error: profileError } = await supabase
-            .from('hr_profiles')
-            .select('name')
-            .eq('id', a.profile_id)
-            .single();
-          
-          if (profileError) {
-            console.warn("⚠️ [fetchFullTeam] Erreur récupération hr_profile:", profileError);
-          }
-          
-          return {
-            ...a,
-            hr_profiles: hrProfile ? { label: hrProfile.name } : null,
-            candidate_profiles: a.candidate_profiles || null
-          };
-        }));
-        
-        console.log("🎯 [fetchFullTeam] Équipe enrichie:", enrichedAssignments);
-        setFullTeam(enrichedAssignments);
+
+        // Les hr_profiles sont déjà inclus dans la requête, plus besoin d'enrichissement
+        console.log("🎯 [fetchFullTeam] Équipe chargée:", assignments);
+        setFullTeam(assignments);
       } else {
         console.log("⚠️ [fetchFullTeam] Aucun membre d'équipe trouvé");
         setFullTeam([]);
@@ -287,7 +273,7 @@ export function CandidateProjectsSection({
     return (
       <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
         <Briefcase className="w-4 h-4 text-primary-500" />
-        <span>{assignment.hr_profiles?.label || 'Non défini'}</span>
+        <span>{assignment.hr_profiles?.name || 'Non défini'}</span>
         {assignment.seniority && (
           <>
             <span className="text-neutral-400 dark:text-neutral-500">•</span>
@@ -572,14 +558,14 @@ export function CandidateProjectsSection({
                 )}
                 
                 {/* Rôle */}
-                {selectedProject.hr_resource_assignments?.[0]?.hr_profiles?.label && (
+                {selectedProject.hr_resource_assignments?.[0]?.hr_profiles?.name && (
                   <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/50 hover:shadow-sm transition-all duration-300">
                     <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 mb-1">
                       <Briefcase className="w-4 h-4 text-primary-500" />
                       <span>Rôle demandé</span>
                     </div>
                     <p className="font-semibold text-neutral-900 dark:text-white">
-                      {selectedProject.hr_resource_assignments[0].hr_profiles.label}
+                      {selectedProject.hr_resource_assignments[0].hr_profiles.name}
                       {selectedProject.hr_resource_assignments[0].seniority && (
                         <span className="text-sm text-neutral-600 dark:text-neutral-400 ml-2 capitalize">
                           ({selectedProject.hr_resource_assignments[0].seniority})
@@ -697,7 +683,7 @@ export function CandidateProjectsSection({
                           <div className="flex items-center gap-4 flex-1">
                             <div>
                               <span className="font-semibold text-neutral-900 dark:text-white">
-                                {assignment.hr_profiles?.label || 'Poste non défini'}
+                                {assignment.hr_profiles?.name || 'Poste non défini'}
                               </span>
                               <span className="text-neutral-400 dark:text-neutral-500 mx-2">•</span>
                               <span className="text-neutral-700 dark:text-neutral-300">
@@ -745,17 +731,18 @@ export function CandidateProjectsSection({
                           )}
                         </div>
                         
-                        {assignment.booking_status === 'accepted' && assignment.candidate_profiles && (
+                        {assignment.booking_status === 'accepted' && (assignment.candidate_profiles || assignment.hr_profiles?.is_ai) && (
                           <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
                             <UserAvatarNeon
                               user={{
-                                id: assignment.candidate_profiles.id,
-                                firstName: assignment.candidate_profiles.first_name,
-                                lastName: assignment.candidate_profiles.last_name,
-                                jobTitle: assignment.hr_profiles?.label || assignment.candidate_profiles.position,
+                                id: assignment.candidate_profiles?.id || `ia_${assignment.profile_id}`,
+                                firstName: assignment.hr_profiles?.is_ai ? 'IA' : assignment.candidate_profiles?.first_name,
+                                lastName: assignment.hr_profiles?.is_ai ? assignment.hr_profiles.name : assignment.candidate_profiles?.last_name,
+                                jobTitle: assignment.hr_profiles?.name || assignment.candidate_profiles?.position,
                                 seniority: assignment.seniority,
-                                status: 'online',
-                                isValidated: true
+                                status: assignment.hr_profiles?.is_ai ? 'ai' : 'online',
+                                isValidated: true,
+                                isAI: assignment.hr_profiles?.is_ai || false
                               }}
                               size="sm"
                               variant="list"
