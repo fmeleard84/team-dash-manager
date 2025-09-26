@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { DatePicker } from '@/components/ui/date-picker';
 import { PageHeaderNeon } from '@/components/ui/page-header-neon';
+import { VisioLauncher } from '@/components/visio/VisioLauncher';
 
 interface PlanningPageProps {
   projects: ProjectWithDate[];
@@ -146,7 +147,8 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
         start: event.start_at || event.start_time || null,  // Priorité à start_at (colonne DB)
         end: event.end_at || event.end_time || null,        // Priorité à end_at (colonne DB)
         description: event.description || '',
-        location: event.video_url || event.meeting_link || event.location || '', 
+        location: event.location || '',
+        video_url: event.video_url || event.meeting_link || '',  // Gardons video_url séparé
         attendees: []
       }));
       console.log('Événements transformés pour le calendrier:', transformedEvents);
@@ -461,12 +463,13 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
             onSave={async () => {
               if (newEventData.title && selectedProject) {
                 try {
-                  // Générer automatiquement le lien Jitsi
-                  const roomName = `${selectedProject.title}-${newEventData.title}-${Date.now()}`
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, '-')
-                    .slice(0, 50);
-                  const videoUrl = `https://meet.jit.si/${roomName}`;
+                  // Générer automatiquement le lien pour visio.vaya.rip
+                  const cleanProjectId = selectedProject.id.substring(0, 8);
+                  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                  const timeStr = new Date().toTimeString().slice(0, 5).replace(':', '');
+                  const roomName = `proj-${cleanProjectId}-${dateStr}-${timeStr}`;
+                  // Format spécial pour notre système Vaya
+                  const videoUrl = `vaya-room:${roomName}`;
                   
                   // Récupérer l'utilisateur actuel
                   const { data: userData } = await supabase.auth.getUser();
@@ -625,16 +628,16 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
           </div>
 
           <div className="space-y-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
               <div className="flex items-start gap-3">
-                <Video className="h-5 w-5 text-blue-600 mt-0.5" />
+                <Video className="h-5 w-5 text-purple-600 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Lien de visioconférence
+                  <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                    Visioconférence Vaya
                   </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    Un lien Jitsi Meet sera généré automatiquement lors de la création de l'événement.
-                    Les participants recevront le lien par email.
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                    Une salle de visioconférence sera automatiquement créée sur visio.vaya.rip.
+                    Tous les participants pourront rejoindre directement depuis l'application.
                   </p>
                 </div>
               </div>
@@ -775,17 +778,18 @@ const PlanningPage = ({ projects }: PlanningPageProps) => {
               )}
             </div>
 
-            {selectedEvent.location && (
+            {(selectedEvent.video_url || selectedEvent.location?.includes('vaya-room:')) && (
               <div>
-                <Label className="text-white">Lien de réunion</Label>
-                <a
-                  href={selectedEvent.location}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 text-purple-400 hover:text-purple-300 hover:underline block"
-                >
-                  {selectedEvent.location}
-                </a>
+                <Label className="text-white">Visioconférence</Label>
+                <div className="mt-3">
+                  <VisioLauncher
+                    roomName={selectedEvent.video_url || selectedEvent.location}
+                    projectTitle={selectedProject?.title}
+                    buttonText="Rejoindre la visio"
+                    buttonVariant="default"
+                    buttonSize="lg"
+                  />
+                </div>
               </div>
             )}
           </div>

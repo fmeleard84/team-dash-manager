@@ -6,13 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Video, 
-  Users, 
-  Edit2, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Video,
+  Users,
+  Edit2,
   Save,
   X,
   User,
@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { VisioLauncher } from "@/components/visio/VisioLauncher";
 
 interface TeamMember {
   id: string;
@@ -112,12 +113,11 @@ export function ViewEventDialog({
   // Générer automatiquement l'URL Jitsi en mode édition
   useEffect(() => {
     if (generateVideoLink && title && isEditMode) {
-      const projectTitle = eventData?.project?.title || initialProjectTitle || "project";
-      const roomName = `${projectTitle}-${title}-${Date.now()}`
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .slice(0, 50);
-      setVideoUrl(`https://meet.jit.si/${roomName}`);
+      const cleanProjectId = eventData?.id?.substring(0, 8) || Date.now().toString().substring(0, 8);
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const timeStr = new Date().toTimeString().slice(0, 5).replace(':', '');
+      const roomName = `proj-${cleanProjectId}-${dateStr}-${timeStr}`;
+      setVideoUrl(`vaya-room:${roomName}`);
     }
   }, [generateVideoLink, title, isEditMode, eventData, initialProjectTitle]);
 
@@ -664,27 +664,27 @@ export function ViewEventDialog({
                 )}
 
                 {eventData.video_url && (
-                  <div className="bg-emerald-50 rounded-lg p-4">
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4">
                     <div className="flex items-center gap-3">
-                      <Video className="w-5 h-5 text-emerald-600" />
+                      <Video className="w-5 h-5 text-purple-600" />
                       <div className="flex-1">
-                        <p className="text-sm text-gray-600 mb-1">Lien de visioconférence</p>
-                        <a 
-                          href={eventData.video_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-emerald-600 hover:text-emerald-700 font-medium break-all"
-                        >
-                          {eventData.video_url}
-                        </a>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Visioconférence Vaya</p>
+                        <p className="text-purple-700 dark:text-purple-300 text-sm">
+                          Salle de réunion sur visio.vaya.rip
+                        </p>
                       </div>
                     </div>
-                    <Button
-                      className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => window.open(eventData.video_url, '_blank')}
-                    >
-                      Rejoindre la visio
-                    </Button>
+                    <div className="mt-3 w-full">
+                      <VisioLauncher
+                        roomName={eventData.video_url.includes('meet.jit.si')
+                          ? `vaya-room:${eventData.video_url.split('/').pop()}`
+                          : eventData.video_url}
+                        projectTitle={eventData.project?.title || initialProjectTitle}
+                        buttonText="Rejoindre la visio"
+                        buttonVariant="default"
+                        buttonSize="lg"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

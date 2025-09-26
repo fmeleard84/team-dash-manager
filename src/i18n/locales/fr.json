@@ -155,7 +155,9 @@
       "inProgress": "En cours",
       "waitingTeam": "Attente équipe",
       "completed": "Terminé",
-      "archived": "Archivé"
+      "archived": "Archivé",
+      "settingUp": "Mise en place",
+      "pausing": "Mise en pause"
     },
     "actions": {
       "view": "Voir les détails",
@@ -238,11 +240,7 @@
     "specifications": "Cahier des charges",
     "acceptedFormats": "Formats acceptés",
     "uploadSuccess": "Fichier uploadé avec succès",
-    "createSuccess": "Projet créé avec succès !",
-    "status": {
-      "settingUp": "Mise en place",
-      "pausing": "Mise en pause"
-    }
+    "createSuccess": "Projet créé avec succès !"
   },
   "team": {
     "title": "Équipe du projet",

@@ -103,8 +103,10 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     let totalPerMinute = 0;
 
     resourceAssignments.forEach((assignment: any) => {
-      // Utiliser hr_profiles.base_price pour TOUTES les ressources (IA et humaines)
-      if (assignment.hr_profiles?.base_price) {
+      // Utiliser calculated_price en priorité, sinon hr_profiles.base_price
+      if (assignment.calculated_price) {
+        totalPerMinute += assignment.calculated_price;
+      } else if (assignment.hr_profiles?.base_price) {
         totalPerMinute += assignment.hr_profiles.base_price;
       }
     });
@@ -158,6 +160,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
             expertises,
             candidate_id,
             node_data,
+            calculated_price,
             candidate_profiles (
               first_name,
               last_name,
@@ -327,6 +330,7 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
           languages,
           expertises,
           candidate_id,
+          calculated_price,
           candidate_profiles (
             first_name,
             last_name,
@@ -556,17 +560,22 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
     }
   };
 
-  const startProject = async (kickoffISO: string) => {
+  const startProject = async (kickoffISO: string, withVisio?: boolean) => {
     try {
       setIsSyncing(true);
-      
+
       // Trigger the project setup with kickoff
       if (onStart) {
-        await onStart({ id: project.id, title: project.title, kickoffISO });
+        await onStart({
+          id: project.id,
+          title: project.title,
+          kickoffISO,
+          withVisio
+        });
       } else {
         toast.error('Fonction de démarrage non définie');
       }
-      
+
       setShowKickoff(false);
     } catch (error) {
       console.error('Error starting project:', error);
@@ -1021,8 +1030,9 @@ export function ProjectCard({ project, onStatusToggle, onDelete, onView, onStart
       <KickoffDialog
         open={showKickoff}
         projectTitle={project.title}
+        projectId={project.id}
         onClose={() => setShowKickoff(false)}
-        onConfirm={(iso) => startProject(iso)}
+        onConfirm={(iso, withVisio) => startProject(iso, withVisio)}
       />
 
       <EditProjectModal

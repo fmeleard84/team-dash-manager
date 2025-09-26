@@ -3,18 +3,20 @@ import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar, Clock, Rocket, Users, Loader2 } from "lucide-react";
+import { Calendar, Clock, Rocket, Users, Loader2, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface KickoffDialogProps {
   open: boolean;
   projectTitle: string;
+  projectId?: string;
   onClose: () => void;
-  onConfirm: (kickoffISO: string) => void;
+  onConfirm: (kickoffISO: string, withVisio?: boolean) => void;
 }
 
-export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: KickoffDialogProps) {
+export function KickoffDialog({ open, projectTitle, projectId, onClose, onConfirm }: KickoffDialogProps) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const defaultDate = tomorrow.toISOString().slice(0, 10);
@@ -22,6 +24,7 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
 
   const [date, setDate] = useState<string>(defaultDate);
   const [time, setTime] = useState<string>(defaultTime);
+  const [withVisio, setWithVisio] = useState(true); // Par défaut, on propose la visio
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
@@ -79,8 +82,8 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
         }
       }, 400);
       
-      // Appeler onConfirm
-      await onConfirm(isoDate);
+      // Appeler onConfirm avec l'option visio
+      await onConfirm(isoDate, withVisio);
       
       // Nettoyer
       clearInterval(progressInterval);
@@ -256,6 +259,40 @@ export function KickoffDialog({ open, projectTitle, onClose, onConfirm }: Kickof
               </ul>
             </div>
           </div>
+        </div>
+
+        {/* Section option visioconférence */}
+        <div className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border border-primary-500/30 dark:border-primary-500/50 rounded-xl p-6 shadow-lg shadow-primary-500/10">
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="with-visio"
+              checked={withVisio}
+              onCheckedChange={(checked) => setWithVisio(checked as boolean)}
+              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-primary-500 data-[state=checked]:to-secondary-500 data-[state=checked]:border-primary-500"
+            />
+            <Label
+              htmlFor="with-visio"
+              className="flex items-center gap-3 cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Video className="w-5 h-5 text-primary-500" />
+                <span className="font-medium text-neutral-900 dark:text-white">
+                  Inclure une visioconférence
+                </span>
+              </div>
+              <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                (via visio.vaya.rip)
+              </span>
+            </Label>
+          </div>
+          {withVisio && (
+            <div className="mt-4 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800">
+              <p className="text-sm text-primary-700 dark:text-primary-300 flex items-center gap-2">
+                <Video className="w-4 h-4" />
+                Un lien de visioconférence sera inclus dans l'invitation
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </FullScreenModal>

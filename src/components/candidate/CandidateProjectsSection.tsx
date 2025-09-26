@@ -692,7 +692,7 @@ export function CandidateProjectsSection({
                   </h3>
                   <div className="space-y-3">
                     {fullTeam.map((assignment, index) => (
-                      <div key={index} className="backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 rounded-lg p-4 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/30 transition-all duration-300">
+                      <div key={index} className="backdrop-blur-xl bg-neutral-50 dark:bg-neutral-800/90 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700 hover:border-primary-500/50 dark:hover:border-primary-500/50 transition-all duration-300 shadow-sm hover:shadow-md">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-4 flex-1">
                             <div>
@@ -706,12 +706,12 @@ export function CandidateProjectsSection({
                             </div>
                           </div>
                           {assignment.booking_status === 'accepted' && (
-                            <Badge className="bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
+                            <Badge className="bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700">
                               ✓ Confirmé
                             </Badge>
                           )}
                           {assignment.booking_status === 'recherche' && (
-                            <Badge className="bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                            <Badge className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                               En recherche
                             </Badge>
                           )}
@@ -723,7 +723,7 @@ export function CandidateProjectsSection({
                               <span className="text-neutral-500 dark:text-neutral-400">Langues:</span>
                               <div className="flex gap-1">
                                 {assignment.languages.map((lang: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-primary-200 dark:border-primary-700">
+                                  <Badge key={i} variant="secondary" className="text-xs bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 border border-primary-300 dark:border-primary-700">
                                     {lang}
                                   </Badge>
                                 ))}
@@ -736,7 +736,7 @@ export function CandidateProjectsSection({
                               <span className="text-neutral-500 dark:text-neutral-400">Expertises:</span>
                               <div className="flex gap-1">
                                 {assignment.expertises.map((exp: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 border-secondary-200 dark:border-secondary-700">
+                                  <Badge key={i} variant="secondary" className="text-xs bg-secondary-100 dark:bg-secondary-900/50 text-secondary-700 dark:text-secondary-300 border border-secondary-300 dark:border-secondary-700">
                                     {exp}
                                   </Badge>
                                 ))}

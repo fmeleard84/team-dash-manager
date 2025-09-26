@@ -17,11 +17,21 @@ i18n
         translation: frTranslations,
       },
     },
-    fallbackLng: 'fr', // Default to French
+    lng: 'fr', // Force French as default
+    fallbackLng: 'fr',
     debug: false,
+
+    ns: ['translation'],
+    defaultNS: 'translation',
+
     interpolation: {
       escapeValue: false,
     },
+
+    react: {
+      useSuspense: false, // Disable suspense to avoid loading issues
+    },
+
     detection: {
       order: ['localStorage', 'navigator', 'htmlTag'],
       caches: ['localStorage'],

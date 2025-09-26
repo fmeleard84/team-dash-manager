@@ -639,6 +639,33 @@ hr_resource_assignments {
       - src/pages/ClientDashboard.tsx
       - src/pages/CandidateDashboard.tsx
 
+### Session 6 (26/09/2025)
+
+16. ✅ **Clés de traduction affichées au lieu des traductions**:
+    - **Problème**: Les filtres de statut affichaient "projects.status.inProgress" au lieu de "En cours"
+    - **Cause**: Duplication d'objets `status` dans les fichiers JSON de traduction. Le second objet (ligne 242) écrasait le premier (ligne 152)
+    - **Solution**:
+      - Suppression du doublon `status` dans fr.json et en.json (lignes 242-245)
+      - Consolidation des traductions `settingUp` et `pausing` dans l'objet principal
+      - Ajout de `useSuspense: false` dans la config i18n pour éviter les problèmes de chargement
+    - **Fichiers**:
+      - src/i18n/locales/fr.json
+      - src/i18n/locales/en.json
+      - src/i18n/config.ts
+      - src/components/client/ProjectsSection.tsx
+
+17. ✅ **Incohérence de calcul de prix entre ReactFlow et ProjectCard**:
+    - **Problème**: Prix affiché différent entre ReactFlow (2.35€/min) et ProjectCard/Popup (1.37€/min)
+    - **Cause**:
+      - ReactFlow utilise `calculated_price` de hr_resource_assignments
+      - ProjectCard utilisait seulement `hr_profiles.base_price`
+      - La colonne `calculated_price` n'était pas récupérée dans les requêtes SQL
+    - **Solution**:
+      - Ajout de `calculated_price` dans les requêtes SELECT de ProjectCard
+      - Modification de `calculateTotalPricePerMinute()` pour utiliser `calculated_price` en priorité
+      - Si `calculated_price` n'existe pas, fallback sur `hr_profiles.base_price`
+    - **Fichier**: src/components/ProjectCard.tsx (lignes 107-110, 154-163, 325-333)
+
 ## ✅ Corrections Session 5 (06/09/2025)
 
 13. **Contrainte statut projet corrigée**:

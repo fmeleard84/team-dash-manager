@@ -155,7 +155,9 @@
       "inProgress": "In Progress",
       "waitingTeam": "Waiting for team",
       "completed": "Completed",
-      "archived": "Archived"
+      "archived": "Archived",
+      "settingUp": "Setting up",
+      "pausing": "Pausing"
     },
     "actions": {
       "view": "View details",
@@ -238,11 +240,7 @@
     "specifications": "Specifications",
     "acceptedFormats": "Accepted formats",
     "uploadSuccess": "File uploaded successfully",
-    "createSuccess": "Project created successfully!",
-    "status": {
-      "settingUp": "Setting up",
-      "pausing": "Pausing"
-    }
+    "createSuccess": "Project created successfully!"
   },
   "team": {
     "title": "Project team",

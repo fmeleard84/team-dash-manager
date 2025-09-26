@@ -286,7 +286,7 @@ const handleClose = () => {
                 type="file"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 disabled={isCreating}
-                className="h-12 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                className="h-12 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-100 file:text-primary-700 hover:file:bg-primary-200 dark:file:bg-primary-900 dark:file:text-primary-300 dark:hover:file:bg-primary-800 dark:bg-neutral-800 dark:text-neutral-200"
                 accept=".pdf,.doc,.docx,.txt"
               />
               <p className="text-xs text-gray-500">
@@ -297,16 +297,16 @@ const handleClose = () => {
           </Card>
           
           {/* Note d'information */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-primary-50 dark:bg-primary-950/30 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center flex-shrink-0">
                   <IallaLogo size="sm" showText={false} />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-medium text-blue-900">
+                  <p className="text-sm font-medium text-primary-900 dark:text-primary-100">
                     Prochaine étape
                   </p>
-                  <p className="text-sm text-blue-700 mt-1">
+                  <p className="text-sm text-primary-700 dark:text-primary-300 mt-1">
                     Choisissez vos compétences sur mesure et créez votre team idéale !
                   </p>
                 </div>

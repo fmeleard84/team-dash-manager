@@ -68,7 +68,7 @@ export function ProjectsSection({
   const { t } = useTranslation();
 
   // Configuration des statuts avec leurs styles (avec traduction)
-  const statusConfig = {
+  const statusConfig: Record<string, { label: string; icon: any; color: string; dotColor: string; }> = {
     'en-cours': {
       label: t('projects.status.inProgress'),
       icon: Play,

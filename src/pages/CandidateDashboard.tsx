@@ -65,7 +65,6 @@ import { CandidateSettings } from "@/components/candidate/CandidateSettings";
 import { useUserProjects } from "@/hooks/useUserProjects";
 import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptimized";
 import CandidateEventNotifications from "@/components/candidate/CandidateEventNotifications";
-import { CandidateMissionRequests } from "@/components/candidate/CandidateMissionRequests";
 import CandidateMessagesView from "@/components/candidate/CandidateMessagesView";
 import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
 import { CandidatePayments } from "@/components/candidate/CandidatePayments";
@@ -551,32 +550,6 @@ const CandidateDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Mission Requests */}
-        <div className="relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity duration-300" />
-          <Card className="relative border border-primary-500/10 backdrop-blur-xl bg-white/90 dark:bg-neutral-900/90 shadow-xl rounded-2xl overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-primary-600/10 to-secondary-600/10 backdrop-blur-sm border-b border-primary-500/10">
-              <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 shadow-neon-purple">
-                  <Users className="h-4 w-4 text-white" />
-                </div>
-                <span className="bg-gradient-to-r from-primary-600 to-secondary-600 text-transparent bg-clip-text">
-                  Demandes de mission
-                </span>
-              </CardTitle>
-            </CardHeader>
-          <CardContent>
-            <CandidateMissionRequests 
-              profileId={profileId}
-              seniority={seniority}
-              candidateLanguages={candidateLanguages}
-              candidateExpertises={candidateExpertises}
-              assignmentTrigger={assignmentTrigger}
-              onAssignmentUpdate={() => setAssignmentTrigger(prev => prev + 1)}
-            />
-            </CardContent>
-          </Card>
-        </div>
         </div>
       </div>
     );
@@ -834,21 +807,12 @@ const CandidateDashboard = () => {
   };
 
   const sidebarContent = (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarContent className="bg-gradient-to-b from-neutral-900 to-neutral-950 dark:from-neutral-950 dark:to-black border-r border-neutral-800/50">
         <div className="p-4 border-b border-neutral-800/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl blur-lg opacity-50 animate-pulse" />
-                <div className="relative">
-                  <IallaLogo className="h-8 w-8" />
-                </div>
-              </div>
-              <span className="font-bold text-lg bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text">
-                Candidat
-              </span>
-            </div>
+          <div className="flex items-center space-x-2">
+            <IallaLogo className="h-8 w-8" />
+            <span className="font-semibold text-lg text-white">Vaya</span>
           </div>
 
           {/* Availability Toggle */}
@@ -1019,9 +983,6 @@ const CandidateDashboard = () => {
     <header className="h-16 px-6 flex items-center justify-between backdrop-blur-xl bg-white/80 dark:bg-neutral-900/80 border-b border-neutral-200/50 dark:border-neutral-700/50 sticky top-0 z-40 shadow-lg">
       <div className="flex items-center gap-4">
         <SidebarTrigger className="hover:scale-105 transition-transform duration-200" />
-        <h1 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-secondary-400 text-transparent bg-clip-text">
-          Dashboard Candidat
-        </h1>
       </div>
       <div className="flex items-center gap-4">
         <TimeTrackerSimple />
@@ -1062,7 +1023,7 @@ const CandidateDashboard = () => {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider collapsible="icon">
       <div className="flex h-screen w-full bg-background">
         {sidebarContent}
 

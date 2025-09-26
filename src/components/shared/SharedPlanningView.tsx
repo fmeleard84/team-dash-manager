@@ -6,15 +6,17 @@ import { useProjectUsers } from "@/hooks/useProjectUsers";
 import { useEffect as useEffectForLog } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink, Check, X, Video, FolderOpen, CalendarPlus, Briefcase, Clock, MapPin, Users } from "lucide-react";
+import { CalendarDays, Trash2, List, Calendar as CalendarIcon, Plus, Edit2, ExternalLink, Check, X, Video, FolderOpen, CalendarPlus, Briefcase, Clock, MapPin, Users, VideoIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { FullScreenModal, ModalActions } from "@/components/ui/fullscreen-modal";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { VisioLauncher } from "@/components/visio/VisioLauncher";
 
 interface Project { id: string; title: string; archived_at?: string | null }
 interface EventRow {
@@ -51,7 +53,6 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [location, setLocation] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
   const [driveUrl, setDriveUrl] = useState("");
   const [attendeesEmails, setAttendeesEmails] = useState("");
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
@@ -82,10 +83,15 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
   }, [projectMembers]);
   const [selectedTeamEmail, setSelectedTeamEmail] = useState<string>("");
 
+  // URL de visio générée automatiquement pour TOUS les événements
   const suggestedVideoUrl = useMemo(() => {
     if (!projectId || !date || !startTime) return "";
-    const ts = `${date}-${startTime.replace(":", "")}`;
-    return `https://meet.jit.si/${projectId}-${ts}`;
+    // Nom de room simple et propre pour Jitsi sur visio.vaya.rip
+    const cleanProjectId = projectId.substring(0, 8); // Premiers 8 caractères de l'UUID
+    const dateStr = date.replace(/-/g, '');
+    const timeStr = startTime.replace(':', '');
+    // Format avec le marqueur spécial pour notre système
+    return `vaya-room:proj-${cleanProjectId}-${dateStr}-${timeStr}`;
   }, [projectId, date, startTime]);
 
   // Set first project as default
@@ -249,7 +255,8 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
 
       const startISO = new Date(`${date}T${startTime}:00`).toISOString();
       const endISO = endTime ? new Date(`${date}T${endTime}:00`).toISOString() : null;
-      const finalVideoUrl = videoUrl || suggestedVideoUrl || null;
+      // TOUJOURS créer une URL de visio (par défaut sur visio.vaya.rip)
+      const finalVideoUrl = suggestedVideoUrl;
 
       const { data: inserted, error } = await supabase
         .from("project_events")
@@ -346,7 +353,6 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     setStartTime("");
     setEndTime("");
     setLocation("");
-    setVideoUrl("");
     setDriveUrl("");
     setAttendeesEmails("");
   };
@@ -363,7 +369,6 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     setStartTime(eventDate.toTimeString().slice(0, 5));
     setEndTime(eventEndDate ? eventEndDate.toTimeString().slice(0, 5) : "");
     setLocation(event.location || "");
-    setVideoUrl(event.video_url || "");
     setDriveUrl(event.drive_url || "");
     
     // Load existing attendees
@@ -394,7 +399,8 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
     try {
       const startISO = new Date(`${date}T${startTime}:00`).toISOString();
       const endISO = endTime ? new Date(`${date}T${endTime}:00`).toISOString() : null;
-      const finalVideoUrl = videoUrl || suggestedVideoUrl || null;
+      // TOUJOURS créer une URL de visio (par défaut sur visio.vaya.rip)
+      const finalVideoUrl = suggestedVideoUrl;
 
       // Update the event
       const { error } = await supabase
@@ -750,17 +756,15 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                         className="border-purple-200 focus:border-purple-400 bg-white text-sm"
                       />
                     </div>
-                    <div>
-                      <label className="text-sm font-semibold text-purple-700 flex items-center gap-1 mb-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-purple-700 flex items-center gap-1">
                         <Video className="w-3 h-3" />
-                        Visio
+                        Visioconférence
                       </label>
-                      <Input 
-                        value={videoUrl || suggestedVideoUrl} 
-                        onChange={(e) => setVideoUrl(e.target.value)} 
-                        placeholder="Lien Jitsi/Teams" 
-                        className="border-purple-200 focus:border-purple-400 bg-white text-sm"
-                      />
+                      <div className="text-xs text-purple-600 bg-purple-50 p-2 rounded">
+                        <VideoIcon className="w-3 h-3 inline mr-1" />
+                        Une salle visio sera automatiquement créée sur visio.vaya.rip
+                      </div>
                     </div>
                   </div>
                   
@@ -906,10 +910,6 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
               <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Adresse / Salle" />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lien visio (optionnel)</label>
-              <Input value={videoUrl || suggestedVideoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="URL Jitsi / Teams" />
-            </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Lien Google Drive (optionnel)</label>
@@ -1043,14 +1043,25 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                          
                          <div className="flex gap-2 flex-wrap">
                            {ev.video_url && (
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               onClick={() => window.open(ev.video_url, '_blank')}
-                             >
-                               <Video className="w-4 h-4 mr-2" />
-                               Visio
-                             </Button>
+                             ev.video_url.includes('meet.jit.si') ? (
+                               // Ancien format - convertir en nouveau format
+                               <VisioLauncher
+                                 roomName={`vaya-room:${ev.video_url.split('/').pop()}`}
+                                 projectTitle={projects.find(p => p.id === ev.project_id)?.title}
+                                 buttonText="Rejoindre la visio"
+                                 buttonVariant="outline"
+                                 buttonSize="sm"
+                               />
+                             ) : (
+                               // Nouveau format
+                               <VisioLauncher
+                                 roomName={ev.video_url}
+                                 projectTitle={projects.find(p => p.id === ev.project_id)?.title}
+                                 buttonText="Rejoindre la visio"
+                                 buttonVariant="outline"
+                                 buttonSize="sm"
+                               />
+                             )
                            )}
                            
                            {ev.drive_url && (
@@ -1176,14 +1187,25 @@ export default function SharedPlanningView({ mode, projects, candidateId }: Shar
                    
                    <div className="flex gap-2 flex-wrap">
                      {ev.video_url && (
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => window.open(ev.video_url, '_blank')}
-                       >
-                         <Video className="w-4 h-4 mr-2" />
-                         Visio
-                       </Button>
+                       ev.video_url.includes('meet.jit.si') ? (
+                         // Ancien format - convertir en nouveau format
+                         <VisioLauncher
+                           roomName={`vaya-room:${ev.video_url.split('/').pop()}`}
+                           projectTitle={projects.find(p => p.id === ev.project_id)?.title}
+                           buttonText="Rejoindre la visio"
+                           buttonVariant="outline"
+                           buttonSize="sm"
+                         />
+                       ) : (
+                         // Nouveau format
+                         <VisioLauncher
+                           roomName={ev.video_url}
+                           projectTitle={projects.find(p => p.id === ev.project_id)?.title}
+                           buttonText="Rejoindre la visio"
+                           buttonVariant="outline"
+                           buttonSize="sm"
+                         />
+                       )
                      )}
                      
                      {ev.drive_url && (

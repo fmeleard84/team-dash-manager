@@ -115,7 +115,15 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
   // Load tracking records for the selected period
   const loadTrackingRecords = async () => {
     if (!user?.id) return;
-    
+
+    // Si aucun projet, ne pas charger de données
+    if (!projects || projects.length === 0) {
+      console.log('No projects available - skipping tracking records load');
+      setTrackingRecords([]);
+      setLoadingRecords(false);
+      return;
+    }
+
     setLoadingRecords(true);
     try {
       console.log('Loading tracking records for period:', startDate, 'to', endDate);
@@ -142,12 +150,26 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
       
       // Filter by project if selected
       if (selectedProject !== 'all') {
+        // IMPORTANT: Vérifier que le projet sélectionné appartient bien au client
+        const projectBelongsToClient = projects.some(p => p.id === selectedProject);
+        if (!projectBelongsToClient) {
+          console.warn(`Security: Project ${selectedProject} does not belong to current client`);
+          setTrackingRecords([]);
+          setLoadingRecords(false);
+          return;
+        }
         query = query.eq('project_id', selectedProject);
       } else {
         // Get all projects owned by this client
         const projectIds = projects.map(p => p.id);
         if (projectIds.length > 0) {
           query = query.in('project_id', projectIds);
+        } else {
+          // Si aucun projet, ne récupérer aucune donnée
+          console.log('No projects found for this client - skipping tracking records');
+          setTrackingRecords([]);
+          setLoadingRecords(false);
+          return;
         }
       }
       
@@ -166,10 +188,12 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
       const candidateIds = [...new Set(trackingData.map(r => r.candidate_id))];
       
       // Batch fetch projects and candidates
+      // IMPORTANT: Ne récupérer que les projets qui appartiennent au client
       const { data: projectsData } = await supabase
         .from('projects')
-        .select('id, title, status')
-        .in('id', projectIds);
+        .select('id, title, status, owner_id')
+        .in('id', projectIds)
+        .eq('owner_id', user.id); // Sécurité : filtrer par owner_id
       
       const { data: candidatesData } = await supabase
         .from('profiles')
@@ -188,17 +212,27 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
       }, {});
       
       // Enrich records - time_tracking_sessions has different structure
-      const enrichedRecords = trackingData.map(record => ({
-        ...record,
-        project: projectsMap[record.project_id] || { id: record.project_id, title: 'Projet inconnu' },
-        candidate: candidatesMap[record.candidate_id] || { id: record.candidate_id, first_name: 'Inconnu', last_name: '' },
-        // Map fields to match expected structure
-        activity_description: record.activity_description,
-        duration_minutes: record.duration_minutes,
-        start_time: record.start_time
-      }));
-      
-      console.log('Tracking records loaded:', enrichedRecords.length, 'records');
+      // IMPORTANT: Filtrer les enregistrements dont le projet n'existe pas
+      const enrichedRecords = trackingData
+        .filter(record => {
+          // Ne garder que les enregistrements avec un projet existant
+          const projectExists = projectsMap[record.project_id];
+          if (!projectExists) {
+            console.log(`Skipping orphaned tracking record for non-existent project: ${record.project_id}`);
+          }
+          return projectExists;
+        })
+        .map(record => ({
+          ...record,
+          project: projectsMap[record.project_id],
+          candidate: candidatesMap[record.candidate_id] || { id: record.candidate_id, first_name: 'Inconnu', last_name: '' },
+          // Map fields to match expected structure
+          activity_description: record.activity_description,
+          duration_minutes: record.duration_minutes,
+          start_time: record.start_time
+        }));
+
+      console.log('Tracking records loaded:', enrichedRecords.length, 'records (after filtering orphans)');
       setTrackingRecords(enrichedRecords);
     } catch (error) {
       console.error('Error loading tracking records:', error);
@@ -331,14 +365,17 @@ export const InvoiceList = ({ projectId }: InvoiceListProps) => {
           
           {/* Project filter with universal selector */}
           <ProjectSelectorNeon
-            projects={[{ id: 'all', title: 'Tous les projets', created_at: new Date().toISOString(), status: 'play' }, ...projects.map(p => ({
-              ...p,
-              created_at: p.project_date || p.created_at || new Date().toISOString(),
-              status: p.status || 'play'
-            }))]}
+            projects={projects.length > 0
+              ? [{ id: 'all', title: 'Tous les projets', created_at: new Date().toISOString(), status: 'play' }, ...projects.map(p => ({
+                  ...p,
+                  created_at: p.project_date || p.created_at || new Date().toISOString(),
+                  status: p.status || 'play'
+                }))]
+              : []
+            }
             selectedProjectId={selectedProject}
             onProjectChange={setSelectedProject}
-            placeholder="Filtrer par projet"
+            placeholder={projects.length > 0 ? "Filtrer par projet" : "Aucun projet"}
             className="w-[220px]"
             showStatus={true}
             showDates={false}

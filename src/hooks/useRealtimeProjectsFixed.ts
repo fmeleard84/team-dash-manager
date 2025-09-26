@@ -36,7 +36,13 @@ export const useRealtimeProjectsFixed = ({
 
   const handleProjectUpdate = useCallback(async (payload: any) => {
     // // console.log('🔄 REALTIME PROJECTS FIXED: Project event:', payload.eventType, payload.new || payload.old);
-    
+
+    // Ne pas mettre à jour si une visio est active
+    if ((window as any).__visioActive) {
+      console.log('⏸️ Skipping realtime update - Visio is active');
+      return;
+    }
+
     const updatedProject = payload.new || payload.old;
     if (!updatedProject) return;
 
@@ -96,7 +102,13 @@ export const useRealtimeProjectsFixed = ({
 
   const handleAssignmentUpdate = useCallback(async (payload: any) => {
     console.log('👥 REALTIME ASSIGNMENTS: Event:', payload.eventType, 'Assignment ID:', payload.new?.id || payload.old?.id);
-    
+
+    // Ne pas mettre à jour si une visio est active
+    if ((window as any).__visioActive) {
+      console.log('⏸️ Skipping realtime assignment update - Visio is active');
+      return;
+    }
+
     const updatedAssignment = payload.new || payload.old;
     if (!updatedAssignment) return;
 

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { LanguageSelector } from "@/components/ui/language-selector";
+import { StripePaymentModal } from "@/components/payment/StripePaymentModal";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -80,7 +81,7 @@ import { useClientCredits } from "@/hooks/useClientCredits";
 import ClientMetricsDashboard from "./ClientMetricsDashboard";
 import PlanningPage from "./PlanningPage";
 import WikiView from "@/components/wiki/WikiView";
-import { AnimatedBackground } from "@/components/ui/animated-background";
+// AnimatedBackground removed - causes white background issues in dark mode
 import { PageHeaderNeon } from "@/components/ui/page-header-neon";
 import { EnhancedVoiceAssistant } from '@/components/client/EnhancedVoiceAssistant';
 import { ClientSettings } from '@/components/client/ClientSettings';
@@ -127,10 +128,11 @@ const [selectedDriveProjectId, setSelectedDriveProjectId] = useState<string>("")
 const [selectedWikiProjectId, setSelectedWikiProjectId] = useState<string>("");
 const [isWikiFullscreen, setIsWikiFullscreen] = useState(false);
 const [refreshTrigger, setRefreshTrigger] = useState(0);
+const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
 const { setupProject, isLoading: isOrchestrating } = useProjectOrchestrator();
 const { categories, templates, getTemplatesByCategory } = useTemplates();
-const { balance, formatBalance } = useClientCredits();
+const { balance, formatBalance, refreshBalance } = useClientCredits();
 
 // Sort projects for different sections using the universal hook
 const playProjects = useMemo(() => 
@@ -359,7 +361,6 @@ const handleProjectDelete = (project: DbProject) => {
 const renderStartContent = () => {
   return (
     <div className="relative">
-      <AnimatedBackground variant="subtle" speed="slow" className="fixed inset-0" />
       <div className="relative z-10 space-y-8">
         {/* KPIs Section */}
         <PageSection title="Vue d'ensemble">
@@ -417,12 +418,33 @@ const renderStartContent = () => {
 const renderKanbanContent = () => {
   if (sortedKanbanProjects.length === 0) {
     return (
-      <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-12 text-center border border-purple-500/30">
-        <Kanban className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-        <h3 className="text-lg font-semibold mb-2 text-white">Aucun projet actif</h3>
-        <p className="text-sm text-gray-300">
-          Démarrez un projet pour accéder au tableau Kanban
-        </p>
+      <div className="space-y-6">
+        {/* Header unifié avec design néon - même sans projets */}
+        <PageHeaderNeon
+          icon={Kanban}
+          title="Tableau Kanban"
+          subtitle="Gérez vos tâches et suivez l'avancement du projet"
+          projects={[]}
+          selectedProjectId=""
+          onProjectChange={() => {}}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: false,
+            showTeamProgress: false,
+            className: "w-[280px]"
+          }}
+        />
+
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Kanban className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
+            <p className="text-sm text-muted-foreground">
+              Démarrez un projet pour accéder au tableau Kanban
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -456,15 +478,35 @@ const renderKanbanContent = () => {
 const renderMessagesContent = () => {
   if (sortedMessagesProjects.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-          <p className="text-sm text-muted-foreground">
-            Démarrez un projet pour accéder à la messagerie
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Header unifié avec design néon - même sans projets */}
+        <PageHeaderNeon
+          icon={MessageSquare}
+          title="Messagerie"
+          subtitle="Communication en temps réel avec votre équipe"
+          badge={{ text: "En ligne", animate: true }}
+          projects={[]}
+          selectedProjectId=""
+          onProjectChange={() => {}}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: true,
+            showTeamProgress: false,
+            className: "w-[280px]"
+          }}
+        />
+
+        <Card>
+          <CardContent className="p-12 text-center">
+            <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
+            <p className="text-sm text-muted-foreground">
+              Démarrez un projet pour accéder à la messagerie
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -501,15 +543,34 @@ const renderMessagesContent = () => {
 const renderDriveContent = () => {
   if (sortedDriveProjects.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <Cloud className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-          <p className="text-sm text-muted-foreground">
-            Démarrez un projet pour accéder au Drive
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Header unifié avec design néon - même sans projets */}
+        <PageHeaderNeon
+          icon={Cloud}
+          title="Drive partagé"
+          subtitle="Stockage et partage de fichiers du projet"
+          projects={[]}
+          selectedProjectId=""
+          onProjectChange={() => {}}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: false,
+            showTeamProgress: false,
+            className: "w-[280px]"
+          }}
+        />
+
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Cloud className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
+            <p className="text-sm text-muted-foreground">
+              Démarrez un projet pour accéder au Drive
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -739,15 +800,34 @@ const renderTemplatesContent = () => {
 const renderWikiContent = () => {
   if (sortedWikiProjects.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
-          <p className="text-sm text-muted-foreground">
-            Démarrez un projet pour accéder au Wiki
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Header unifié avec design néon - même sans projets */}
+        <PageHeaderNeon
+          icon={BookOpen}
+          title="Wiki collaboratif"
+          subtitle="Documentation et base de connaissances du projet"
+          projects={[]}
+          selectedProjectId=""
+          onProjectChange={() => {}}
+          projectSelectorConfig={{
+            placeholder: "Sélectionner un projet",
+            showStatus: true,
+            showDates: false,
+            showTeamProgress: false,
+            className: "w-[280px]"
+          }}
+        />
+
+        <Card>
+          <CardContent className="p-12 text-center">
+            <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">Aucun projet actif</h3>
+            <p className="text-sm text-muted-foreground">
+              Démarrez un projet pour accéder au Wiki
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -829,12 +909,12 @@ const renderContent = () => {
 };
 
 const sidebarContent = (
-  <Sidebar>
+  <Sidebar collapsible="icon">
     <SidebarContent className="bg-card">
       <div className="p-4 border-b border-border">
         <div className="flex items-center space-x-2">
           <IallaLogo className="h-8 w-8" />
-          <span className="font-semibold text-lg">Client</span>
+          <span className="font-semibold text-lg">Vaya</span>
         </div>
       </div>
 
@@ -973,7 +1053,13 @@ const headerContent = (
       {/* Affichage du solde de crédits */}
       <Button
         variant="ghost"
-        onClick={() => navigateToSection('settings', 'payments')}
+        onClick={() => {
+          if (balance === 0) {
+            setIsPaymentModalOpen(true);
+          } else {
+            navigateToSection('settings', 'payments');
+          }
+        }}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${
           balance === 0 
             ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20' 
@@ -1000,14 +1086,14 @@ const headerContent = (
 );
 
 return (
-  <SidebarProvider>
-    <div className="flex h-screen w-full">
+  <SidebarProvider collapsible="icon">
+    <div className="flex h-screen w-full bg-background">
       {sidebarContent}
       
       <div className="flex-1 flex flex-col overflow-hidden">
         {headerContent}
         
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-muted/30 dark:bg-neutral-900">
           <div className="w-full p-6 lg:p-8">
             {renderContent()}
           </div>
@@ -1084,6 +1170,18 @@ return (
           }
         };
         refreshProjects();
+      }}
+    />
+
+    {/* Modal de paiement */}
+    <StripePaymentModal
+      isOpen={isPaymentModalOpen}
+      onClose={() => setIsPaymentModalOpen(false)}
+      onSuccess={() => {
+        setIsPaymentModalOpen(false);
+        // Rafraîchir le solde après le paiement
+        refreshBalance();
+        window.location.reload();
       }}
     />
   </SidebarProvider>
