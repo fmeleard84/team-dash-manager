@@ -67,7 +67,7 @@ import { useCandidateProjectsOptimized } from "@/hooks/useCandidateProjectsOptim
 import CandidateEventNotifications from "@/components/candidate/CandidateEventNotifications";
 import { CandidateMissionRequests } from "@/components/candidate/CandidateMissionRequests";
 import { useRealtimeProjectsFixed } from "@/hooks/useRealtimeProjectsFixed";
-import { useCandidateIdentity } from "@/hooks/useCandidateIdentity";
+import { useCandidate } from "@/hooks/useCandidate";
 
 // Lazy load heavy components
 const SimpleDriveView = lazy(() => import("@/components/drive/SimpleDriveView"));
@@ -105,7 +105,20 @@ const CandidateDashboard = () => {
   const navigate = useNavigate();
   
   // Use centralized candidate identity hook
-  const { candidateId, profileId, seniority, status: candidateStatus, isLoading: identityLoading, error: identityError, refetch: refetchIdentity } = useCandidateIdentity();
+  const {
+    profile,
+    isLoading: identityLoading,
+    error: identityError,
+    refetch: refetchIdentity,
+    canReceiveMissions,
+    displayName,
+    displayTitle
+  } = useCandidate();
+
+  const candidateId = profile?.id;
+  const profileId = profile?.hr_profile_id;
+  const seniority = profile?.seniority_level;
+  const candidateStatus = profile?.status;
 
   // Debug logs
   useEffect(() => {
