@@ -61,7 +61,7 @@ import { IallaLogo } from "@/components/IallaLogo";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useTemplates } from "@/hooks/useTemplates";
 import CreateProjectModal from "@/components/CreateProjectModal";
-import { ProjectCard } from "@/components/ProjectCard";
+import { ClientProjectCard } from "@/components/unified/UnifiedProjectCard";
 import { ProjectsSection } from '@/components/client/ProjectsSection';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
