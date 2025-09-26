@@ -37,6 +37,8 @@ export interface CandidateFullProfile extends CandidateProfile {
   languages: CandidateLanguage[];
   projects_count: number;
   qualification_score?: number;
+  hr_profile_id?: string | null;
+  seniority_level?: string | null;
 }
 
 export interface CandidateSearchCriteria {
@@ -56,22 +58,28 @@ export class CandidateService {
    */
   static async getCandidateFullProfile(candidateId: string): Promise<CandidateFullProfile | null> {
     try {
-      // Récupération du profil de base avec le métier
+      // Récupération du profil de base
       const { data: profile, error: profileError } = await supabase
         .from('candidate_profiles')
-        .select(`
-          *,
-          hr_profiles!profile_id (
-            id,
-            name
-          )
-        `)
+        .select('*')
         .eq('id', candidateId)
         .single();
 
       if (profileError || !profile) {
         console.error('Error fetching candidate profile:', profileError);
         return null;
+      }
+
+      // Récupération du métier (hr_profile) si profile_id existe
+      let hrProfile = null;
+      if (profile.profile_id) {
+        const { data: hrProfileData } = await supabase
+          .from('hr_profiles')
+          .select('id, name')
+          .eq('id', profile.profile_id)
+          .single();
+
+        hrProfile = hrProfileData;
       }
 
       // Récupération des expertises
@@ -114,7 +122,9 @@ export class CandidateService {
 
       return {
         ...profile,
-        hr_profile: profile.hr_profiles || null,
+        hr_profile: hrProfile,
+        hr_profile_id: profile.profile_id,
+        seniority_level: profile.seniority,
         expertises,
         languages,
         projects_count: projectsCount || 0,
@@ -134,13 +144,7 @@ export class CandidateService {
       // Construction de la requête de base
       let query = supabase
         .from('candidate_profiles')
-        .select(`
-          *,
-          hr_profiles!profile_id (
-            id,
-            name
-          )
-        `);
+        .select('*');
 
       // Filtres de base
       if (criteria.profile_id) {

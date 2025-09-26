@@ -193,13 +193,13 @@ export const useTimeTracking = () => {
       // Check if there's already an active session in database
       const { data: existingActive } = await supabase
         .from('active_time_tracking')
-        .select('id, projects(title)')
+        .select('*')
         .eq('candidate_id', user.id)
         .in('status', ['active', 'paused'])
-        .single();
+        .maybeSingle();
 
       if (existingActive) {
-        toast.error(`Un chronomètre est déjà en cours sur le projet "${existingActive.projects?.title}". Veuillez l'arrêter avant d'en démarrer un nouveau.`);
+        toast.error(`Un chronomètre est déjà en cours. Veuillez l'arrêter avant d'en démarrer un nouveau.`);
         setLoading(false);
         return;
       }
