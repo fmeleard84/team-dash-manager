@@ -7,13 +7,13 @@ import {
   ControllerRenderProps,
 } from 'react-hook-form';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Switch } from '@/components/ui/switch';
+import { Input } from '@/ui/components/input';
+import { Textarea } from '@/ui/components/textarea';
+import { Label } from '@/ui/components/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/components/select';
+import { Checkbox } from '@/ui/components/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/ui/components/radio-group';
+import { Switch } from '@/ui/components/switch';
 import { AlertCircle } from 'lucide-react';
 
 interface BaseFormFieldProps<TFieldValues extends FieldValues> {

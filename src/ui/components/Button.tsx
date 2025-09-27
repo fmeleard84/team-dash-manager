@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Button as ShadcnButton, ButtonProps as ShadcnButtonProps } from '@/components/ui/button';
+import { Button as ShadcnButton, ButtonProps as ShadcnButtonProps } from '@/ui/components/button';
 
 export interface ButtonProps extends ShadcnButtonProps {
   variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' | 'outline';

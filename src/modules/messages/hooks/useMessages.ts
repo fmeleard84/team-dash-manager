@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '../../auth/hooks/useAuth';
 import { MessageAPI } from '../services/messageAPI';
 import type {
   MessageThread,

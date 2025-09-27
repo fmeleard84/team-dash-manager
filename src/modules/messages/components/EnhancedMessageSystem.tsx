@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/ui/components/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/ui/components/card';
+import { Input } from '@/ui/components/input';
+import { Textarea } from '@/ui/components/textarea';
+import { ScrollArea } from '@/ui/components/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/ui/components/avatar';
+import { Badge } from '@/ui/components/badge';
+import { Separator } from '@/ui/components/separator';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/ui/components/dialog";
 import {
   Send,
   Paperclip,
@@ -30,8 +30,8 @@ import {
   Bot,
   Clock
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { useToast } from '@/ui/components/use-toast';
 import {
   useMessages,
   useMessageThreads,
@@ -46,7 +46,7 @@ import type {
   CreateThreadData,
   TypingIndicator
 } from '../types';
-import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
+import { UserAvatarNeon } from '@/ui/components/user-avatar-neon';
 
 interface EnhancedMessageSystemProps {
   projectId: string;

@@ -7,7 +7,7 @@ import {
   DialogHeader as ShadcnDialogHeader,
   DialogTitle as ShadcnDialogTitle,
   DialogTrigger as ShadcnDialogTrigger,
-} from '@/components/ui/dialog';
+} from '@/ui/components/dialog';
 import { cn } from '@/lib/utils';
 
 interface DialogProps {

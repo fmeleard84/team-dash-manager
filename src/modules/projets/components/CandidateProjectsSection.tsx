@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { FullScreenModal, ModalActions } from '@/components/ui/fullscreen-modal';
+import { Button } from '@/ui/components/button';
+import { Badge } from '@/ui/components/badge';
+import { FullScreenModal, ModalActions } from '@/ui/components/fullscreen-modal';
 import { supabase } from '@/integrations/supabase/client';
 import {
   FolderOpen,
@@ -28,7 +28,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
+import { UserAvatarNeon } from '@/ui/components/user-avatar-neon';
 import { useCandidateProjects, useProjectMembers } from '../hooks';
 import type { Project } from '../types';
 

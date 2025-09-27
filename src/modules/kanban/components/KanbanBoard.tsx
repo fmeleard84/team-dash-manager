@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/ui/components/button';
+import { Input } from '@/ui/components/input';
+import { Badge } from '@/ui/components/badge';
 import {
   Plus,
   Search,
@@ -20,16 +20,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from '@/ui/components/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { UserSelectNeon } from '@/components/ui/user-select-neon';
-import { UserAvatarNeon } from '@/components/ui/user-avatar-neon';
+} from '@/ui/components/select';
+import { UserSelectNeon } from '@/ui/components/user-select-neon';
+import { UserAvatarNeon } from '@/ui/components/user-avatar-neon';
 import { useKanbanBoard, useKanbanActions, useKanbanMembers, useKanbanStats } from '../hooks';
 import type { KanbanBoard as KanbanBoardType, KanbanCard, KanbanColumn as KanbanColumnType } from '../types';
 import { KanbanColumn } from './KanbanColumn';

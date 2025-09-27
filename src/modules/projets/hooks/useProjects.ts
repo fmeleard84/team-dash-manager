@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '../../auth/hooks/useAuth';
 import { ProjetAPI } from '../services/projetAPI';
 import type { Project, ProjectFilters } from '../types';
 

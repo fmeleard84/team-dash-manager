@@ -23,7 +23,7 @@ import {
   ChevronUp,
   ChevronDown
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/ui/components/input';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -31,7 +31,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/ui/components/dropdown-menu';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
