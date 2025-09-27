@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FullScreenModal, ModalActions } from '@/components/ui/fullscreen-modal';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  FolderOpen, 
+import {
+  FolderOpen,
   Filter,
   Clock,
   CheckCircle2,
@@ -20,7 +20,10 @@ import {
   FileText,
   Euro,
   Paperclip,
-  Download
+  Download,
+  User,
+  BarChart3,
+  Bot
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -137,7 +140,7 @@ export function CandidateProjectsSection({
 
   // Fonction pour charger toute l'équipe du projet
   const fetchFullTeam = async (projectId: string) => {
-    console.log("🔍 [fetchFullTeam] Chargement équipe pour projet:", projectId);
+    console.log("🔍 [fetchFullTeam] Chargement équipe pour projet:", projectId, "- Timestamp:", new Date().toISOString());
     try {
       const { data: assignments, error } = await supabase
         .from('hr_resource_assignments')
@@ -165,25 +168,62 @@ export function CandidateProjectsSection({
           )
         `)
         .eq('project_id', projectId)
+        .in('booking_status', ['accepted', 'completed']) // Filtrer uniquement les membres confirmés
         .order('created_at', { ascending: true });
-      
-      console.log("📊 [fetchFullTeam] Résultat requête:", { assignments, error });
-      
+
+      console.log("📊 [fetchFullTeam] Résultat requête:", {
+        assignmentsCount: assignments?.length || 0,
+        error: error?.message || error,
+        projectId,
+        timestamp: new Date().toISOString()
+      });
+
       if (error) {
-        console.error("❌ [fetchFullTeam] Erreur chargement équipe:", error);
+        console.error("❌ [fetchFullTeam] Erreur chargement équipe:", {
+          error: error.message || error,
+          projectId,
+          timestamp: new Date().toISOString()
+        });
         setFullTeam([]);
       } else if (assignments && assignments.length > 0) {
-        console.log(`✅ [fetchFullTeam] ${assignments.length} membres trouvés`);
+        console.log(`✅ [fetchFullTeam] ${assignments.length} membres trouvés pour projet ${projectId}`);
 
-        // Les hr_profiles sont déjà inclus dans la requête, plus besoin d'enrichissement
-        console.log("🎯 [fetchFullTeam] Équipe chargée:", assignments);
+        // Debug détaillé de chaque assignment avec validation complète
+        assignments.forEach((assignment, index) => {
+          console.log(`🔍 [fetchFullTeam] Member ${index + 1}:`, {
+            assignment_id: assignment.id,
+            hr_profile: assignment.hr_profiles?.name || 'NO HR PROFILE',
+            is_ai: assignment.hr_profiles?.is_ai || false,
+            candidate_id: assignment.candidate_id,
+            candidate_name: assignment.candidate_profiles ?
+              `${assignment.candidate_profiles.first_name} ${assignment.candidate_profiles.last_name}` :
+              'NO CANDIDATE PROFILE',
+            booking_status: assignment.booking_status,
+            seniority: assignment.seniority,
+            has_hr_profiles: !!assignment.hr_profiles,
+            has_candidate_profiles: !!assignment.candidate_profiles
+          });
+        });
+
+        // Séparation IA et humains pour debug
+        const iaMembers = assignments.filter(a => a.hr_profiles?.is_ai);
+        const humanMembers = assignments.filter(a => !a.hr_profiles?.is_ai);
+        console.log("🤖 [fetchFullTeam] Membres IA:", iaMembers.length, iaMembers.map(a => a.hr_profiles?.name));
+        console.log("👥 [fetchFullTeam] Membres humains:", humanMembers.length, humanMembers.map(a => a.hr_profiles?.name));
+
+        console.log("🎯 [fetchFullTeam] Équipe finale chargée:", assignments.map(a => ({
+          name: a.hr_profiles?.name,
+          isAI: a.hr_profiles?.is_ai,
+          candidate: a.candidate_profiles ? `${a.candidate_profiles.first_name} ${a.candidate_profiles.last_name}` : null
+        })));
         setFullTeam(assignments);
       } else {
-        console.log("⚠️ [fetchFullTeam] Aucun membre d'équipe trouvé");
+        console.log("⚠️ [fetchFullTeam] Aucun membre d'équipe trouvé pour projet:", projectId, "- Vérifier les politiques RLS");
         setFullTeam([]);
       }
     } catch (error) {
       console.error("Erreur inattendue chargement équipe:", error);
+      setFullTeam([]);
     }
   };
 
@@ -678,17 +718,41 @@ export function CandidateProjectsSection({
                   </h3>
                   <div className="space-y-3">
                     {fullTeam.map((assignment, index) => (
-                      <div key={index} className="backdrop-blur-xl bg-neutral-50 dark:bg-neutral-800/90 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700 hover:border-primary-500/50 dark:hover:border-primary-500/50 transition-all duration-300 shadow-sm hover:shadow-md">
-                        <div className="flex items-center justify-between mb-2">
+                      <div key={index} className="backdrop-blur-xl bg-white dark:bg-neutral-800/90 rounded-xl p-6 border border-neutral-200/50 dark:border-neutral-700/50 hover:border-primary-500/50 dark:hover:border-primary-500/50 transition-all duration-300 shadow-lg hover:shadow-xl">
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-4 flex-1">
                             <div>
-                              <span className="font-semibold text-neutral-900 dark:text-white">
-                                {assignment.hr_profiles?.name || 'Poste non défini'}
-                              </span>
-                              <span className="text-neutral-400 dark:text-neutral-500 mx-2">•</span>
-                              <span className="text-neutral-700 dark:text-neutral-300">
-                                {assignment.seniority || 'Séniorité non définie'}
-                              </span>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-neutral-900 dark:text-white">
+                                  {assignment.hr_profiles?.name || 'Poste non défini'}
+                                </span>
+                                {assignment.hr_profiles?.is_ai && (
+                                  <Badge className="bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 text-xs">
+                                    IA
+                                  </Badge>
+                                )}
+                              </div>
+                              {assignment.candidate_profiles && (
+                                <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-1 flex items-center gap-2">
+                                  <User className="w-4 h-4 text-primary-500" />
+                                  <span>{assignment.candidate_profiles.first_name} {assignment.candidate_profiles.last_name}</span>
+                                  {assignment.hr_profiles?.is_ai && (
+                                    <span className="ml-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                                      (Intelligence Artificielle)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {!assignment.candidate_profiles && assignment.hr_profiles?.is_ai && (
+                                <div className="text-sm text-purple-600 dark:text-purple-400 mb-1 flex items-center gap-2">
+                                  <Bot className="w-4 h-4 text-purple-500" />
+                                  <span>Ressource Intelligence Artificielle</span>
+                                </div>
+                              )}
+                              <div className="text-sm text-neutral-600 dark:text-neutral-400 flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-blue-500" />
+                                <span className="capitalize">{assignment.seniority || 'Séniorité non définie'}</span>
+                              </div>
                             </div>
                           </div>
                           {assignment.booking_status === 'accepted' && (

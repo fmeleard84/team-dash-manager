@@ -113,62 +113,93 @@ export const useProjectMembersForMessaging = (projectId: string) => {
               booking_status: assignment.booking_status
             });
             
-            // Avec l'architecture unifiée, les IA ont aussi un candidate_id
-            if (assignment.candidate_id) {
-              // With unified IDs, candidate_id = profiles.id
-              const { data: userProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', assignment.candidate_id)
+            // Get the job title and AI status from hr_profiles first
+            let jobTitle = 'Ressource';
+            let isAI = false;
+            let promptId = undefined;
+
+            if (assignment.profile_id) {
+              console.log('[MESSAGING] Fetching hr_profile for profile_id:', assignment.profile_id);
+              const { data: hrProfile, error: hrError } = await supabase
+                .from('hr_profiles')
+                .select('name, is_ai, prompt_id')
+                .eq('id', assignment.profile_id)
                 .single();
 
+              if (hrError) {
+                console.error('[MESSAGING] Error fetching hr_profile:', hrError);
+              }
+
+              if (hrProfile) {
+                console.log('[MESSAGING] Found hr_profile:', hrProfile);
+                jobTitle = hrProfile.name || 'Ressource';
+                isAI = hrProfile.is_ai || false;
+                promptId = hrProfile.prompt_id;
+                console.log('[MESSAGING] Job title set to:', jobTitle, 'Is AI:', isAI);
+              }
+            }
+
+            // Avec l'architecture unifiée, les IA ont aussi un candidate_id
+            const candidateIdToUse = assignment.candidate_id || assignment.profile_id;
+
+            if (candidateIdToUse) {
+              // For AI, get from candidate_profiles; for humans, get from profiles first then candidate_profiles
+              let userProfile = null;
+              let candidateProfile = null;
+
+              if (isAI) {
+                // For AI, get directly from candidate_profiles
+                const { data: aiProfile } = await supabase
+                  .from('candidate_profiles')
+                  .select('*')
+                  .eq('id', candidateIdToUse)
+                  .single();
+
+                candidateProfile = aiProfile;
+                // For AI, create a mock profiles entry or use existing data
+                userProfile = {
+                  id: candidateIdToUse,
+                  email: aiProfile?.email || '',
+                  first_name: aiProfile?.first_name || 'IA',
+                  user_id: candidateIdToUse
+                };
+              } else {
+                // For humans, get from profiles first
+                const { data: humanProfile } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', candidateIdToUse)
+                  .single();
+
+                userProfile = humanProfile;
+
+                // Also get candidate_profiles data
+                const { data: humanCandidateProfile } = await supabase
+                  .from('candidate_profiles')
+                  .select('*')
+                  .eq('id', candidateIdToUse)
+                  .single();
+
+                candidateProfile = humanCandidateProfile;
+              }
+
               if (userProfile) {
-                // Get the job title and AI status from hr_profiles
-                let jobTitle = 'Ressource';
-                let isAI = false;
-                let promptId = undefined;
-
-                if (assignment.profile_id) {
-                  console.log('[MESSAGING] Fetching hr_profile for profile_id:', assignment.profile_id);
-                  const { data: hrProfile, error: hrError } = await supabase
-                    .from('hr_profiles')
-                    .select('name, is_ai, prompt_id')
-                    .eq('id', assignment.profile_id)
-                    .single();
-
-                  if (hrError) {
-                    console.error('[MESSAGING] Error fetching hr_profile:', hrError);
-                  }
-
-                  if (hrProfile) {
-                    console.log('[MESSAGING] Found hr_profile:', hrProfile);
-                    jobTitle = hrProfile.name || 'Ressource';
-                    isAI = hrProfile.is_ai || false;
-                    promptId = hrProfile.prompt_id;
-                    console.log('[MESSAGING] Job title set to:', jobTitle, 'Is AI:', isAI);
-                  } else {
-                    console.log('[MESSAGING] No hr_profile found for profile_id:', assignment.profile_id);
-                  }
-                } else {
-                  console.log('[MESSAGING] No profile_id in assignment');
-                }
-
                 allMembers.push({
                   id: isAI ? `ia_${userProfile.id}` : userProfile.id,
                   userId: isAI ? `ia_${userProfile.id}` : (userProfile.user_id || userProfile.id),
                   email: userProfile.email,
-                  name: userProfile.first_name || 'Candidat',
-                  firstName: userProfile.first_name,
+                  name: candidateProfile?.first_name || userProfile.first_name || (isAI ? jobTitle : 'Candidat'),
+                  firstName: candidateProfile?.first_name || userProfile.first_name,
                   jobTitle: jobTitle,
                   role: isAI ? 'ia' : 'candidate',
                   isOnline: isAI ? true : false, // Les IA sont toujours "en ligne"
                   isAI: isAI,
                   promptId: promptId
                 });
-                
-                console.log('[MESSAGING] Added candidate:', userProfile.first_name, 'ID:', userProfile.id, 'Job:', jobTitle);
+
+                console.log('[MESSAGING] Added member:', candidateProfile?.first_name || userProfile.first_name, 'ID:', userProfile.id, 'Job:', jobTitle, 'Is AI:', isAI);
               } else {
-                console.error('[MESSAGING] Could not find profile for candidate_id:', assignment.candidate_id);
+                console.error('[MESSAGING] Could not find profile for candidate_id:', candidateIdToUse);
               }
             }
             // Fallback: try to get candidate from profile in assignment
